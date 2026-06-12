@@ -1,18 +1,17 @@
 # ⚓ KubeQuest – Das Hafen-Abenteuer
 
-Ein **2D-Lernspiel** für Kubernetes, Helm und Terraform – von „Helm? Das setzt man doch auf den Kopf?" bis zum souveränen Umgang mit den Profi-Werkzeugen. Du läufst durch die Hafenstadt **Port Kubernia**, löst Quests für die Bewohner:innen und funkst echte Befehle an den Cluster.
+Ein **2D-Lernspiel** (gebaut mit **Phaser 3**) für Docker, Kubernetes, Helm, Terraform und Security-Grundlagen – von „Helm? Das setzt man doch auf den Kopf?" bis zum souveränen Umgang mit den Profi-Werkzeugen. Du läufst durch die Hafenstadt **Port Kubernia**, löst Quests und funkst echte Befehle an den Cluster.
 
-**Das Besondere: Die Spielwelt IST der Cluster.**
+**Die Spielwelt IST der Cluster:**
 
-- Die drei Stege am Dock sind deine **Nodes** – jede Kiste darauf ist ein **Pod**, live aus dem Cluster
-- `kubectl scale --replicas=3` → es erscheinen sichtbar Kisten
-- `kubectl delete pod …` → die Kiste platscht ins Wasser und der Kran stellt sofort Ersatz hin (**Self-Healing zum Zugucken!**)
-- Helm-Releases hissen **Flaggen** an der Werft, Services leuchten als **Laternen**
-- `terraform apply` baut **sichtbar neues Land** ins Meer – und `destroy` reißt es wieder ab
+- Die drei Stege am Dock = **Nodes**, jede Kiste darauf = ein **Pod** (live!)
+- Pod löschen → Kiste platscht ins Wasser, der Kran stellt sofort Ersatz hin (**Self-Healing zum Zugucken**)
+- Helm-Releases hissen **Flaggen**, Services leuchten als **Laternen**, Docker-Container stehen als **Fässer** am Dock
+- `terraform apply` baut **sichtbar neues Land** ins Meer
 
 ## Spielstart
 
-**`index.html` doppelklicken** – fertig. Läuft komplett lokal im Browser, ohne Installation, ohne echtes Cluster. Der Spielstand speichert sich automatisch (localStorage, also immer denselben Browser benutzen).
+**`index.html` doppelklicken** – fertig. Läuft komplett lokal im Browser (die Grafiken sind eingebettet, deshalb braucht auch Phaser keinen Server). Spielstand speichert automatisch im Browser.
 
 | Taste | Aktion |
 |---|---|
@@ -22,49 +21,59 @@ Ein **2D-Lernspiel** für Kubernetes, Helm und Terraform – von „Helm? Das se
 | J | 📜 Logbuch (Questlog) |
 | Esc | Fenster schließen |
 
-## Die Reise (von 0 auf Profi)
+## Lernen in kleinen Schritten
 
-1. **Anheuern** – Funkgerät kennenlernen
-2. **Bo und die genormten Kisten** – Container & Docker (Images, Container, Registry)
-3. **Der Hafen wird ein Cluster** – Kubernetes-Grundlagen (Cluster, Nodes, Pods, kubectl)
-4. **Sturmfeste Kisten** – Deployments & Services (Skalieren, Self-Healing live!)
-5. **Adas Seekarten** – YAML & deklaratives Arbeiten (Manifeste, apply)
-6. **Runas Steuerrad** – Helm (Charts, Releases, values, Upgrade & Rollback)
-7. **Neues Land** – Terraform (Infrastructure as Code: init → plan → apply, State)
+Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
-Dazu: **XP & Ränge** (Landratte → Moses → Deckshand → … → Admiral), **🪙 Dublonen**, ein **Shop** (Hinweis-Fernrohr, Lösungs-Kompass, Haustiere, die dir folgen, Schiffsflaggen) und ein **🔥 Tages-Streak** mit Dublonen-Bonus.
+1. **🆕 Vormachen** – ein NPC erklärt EINEN neuen Befehl (kurz!)
+2. **⌨️ Nachtippen** – du tippst ihn selbst im Funkgerät
+3. **🏋️ Drills** – Zufalls-Varianten („anderes Image, anderer Name, andere Zahl") bis es sitzt
+4. **🤔 Verständnisfrage** – ins Gespräch eingebaut, keine Quiz-Wände
+5. **🦀 Krabbe Kralle** – tägliche Karteikarten (Spaced Repetition), falsch Beantwortetes kommt öfter
 
-**Damit das Wissen bleibt:** Krabbe Kralle 🦀 auf deinem Schiff stellt dir täglich fällige Karteikarten (Spaced Repetition / Leitner-System). Was du verwechselst, kommt öfter – bis es sitzt. Nach den Quests kannst du im Funkgerät jederzeit **frei üben** – die Welt reagiert weiter auf alles.
+Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
+
+**15 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) + Einstieg.
+
+## Spielsysteme
+
+- **🪙 Hafen-Wirtschaft** – laufende Pods und Services verdienen passiv Dublonen (auch offline, gedeckelt). Gesunder Cluster = volle Kasse!
+- **🏴‍☠️ Piraten-Überfälle** – Zufalls-Events: Piraten klauen Pod-Kisten, du stellst den Soll-Zustand unter Zeitdruck wieder her (Incident-Response!). Die Hafen-Kanone aus dem Shop erhöht das Kopfgeld.
+- **🐙 Hacker-Krake** – schnüffelt nach Klartext-Daten; nur ein schnell angelegtes Secret vertreibt sie (Security!)
+- **🎮 Bos Stapel-Spiel** – Docker-Image-Schichten in der richtigen Reihenfolge stapeln (lehrt Layer & Build-Cache)
+- **XP & Ränge** (Landratte → Moses → … → Admiral), Shop mit Haustieren 🐀🦇👻, Schiffsflaggen, Hinweis-Items, 🔥 Tages-Streak
 
 ## Projektstruktur
 
 ```
 kubequest/
-├── index.html       Einstieg (doppelklicken!)
-├── style.css        UI-Design (HUD, Dialoge, Funkgerät, Shop)
-├── assets/          Grafiken: Kenney "Tiny Town" & "Tiny Dungeon" (CC0)
+├── index.html        Einstieg (doppelklicken!)
+├── style.css         UI (HUD, Dialoge, Funkgerät, Shop, Alarm, Minispiel)
+├── assets/           Kenney "Tiny Town" & "Tiny Dungeon" (CC0) + Lizenzen
 ├── js/
-│   ├── sim.js       Cluster-Simulator (docker, kubectl, helm, terraform)
-│   ├── content.js   Quests, Dialoge, NPCs, Ränge, Shop, Karteikarten
-│   ├── game.js      Spielstand, XP, Dublonen, Streak, Spaced Repetition
-│   ├── engine.js    Canvas-Engine (Rendering, Eingabe, Kamera)
-│   ├── world.js     Port Kubernia: Karte, Kollision, Cluster→Welt-Sync
-│   ├── ui.js        Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz
-│   └── main.js      Start & Verdrahtung
-└── test/smoke.js    Test: spielt alle Quest-Aufgaben automatisch durch
+│   ├── phaser.min.js Phaser 3 Engine (MIT-Lizenz, kostenlos)
+│   ├── assets-data.js Spritesheets als Base64 (ermöglicht Doppelklick-Start)
+│   ├── sim.js        Cluster-Simulator (docker, kubectl, helm, terraform, secrets)
+│   ├── content.js    Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
+│   ├── game.js       Spielstand, XP, Wirtschaft, Spaced Repetition
+│   ├── scene.js      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake, Sound
+│   ├── ui.js         Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel
+│   └── main.js       Start & Tastatur
+└── test/smoke.js     Test: spielt alle Quests & Drills automatisch durch
 ```
 
 Test ausführen: `node test/smoke.js`
 
-## Grafiken
+## Lizenzen
 
-Die Pixel-Art stammt aus den Packs **Tiny Town** und **Tiny Dungeon** von [Kenney](https://kenney.nl) – Lizenz **CC0** (public domain), Lizenztexte liegen in `assets/`. Danke, Kenney! 💛
+- **Phaser 3** – MIT-Lizenz (kostenlos, auch kommerziell): https://phaser.io
+- **Grafiken** – „Tiny Town" & „Tiny Dungeon" von [Kenney](https://kenney.nl), **CC0** (public domain). Danke, Kenney! 💛
+- Sounds werden zur Laufzeit synthetisiert (WebAudio) – keine Audio-Dateien nötig.
 
-## Roadmap (Fortsetzung folgt)
+## Roadmap
 
 - **Ingress-Inseln**: Routing & Ingress-Controller
-- **GitOps-Archipel**: Argo CD, Pull-Prinzip, App-of-Apps
+- **GitOps-Archipel**: Argo CD & das Pull-Prinzip
 - **Monitoring-Leuchtturm**: Prometheus, Grafana, Alerts
 - **Werft-Ausbau**: eigene Helm-Charts schreiben
-- **Sturm-Ereignisse**: Live-Incidents (Lastspitze, kaputtes Upgrade) unter Zeitdruck lösen
 - **Echter Modus**: dieselben Quests gegen ein lokales kind/minikube-Cluster

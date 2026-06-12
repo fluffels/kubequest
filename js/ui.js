@@ -1,5 +1,6 @@
-/* ===== KubeQuest 2.0 – UI & Quest-Steuerung =====
- * Dialoge, Funkgerät (Terminal), Shop, Krabben-Quiz, Logbuch, HUD.
+/* ===== KubeQuest 3.0 – UI & Quest-Steuerung =====
+ * Dialoge, Funkgerät (teach/drill/terminal + freies Üben), Shop,
+ * Krabben-Quiz, Stapel-Minispiel, Alarm-Leiste, HUD.
  */
 
 (function () {
@@ -20,26 +21,46 @@
     return a;
   }
 
+  // Spritesheet-Bilder für Porträts (unabhängig von Phaser, geht auch per file://)
+  const sheetImgs = {};
+  for (const key of ["town", "dungeon"]) {
+    const img = new Image();
+    img.src = KQAssets[key];
+    sheetImgs[key] = img;
+  }
+
   const UI = {
-    dialogue: null,   // { npc, lines, idx, choice, onDone }
+    dialogue: null,
     termLog: [],
     review: null,
+    practice: null,   // { npcId, drills, idx, task }
+    _drillTask: null, // aktuelle generierte Drill-Aufgabe des Quest-Schritts
+    stack: null,      // Stapel-Minispiel
+    failCount: 0,
 
-    /* ========== Blockierung (Welt einfrieren?) ========== */
+    drawPortrait(canvas, idx) {
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const img = sheetImgs.dungeon;
+      const sx = (idx % 12) * 16, sy = Math.floor(idx / 12) * 16;
+      if (img.complete) ctx.drawImage(img, sx, sy, 16, 16, 0, 0, canvas.width, canvas.height);
+      else img.addEventListener("load", () => ctx.drawImage(img, sx, sy, 16, 16, 0, 0, canvas.width, canvas.height), { once: true });
+    },
+
+    /* ========== Blockierung ========== */
     blocking() {
       return !!this.dialogue ||
-        !$("overlay-terminal").classList.contains("hidden") ||
-        !$("overlay-quest").classList.contains("hidden") ||
-        !$("overlay-shop").classList.contains("hidden") ||
-        !$("overlay-review").classList.contains("hidden") ||
-        !$("charselect").classList.contains("hidden");
+        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "charselect"]
+          .some(id => !$(id).classList.contains("hidden"));
     },
 
     closeOverlays() {
-      ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review"].forEach(id => $(id).classList.add("hidden"));
+      ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack"].forEach(id => $(id).classList.add("hidden"));
+      if (this.practice && this.practice.idx >= this.practice.drills.length) this.practice = null;
     },
 
-    /* ========== HUD & Toasts ========== */
+    /* ========== HUD, Toasts, Alarm ========== */
     refreshHud() {
       const s = Game.state;
       const rank = Game.rank();
@@ -47,6 +68,8 @@
       $("hud-rankname").textContent = rank.icon + " " + rank.name;
       $("hud-coins").textContent = s.coins;
       $("hud-streak").textContent = s.streak.count;
+      const rate = Game.incomeRate();
+      $("hud-income").textContent = rate > 0 ? "+" + (Math.round(rate * 10) / 10) + "/min" : "";
       if (next) {
         $("hud-xpfill").style.width = Math.min(100, ((s.xp - rank.xp) / (next.xp - rank.xp)) * 100) + "%";
         $("hud-xptext").textContent = s.xp + " / " + next.xp + " XP";
@@ -60,14 +83,14 @@
     refreshQuestHint() {
       const el = $("hud-quest");
       if (Game.allQuestsDone()) {
-        el.innerHTML = "🏅 Grundausbildung geschafft – tägliche Quizrunde bei Krabbe Kralle auf deinem Schiff!";
+        el.innerHTML = "🏅 Grundausbildung geschafft! Halte den Hafen am Laufen – und übe bei der Crew (E → Üben).";
         return;
       }
       const q = Game.currentQuest();
       const step = Game.currentStep();
       if (!q || !step) { el.textContent = ""; return; }
-      if (step.type === "terminal") {
-        el.innerHTML = "📜 <b>" + q.title + "</b> – 📻 Öffne dein Funkgerät (<b>T</b>)!";
+      if (Game.isFunkStep(step)) {
+        el.innerHTML = "📜 <b>" + q.title + "</b> – 📻 Funkgerät öffnen (<b>T</b>)!";
       } else {
         const npc = KQContent.NPCS[step.npc];
         el.innerHTML = "📜 <b>" + q.title + "</b> – Sprich mit <b>" + npc.name + "</b> (" + npc.title + ")";
@@ -79,7 +102,7 @@
       t.className = "toast" + (cls ? " " + cls : "");
       t.innerHTML = msg;
       $("toasts").appendChild(t);
-      setTimeout(() => t.remove(), 4000);
+      setTimeout(() => t.remove(), 4200);
     },
 
     reward(xp, coins, label) {
@@ -89,15 +112,29 @@
       if (realCoins > 0) msg += " · +" + realCoins + " 🪙";
       if (label) msg = label + " " + msg;
       this.toast(msg);
+      if (window.SFX) SFX.coin();
       if (rankUp) {
         const r = Game.rank();
         this.toast("🎉 <b>Beförderung!</b> Du bist jetzt <b>" + r.icon + " " + r.name + "</b>!", "rankup");
-        World.burst(World.player.x, World.player.y - 10, "#ffc857", 18);
+        if (window.SFX) SFX.fanfare();
+        if (window.WorldScene) WorldScene.burstAtPlayer("sparkle");
       }
       this.refreshHud();
     },
 
-    /* ========== Interaktion in der Welt ========== */
+    showAlarm(html, seconds) {
+      $("alarm").classList.remove("hidden");
+      $("alarm-text").innerHTML = html;
+      $("alarm-timer").textContent = seconds + "s";
+    },
+    updateAlarmTimer(seconds) {
+      $("alarm-timer").textContent = seconds + "s";
+    },
+    hideAlarm() {
+      $("alarm").classList.add("hidden");
+    },
+
+    /* ========== Interaktion ========== */
     questMarkerFor(npcId) {
       const step = Game.currentStep();
       return !!(step && (step.type === "dialog" || step.type === "choice") && step.npc === npcId);
@@ -105,32 +142,74 @@
 
     updatePrompt() {
       const p = $("prompt");
-      if (this.blocking()) { p.classList.add("hidden"); return; }
-      const near = World.nearestInteractable();
+      if (this.blocking() || !window.WorldScene) { p.classList.add("hidden"); return; }
+      const near = WorldScene.nearestNpc();
       if (!near) { p.classList.add("hidden"); return; }
-      const n = near.npc;
-      let label = "💬 Mit " + n.name + " reden";
-      if (n.id === "pelle") label = "🛒 Bei Pelle einkaufen";
-      if (n.id === "kralle") label = "🦀 Quizrunde mit Kralle";
+      const meta = KQContent.NPCS[near.id];
+      let label = "💬 Mit " + meta.name + " reden";
+      if (near.id === "pelle") label = "🛒 Bei Pelle einkaufen";
+      if (near.id === "kralle") label = "🦀 Quizrunde mit Kralle";
       p.innerHTML = "<b>E</b> – " + label;
       p.classList.remove("hidden");
     },
 
     interact() {
-      const near = World.nearestInteractable();
+      if (!window.WorldScene) return;
+      const near = WorldScene.nearestNpc();
       if (!near) return;
-      const npc = near.npc;
-      if (npc.id === "pelle") return this.openShop();
-      if (npc.id === "kralle") return this.openReview();
+      const npcId = near.id;
+      if (npcId === "pelle") return this.openShop();
+      if (npcId === "kralle") return this.openReview();
 
       const step = Game.currentStep();
-      if (step && (step.type === "dialog" || step.type === "choice") && step.npc === npc.id) {
-        this.runQuestStep();
-      } else {
-        // Smalltalk
-        const lines = KQContent.SMALLTALK[npc.id] || ["…"];
-        this.showDialogue(npc.id, [lines[Math.floor(Math.random() * lines.length)]]);
+      if (step && (step.type === "dialog" || step.type === "choice") && step.npc === npcId) {
+        return this.runQuestStep();
       }
+      this.showNpcMenu(npcId);
+    },
+
+    /** Menü: Plaudern / Üben / Stapel-Spiel */
+    showNpcMenu(npcId) {
+      const drills = Game.practiceDrillsFor(npcId);
+      const stackOk = npcId === "bo" && Game.state.completedQuests.includes("q2");
+      if (drills.length === 0 && !stackOk) {
+        const lines = KQContent.SMALLTALK[npcId] || ["…"];
+        return this.showDialogue(npcId, [lines[Math.floor(Math.random() * lines.length)]]);
+      }
+      const npc = KQContent.NPCS[npcId];
+      this.dialogue = { npcId, lines: [], idx: 0, choice: { menu: true }, onDone: null };
+      $("dlg-name").textContent = npc.name + " · " + npc.title;
+      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
+      $("dlg-text").innerHTML = "Was kann ich für dich tun?";
+      $("dlg-next").classList.add("hidden");
+      const box = $("dlg-choices");
+      box.innerHTML = "";
+      const addBtn = (label, fn) => {
+        const b = document.createElement("button");
+        b.innerHTML = label;
+        b.onclick = fn;
+        box.appendChild(b);
+      };
+      addBtn("💬 Plaudern", () => {
+        const lines = KQContent.SMALLTALK[npcId] || ["…"];
+        this.closeDialogue();
+        this.showDialogue(npcId, [lines[Math.floor(Math.random() * lines.length)]]);
+      });
+      if (drills.length > 0) addBtn("🏋️ Üben – 3 Aufgaben (gibt 🪙!)", () => {
+        this.closeDialogue();
+        this.startPractice(npcId);
+      });
+      if (stackOk) addBtn("🎮 Stapel-Spiel (Image-Schichten)", () => {
+        this.closeDialogue();
+        this.openStackGame();
+      });
+      addBtn("Nichts, schönen Tag! ⚓", () => this.closeDialogue());
+      $("dialogue").classList.remove("hidden");
+    },
+
+    closeDialogue() {
+      this.dialogue = null;
+      $("dialogue").classList.add("hidden");
     },
 
     /* ========== Quest-Maschine ========== */
@@ -138,48 +217,39 @@
       const step = Game.currentStep();
       if (!step) return;
       if (step.type === "dialog") {
-        this.showDialogue(step.npc, step.lines, () => {
-          this.afterStep();
-        });
+        this.showDialogue(step.npc, step.lines, () => this.afterStep());
       } else if (step.type === "choice") {
-        this.showChoice(step, () => {
-          this.afterStep();
-        });
+        this.showChoice(step, () => this.afterStep());
       }
     },
 
     afterStep() {
       const result = Game.advanceStep() || {};
+      this._drillTask = null;
       if (result.questDone) {
         const q = result.questDone;
         Game.registerQuestCards(q.id);
         this.reward(q.rewardXp, q.rewardCoins, "🏁 Quest „" + q.title + "“ abgeschlossen!");
-        World.burst(World.player.x, World.player.y - 8, "#6fdc8c", 16);
-        Game.state.taskIdx = 0;
-        Game.save();
-        this.refreshHud();
+        if (window.WorldScene) WorldScene.burstAtPlayer("sparkle");
         return;
       }
       const next = Game.currentStep();
       if (!next) return;
-      if (next.type === "terminal") {
-        Game.state.taskIdx = 0;
-        if (next.scenario) Game.sim.mergeScenario(next.scenario);
-        Game.save();
+      if (Game.isFunkStep(next)) {
+        if (next.scenario) { Game.sim.mergeScenario(next.scenario); Game.save(); }
         this.refreshHud();
-      } else if (next.type === "dialog" || next.type === "choice") {
-        // Direkt weiterreden (gleicher Gesprächsfluss)
+      } else {
         this.refreshHud();
         if (!this.dialogue) this.runQuestStep();
       }
     },
 
-    /* ========== Dialog-Anzeige ========== */
+    /* ========== Dialog ========== */
     showDialogue(npcId, lines, onDone) {
       const npc = KQContent.NPCS[npcId];
       this.dialogue = { npcId, lines, idx: 0, onDone, choice: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      Engine.drawPortrait($("dlg-portrait-canvas"), "dungeon", npc.sprite);
+      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
       $("dlg-choices").innerHTML = "";
       $("dialogue").classList.remove("hidden");
       this.renderDialogueLine();
@@ -199,8 +269,7 @@
       if (d.idx < d.lines.length) {
         this.renderDialogueLine();
       } else {
-        this.dialogue = null;
-        $("dialogue").classList.add("hidden");
+        this.closeDialogue();
         if (d.onDone) d.onDone();
       }
     },
@@ -209,7 +278,7 @@
       const npc = KQContent.NPCS[step.npc];
       this.dialogue = { npcId: step.npc, lines: [], idx: 0, onDone, choice: step };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      Engine.drawPortrait($("dlg-portrait-canvas"), "dungeon", npc.sprite);
+      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
       $("dlg-text").innerHTML = "🤔 " + step.q;
       $("dlg-next").classList.add("hidden");
       const box = $("dlg-choices");
@@ -233,16 +302,16 @@
       });
       Game.choiceResult(step.reviewId, opt.ok);
       if (opt.ok) this.reward(12, 6);
+      else if (window.SFX) SFX.wrong();
       $("dlg-text").innerHTML = (opt.ok ? "✅ " : "❌ ") + opt.reply;
       $("dlg-next").textContent = "✔ weiter (E)";
       $("dlg-next").classList.remove("hidden");
-      // E schließt jetzt den Dialog ab (letzte „Zeile“ erreicht)
       d.choice = null;
       d.lines = [""];
       d.idx = 0;
     },
 
-    /* ========== Funkgerät / Terminal ========== */
+    /* ========== Funkgerät ========== */
     toggleTerminal() {
       const ov = $("overlay-terminal");
       if (!ov.classList.contains("hidden")) { this.closeOverlays(); return; }
@@ -253,33 +322,81 @@
       $("term-input").focus();
     },
 
-    currentTerminalStep() {
+    /** Aktive Funk-Session: practice > Quest-Schritt > frei */
+    funkSession() {
+      if (this.practice && this.practice.idx < this.practice.drills.length) return { kind: "practice" };
       const step = Game.currentStep();
-      return step && step.type === "terminal" ? step : null;
+      if (Game.isFunkStep(step)) return { kind: "quest", step };
+      return { kind: "free" };
+    },
+
+    /** Aktuelle Aufgabe der Session (Drills werden hier lazily erzeugt). */
+    currentTask() {
+      const s = this.funkSession();
+      if (s.kind === "practice") {
+        const p = this.practice;
+        if (!p.task) p.task = KQContent.DRILLS[p.drills[p.idx]](Game.sim);
+        return p.task;
+      }
+      if (s.kind === "quest") {
+        const step = s.step;
+        if (step.type === "drill") {
+          if ((Game.state.taskIdx || 0) >= step.count) return null;
+          if (!this._drillTask) this._drillTask = KQContent.DRILLS[step.pool[Math.floor(Math.random() * step.pool.length)]](Game.sim);
+          return this._drillTask;
+        }
+        const tasks = Game.stepTasks(step);
+        return tasks[Game.state.taskIdx || 0] || null;
+      }
+      return null;
     },
 
     renderTermTasks() {
       const box = $("term-tasks");
-      const step = this.currentTerminalStep();
       const actions = $("term-actions");
-      if (!step) {
+      const s = this.funkSession();
+
+      if (s.kind === "free") {
         box.innerHTML = `<div class="tt-head">🧪 Freies Funken</div>
           <div class="dim">Gerade kein Auftrag – probier aus, was du gelernt hast!
           Alles, was du hier anrichtest, siehst du draußen in der Welt.
-          <br><br>Mit <code>help</code> siehst du alle Befehle.</div>
+          <br><br>Mit <code>help</code> siehst du alle Befehle.
+          <br><br>💡 Übungs-Aufgaben mit Belohnung bekommst du bei der Crew: ansprechen → „Üben“.</div>
           <div id="tt-feedback"></div>`;
         actions.innerHTML = "";
         return;
       }
-      const taskIdx = Game.state.taskIdx || 0;
-      const q = Game.currentQuest();
-      let html = `<div class="tt-head">📜 ${q.title}: ${step.brief}</div>`;
-      step.tasks.forEach((t, i) => {
-        const cls = i < taskIdx ? "done" : i === taskIdx ? "current" : "";
-        const mark = i < taskIdx ? "✅" : i === taskIdx ? "▶️" : "·";
-        html += `<div class="tt-item ${cls}">${mark} ${i === taskIdx || i < taskIdx ? t.text : "???"}</div>`;
-      });
-      html += `<div id="tt-feedback"></div>`;
+
+      let html = "";
+      const task = this.currentTask();
+
+      if (s.kind === "practice") {
+        const p = this.practice;
+        const npc = KQContent.NPCS[p.npcId];
+        html += `<div class="tt-head">🏋️ Üben bei ${npc.name} (${Math.min(p.idx + 1, p.drills.length)}/${p.drills.length})</div>`;
+        if (task) html += `<div class="tt-item current">▶️ ${task.text}</div>`;
+        html += `<div id="tt-feedback"></div>`;
+      } else {
+        const step = s.step;
+        const q = Game.currentQuest();
+        html += `<div class="tt-head">📜 ${q.title}: ${step.brief}</div>`;
+        if (step.type === "teach") {
+          html += `<div class="tt-new">${step.cmd.intro}</div>`;
+          html += `<div class="tt-item current">▶️ ${step.cmd.text}</div>`;
+        } else if (step.type === "drill") {
+          html += `<div class="dim" style="margin-bottom:8px">${step.intro}</div>`;
+          html += `<div class="dim">Übung ${Math.min((Game.state.taskIdx || 0) + 1, step.count)} von ${step.count}</div>`;
+          if (task) html += `<div class="tt-item current">▶️ ${task.text}</div>`;
+        } else {
+          const taskIdx = Game.state.taskIdx || 0;
+          step.tasks.forEach((t, i) => {
+            const cls = i < taskIdx ? "done" : i === taskIdx ? "current" : "";
+            const mark = i < taskIdx ? "✅" : i === taskIdx ? "▶️" : "·";
+            html += `<div class="tt-item ${cls}">${mark} ${i <= taskIdx ? t.text : "???"}</div>`;
+          });
+        }
+        html += `<div id="tt-feedback"></div>`;
+      }
       box.innerHTML = html;
 
       const fernrohr = Game.state.inventory["fernrohr"] || 0;
@@ -287,7 +404,7 @@
       actions.innerHTML = `
         <button onclick="UI.termHint()">🔭 Hinweis ${fernrohr > 0 ? "(Fernrohr: " + fernrohr + ")" : "(25 🪙)"}</button>
         <button onclick="UI.termSolution()">🧭 Lösung ${kompass > 0 ? "(Kompass: " + kompass + ")" : "(50 🪙)"}</button>
-        <span class="dim" style="align-self:center">Tipp: selbst tippen statt kopieren – das Tippen ist das Training!</span>`;
+        <span class="dim" style="align-self:center">Selbst tippen statt kopieren – das Tippen ist das Training!</span>`;
     },
 
     termRedraw() {
@@ -310,61 +427,93 @@
       Game.state.stats.commands++;
       Game.save();
 
-      const step = this.currentTerminalStep();
-      if (!step) return;
-      const taskIdx = Game.state.taskIdx || 0;
-      const task = step.tasks[taskIdx];
+      const task = this.currentTask();
       if (!task) return;
       const norm = line.trim().replace(/\s+/g, " ");
       const cmdOk = task.accept.some(re => re.test(norm));
       const checkOk = !task.check || task.check(Game.sim);
 
       if (cmdOk && !result.error && checkOk) {
-        this.reward(15, 8);
-        Game.state.taskIdx = taskIdx + 1;
-        Game.save();
-        if (Game.state.taskIdx >= step.tasks.length) {
-          this.reward(20, 12, "📻 Auftrag erledigt!");
-          this.afterTerminalStep();
-        } else {
-          this.renderTermTasks();
-          const fb = $("tt-feedback");
-          if (fb) fb.innerHTML = '<div class="tt-feedback">✅ Stark! Nächste Aufgabe ⤴</div>';
-        }
+        this.failCount = 0;
+        if (window.SFX) SFX.success();
+        this.taskSolved();
       } else {
-        this.failCount = (this.failCount || 0) + 1;
+        this.failCount++;
         if (this.failCount >= 3) {
           this.failCount = 0;
           const fb = $("tt-feedback");
-          if (fb) fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft!</div>';
+          if (fb) fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft – das ist keine Schande!</div>';
         }
       }
     },
 
-    afterTerminalStep() {
-      // Terminal-Schritt der Quest abgeschlossen
+    taskSolved() {
+      const s = this.funkSession();
+
+      if (s.kind === "practice") {
+        const p = this.practice;
+        this.reward(8, 6);
+        p.idx++; p.task = null;
+        if (p.idx >= p.drills.length) {
+          this.reward(10, 10, "🏋️ Übungsrunde geschafft!");
+          this.practice = null;
+        }
+        this.renderTermTasks();
+        const fb = $("tt-feedback");
+        if (fb && this.practice) fb.innerHTML = '<div class="tt-feedback">✅ Stark! Nächste Übung ⤴</div>';
+        else if (fb) fb.innerHTML = '<div class="tt-feedback">🎉 Runde komplett! Komm jederzeit wieder – Übung füllt den Beutel.</div>';
+        return;
+      }
+
+      // Quest-Schritt
+      const step = s.step;
+      this.reward(12, 7);
+      if (step.type === "drill") {
+        this._drillTask = null;
+        Game.state.taskIdx = (Game.state.taskIdx || 0) + 1;
+        Game.save();
+        if (Game.state.taskIdx >= step.count) return this.finishFunkStep();
+      } else if (step.type === "teach") {
+        return this.finishFunkStep();
+      } else {
+        Game.state.taskIdx = (Game.state.taskIdx || 0) + 1;
+        Game.save();
+        if (Game.state.taskIdx >= step.tasks.length) return this.finishFunkStep();
+      }
+      this.renderTermTasks();
+      const fb = $("tt-feedback");
+      if (fb) fb.innerHTML = '<div class="tt-feedback">✅ Stark! Weiter ⤴</div>';
+    },
+
+    finishFunkStep() {
       const result = Game.advanceStep() || {};
+      this._drillTask = null;
       if (result.questDone) {
         const q = result.questDone;
         Game.registerQuestCards(q.id);
         this.reward(q.rewardXp, q.rewardCoins, "🏁 Quest „" + q.title + "“ abgeschlossen!");
+      } else {
+        this.reward(10, 6, "📻 Auftrag erledigt!");
       }
-      Game.state.taskIdx = 0;
-      Game.save();
+      const next = Game.currentStep();
+      if (next && Game.isFunkStep(next)) {
+        if (next.scenario) { Game.sim.mergeScenario(next.scenario); Game.save(); }
+      }
       this.renderTermTasks();
       this.refreshHud();
-      const next = Game.currentStep();
-      if (next && (next.type === "dialog" || next.type === "choice")) {
-        const npc = KQContent.NPCS[next.npc];
-        const fb = $("tt-feedback");
-        if (fb) fb.innerHTML = `<div class="tt-feedback">🎉 Geschafft! <b>${npc.name}</b> will dich sprechen. (Esc schließt das Funkgerät)</div>`;
+      const fb = $("tt-feedback");
+      if (fb) {
+        if (next && !Game.isFunkStep(next) && next.npc) {
+          const npc = KQContent.NPCS[next.npc];
+          fb.innerHTML = `<div class="tt-feedback">🎉 Geschafft! <b>${npc.name}</b> will dich sprechen. (Esc schließt das Funkgerät)</div>`;
+        } else if (next && Game.isFunkStep(next)) {
+          fb.innerHTML = `<div class="tt-feedback">🎉 Weiter geht's direkt hier ⤴</div>`;
+        }
       }
     },
 
     termHint() {
-      const step = this.currentTerminalStep();
-      if (!step) return;
-      const task = step.tasks[Game.state.taskIdx || 0];
+      const task = this.currentTask();
       if (!task) return;
       if (!Game.useConsumable("fernrohr") && !Game.spendCoins(25)) {
         this.toast("Nicht genug Dublonen für einen Hinweis! 🪙");
@@ -377,9 +526,7 @@
     },
 
     termSolution() {
-      const step = this.currentTerminalStep();
-      if (!step) return;
-      const task = step.tasks[Game.state.taskIdx || 0];
+      const task = this.currentTask();
       if (!task) return;
       if (!Game.useConsumable("kompass") && !Game.spendCoins(50)) {
         this.toast("Nicht genug Dublonen für die Lösung! 🪙");
@@ -391,6 +538,83 @@
       if (fb) fb.innerHTML = '<div class="tt-feedback">🧭 <b>Lösung:</b> <code>' + esc(task.solution) + "</code> – selbst eintippen!</div>";
     },
 
+    /* ========== Üben ========== */
+    startPractice(npcId) {
+      const available = Game.practiceDrillsFor(npcId);
+      const drills = [];
+      for (let i = 0; i < 3; i++) drills.push(available[Math.floor(Math.random() * available.length)]);
+      this.practice = { npcId, drills, idx: 0, task: null };
+      this.toggleTerminal();
+    },
+
+    /* ========== Stapel-Minispiel ========== */
+    openStackGame() {
+      this.closeOverlays();
+      $("overlay-stack").classList.remove("hidden");
+      this.stack = { round: 0, score: 0 };
+      this.renderStackRound();
+    },
+
+    renderStackRound() {
+      const st = this.stack;
+      const rounds = KQContent.STACK_ROUNDS;
+      if (st.round >= rounds.length) {
+        const coins = 5 * st.score;
+        if (st.score > (Game.state.stats.stackBest || 0)) Game.state.stats.stackBest = st.score;
+        Game.save();
+        this.reward(15, coins, "🎮 Stapel-Spiel beendet!");
+        $("stack-body").innerHTML = `<div style="text-align:center">
+          <div style="font-size:3em">📦</div>
+          <h2>${st.score} von ${rounds.reduce((s, r) => s + r.layers.length, 0)} Schichten ohne Fehler!</h2>
+          <p class="dim">Merke: Ein Image ist ein <b>Schichtstapel</b>. Unten die Basis (ändert sich selten = bleibt im Cache),
+          oben dein Code (ändert sich oft). Gute Reihenfolge = schnelle Builds!</p>
+          <button class="primary" onclick="UI.closeOverlays()">Zurück zu Bo</button></div>`;
+        this.stack = null;
+        return;
+      }
+      const round = rounds[st.round];
+      st.target = round.layers;
+      st.placed = 0;
+      let html = `<p><b>Runde ${st.round + 1}/${rounds.length}: ${round.name}</b> –
+        Bo ruft die Schichten durcheinander. Stapel sie in der <b>richtigen Reihenfolge</b>: unten anfangen (Basis zuerst)!</p>
+        <div class="stack-area"><div class="stack-pile" id="stack-pile"></div>
+        <div class="stack-choices" id="stack-choices"></div></div>`;
+      $("stack-body").innerHTML = html;
+      const choices = $("stack-choices");
+      for (const layer of shuffled(round.layers)) {
+        const b = document.createElement("button");
+        b.textContent = "📦 " + layer;
+        b.onclick = () => this.placeLayer(layer, b);
+        choices.appendChild(b);
+      }
+    },
+
+    placeLayer(layer, btn) {
+      const st = this.stack;
+      if (!st) return;
+      if (layer === st.target[st.placed]) {
+        st.placed++; st.score++;
+        btn.remove();
+        const div = document.createElement("div");
+        div.className = "stack-layer";
+        div.textContent = "📦 " + layer;
+        $("stack-pile").prepend(div);
+        if (window.SFX) SFX.success();
+        if (st.placed >= st.target.length) {
+          st.round++;
+          setTimeout(() => this.renderStackRound(), 700);
+        }
+      } else {
+        st.score = Math.max(0, st.score - 1);
+        btn.classList.add("wrong");
+        setTimeout(() => btn.classList.remove("wrong"), 400);
+        if (window.SFX) SFX.wrong();
+        const expected = st.placed === 0 ? "der Basis (FROM …)" : "der nächsten Schicht über „" + st.target[st.placed - 1].split(" (")[0] + "“";
+        $("stack-pile").insertAdjacentHTML("beforebegin", "");
+        this.toast("❌ Nicht ganz – wir sind bei " + expected + ".");
+      }
+    },
+
     /* ========== Logbuch ========== */
     openQuestLog() {
       this.closeOverlays();
@@ -400,7 +624,7 @@
       KQContent.QUESTS.forEach((q, i) => {
         const done = s.completedQuests.includes(q.id);
         const active = i === s.questIdx;
-        if (!done && !active) return; // Zukünftiges bleibt geheim
+        if (!done && !active) return;
         html += `<div class="ql-quest ${done ? "done" : ""}">
           <div class="ql-title">${done ? "✅" : "▶️"} ${q.title}</div>
           ${active ? `<div>${this.hintForStep()}</div>` : ""}
@@ -408,11 +632,13 @@
       });
       if (Game.allQuestsDone()) {
         html += `<div class="ql-quest"><div class="ql-title">🏅 Grundausbildung abgeschlossen!</div>
-          <div>Halte dein Wissen mit Krabbe Kralle frisch. Gerüchte über neue Inseln (Ingress, GitOps, Monitoring …) machen die Runde – Fortsetzung folgt!</div></div>`;
+          <div>Der Hafen verdient jetzt für dich – aber Piraten 🏴‍☠️ und die Krake 🐙 lauern.
+          Übe bei der Crew, spiele Bos Stapel-Spiel und halte den Streak! Neue Inseln (Ingress, GitOps …) in Arbeit.</div></div>`;
       }
       const r = Game.rank();
-      html += `<div class="ql-stats">Rang: ${r.icon} ${r.name} · ${s.xp} XP · 🪙 ${s.coins} · 🔥 Streak: ${s.streak.count} Tag(e)<br>
-        Befehle gefunkt: ${s.stats.commands} · Quizfragen richtig: ${s.stats.quizRight} · Quizrunden: ${s.stats.reviews}<br>
+      const rate = Math.round(Game.incomeRate() * 10) / 10;
+      html += `<div class="ql-stats">Rang: ${r.icon} ${r.name} · ${s.xp} XP · 🪙 ${s.coins} (+${rate}/min) · 🔥 Streak: ${s.streak.count}<br>
+        Befehle gefunkt: ${s.stats.commands} · Quiz richtig: ${s.stats.quizRight} · Piraten vertrieben: ${s.stats.piratesBeaten} · Kraken vertrieben: ${s.stats.krakenBeaten}<br>
         <button class="linklike" style="margin-top:8px" onclick="UI.resetGame()">Spielstand zurücksetzen</button></div>`;
       $("quest-body").innerHTML = html;
     },
@@ -420,7 +646,7 @@
     hintForStep() {
       const step = Game.currentStep();
       if (!step) return "";
-      if (step.type === "terminal") return "📻 Öffne dein Funkgerät (T) und erledige die Aufgaben.";
+      if (Game.isFunkStep(step)) return "📻 Öffne dein Funkgerät (T) und erledige die Aufgaben.";
       const npc = KQContent.NPCS[step.npc];
       return "💬 Sprich mit <b>" + npc.name + "</b> (" + npc.title + ").";
     },
@@ -430,7 +656,8 @@
       this.closeOverlays();
       $("overlay-shop").classList.remove("hidden");
       const s = Game.state;
-      let html = `<p class="dim">„Willkommen! Frische Ware, faire Preise!“ – Du hast <b>${s.coins} 🪙</b>. Dein 🔥 Streak (${s.streak.count}) gibt bis zu +50% auf alle Einnahmen.</p>
+      let html = `<p class="dim">„Willkommen! Frische Ware, faire Preise!“ – Du hast <b>${s.coins} 🪙</b>.
+        Dein 🔥 Streak (${s.streak.count}) gibt bis zu +50% auf Belohnungen, dein Hafen verdient +${Math.round(Game.incomeRate() * 10) / 10}/min.</p>
         <div class="shop-grid">`;
       for (const item of KQContent.SHOP) {
         const ownedCount = s.inventory[item.id] || 0;
@@ -440,10 +667,14 @@
           action = `<button class="primary" onclick="UI.buyItem('${item.id}')">Kaufen – ${item.price} 🪙</button>
             ${ownedCount > 0 ? `<div class="si-owned">Im Beutel: ${ownedCount}</div>` : ""}`;
         } else if (ownedPerm) {
-          const active = s.activePet === item.id || s.activeFlag === item.id;
-          action = active
-            ? `<button onclick="UI.toggleItem('${item.id}', false)">✅ Aktiv – abschalten</button>`
-            : `<button onclick="UI.toggleItem('${item.id}', true)">Aktivieren</button>`;
+          if (item.type === "upgrade") {
+            action = `<div class="si-owned">✅ Installiert</div>`;
+          } else {
+            const active = s.activePet === item.id || s.activeFlag === item.id;
+            action = active
+              ? `<button onclick="UI.toggleItem('${item.id}', false)">✅ Aktiv – abschalten</button>`
+              : `<button onclick="UI.toggleItem('${item.id}', true)">Aktivieren</button>`;
+          }
         } else {
           action = `<button class="primary" onclick="UI.buyItem('${item.id}')">Kaufen – ${item.price} 🪙</button>`;
         }
@@ -460,13 +691,14 @@
       html += "</div>";
       $("shop-body").innerHTML = html;
       document.querySelectorAll("#shop-body canvas[data-sprite]").forEach(cv => {
-        Engine.drawPortrait(cv, "dungeon", parseInt(cv.dataset.sprite, 10));
+        this.drawPortrait(cv, parseInt(cv.dataset.sprite, 10));
       });
     },
 
     buyItem(itemId) {
       const result = Game.buy(itemId);
       this.toast(result.ok ? "🛒 " + result.msg : "⚠️ " + result.msg);
+      if (result.ok && window.SFX) SFX.coin();
       this.refreshHud();
       this.openShop();
     },
@@ -479,7 +711,7 @@
       this.openShop();
     },
 
-    /* ========== Krabben-Quiz (Spaced Repetition) ========== */
+    /* ========== Krabben-Quiz ========== */
     openReview() {
       this.closeOverlays();
       $("overlay-review").classList.remove("hidden");
@@ -570,6 +802,7 @@
       const r = this.review;
       Game.reviewResult(r.current.itemId, correct);
       if (correct) { r.right++; this.reward(4, 3); }
+      else if (window.SFX) SFX.wrong();
       $("review-explain").innerHTML = `
         <div class="quiz-explain">${correct ? "✅ <b>Richtig!</b> Schnipp-schnapp-applaus! 🦀" : "❌ <b>Nicht ganz.</b>"} ${explainHtml}</div>
         <div class="actions"><button class="primary" onclick="UI.nextReviewItem()">Weiter ➡️</button></div>`;

@@ -1,13 +1,24 @@
-/* ===== KubeQuest 2.0 – Spiel-Logik =====
- * Spielstand, XP/Ränge, Dublonen, Streak, Shop, Quest-Fortschritt
- * und Spaced Repetition (Leitner-System). Alles in localStorage.
+/* ===== KubeQuest 3.0 – Spiel-Logik =====
+ * Spielstand, XP/Ränge, Dublonen, Hafen-Wirtschaft, Streak, Shop,
+ * Quest-Fortschritt und Spaced Repetition. Alles in localStorage.
  */
 
 (function () {
   "use strict";
 
-  const SAVE_KEY = "kubequest-save-v2";
+  const SAVE_KEY = "kubequest-save-v3";
   const BOX_INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+
+  // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
+  const EXTRA_CARDS = {
+    q3: ["q-ch1-3", "q-ch1-5"],
+    q4: ["q-ch2-1", "q-ch2-4"],
+    q7: ["q-ch3-2"],
+    q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3"],
+    q10: ["q-ch5-3"],
+    q13: ["q-ch6-1", "q-ch6-4"],
+    q14: ["q-sec-2"],
+  };
 
   function today() {
     const now = new Date();
@@ -16,25 +27,28 @@
 
   const Game = {
     state: null,
-    sim: null, // die eine, dauerhafte Cluster-Welt
+    sim: null,
+    incomeAcc: 0,
 
     defaultState() {
       return {
         xp: 0,
         coins: 40,
-        character: null,          // Sprite-Index, bei Spielstart gewählt
-        player: { x: 0, y: 0 },   // Position (Welt-Pixel), 0 = Spawn benutzen
-        questIdx: 0,              // Index in KQContent.QUESTS
-        questStep: 0,             // Schritt innerhalb der Quest
+        character: null,
+        player: { x: 0, y: 0 },
+        questIdx: 0,
+        questStep: 0,
+        taskIdx: 0,
         completedQuests: [],
-        inventory: {},            // consumables: id -> Anzahl
-        owned: [],                // pets/flaggen
+        inventory: {},
+        owned: [],
         activePet: null,
         activeFlag: null,
-        review: {},               // itemId -> { box, due }
+        review: {},
         streak: { count: 0, lastDay: 0 },
-        stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0 },
-        clusterSnapshot: null,    // gespeicherter Sim-Zustand
+        stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
+        lastSeen: 0,
+        clusterSnapshot: null,
       };
     },
 
@@ -46,34 +60,60 @@
         this.state = this.defaultState();
       }
       this.sim = new KQSim(this.state.clusterSnapshot || {});
-      // Szenarien aller bereits erreichten Terminal-Schritte wieder einmischen
-      // (Dateien & applyEffects stecken nicht komplett im Snapshot)
+      // Szenarien bereits erreichter Funk-Schritte wieder einmischen
       for (let qi = 0; qi <= Math.min(this.state.questIdx, KQContent.QUESTS.length - 1); qi++) {
         const quest = KQContent.QUESTS[qi];
         quest.steps.forEach((step, si) => {
-          if (step.type === "terminal" && step.scenario &&
-              (qi < this.state.questIdx || si <= this.state.questStep)) {
+          if (step.scenario && (qi < this.state.questIdx || si <= this.state.questStep)) {
             const sc = Object.assign({}, step.scenario);
-            if (this.state.clusterSnapshot) delete sc.deployments; // schon im Snapshot enthalten
+            if (this.state.clusterSnapshot) delete sc.deployments;
             this.sim.mergeScenario(sc);
           }
         });
       }
       this.touchStreak();
+      // Offline-Einnahmen: dein Hafen hat weitergearbeitet (max. 4 Stunden, halber Satz)
+      this.offlineEarnings = 0;
+      if (this.state.lastSeen) {
+        const minutes = Math.min(240, (Date.now() - this.state.lastSeen) / 60000);
+        this.offlineEarnings = Math.floor(minutes * this.incomeRate() * 0.5);
+        if (this.offlineEarnings > 0) this.state.coins += this.offlineEarnings;
+      }
       this.save();
     },
 
     save() {
       if (this.sim) this.state.clusterSnapshot = this.sim.snapshot();
-      if (window.World && World.player && World.player.x) {
-        this.state.player = { x: World.player.x, y: World.player.y };
+      if (window.WorldScene && WorldScene.player) {
+        this.state.player = { x: WorldScene.player.x, y: WorldScene.player.y };
       }
+      this.state.lastSeen = Date.now();
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
     },
 
     reset() {
       localStorage.removeItem(SAVE_KEY);
       this.load();
+    },
+
+    /* ---------- Hafen-Wirtschaft ---------- */
+    /** Dublonen pro Minute: jede Pod-Kopie 0.5, jeder Service 1. */
+    incomeRate() {
+      if (!this.sim) return 0;
+      const pods = this.sim.deployments.reduce((sum, d) => sum + d.replicas, 0);
+      return pods * 0.5 + this.sim.services.length * 1;
+    },
+
+    /** Wird von der Spielschleife getickt; gibt ausgezahlte Dublonen zurück. */
+    economyTick(dt) {
+      this.incomeAcc += this.incomeRate() / 60 * dt;
+      if (this.incomeAcc >= 1) {
+        const payout = Math.floor(this.incomeAcc);
+        this.incomeAcc -= payout;
+        this.state.coins += payout;
+        return payout;
+      }
+      return 0;
     },
 
     /* ---------- Streak ---------- */
@@ -132,7 +172,7 @@
         return { ok: false, msg: "Hast du schon!" };
       }
       if (!this.spendCoins(item.price)) {
-        return { ok: false, msg: "Nicht genug Dublonen! Quests und Krabben-Quiz füllen den Beutel." };
+        return { ok: false, msg: "Nicht genug Dublonen! Quests, Üben und ein gesunder Hafen füllen den Beutel." };
       }
       if (item.type === "consumable") {
         this.state.inventory[itemId] = (this.state.inventory[itemId] || 0) + 1;
@@ -152,18 +192,30 @@
       return true;
     },
 
+    hasUpgrade(id) { return this.state.owned.includes(id); },
+
     /* ---------- Quests ---------- */
-    currentQuest() {
-      return KQContent.QUESTS[this.state.questIdx] || null;
-    },
+    currentQuest() { return KQContent.QUESTS[this.state.questIdx] || null; },
     currentStep() {
       const q = this.currentQuest();
       return q ? q.steps[this.state.questStep] || null : null;
     },
+    /** Ist der aktuelle Schritt einer fürs Funkgerät? */
+    isFunkStep(step) {
+      return step && ["teach", "drill", "terminal"].includes(step.type);
+    },
+    /** Aufgabenliste eines Funk-Schritts (drills werden von der UI generiert). */
+    stepTasks(step) {
+      if (step.type === "terminal") return step.tasks;
+      if (step.type === "teach") return [step.cmd];
+      return null;
+    },
+
     advanceStep() {
       const q = this.currentQuest();
-      if (!q) return;
+      if (!q) return {};
       this.state.questStep++;
+      this.state.taskIdx = 0;
       if (this.state.questStep >= q.steps.length) {
         this.state.completedQuests.push(q.id);
         this.state.questIdx++;
@@ -174,8 +226,12 @@
       this.save();
       return {};
     },
-    allQuestsDone() {
-      return this.state.questIdx >= KQContent.QUESTS.length;
+    allQuestsDone() { return this.state.questIdx >= KQContent.QUESTS.length; },
+
+    /* ---------- Üben (Drills bei NPCs) ---------- */
+    practiceDrillsFor(npcId) {
+      const pool = KQContent.PRACTICE[npcId] || [];
+      return pool.filter(p => this.state.completedQuests.includes(p.after)).map(p => p.drill);
     },
 
     /* ---------- Spaced Repetition (Leitner) ---------- */
@@ -187,11 +243,13 @@
 
     registerQuestCards(questId) {
       for (const c of KQContent.CMD_CARDS.filter(c => c.chapter === questId)) this.ensureReviewItem(c.id);
-      // Quiz-Karten des Kapitels (gleiche Nummer) ebenfalls aktivieren
-      const chapterNo = questId.replace("q", "");
-      for (const qz of KQContent.CRAB_QUIZ.filter(q => q.id.startsWith("q-ch" + chapterNo + "-"))) {
-        this.ensureReviewItem(qz.id);
+      const quest = KQContent.QUESTS.find(q => q.id === questId);
+      if (quest) {
+        for (const step of quest.steps) {
+          if (step.type === "choice" && step.reviewId) this.ensureReviewItem(step.reviewId);
+        }
       }
+      for (const id of EXTRA_CARDS[questId] || []) this.ensureReviewItem(id);
       this.save();
     },
 
@@ -209,11 +267,12 @@
     },
 
     choiceResult(itemId, correct) {
-      if (!itemId) return;
-      this.ensureReviewItem(itemId);
-      if (!correct) {
-        this.state.review[itemId].box = 1;
-        this.state.review[itemId].due = today() + 1;
+      if (itemId) {
+        this.ensureReviewItem(itemId);
+        if (!correct) {
+          this.state.review[itemId].box = 1;
+          this.state.review[itemId].due = today() + 1;
+        }
       }
       if (correct) this.state.stats.quizRight++; else this.state.stats.quizWrong++;
       this.save();

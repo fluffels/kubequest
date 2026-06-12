@@ -1,22 +1,26 @@
-/* ===== KubeQuest 2.0 – Inhalte =====
- * Ränge, Shop, NPCs, Quests (Dialoge + Terminal-Aufträge), Wiederholungskarten.
- * Sprache bewusst neutral – das Spiel ist für alle.
+/* ===== KubeQuest 3.0 – Inhalte =====
+ * Kleinschrittiges Lernen: jeder Befehl wird einzeln eingeführt (teach),
+ * dann in Zufalls-Varianten geübt (drill), erst dann kommt der nächste.
+ * Dazu: Quests, Dialoge, NPCs, Ränge, Shop, Drills, Karteikarten, Events.
  */
 
 (function () {
   "use strict";
 
-  /* ---------- Ränge (alle geschlechtsneutral) ---------- */
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+  /* ---------- Ränge (geschlechtsneutral) ---------- */
   const RANKS = [
     { xp: 0,    name: "Landratte",  icon: "🦔" },
-    { xp: 80,   name: "Moses",      icon: "🧽" },   // traditionell: jüngstes Crew-Mitglied
-    { xp: 200,  name: "Deckshand",  icon: "🧹" },
-    { xp: 380,  name: "Matrose",    icon: "⚓" },
-    { xp: 600,  name: "Maat",       icon: "🪢" },
-    { xp: 900,  name: "Steuermaat", icon: "☸️" },
-    { xp: 1300, name: "Navigator",  icon: "🧭" },
-    { xp: 1800, name: "Käpt'n",     icon: "🫡" },
-    { xp: 2500, name: "Admiral",    icon: "🏅" },
+    { xp: 110,  name: "Moses",      icon: "🧽" },
+    { xp: 280,  name: "Deckshand",  icon: "🧹" },
+    { xp: 520,  name: "Matrose",    icon: "⚓" },
+    { xp: 820,  name: "Maat",       icon: "🪢" },
+    { xp: 1200, name: "Steuermaat", icon: "☸️" },
+    { xp: 1700, name: "Navigator",  icon: "🧭" },
+    { xp: 2300, name: "Käpt'n",     icon: "🫡" },
+    { xp: 3000, name: "Admiral",    icon: "🏅" },
   ];
 
   /* ---------- Shop ---------- */
@@ -31,15 +35,17 @@
       desc: "Flattert hinter dir her. Findet jeden Weg – auch im Dunkeln." },
     { id: "pet-geist", icon: "👻", sprite: 121, name: "Archiv-Geist Plotter", price: 400, type: "pet",
       desc: "Spukt seit Jahren im Kartenhaus. Kennt YAML auswendig. Gruselig." },
-    { id: "flagge-lila", icon: "🟪", color: "#9b6bdf", name: "Lila Schiffsflagge", price: 80, type: "flag",
+    { id: "flagge-lila", icon: "🟪", color: 0x9b6bdf, name: "Lila Schiffsflagge", price: 80, type: "flag",
       desc: "Dein Schiff am Pier zeigt Flagge – in Edel-Lila." },
-    { id: "flagge-gruen", icon: "🟩", color: "#6fdc8c", name: "Grüne Schiffsflagge", price: 80, type: "flag",
+    { id: "flagge-gruen", icon: "🟩", color: 0x6fdc8c, name: "Grüne Schiffsflagge", price: 80, type: "flag",
       desc: "Grün wie ein frisch deploytes Release." },
-    { id: "flagge-pirat", icon: "🏴‍☠️", color: "#202028", name: "Piratenflagge", price: 150, type: "flag",
+    { id: "flagge-pirat", icon: "🏴‍☠️", color: 0x202028, name: "Piratenflagge", price: 150, type: "flag",
       desc: "Arrr! Streng genommen nicht erlaubt. Ole drückt ein Auge zu." },
+    { id: "kanone", icon: "💣", name: "Hafen-Kanone", price: 300, type: "upgrade",
+      desc: "Steht danach am Dock. Piraten-Überfälle bringen dir +50% Kopfgeld." },
   ];
 
-  /* ---------- NPCs (Sprite-Index aus dem Dungeon-Sheet) ---------- */
+  /* ---------- NPCs ---------- */
   const NPCS = {
     ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100 },
     bo:     { name: "Bo",            title: "Dock-Golem",      sprite: 109 },
@@ -50,10 +56,9 @@
     kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110 },
   };
 
-  /* ---------- Spielbare Charaktere ---------- */
   const PLAYER_SPRITES = [85, 88, 98, 99, 112, 96];
 
-  /* ---------- Virtuelle Dateien für Quests ---------- */
+  /* ---------- Virtuelle Dateien ---------- */
   const DEPLOYMENT_YAML = [
     "apiVersion: apps/v1", "kind: Deployment", "metadata:", "  name: lager", "spec:",
     "  replicas: 2", "  selector:", "    matchLabels:", "      app: lager", "  template:",
@@ -66,6 +71,12 @@
     "  selector:", "    app: lager", "  ports:", "    - port: 6379",
   ].join("\n");
 
+  const BOESE_CONFIG_YAML = [
+    "apiVersion: v1", "kind: ConfigMap", "metadata:", "  name: kasse-config", "data:",
+    "  datenbank_host: db.hafen.local", "  # AUTSCH – Passwort im Klartext! Krakenfutter!",
+    "  datenbank_passwort: fisch123",
+  ].join("\n");
+
   const MAIN_TF = [
     "terraform {", "  required_providers {", "    hafen = {", "      source = \"kubequest/hafen\"", "    }", "  }", "}",
     "", "# Ein neues Ost-Plateau für Port Kubernia",
@@ -75,183 +86,391 @@
   ].join("\n");
 
   /* =================================================================
-   * QUESTS – die Hauptgeschichte. Schritt-Typen:
-   *  dialog   – NPC redet (kurze Sprechblasen)
-   *  choice   – NPC stellt eine Frage mit Antwortmöglichkeiten
-   *  terminal – Funkgerät-Aufgaben (echte Befehle, Welt reagiert!)
+   * DRILLS – Zufalls-Übungsaufgaben. Jede Funktion bekommt den Simulator
+   * und liefert eine frische Aufgabe (ggf. mit Vorbereitung der Welt).
+   * ================================================================= */
+  const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
+  const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
+
+  function ensureDeployment(sim) {
+    let d = sim.deployments.find(d => !["kantine"].includes(d.name)) || sim.deployments[0];
+    if (!d) {
+      const name = pick(NAMES);
+      sim.exec("kubectl create deployment " + name + " --image=nginx");
+      d = sim.deployments.find(x => x.name === name);
+    }
+    return d;
+  }
+
+  const DRILLS = {
+    "docker-pull": sim => {
+      const img = pick(IMAGES);
+      return { text: "Lade das Image <code>" + img + "</code> aus der Registry.", accept: [new RegExp("^docker\\s+pull\\s+" + img + "(:\\S+)?$")], solution: "docker pull " + img, hint: "Muster: docker pull <image>" };
+    },
+    "docker-run": sim => {
+      const img = pick(IMAGES);
+      return { text: "Starte einen Container aus dem Image <code>" + img + "</code> (ohne Extras).", accept: [new RegExp("^docker\\s+run\\s+" + img + "(:\\S+)?$")], solution: "docker run " + img, hint: "Muster: docker run <image>" };
+    },
+    "docker-run-named": sim => {
+      const img = pick(IMAGES);
+      let name = pick(NAMES);
+      while (sim.docker.containers.some(c => c.name === name && c.running)) name = pick(NAMES) + rnd(2, 99);
+      return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?=.*-d)(?=.*--name\\s+" + name + ").*" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Muster: docker run -d --name <name> <image>" };
+    },
+    "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker." }),
+    "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“." }),
+    "docker-stop": sim => {
+      let c = sim.docker.containers.find(c => c.running);
+      if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name); }
+      return { text: "Stoppe den Container <code>" + c.name + "</code>.", accept: [new RegExp("^docker\\s+stop\\s+" + c.name + "$")], solution: "docker stop " + c.name, hint: "Muster: docker stop <name>" };
+    },
+    "k-get-nodes": () => ({ text: "Zeig die Nodes des Clusters.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "kubectl get <ressourcentyp>" }),
+    "k-get-pods": () => ({ text: "Zeig alle Pods.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "kubectl get <ressourcentyp>" }),
+    "k-get-svc": () => ({ text: "Zeig alle Services.", accept: [/^kubectl\s+get\s+(services|service|svc)$/], solution: "kubectl get services", hint: "Kurzform svc geht auch." }),
+    "k-describe": sim => {
+      const d = ensureDeployment(sim);
+      const pod = d.pods[0].name;
+      return { text: "Beschreibe den Pod <code>" + pod + "</code> im Detail.", accept: [new RegExp("^kubectl\\s+describe\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe pod " + pod, hint: "kubectl describe pod <name> – den Namen kannst du abtippen." };
+    },
+    "k-create": sim => {
+      let name = pick(NAMES);
+      while (sim.deployments.some(d => d.name === name)) name = pick(NAMES) + rnd(2, 9);
+      const img = pick(IMAGES);
+      return { text: "Erstelle ein Deployment <code>" + name + "</code> mit dem Image <code>" + img + "</code>.", accept: [new RegExp("^kubectl\\s+create\\s+deployment\\s+" + name + "\\s+--image[=\\s]" + img + "(:\\S+)?$")], solution: "kubectl create deployment " + name + " --image=" + img, hint: "Muster: kubectl create deployment <name> --image=<image>" };
+    },
+    "k-scale": sim => {
+      const d = ensureDeployment(sim);
+      let n = rnd(2, 5);
+      if (n === d.replicas) n++;
+      return { text: "Skaliere das Deployment <code>" + d.name + "</code> auf <b>" + n + "</b> Kopien. (Blick zum Dock!)", accept: [new RegExp("^kubectl\\s+scale\\s+deployment\\s+" + d.name + "\\s+--replicas[=\\s]" + n + "$")], solution: "kubectl scale deployment " + d.name + " --replicas=" + n, hint: "Muster: kubectl scale deployment <name> --replicas=<zahl>" };
+    },
+    "k-delete-pod": sim => {
+      const d = ensureDeployment(sim);
+      const pod = d.pods[0].name;
+      return { text: "Versenke den Pod <code>" + pod + "</code> – und beobachte das Self-Healing am Dock!", accept: [new RegExp("^kubectl\\s+delete\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete pod " + pod, hint: "kubectl delete pod <name>" };
+    },
+    "k-expose": sim => {
+      const d = ensureDeployment(sim);
+      if (sim.services.some(s => s.name === d.name)) sim.exec("kubectl delete service " + d.name);
+      const port = pick([80, 8080, 3000, 5432]);
+      return { text: "Stelle einen Service vor <code>" + d.name + "</code>, Port <b>" + port + "</b>.", accept: [new RegExp("^kubectl\\s+expose\\s+deployment\\s+" + d.name + "\\s+--port[=\\s]" + port + "(\\s.*)?$")], solution: "kubectl expose deployment " + d.name + " --port=" + port, hint: "Muster: kubectl expose deployment <name> --port=<port>" };
+    },
+    "k-apply": sim => {
+      sim.files["uebung.yaml"] = "# Übungs-Manifest\nkind: Deployment\n…";
+      sim.applyEffects["uebung.yaml"] = { deployment: { name: "uebung", image: "nginx", replicas: 1 } };
+      if (sim.deployments.some(d => d.name === "uebung")) sim.exec("kubectl delete deployment uebung");
+      return { text: "Wende die Datei <code>uebung.yaml</code> deklarativ an.", accept: [/^kubectl\s+apply\s+-f\s+uebung\.yaml$/], solution: "kubectl apply -f uebung.yaml", hint: "kubectl apply -f <datei>" };
+    },
+    "helm-install": sim => {
+      if (!sim.helmRepos.includes("bitnami")) sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami");
+      let rel = pick(NAMES);
+      while (sim.releases.some(r => r.name === rel)) rel = pick(NAMES) + rnd(2, 9);
+      const chart = pick(["nginx", "redis"]);
+      return { text: "Installiere <code>bitnami/" + chart + "</code> als Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+bitnami\\/" + chart + "$")], solution: "helm install " + rel + " bitnami/" + chart, hint: "Muster: helm install <release> <repo>/<chart>" };
+    },
+    "helm-list": () => ({ text: "Zeig alle installierten Releases.", accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." }),
+    "helm-upgrade": sim => {
+      let r = sim.releases[0];
+      if (!r) { sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami"); sim.exec("helm install uebung bitnami/nginx"); r = sim.releases[0]; }
+      const n = rnd(2, 4);
+      return { text: "Stelle das Release <code>" + r.name + "</code> per <code>--set replicaCount=" + n + "</code> um.", accept: [new RegExp("^helm\\s+upgrade\\s+" + r.name + "\\s+" + r.chart.replace("/", "\\/") + "\\s+--set\\s+replicaCount=" + n + "$")], solution: "helm upgrade " + r.name + " " + r.chart + " --set replicaCount=" + n, hint: "Muster: helm upgrade <release> <chart> --set replicaCount=<n>" };
+    },
+    "helm-rollback": sim => {
+      let r = sim.releases.find(r => r.revision > 1);
+      if (!r) {
+        r = sim.releases[0];
+        if (!r) { sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami"); sim.exec("helm install uebung bitnami/nginx"); r = sim.releases[0]; }
+        sim.exec("helm upgrade " + r.name + " " + r.chart + " --set replicaCount=2");
+      }
+      return { text: "Hoppla, das Upgrade von <code>" + r.name + "</code> war ein Fehler – rolle auf Revision <b>1</b> zurück!", accept: [new RegExp("^helm\\s+rollback\\s+" + r.name + "\\s+1$")], solution: "helm rollback " + r.name + " 1", hint: "Muster: helm rollback <release> <revision>" };
+    },
+    "tf-plan": () => ({ text: "Zeig, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Die Generalprobe." }),
+    "tf-state": sim => {
+      if (!sim.tf.applied) { sim.tf.initialized = true; sim.exec("terraform apply"); }
+      return { text: "Wirf einen Blick in Terraforms Gedächtnis.", accept: [/^terraform\s+state\s+list$/], solution: "terraform state list", hint: "terraform state …" };
+    },
+    "k-secret": sim => {
+      let name = pick(["schatzkarte", "funkcode", "kombuesen-rezept"]) + rnd(2, 99);
+      while (sim.secrets.some(s => s.name === name)) name = "funkcode" + rnd(100, 9999);
+      return { text: "Lege ein Secret <code>" + name + "</code> mit <code>--from-literal=passwort=geheim" + rnd(10, 99) + "x</code> an. (Wert frei wählbar!)", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+generic\\s+" + name + "\\s+--from-literal[=\\s][\\w.-]+=\\S+$")], solution: "kubectl create secret generic " + name + " --from-literal=passwort=geheim123", hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert" };
+    },
+    "k-get-secrets": () => ({ text: "Zeig alle Secrets an.", accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …" }),
+  };
+
+  /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
+  const PRACTICE = {
+    bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
+    ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
+    ada:  [{ drill: "k-apply", after: "q8" }],
+    runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }],
+    theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
+  };
+
+  /* =================================================================
+   * QUESTS – viele kleine Schritte. Typen:
+   *  dialog / choice  – Gespräch
+   *  teach            – EIN neuer Befehl: erklärt + selbst tippen
+   *  drill            – Zufalls-Übungen aus dem Gelernten
+   *  terminal         – feste Aufgabenkette (für Showdowns)
    * ================================================================= */
   const QUESTS = [
 
-    /* ---------- Quest 0: Ankommen ---------- */
-    {
-      id: "q0", title: "Anheuern in Port Kubernia", giver: "ole",
-      rewardXp: 20, rewardCoins: 15,
+    { id: "q0", title: "Anheuern in Port Kubernia", giver: "ole", rewardXp: 15, rewardCoins: 10,
       steps: [
         { type: "dialog", npc: "ole", lines: [
           "Ahoi! Du musst die neue Crew sein. Willkommen in <b>Port Kubernia</b> – dem modernsten Hafen der sieben Meere!",
-          "Ich bin Ole, Hafenmeister. Bei uns läuft die ganze Fracht in <b>Containern</b> – und verwaltet wird alles mit Software. Keine Sorge, du lernst das von der Pike auf.",
-          "Dein wichtigstes Werkzeug bekommst du sofort: dein <b>📻 Funkgerät</b>. Damit gibst du dem Hafen Befehle. Drück <b>T</b> und tippe als Erstes <code>help</code>!",
+          "Ich bin Ole, Hafenmeister. Keine Sorge: Hier lernt jede:r in <b>kleinen Schritten</b> – einen Handgriff nach dem anderen, mit viel Übung.",
+          "Dein wichtigstes Werkzeug: dein <b>📻 Funkgerät</b>. Drück <b>T</b> und tippe <code>help</code> – mehr nicht!",
         ]},
-        { type: "terminal", brief: "Funkgerät-Test", tasks: [
-          { id: "t-q0-1", text: "Tippe <code>help</code>, um zu sehen, was dein Funkgerät alles kann.",
-            accept: [/^help$/], hint: "Einfach das Wort help eintippen und Enter drücken.", solution: "help" },
-        ]},
+        { type: "teach", brief: "Funkgerät-Test", cmd: {
+          id: "t-help", intro: "🆕 Dein erster Funkspruch!",
+          text: "Tippe <code>help</code> und drück Enter.",
+          accept: [/^help$/], solution: "help", hint: "Wirklich nur das Wort help." } },
         { type: "dialog", npc: "ole", lines: [
-          "Sieh an – du funkst ja schon wie ein alter Seebär! Das war's auch schon mit der Theorie, versprochen.",
-          "Geh als Erstes runter zum <b>Dock im Südwesten</b>. Dort wartet <b>Bo</b> auf dich – unser Dock-Golem. Stapelt seit 200 Jahren Kisten und weiß ALLES über Container.",
+          "Du funkst ja schon wie ein alter Seebär! Geh als Nächstes runter zum <b>Dock im Südwesten</b> zu <b>Bo</b>, unserem Dock-Golem.",
+          "Und merk dir: Bei jedem von uns kannst du später jederzeit <b>üben</b> – einfach ansprechen und „Üben“ wählen. Übung füllt den Geldbeutel!",
         ]},
-      ],
-    },
+      ]},
 
-    /* ---------- Quest 1: Docker ---------- */
-    {
-      id: "q1", title: "Bo und die genormten Kisten", giver: "bo",
-      rewardXp: 40, rewardCoins: 30,
+    { id: "q1", title: "Die erste Kiste", giver: "bo", rewardXp: 25, rewardCoins: 20,
       steps: [
         { type: "dialog", npc: "bo", lines: [
-          "BO. GRÜSST. NEUE CREW. <i>*knirsch*</i>",
-          "Bo stapelt Fracht. Früher: Chaos. Säcke, Fässer, Kisten in hundert Formen. Jedes Schiff anders. Bo hatte Rückenschmerzen. Golem-Rückenschmerzen.",
-          "Dann kam: <b>DER CONTAINER</b>. Genormte Box. Egal, was drin ist – jeder Kran, jedes Schiff kann damit umgehen.",
-          "Software genauso: App + alles, was sie braucht, in eine Box → läuft <b>überall gleich</b>. Das Werkzeug dafür heißt <b>Docker</b>.",
+          "BO. GRÜSST. NEUE CREW. <i>*knirsch*</i> Bo stapelt Fracht. Früher: Chaos – Säcke, Fässer, hundert Formen. Dann kam: <b>DER CONTAINER</b>. Genormte Box. Jeder Kran kann sie heben.",
+          "Software genauso: App + alles Drumherum in eine Box → läuft <b>überall gleich</b>. Werkzeug: <b>Docker</b>.",
+          "Erster Handgriff: Bauplan holen. Baupläne heißen <b>Images</b> und liegen im Kisten-Supermarkt, der <b>Registry</b>. Bo zeigt: <code>docker pull nginx</code>. Jetzt DU! (T drücken)",
         ]},
-        { type: "choice", npc: "bo", reviewId: "q-ch1-1",
-          q: "Bo testet dich: WARUM sind Container gut?",
-          options: [
-            { t: "Eine App läuft mit allem Drumherum überall gleich – Laptop, Server, Cloud.", ok: true,
-              reply: "RICHTIG. <i>*stolzes Steinknirschen*</i> Das berüchtigte „Bei mir läuft's aber!“ ist damit Geschichte." },
-            { t: "Sie machen Apps automatisch schneller.", ok: false,
-              reply: "NEIN. Schneller nicht. Aber ÜBERALL GLEICH. Das ist der Punkt. Merken!" },
-            { t: "Sie sind aus Stahl und halten ewig.", ok: false,
-              reply: "BO MAG STAHL. Aber nein – Software-Container sind aus … Software. Der Punkt ist: läuft überall gleich." },
-          ]},
+        { type: "teach", brief: "Bauplan holen", cmd: {
+          id: "t-pull", intro: "🆕 Neuer Befehl: <code>docker pull</code> – lädt ein Image aus der Registry.",
+          text: "Lade das Image <code>nginx</code> (ein kleiner Webserver) herunter.",
+          accept: [/^docker\s+pull\s+nginx(:\S+)?$/], solution: "docker pull nginx", hint: "Muster: docker pull <image>" } },
         { type: "dialog", npc: "bo", lines: [
-          "Zwei Wörter musst du auseinanderhalten: <b>Image</b> = der Bauplan. <b>Container</b> = die laufende Kiste, gebaut nach dem Bauplan. Aus einem Image: beliebig viele Container.",
-          "Baupläne holt man aus einer <b>Registry</b> – einem Kisten-Supermarkt. Der bekannteste: <b>Docker Hub</b>. Jetzt DU. Funkgerät raus (<b>T</b>)! Bo schaut zu.",
+          "GUT. Image ist da – das ist nur der <b>Bauplan</b>. Jetzt zum Leben erwecken: <code>docker run</code> baut daraus eine laufende Kiste – einen <b>Container</b>. Schau danach zum Dock!",
         ]},
-        { type: "terminal", brief: "Bos Container-Training", tasks: [
-          { id: "t-ch1-1", text: "Hol dir den Bauplan: Lade das Image <code>nginx</code> (ein kleiner Webserver) aus der Registry.",
-            accept: [/^docker\s+pull\s+nginx(:\S+)?$/], hint: "Herunterladen heißt bei Docker „pull“. Muster: docker pull <image>", solution: "docker pull nginx" },
-          { id: "t-ch1-2", text: "Starte daraus einen Container im Hintergrund (<code>-d</code>) mit dem Namen <code>webserver</code>. Schau danach zum Dock – Bo stellt die Kiste hin!",
-            accept: [/^docker\s+run\s+(?=.*-d)(?=.*--name\s+webserver).*nginx(:\S+)?$/], hint: "Muster: docker run -d --name <wunschname> <image>", solution: "docker run -d --name webserver nginx" },
-          { id: "t-ch1-3", text: "Prüfe, ob dein Container wirklich läuft.",
-            accept: [/^docker\s+ps$/], check: sim => sim.docker.containers.some(c => c.name === "webserver" && c.running),
-            hint: "Der Befehl, der laufende Container auflistet … zwei Buchstaben nach docker.", solution: "docker ps" },
-          { id: "t-ch1-4", text: "Feierabend für die Kiste: Stoppe den Container <code>webserver</code>.",
-            accept: [/^docker\s+stop\s+webserver$/], hint: "Muster: docker stop <name>", solution: "docker stop webserver" },
-          { id: "t-ch1-5", text: "Gestoppt heißt nicht weg! Zeig <b>alle</b> Container an – auch die gestoppten.",
-            accept: [/^docker\s+ps\s+(-a|--all)$/], hint: "docker ps zeigt nur laufende. Es gibt eine kleine Flag für „alle“ …", solution: "docker ps -a" },
-        ]},
+        { type: "teach", brief: "Kiste starten", cmd: {
+          id: "t-run", intro: "🆕 Neuer Befehl: <code>docker run</code> – startet einen Container aus einem Image.",
+          text: "Starte einen Container aus dem Image <code>nginx</code>. (Einfachste Form, keine Extras!)",
+          accept: [/^docker\s+run\s+nginx(:\S+)?$/], solution: "docker run nginx", hint: "Muster: docker run <image>" } },
+        { type: "drill", brief: "Bos Übungsrunde", pool: ["docker-pull", "docker-run"], count: 2,
+          intro: "Übung macht den Golem! Zwei schnelle Wiederholungen mit anderen Images:" },
         { type: "choice", npc: "bo", reviewId: "q-ch1-2",
-          q: "Letzte Prüfung von Bo: Image und Container – was ist was?",
+          q: "Bo testet: Image und Container – was ist was?",
           options: [
             { t: "Image = Bauplan/Vorlage, Container = laufende Instanz davon.", ok: true,
-              reply: "PERFEKT. Wie Tiefkühlpizza (Image) und Pizza im Ofen (Container). Bo hat Hunger." },
+              reply: "PERFEKT. Wie Tiefkühlpizza (Image) und Pizza im Ofen (Container). Bo hat jetzt Hunger." },
             { t: "Container = Vorlage, Image = das laufende Programm.", ok: false,
-              reply: "ANDERSRUM! Image = Bauplan, Container = läuft. Bo verwechselt das nie. Bo ist aus Stein." },
+              reply: "ANDERSRUM. Image = Bauplan (pull). Container = läuft (run). Nochmal merken!" },
           ]},
         { type: "dialog", npc: "bo", lines: [
-          "Bo sieht: Du hast Talent. <i>*steinernes Nicken*</i> Ole will dich sprechen – es geht um den GROSSEN Umbau. Bo bleibt hier. Bo stapelt.",
+          "Genug für heute. Bo-Regel: <b>Lieber zwei Befehle sicher als zehn halb.</b> Komm wieder, wenn du durchgeatmet hast – oder sprich Bo an und wähle „Üben“.",
         ]},
-      ],
-    },
+      ]},
 
-    /* ---------- Quest 2: Kubernetes-Grundlagen ---------- */
-    {
-      id: "q2", title: "Der Hafen wird ein Cluster", giver: "ole",
-      rewardXp: 50, rewardCoins: 35,
+    { id: "q2", title: "Den Überblick behalten", giver: "bo", rewardXp: 30, rewardCoins: 22,
+      steps: [
+        { type: "dialog", npc: "bo", lines: [
+          "ZWEITE LEKTION. Kisten starten kannst du. Aber: Welche laufen gerade? Dafür gibt es <code>docker ps</code> – die Liste aller <b>laufenden</b> Container.",
+        ]},
+        { type: "teach", brief: "Kisten-Liste", cmd: {
+          id: "t-ps", intro: "🆕 Neuer Befehl: <code>docker ps</code> – zeigt laufende Container.",
+          text: "Zeig alle laufenden Container an. Die NAMES-Spalte rechts wird gleich wichtig!",
+          accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Nur zwei Buchstaben nach docker." } },
+        { type: "dialog", npc: "bo", lines: [
+          "Siehst du die Namen in der NAMES-Spalte? Docker erfindet welche, wenn du keinen vergibst. Mit dem Namen kannst du eine Kiste gezielt <b>stoppen</b>: <code>docker stop &lt;name&gt;</code>.",
+        ]},
+        { type: "teach", brief: "Kiste stoppen", cmd: {
+          id: "t-stop", intro: "🆕 Neuer Befehl: <code>docker stop</code> – hält einen Container an.",
+          text: "Stoppe einen deiner laufenden Container. (Name aus <code>docker ps</code> abtippen!)",
+          accept: [/^docker\s+stop\s+\S+$/], check: sim => sim.docker.containers.some(c => !c.running),
+          solution: "docker stop <name aus docker ps>", hint: "Erst docker ps für den Namen, dann docker stop <name>." } },
+        { type: "dialog", npc: "bo", lines: [
+          "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps -a</code> zeigt ALLE – auch gestoppte. Das <code>-a</code> heißt „all“.",
+        ]},
+        { type: "teach", brief: "Alle Kisten sehen", cmd: {
+          id: "t-ps-a", intro: "🆕 Neue Variante: <code>docker ps -a</code> – zeigt auch gestoppte Container.",
+          text: "Zeig ALLE Container an. Dein gestoppter müsste mit „Exited“ auftauchen.",
+          accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + Flag für „alle“." } },
+        { type: "drill", brief: "Bos Übungsrunde", pool: ["docker-ps", "docker-stop", "docker-ps-a", "docker-run"], count: 3,
+          intro: "Drei Wiederholungen, dann sitzt es:" },
+        { type: "choice", npc: "bo", reviewId: "q-ch1-4",
+          q: "Was zeigt <code>docker ps</code> – ohne Extras?",
+          options: [
+            { t: "Nur die gerade laufenden Container.", ok: true, reply: "RICHTIG. Für alle (auch gestoppte): docker ps -a. Bo nickt steinern." },
+            { t: "Alle Container, die es je gab.", ok: false, reply: "FAST. Das macht docker ps -a. Ohne -a: nur die laufenden." },
+          ]},
+        { type: "dialog", npc: "bo", lines: [
+          "Bo hat eine Überraschung: Sprich Bo nochmal an und wähle <b>🎮 Stapel-Spiel</b>! Da lernst du, wie Images aus <b>Schichten</b> gebaut sind. Macht Spaß. Bo verliert nie. Bo ist Stein.",
+        ]},
+      ]},
+
+    { id: "q3", title: "Namen und Hintergrund", giver: "bo", rewardXp: 35, rewardCoins: 25,
+      steps: [
+        { type: "dialog", npc: "bo", lines: [
+          "LETZTE DOCKER-LEKTION. Profis geben Kisten <b>eigene Namen</b> (<code>--name</code>) und schicken sie in den <b>Hintergrund</b> (<code>-d</code> wie „detached“), damit das Funkgerät frei bleibt.",
+          "Zusammen: <code>docker run -d --name webserver nginx</code>. Sieht lang aus – ist nur run + zwei Extras. Du schaffst das.",
+        ]},
+        { type: "teach", brief: "Profi-Start", cmd: {
+          id: "t-run-named", intro: "🆕 Neue Flags: <code>-d</code> (Hintergrund) und <code>--name</code> (eigener Name).",
+          text: "Starte aus <code>nginx</code> einen Container im Hintergrund mit dem Namen <code>webserver</code>.",
+          accept: [/^docker\s+run\s+(?=.*-d)(?=.*--name\s+webserver).*nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
+          hint: "Muster: docker run -d --name <wunschname> <image>" } },
+        { type: "drill", brief: "Bos Übungsrunde", pool: ["docker-run-named", "docker-run-named", "docker-stop"], count: 3,
+          intro: "Das lange Muster üben wir extra gründlich:" },
+        { type: "choice", npc: "bo", reviewId: "q-ch1-1",
+          q: "Bos Abschlussfrage: WARUM das alles? Was ist der Kern-Vorteil von Containern?",
+          options: [
+            { t: "Eine App läuft mit allem Drumherum überall gleich – Laptop, Server, Cloud.", ok: true,
+              reply: "RICHTIG. „Bei mir läuft's aber!“ ist Geschichte. <i>*stolzes Steinknirschen*</i>" },
+            { t: "Sie machen Apps automatisch schneller.", ok: false,
+              reply: "NEIN. Nicht schneller – ÜBERALL GLEICH. Das ist der Schatz." },
+          ]},
+        { type: "dialog", npc: "bo", lines: [
+          "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Ole will dich sprechen – es geht um den GROSSEN Umbau. Und vergiss nicht: Üben bei Bo bringt Dublonen!",
+        ]},
+      ]},
+
+    { id: "q4", title: "Der Hafen wird ein Cluster", giver: "ole", rewardXp: 30, rewardCoins: 22,
       steps: [
         { type: "dialog", npc: "ole", lines: [
-          "Da bist du ja! Bo lobt dich – das passiert alle hundert Jahre. Jetzt die Königsfrage: Eine Kiste starten kann jeder. Aber <b>hunderte Kisten auf vielen Stegen</b>?",
-          "Wer startet eine neue Kiste, wenn nachts eine über Bord geht? Wer verteilt sie sinnvoll? Dafür gibt es <b>Kubernetes</b> – griechisch für „Steuermann“. Kurz: <b>K8s</b> (K, 8 Buchstaben, s).",
-          "Schau zum Wasser! Unsere <b>drei Stege</b> sind die <b>Nodes</b> – die Arbeits-Server. Alles zusammen ist der <b>Cluster</b>. Und jede Kiste steht auf einem Liegeplatz namens <b>Pod</b> – der kleinsten Einheit von Kubernetes.",
-          "Dein Funkgerät spricht mit dem Cluster über <code>kubectl</code>. Die Bord-Kantine läuft schon im Cluster – finde sie! Drück <b>T</b>.",
+          "Bo lobt dich – das passiert alle hundert Jahre! Jetzt die Königsfrage: Eine Kiste kann jeder. Aber <b>hunderte Kisten auf vielen Stegen</b>? Wer startet nachts Ersatz, wenn eine über Bord geht?",
+          "Dafür gibt es <b>Kubernetes</b> – griechisch für „Steuermann“, kurz <b>K8s</b>. Schau zum Wasser: Unsere <b>drei Stege</b> sind die <b>Nodes</b> (Arbeits-Server). Alles zusammen: der <b>Cluster</b>.",
+          "Dein Funkgerät spricht mit dem Cluster über <code>kubectl</code>. Erster Befehl, ganz harmlos: <code>kubectl get nodes</code> – zeig mir die Stege!",
         ]},
-        { type: "terminal", brief: "Erkunde den Cluster",
+        { type: "teach", brief: "Die Stege zählen", cmd: {
+          id: "t-nodes", intro: "🆕 Neuer Befehl: <code>kubectl get nodes</code> – zeigt die Server des Clusters.",
+          text: "Zeig die Nodes deines Clusters an. Vergleich mit den Stegen draußen!",
+          accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "Muster: kubectl get <ressourcentyp>" } },
+        { type: "dialog", npc: "ole", lines: [
+          "Drei Stege, drei Nodes – passt! Und die Fracht? Jede Kiste steht auf einem Liegeplatz namens <b>Pod</b> – der kleinsten Einheit von Kubernetes. Die Bord-Kantine läuft schon. Finde ihre Pods!",
+        ]},
+        { type: "teach", brief: "Die Fracht finden",
           scenario: { deployments: [{ name: "kantine", image: "nginx:1.27", replicas: 2 }] },
-          tasks: [
-          { id: "t-ch2-1", text: "Verschaff dir einen Überblick: Welche <b>Nodes</b> (Stege) gehören zum Cluster?",
-            accept: [/^kubectl\s+get\s+(nodes|node|no)$/], hint: "kubectl get <ressourcentyp> – Server heißen hier Nodes.", solution: "kubectl get nodes" },
-          { id: "t-ch2-2", text: "Jetzt die Fracht: Zeig alle <b>Pods</b> an. Vergleich mit dem Dock – die Kisten draußen sind genau diese Pods!",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], hint: "Gleiches Muster, anderer Ressourcentyp.", solution: "kubectl get pods" },
-          { id: "t-ch2-3", text: "Schau dir einen <code>kantine</code>-Pod im Detail an. (Den Namen kannst du oben abtippen.)",
-            accept: [/^kubectl\s+describe\s+pods?\s+kantine-\S+$/], hint: "„Beschreiben“ heißt describe. Muster: kubectl describe pod <pod-name>", solution: "kubectl describe pod <name aus der Liste>" },
-          { id: "t-ch2-4", text: "Kubernetes selbst besteht auch aus Pods – versteckt im Namespace <code>kube-system</code>. Lass sie dir zeigen!",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)\s+(-n|--namespace)[=\s]?kube-system$/], hint: "Mit -n <namespace> schaust du woanders rein. Muster: kubectl get pods -n kube-system", solution: "kubectl get pods -n kube-system" },
-        ]},
+          cmd: {
+          id: "t-pods", intro: "🆕 Neuer Befehl: <code>kubectl get pods</code> – zeigt alle Pods.",
+          text: "Zeig alle Pods an – und schau dann zum Dock: Die Kisten dort sind GENAU diese Pods!",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Gleiches Muster wie bei nodes." } },
+        { type: "drill", brief: "Oles Übungsrunde", pool: ["k-get-nodes", "k-get-pods"], count: 2,
+          intro: "Einmal tief durchatmen und wiederholen:" },
         { type: "choice", npc: "ole", reviewId: "q-ch2-2",
           q: "Kurzer Check: Was ist ein Pod?",
           options: [
             { t: "Die kleinste Einheit in Kubernetes – meist genau ein Container drin.", ok: true,
-              reply: "Exakt! Kubernetes verwaltet nie Container direkt, immer Pods. Deshalb stehen draußen Kisten auf Liegeplätzen." },
+              reply: "Exakt! Kubernetes verwaltet nie Container direkt, immer Pods – die Liegeplätze mit den Kisten." },
             { t: "Ein anderes Wort für einen Server.", ok: false,
-              reply: "Fast-Falle! Der Server ist der <b>Node</b> (Steg). Der Pod ist der kleine Liegeplatz mit der Kiste drauf." },
-            { t: "Das Konfigurationsformat von Kubernetes.", ok: false,
-              reply: "Nein, das wird später YAML sein. Pod = kleinste Einheit, meist ein Container." },
+              reply: "Fast-Falle! Der Server ist der <b>Node</b> (Steg). Der Pod ist der kleine Liegeplatz darauf." },
           ]},
         { type: "dialog", npc: "ole", lines: [
-          "Siehst du die Kisten an den Stegen? Ab jetzt siehst du da draußen <b>alles, was du per Funk anrichtest</b>. Praktisch, oder?",
-          "Du machst dich gut. Wenn du zwischendurch üben willst: <b>Krabbe Kralle</b> auf deinem Schiff stellt dir täglich Fragen – dafür gibt's Dublonen. Und bei <b>Pelle</b> am Markt kannst du sie ausgeben.",
+          "Ab jetzt siehst du am Dock <b>live</b>, was du im Cluster anrichtest. Übrigens: Deine laufenden Dienste werfen ab sofort <b>🪙 Einnahmen</b> ab – ein gesunder Hafen verdient Geld! Mehr dazu bald.",
         ]},
-      ],
-    },
+      ]},
 
-    /* ---------- Quest 3: Deployments & Services ---------- */
-    {
-      id: "q3", title: "Sturmfeste Kisten", giver: "ole",
-      rewardXp: 60, rewardCoins: 40,
+    { id: "q5", title: "Genauer hinsehen", giver: "ole", rewardXp: 30, rewardCoins: 22,
       steps: [
         { type: "dialog", npc: "ole", lines: [
-          "Schlechte Nachricht: Letzte Nacht ist ein Pod über Bord gegangen. Gute Nachricht: <b>Niemand musste aufstehen.</b> Der Kran hat sofort Ersatz hingestellt.",
-          "Das Geheimnis heißt <b>Deployment</b> – ein Dauerauftrag an den Cluster: „Halte IMMER 3 Kopien am Laufen!“ Fällt eine ins Wasser → sofort Ersatz. Das nennt sich <b>Self-Healing</b>.",
-          "Und weil neue Kisten immer neue Namen bekommen, braucht es eine feste Adresse davor: einen <b>Service</b>. Wie ein Empfangstresen – die Person dahinter wechselt, der Tresen bleibt.",
-          "Dein Auftrag: Bau eine <b>Kasse</b> für den Fischmarkt. Ausfallsicher, 3 Kopien, feste Adresse. Und dann … versenk eine Kiste. Im Ernst! Du wirst staunen. Drück <b>T</b>!",
+          "Listen sind gut – Details sind besser. Wenn ein Pod zickt, willst du ALLES über ihn wissen: <code>kubectl describe pod &lt;name&gt;</code>. Das ist DER Debugging-Befehl, den du später täglich brauchst.",
         ]},
-        { type: "terminal", brief: "Kasse für den Fischmarkt", tasks: [
-          { id: "t-ch3-1", text: "Erstelle ein Deployment namens <code>kasse</code> mit dem Image <code>nginx</code>.",
-            accept: [/^kubectl\s+create\s+deployment\s+kasse\s+--image[=\s]nginx(:\S+)?$/], hint: "Muster: kubectl create deployment <name> --image=<image>", solution: "kubectl create deployment kasse --image=nginx" },
-          { id: "t-ch3-2", text: "Eine Kasse reicht nicht, wenn die Crew Hunger hat: Skaliere auf <b>3</b> Kopien. (Blick zum Dock!)",
-            accept: [/^kubectl\s+scale\s+deployment\s+kasse\s+--replicas[=\s]3$/], hint: "Muster: kubectl scale deployment <name> --replicas=<zahl>", solution: "kubectl scale deployment kasse --replicas=3" },
-          { id: "t-ch3-3", text: "Prüfe nach: Laufen wirklich 3 <code>kasse</code>-Pods?",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "kasse"); return d && d.replicas === 3; },
-            hint: "Der Übersichts-Befehl für Pods.", solution: "kubectl get pods" },
-          { id: "t-ch3-4", text: "Jetzt der Härtetest! 💥 Lösche einen der drei <code>kasse</code>-Pods – und beobachte das Dock!",
-            accept: [/^kubectl\s+delete\s+pods?\s+kasse-\S+$/], hint: "Muster: kubectl delete pod <pod-name>", solution: "kubectl delete pod <ein kasse-pod-name>" },
-          { id: "t-ch3-5", text: "Hast du es gesehen? Platsch – und der Kran war schneller! Prüfe: Es sollten wieder 3 sein (einer ganz frisch, kleines AGE).",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.lastDeletedPod !== null,
-            hint: "Einfach nochmal die Pod-Liste.", solution: "kubectl get pods" },
-          { id: "t-ch3-6", text: "Jetzt die feste Adresse: Stelle einen <b>Service</b> vor das Deployment <code>kasse</code>, Port <b>80</b>.",
-            accept: [/^kubectl\s+expose\s+deployment\s+kasse\s+--port[=\s]80(\s.*)?$/], hint: "„Nach außen stellen“ heißt expose. Muster: kubectl expose deployment <name> --port=80", solution: "kubectl expose deployment kasse --port=80" },
-          { id: "t-ch3-7", text: "Kontrollblick: Zeig die Services an. Draußen am Dock leuchtet jetzt eine Laterne für deine Kasse!",
-            accept: [/^kubectl\s+get\s+(services|service|svc)$/], check: sim => sim.services.some(s => s.name === "kasse"),
-            hint: "kubectl get … (Kurzform svc geht auch).", solution: "kubectl get services" },
-        ]},
-        { type: "choice", npc: "ole", reviewId: "q-ch3-2",
-          q: "Du löschst einen Pod eines Deployments mit replicas: 3. Was passiert?",
-          options: [
-            { t: "Kubernetes startet sofort einen neuen – es sollen ja 3 sein.", ok: true,
-              reply: "Genau das hast du gerade live gesehen! Soll-Zustand 3, Ist-Zustand 2 → Differenz wird sofort behoben." },
-            { t: "Es laufen ab jetzt dauerhaft nur noch 2.", ok: false,
-              reply: "Nein – schau zum Dock! Die Kiste ist längst ersetzt. Das Deployment hält den Soll-Zustand: immer 3." },
-          ]},
+        { type: "teach", brief: "Pod-Akte öffnen", cmd: {
+          id: "t-describe", intro: "🆕 Neuer Befehl: <code>kubectl describe pod &lt;name&gt;</code> – alle Details + Ereignisse.",
+          text: "Beschreibe einen <code>kantine</code>-Pod. (Name per <code>kubectl get pods</code> holen und abtippen – das Abtippen trainiert!)",
+          accept: [/^kubectl\s+describe\s+pods?\s+kantine-\S+$/], solution: "kubectl describe pod <name aus get pods>",
+          hint: "Erst kubectl get pods, dann kubectl describe pod <name>." } },
         { type: "dialog", npc: "ole", lines: [
-          "Die Laterne am Steg ist dein <b>Service</b> – die feste Adresse deiner Kasse. Egal welche Kisten dahinter gerade leben.",
-          "Weißt du, wer sich für deine Fortschritte interessiert? <b>Ada im Kartenhaus</b> oben im Nordosten. Sie hat eine … sagen wir … <i>elegantere</i> Art, mit dem Cluster zu reden.",
+          "Unten in den <b>Events</b> steht die Lebensgeschichte des Pods – Gold wert bei der Fehlersuche! Eins noch: Kubernetes selbst läuft AUCH als Pods, versteckt im Namespace <code>kube-system</code>.",
         ]},
-      ],
-    },
+        { type: "teach", brief: "Hinter die Kulissen", cmd: {
+          id: "t-ns", intro: "🆕 Neue Flag: <code>-n &lt;namespace&gt;</code> – in einen anderen Namespace schauen.",
+          text: "Zeig die Pods im Namespace <code>kube-system</code> – das Maschinenherz von Kubernetes.",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)\s+(-n|--namespace)[=\s]?kube-system$/], solution: "kubectl get pods -n kube-system",
+          hint: "kubectl get pods -n kube-system" } },
+        { type: "drill", brief: "Oles Übungsrunde", pool: ["k-describe", "k-get-pods", "k-get-nodes"], count: 3,
+          intro: "Wiederholen, bis die Finger es allein können:" },
+        { type: "choice", npc: "ole", reviewId: "q-ch2-3",
+          q: "Und was war nochmal ein Node?",
+          options: [
+            { t: "Ein einzelner Server (Steg), der Pods ausführt – mehrere Nodes bilden den Cluster.", ok: true,
+              reply: "Sitzt! Cluster = Hafen, Node = Steg, Pod = Liegeplatz. Diese drei Begriffe trägst du jetzt für immer bei dir." },
+            { t: "Ein besonders großer Pod.", ok: false,
+              reply: "Nein – andersrum wird's richtig: Auf einem Node (Steg) stehen viele Pods (Liegeplätze)." },
+          ]},
+      ]},
 
-    /* ---------- Quest 4: YAML ---------- */
-    {
-      id: "q4", title: "Adas Seekarten", giver: "ada",
-      rewardXp: 60, rewardCoins: 40,
+    { id: "q6", title: "Der Dauerauftrag", giver: "ole", rewardXp: 35, rewardCoins: 25,
+      steps: [
+        { type: "dialog", npc: "ole", lines: [
+          "Jetzt wird's mächtig. Unbequeme Wahrheit: <b>Pods sind sterblich.</b> Deshalb erstellt man sie nie einzeln, sondern gibt einen Dauerauftrag: ein <b>Deployment</b>.",
+          "Ein Deployment sagt: „Halte IMMER N Kopien am Laufen.“ Stirbt eine → sofort Ersatz. Erstellt wird es so: <code>kubectl create deployment kasse --image=nginx</code>.",
+        ]},
+        { type: "teach", brief: "Dauerauftrag erteilen", cmd: {
+          id: "t-create", intro: "🆕 Neuer Befehl: <code>kubectl create deployment</code> – der Dauerauftrag.",
+          text: "Erstelle ein Deployment <code>kasse</code> mit dem Image <code>nginx</code>. (Der Fischmarkt braucht eine Kasse!)",
+          accept: [/^kubectl\s+create\s+deployment\s+kasse\s+--image[=\s]nginx(:\S+)?$/], solution: "kubectl create deployment kasse --image=nginx",
+          hint: "Muster: kubectl create deployment <name> --image=<image>" } },
+        { type: "dialog", npc: "ole", lines: [
+          "Eine Kasse läuft! Aber bei Hochbetrieb brauchen wir mehr. Das Beste am Deployment: <b>Skalieren ist ein Einzeiler</b> – du änderst nur die Wunsch-Zahl.",
+        ]},
+        { type: "teach", brief: "Hochskalieren", cmd: {
+          id: "t-scale", intro: "🆕 Neuer Befehl: <code>kubectl scale</code> – Anzahl der Kopien ändern.",
+          text: "Skaliere <code>kasse</code> auf <b>3</b> Kopien – und beobachte das Dock!",
+          accept: [/^kubectl\s+scale\s+deployment\s+kasse\s+--replicas[=\s]3$/], solution: "kubectl scale deployment kasse --replicas=3",
+          hint: "Muster: kubectl scale deployment <name> --replicas=<zahl>" } },
+        { type: "drill", brief: "Oles Übungsrunde", pool: ["k-create", "k-scale", "k-scale"], count: 3,
+          intro: "Skalieren muss in Fleisch und Blut übergehen:" },
+        { type: "choice", npc: "ole", reviewId: "q-ch3-1",
+          q: "Warum Pods über ein Deployment erstellen statt direkt?",
+          options: [
+            { t: "Pods sind sterblich – das Deployment ersetzt sie automatisch und hält die Anzahl.", ok: true,
+              reply: "Genau. Der Dauerauftrag arbeitet, während du schläfst. Morgen zeige ich dir den Beweis … 😏" },
+            { t: "Einzelne Pods sind teurer.", ok: false,
+              reply: "Nicht ganz – es geht um Automatik: Das Deployment hält den Soll-Zustand, auch nachts um 3." },
+          ]},
+      ]},
+
+    { id: "q7", title: "Der Sturm-Test", giver: "ole", rewardXp: 45, rewardCoins: 35,
+      steps: [
+        { type: "dialog", npc: "ole", lines: [
+          "Heute beweise ich dir das <b>Self-Healing</b>. Dein Auftrag klingt verrückt: <b>Versenke eine deiner eigenen Kassen-Kisten.</b> Im Ernst! Und schau dabei zum Dock.",
+        ]},
+        { type: "terminal", brief: "Der Sturm-Test", tasks: [
+          { id: "t-storm-1", text: "Hol dir mit <code>kubectl get pods</code> die Namen der <code>kasse</code>-Pods.",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Kennst du längst!" },
+          { id: "t-storm-2", text: "💥 Lösche einen <code>kasse</code>-Pod – Dock im Blick behalten!",
+            accept: [/^kubectl\s+delete\s+pods?\s+kasse-\S+$/], solution: "kubectl delete pod <kasse-pod-name>", hint: "kubectl delete pod <name>" },
+          { id: "t-storm-3", text: "Platsch – und der Kran war schneller! Prüfe: Es müssten wieder 3 sein, einer ganz frisch (kleines AGE).",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.lastDeletedPod !== null, solution: "kubectl get pods", hint: "Nochmal die Pod-Liste." },
+        ]},
+        { type: "dialog", npc: "ole", lines: [
+          "DAS ist Kubernetes! Soll: 3. Ist: 2. → Differenz sofort behoben. Ein letztes Puzzlestück fehlt: Neue Pods bekommen neue Namen und Adressen. Wie sollen Kund:innen die Kasse finden?",
+          "Mit einem <b>Service</b> – einer festen Adresse vor den wechselnden Pods. Wie ein Empfangstresen: Die Person dahinter wechselt, der Tresen bleibt.",
+        ]},
+        { type: "teach", brief: "Feste Adresse", cmd: {
+          id: "t-expose", intro: "🆕 Neuer Befehl: <code>kubectl expose</code> – stellt einen Service vor ein Deployment.",
+          text: "Stelle einen Service vor <code>kasse</code>, Port <b>80</b>. Draußen geht eine Laterne an!",
+          accept: [/^kubectl\s+expose\s+deployment\s+kasse\s+--port[=\s]80(\s.*)?$/], solution: "kubectl expose deployment kasse --port=80",
+          hint: "Muster: kubectl expose deployment <name> --port=80" } },
+        { type: "teach", brief: "Service-Liste", cmd: {
+          id: "t-getsvc", intro: "🆕 Neuer Befehl: <code>kubectl get services</code> – alle festen Adressen.",
+          text: "Zeig die Services an – deine <code>kasse</code> hat jetzt eine feste CLUSTER-IP.",
+          accept: [/^kubectl\s+get\s+(services|service|svc)$/], check: sim => sim.services.some(s => s.name === "kasse"),
+          solution: "kubectl get services", hint: "Kurzform svc geht auch." } },
+        { type: "drill", brief: "Oles Übungsrunde", pool: ["k-delete-pod", "k-expose", "k-get-svc"], count: 3,
+          intro: "Der ganze Werkzeugkasten einmal durch:" },
+        { type: "choice", npc: "ole", reviewId: "q-ch3-3",
+          q: "Wozu der Service nochmal?",
+          options: [
+            { t: "Feste, stabile Adresse vor den Pods – deren Namen und IPs wechseln ständig.", ok: true,
+              reply: "Sauber! Und WICHTIG: Ab jetzt verdienen deine Services draußen richtig Dublonen. Gesunder Cluster = volle Kasse. Aber Vorsicht … es gibt Gerüchte über <b>Piraten</b> in der Gegend. 🏴‍☠️" },
+            { t: "Der Service startet abgestürzte Pods neu.", ok: false,
+              reply: "Das macht das Deployment! Der Service ist nur der Empfangstresen davor – die feste Adresse." },
+          ]},
+      ]},
+
+    { id: "q8", title: "Adas Seekarten", giver: "ada", rewardXp: 45, rewardCoins: 32,
       steps: [
         { type: "dialog", npc: "ada", lines: [
-          "Pssst! Hier im Kartenhaus wird nicht gebrüllt. Du rufst dem Cluster deine Wünsche bisher einzeln zu, hm? <code>create</code> hier, <code>scale</code> da … Das nennt man <b>imperativ</b>. Tssss.",
-          "Profis <b>zeichnen Karten</b>: Sie schreiben den Wunschzustand in eine Datei. „Ich hätte gern: 2 Lager-Kisten mit Redis.“ Das ist <b>deklarativ</b> – und die Datei kann in <b>Git</b> liegen! Nachvollziehbar. Teilbar. Schön.",
-          "Diese Karten heißen <b>Manifeste</b> und sind in <b>YAML</b> geschrieben. Vier Stammdaten hat jedes: <code>apiVersion</code>, <code>kind</code> (was es ist), <code>metadata</code> (Name), <code>spec</code> (der Wunsch).",
-          "Und das Wichtigste: Einrückung mit <b>Leerzeichen</b> – NIEMALS Tabs, sonst spukt es hier noch mehr. Ich habe dir zwei Karten hingelegt. Erweck sie mit <code>kubectl apply</code> zum Leben!",
+          "Pssst! Hier wird nicht gebrüllt. Du rufst dem Cluster alles einzeln zu, hm? <code>create</code> hier, <code>scale</code> da … Das ist <b>imperativ</b>. Tssss.",
+          "Profis <b>zeichnen Karten</b>: den Wunschzustand in eine Datei. Das ist <b>deklarativ</b> – und die Datei kann in <b>Git</b> liegen! Diese Karten heißen <b>Manifeste</b>, geschrieben in <b>YAML</b>.",
+          "Vier Stammdaten hat jedes Manifest: <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code>. Und: Einrückung mit <b>Leerzeichen, NIEMALS Tabs</b>. Ich habe dir zwei Karten hingelegt – schau sie dir an!",
         ]},
-        { type: "terminal", brief: "Adas Karten anwenden",
+        { type: "terminal", brief: "Karten lesen",
           scenario: {
             files: { "deployment.yaml": DEPLOYMENT_YAML, "service.yaml": SERVICE_YAML },
             applyEffects: {
@@ -260,94 +479,125 @@
             },
           },
           tasks: [
-          { id: "t-ch4-1", text: "Schau nach, welche Dateien Ada dir hingelegt hat.",
-            accept: [/^ls$/], hint: "Der Klassiker zum Dateien-Auflisten, zwei Buchstaben.", solution: "ls" },
-          { id: "t-ch4-2", text: "Wirf einen Blick in <code>deployment.yaml</code>. Findest du <code>kind</code>, <code>replicas</code> und das Image?",
-            accept: [/^cat\s+deployment\.yaml$/], hint: "Dateien anzeigen geht mit cat <datei>.", solution: "cat deployment.yaml" },
-          { id: "t-ch4-3", text: "Jetzt deklarativ: Wende <code>deployment.yaml</code> auf den Cluster an!",
-            accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], hint: "Der Zauberbefehl: kubectl apply -f <datei>", solution: "kubectl apply -f deployment.yaml" },
-          { id: "t-ch4-4", text: "Wende auch <code>service.yaml</code> an.",
-            accept: [/^kubectl\s+apply\s+-f\s+service\.yaml$/], hint: "Gleicher Befehl, andere Datei.", solution: "kubectl apply -f service.yaml" },
-          { id: "t-ch4-5", text: "Prüfe das Ergebnis: Wie viele <code>lager</code>-Pods sind am Dock dazugekommen? (In der Karte standen <code>replicas: 2</code> …)",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "lager"); return d && d.replicas === 2; },
-            hint: "Pods anzeigen – kannst du längst!", solution: "kubectl get pods" },
-          { id: "t-ch4-6", text: "Adas Lieblingstrick: Führe denselben apply <b>nochmal</b> aus – und sieh, dass NICHTS doppelt entsteht („unchanged“).",
-            accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], hint: "Wirklich einfach nochmal derselbe Befehl.", solution: "kubectl apply -f deployment.yaml" },
+          { id: "t-ada-1", text: "Schau mit <code>ls</code> nach, was Ada dir hingelegt hat.", accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+          { id: "t-ada-2", text: "Lies <code>deployment.yaml</code> mit <code>cat</code>. Findest du <code>kind</code> und <code>replicas</code>?", accept: [/^cat\s+deployment\.yaml$/], solution: "cat deployment.yaml", hint: "cat <datei>" },
+        ]},
+        { type: "teach", brief: "Karte anwenden", cmd: {
+          id: "t-apply", intro: "🆕 Neuer Befehl: <code>kubectl apply -f</code> – „Stelle her, was in der Datei steht.“",
+          text: "Wende <code>deployment.yaml</code> auf den Cluster an – und schau zum Dock!",
+          accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "kubectl apply -f <datei>" } },
+        { type: "terminal", brief: "Adas Doppeltrick", tasks: [
+          { id: "t-ada-3", text: "Wende auch <code>service.yaml</code> an.", accept: [/^kubectl\s+apply\s+-f\s+service\.yaml$/], solution: "kubectl apply -f service.yaml", hint: "Gleicher Befehl, andere Datei." },
+          { id: "t-ada-4", text: "Adas Lieblingstrick: Denselben apply <b>nochmal</b> – nichts passiert doppelt („unchanged“)!",
+            accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "Wirklich nochmal exakt derselbe Befehl." },
         ]},
         { type: "choice", npc: "ada", reviewId: "q-ch4-4",
           q: "Du wendest dieselbe Karte zweimal an. Was passiert beim zweiten Mal?",
           options: [
-            { t: "Nichts Schlimmes – Kubernetes meldet „unchanged“, alles stimmt ja schon.", ok: true,
-              reply: "Wunderbar! apply vergleicht immer Soll (Karte) mit Ist (Hafen) und tut nur das Nötige. Das nennt man <b>idempotent</b>. Mein Lieblingswort." },
-            { t: "Alles wird doppelt erstellt – 4 Lager-Kisten!", ok: false,
-              reply: "Nein! Das ist ja das Schöne: apply gleicht Soll und Ist ab. Es existiert schon? Dann passiert: nichts. „unchanged“." },
+            { t: "Nichts Schlimmes – „unchanged“, alles stimmt ja schon.", ok: true,
+              reply: "Wunderbar! apply vergleicht Soll mit Ist und tut nur das Nötige. Das nennt man <b>idempotent</b>. Mein Lieblingswort." },
+            { t: "Alles wird doppelt erstellt.", ok: false,
+              reply: "Nein! apply gleicht Soll und Ist ab. Schon da? Dann: „unchanged“. Deshalb ist es so sicher." },
           ]},
         { type: "dialog", npc: "ada", lines: [
-          "Du hast das Zeug zur Kartografie! Behalte das Prinzip: <b>Wunschzustand aufschreiben, System stellt ihn her.</b> Es wird gleich nochmal wichtig …",
-          "<b>Runa in der Werft</b> im Norden wartet schon auf dich. Sie hat ein … Steuerrad-Problem. Du wirst schon sehen. <i>*kichert*</i>",
+          "Merke: <b>Wunschzustand aufschreiben, System stellt ihn her.</b> Das Prinzip kommt wieder – frag mal <b>Runa in der Werft</b>. Sie hat ein … Steuerrad-Problem. <i>*kichert*</i>",
         ]},
-      ],
-    },
+      ]},
 
-    /* ---------- Quest 5: Helm ---------- */
-    {
-      id: "q5", title: "Runas Steuerrad", giver: "runa",
-      rewardXp: 70, rewardCoins: 50,
+    { id: "q9", title: "Das Steuerrad", giver: "runa", rewardXp: 35, rewardCoins: 25,
       steps: [
         { type: "dialog", npc: "runa", lines: [
-          "Ahoi! Runa, Werftchefin. Lass mich raten: Du dachtest bei <b>Helm</b> erst an das Ding für den Kopf? HA! Passiert allen. Helm ist Englisch für <b>Steuerrad</b> – schau dir das Logo an!",
-          "Und WAS es ist: der <b>Paketmanager für Kubernetes</b>. Bei Ada waren es 2 Karten für eine Mini-App. Eine ECHTE App braucht 20, 30 Manifeste. Und das dreimal: Test, Staging, Produktion. 90 Dateien pflegen? NIEMALS.",
-          "Helm bündelt alles in ein <b>Chart</b> – ein Paket mit Drehknöpfen. Die Drehknöpfe stehen in <code>values.yaml</code>. Eine Installation eines Charts heißt <b>Release</b>.",
-          "Und das Beste: Geht ein Update schief, rettet dich <code>helm rollback</code>. Genug geredet – hol dir das nginx-Chart und hiss die Flagge! Für jedes Release weht hier an der Werft eine. Drück <b>T</b>!",
+          "Ahoi! Runa, Werftchefin. Lass mich raten – bei <b>Helm</b> dachtest du an das Ding für den Kopf? HA! Helm ist Englisch für <b>Steuerrad</b> – und der <b>Paketmanager für Kubernetes</b>.",
+          "Bei Ada: 2 Karten für eine Mini-App. Eine ECHTE App: 30 Manifeste, mal drei Umgebungen. 90 Dateien?! NIEMALS. Helm bündelt alles in ein <b>Chart</b> – ein Paket mit Drehknöpfen.",
+          "Charts liegen in <b>Repos</b> (wie Docker Hub für Images). Schritt eins: ein Repo hinzufügen.",
         ]},
-        { type: "terminal", brief: "Runas Werft-Auftrag", tasks: [
-          { id: "t-ch5-1", text: "Füge das bekannte Chart-Repo <code>bitnami</code> hinzu (URL: <code>https://charts.bitnami.com/bitnami</code>).",
-            accept: [/^helm\s+repo\s+add\s+bitnami\s+https:\/\/charts\.bitnami\.com\/bitnami$/], hint: "Muster: helm repo add <name> <url>", solution: "helm repo add bitnami https://charts.bitnami.com/bitnami" },
-          { id: "t-ch5-2", text: "Aktualisiere die Repo-Informationen.",
-            accept: [/^helm\s+repo\s+update$/], hint: "Auch das geht über helm repo …", solution: "helm repo update" },
-          { id: "t-ch5-3", text: "Suche in den Repos nach einem <code>nginx</code>-Chart.",
-            accept: [/^helm\s+search\s+repo\s+nginx$/], hint: "Muster: helm search repo <suchwort>", solution: "helm search repo nginx" },
-          { id: "t-ch5-4", text: "Installiere <code>bitnami/nginx</code> als Release mit dem Namen <code>mein-web</code>. (Flaggen-Blick zur Werft!)",
-            accept: [/^helm\s+install\s+mein-web\s+bitnami\/nginx$/], hint: "Muster: helm install <release-name> <repo>/<chart>", solution: "helm install mein-web bitnami/nginx" },
-          { id: "t-ch5-5", text: "Lass dir alle installierten Releases anzeigen.",
-            accept: [/^helm\s+(list|ls)$/], hint: "Der Befehl heißt wie das englische Wort für „auflisten“.", solution: "helm list" },
-          { id: "t-ch5-6", text: "Spannend: Was hat Helm in den Cluster gebaut? Schau mit <b>kubectl</b> nach den Pods – und aufs Dock!",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.releases.length > 0,
-            hint: "Helm erzeugt ganz normale Kubernetes-Ressourcen.", solution: "kubectl get pods" },
-          { id: "t-ch5-7", text: "Upgrade! Stelle das Release per <code>--set replicaCount=3</code> auf 3 Kopien um.",
-            accept: [/^helm\s+upgrade\s+mein-web\s+bitnami\/nginx\s+--set\s+replicaCount=3$/], hint: "Muster: helm upgrade <release> <chart> --set replicaCount=3", solution: "helm upgrade mein-web bitnami/nginx --set replicaCount=3" },
-          { id: "t-ch5-8", text: "Ups – Befehl von oben: doch wieder zurück! Rolle das Release auf Revision <b>1</b> zurück.",
-            accept: [/^helm\s+rollback\s+mein-web(\s+1)?$/], hint: "Muster: helm rollback <release> <revision>", solution: "helm rollback mein-web 1" },
-          { id: "t-ch5-9", text: "Übung beendet: Deinstalliere das Release <code>mein-web</code> komplett. (Die Flagge wird eingeholt …)",
-            accept: [/^helm\s+uninstall\s+mein-web$/], hint: "Das Gegenteil von install …", solution: "helm uninstall mein-web" },
+        { type: "teach", brief: "Chart-Quelle anzapfen", cmd: {
+          id: "t-repoadd", intro: "🆕 Neuer Befehl: <code>helm repo add</code> – eine Chart-Quelle hinzufügen.",
+          text: "Füge das Repo <code>bitnami</code> hinzu (URL: <code>https://charts.bitnami.com/bitnami</code>).",
+          accept: [/^helm\s+repo\s+add\s+bitnami\s+https:\/\/charts\.bitnami\.com\/bitnami$/], solution: "helm repo add bitnami https://charts.bitnami.com/bitnami",
+          hint: "Muster: helm repo add <name> <url>" } },
+        { type: "terminal", brief: "Stöbern", tasks: [
+          { id: "t-runa-1", text: "Aktualisiere die Repo-Infos mit <code>helm repo update</code>.", accept: [/^helm\s+repo\s+update$/], solution: "helm repo update", hint: "helm repo …" },
+          { id: "t-runa-2", text: "Suche mit <code>helm search repo nginx</code> nach einem Webserver-Chart.", accept: [/^helm\s+search\s+repo\s+nginx$/], solution: "helm search repo nginx", hint: "helm search repo <begriff>" },
         ]},
+        { type: "choice", npc: "runa", reviewId: "q-ch5-1",
+          q: "Einmal festnageln: Was IST Helm?",
+          options: [
+            { t: "Der Paketmanager für Kubernetes – installiert komplette Apps als Charts.", ok: true,
+              reply: "Genau! Wie ein App-Store für den Cluster. Morgen hissen wir die erste Flagge!" },
+            { t: "Ein Kopfschutz für die Werft.", ok: false,
+              reply: "HA! Reingefallen. Steuerrad! Paketmanager! Schau aufs Logo!" },
+          ]},
+      ]},
+
+    { id: "q10", title: "Flagge hissen", giver: "runa", rewardXp: 40, rewardCoins: 30,
+      steps: [
+        { type: "dialog", npc: "runa", lines: [
+          "Jetzt wird installiert! Eine Installation eines Charts heißt <b>Release</b> und bekommt einen eigenen Namen. Für jedes Release weht hier an der Werft eine <b>Flagge</b> – gleich siehst du's!",
+        ]},
+        { type: "teach", brief: "Erste Installation", cmd: {
+          id: "t-install", intro: "🆕 Neuer Befehl: <code>helm install</code> – ein Chart als Release installieren.",
+          text: "Installiere <code>bitnami/nginx</code> als Release <code>mein-web</code>. Flaggen-Blick zur Werft!",
+          accept: [/^helm\s+install\s+mein-web\s+bitnami\/nginx$/], solution: "helm install mein-web bitnami/nginx",
+          hint: "Muster: helm install <release-name> <repo>/<chart>" } },
+        { type: "terminal", brief: "Was ist da passiert?", tasks: [
+          { id: "t-runa-3", text: "Zeig die Releases mit <code>helm list</code>.", accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." },
+          { id: "t-runa-4", text: "Und jetzt der Aha-Moment: Schau mit <b>kubectl</b> nach den Pods – Helm hat ganz normale Kubernetes-Ressourcen gebaut!",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.releases.length > 0, solution: "kubectl get pods", hint: "Kennst du im Schlaf." },
+        ]},
+        { type: "drill", brief: "Runas Übungsrunde", pool: ["helm-install", "helm-list"], count: 2,
+          intro: "Noch ein Release zum Festigen – mehr Flaggen!" },
         { type: "choice", npc: "runa", reviewId: "q-ch5-2",
-          q: "Runa fragt: Chart und Release – was ist der Unterschied?",
+          q: "Chart und Release – was ist der Unterschied?",
           options: [
             { t: "Chart = das Paket (Vorlage), Release = eine installierte Instanz davon.", ok: true,
-              reply: "Sauber! Wie Image und Container bei Docker. Aus einem Chart kannst du zehn Releases installieren – jedes mit eigenem Namen und eigener Flagge!" },
+              reply: "Sauber! Wie Image und Container bei Docker. Ein Chart, viele Releases, viele Flaggen!" },
             { t: "Release = die Vorlage, Chart = die Installation.", ok: false,
-              reply: "Andersrum! Das Chart liegt im Regal (Vorlage), das Release weht am Mast (installiert). Eselsbrücke: Software-RELEASES sind veröffentlichte, laufende Dinger." },
+              reply: "Andersrum: Das Chart liegt im Regal, das Release weht am Mast." },
           ]},
-        { type: "dialog", npc: "runa", lines: [
-          "Du steuerst das Rad wie ein alter Hase! Eine Sache noch, dann bist du durch mit der Grundausbildung …",
-          "<b>Theo</b> vom Vermessungstrupp campiert östlich vom Markt. Der Rat plant eine <b>Hafenerweiterung</b> – und Theo braucht jemanden, der keine Angst vor großen Plänen hat.",
-        ]},
-      ],
-    },
+      ]},
 
-    /* ---------- Quest 6: Terraform ---------- */
-    {
-      id: "q6", title: "Neues Land für Port Kubernia", giver: "theo",
-      rewardXp: 100, rewardCoins: 80,
+    { id: "q11", title: "Auf und ab", giver: "runa", rewardXp: 45, rewardCoins: 35,
+      steps: [
+        { type: "dialog", npc: "runa", lines: [
+          "Heute das Beste an Helm. Apps ändern sich: mehr Kopien, neue Version … Dafür gibt's <code>helm upgrade</code> mit <code>--set</code> – die Drehknöpfe aus <code>values.yaml</code> direkt verstellen.",
+        ]},
+        { type: "teach", brief: "Drehknopf verstellen", cmd: {
+          id: "t-upgrade", intro: "🆕 Neuer Befehl: <code>helm upgrade --set</code> – ein Release ändern.",
+          text: "Stelle <code>mein-web</code> per <code>--set replicaCount=3</code> auf 3 Kopien.",
+          accept: [/^helm\s+upgrade\s+mein-web\s+bitnami\/nginx\s+--set\s+replicaCount=3$/], solution: "helm upgrade mein-web bitnami/nginx --set replicaCount=3",
+          hint: "Muster: helm upgrade <release> <chart> --set replicaCount=3" } },
+        { type: "dialog", npc: "runa", lines: [
+          "Und wenn ein Upgrade alles kaputt macht? <b>Keine Panik!</b> Helm merkt sich jede Revision. <code>helm rollback</code> bringt dich zurück. Dieser Befehl hat mir mal ein Wochenende gerettet.",
+        ]},
+        { type: "teach", brief: "Der Lebensretter", cmd: {
+          id: "t-rollback", intro: "🆕 Neuer Befehl: <code>helm rollback</code> – zurück zu einer früheren Revision.",
+          text: "Befehl von oben: doch wieder zurück! Rolle <code>mein-web</code> auf Revision <b>1</b>.",
+          accept: [/^helm\s+rollback\s+mein-web(\s+1)?$/], solution: "helm rollback mein-web 1", hint: "Muster: helm rollback <release> <revision>" } },
+        { type: "teach", brief: "Aufräumen", cmd: {
+          id: "t-uninstall", intro: "🆕 Neuer Befehl: <code>helm uninstall</code> – Release komplett entfernen.",
+          text: "Übung vorbei: Deinstalliere <code>mein-web</code>. (Die Flagge wird eingeholt …)",
+          accept: [/^helm\s+uninstall\s+mein-web$/], solution: "helm uninstall mein-web", hint: "Das Gegenteil von install." } },
+        { type: "drill", brief: "Runas Übungsrunde", pool: ["helm-upgrade", "helm-rollback"], count: 2,
+          intro: "Upgrade & Rollback – das Power-Duo, nochmal:" },
+        { type: "choice", npc: "runa", reviewId: "q-ch5-4",
+          q: "Dein Upgrade hat alles zerschossen. Panik?",
+          options: [
+            { t: "Nein – helm rollback bringt das Release auf eine frühere Revision zurück.", ok: true,
+              reply: "Eingebrannt! Revisions-Historie = dein Sicherheitsnetz. Jetzt ab zu <b>Theo</b> östlich vom Markt – der Rat plant GROSSES." },
+            { t: "Ja – Cluster löschen und neu aufsetzen.", ok: false,
+              reply: "Bloß nicht! helm rollback <release> <revision> – zwei Sekunden, gerettet." },
+          ]},
+      ]},
+
+    { id: "q12", title: "Neues Land", giver: "theo", rewardXp: 45, rewardCoins: 35,
       steps: [
         { type: "dialog", npc: "theo", lines: [
-          "Du bist also die Funk-Legende, von der alle reden! Theo, Landvermessung. Eine Frage: Wer hat eigentlich den Hafen <b>gebaut</b>, auf dem deine ganzen Kisten stehen?",
-          "Früher hat man Infrastruktur zusammengeklickt – und nach einem Jahr wusste niemand mehr, wer was warum. Heute beschreiben wir sie als <b>Textdatei</b>: <b>Infrastructure as Code</b>! Das Werkzeug: <b>Terraform</b>.",
-          "Kommt dir bekannt vor? Genau – <b>deklarativ</b>, wie Adas Karten! Nur baut Terraform nicht Kisten IM Hafen, sondern <b>den Hafen selbst</b>: Land, Server, Netze.",
-          "Der heilige Dreischritt: <code>init</code> (Werkzeug laden) → <code>plan</code> (Generalprobe – IMMER erst lesen!) → <code>apply</code> (bauen!). Der Bauplan liegt in <code>main.tf</code>. Lass Land entstehen! Drück <b>T</b>!",
+          "Die Funk-Legende persönlich! Theo, Landvermessung. Eine Frage: Wer hat eigentlich den Hafen <b>gebaut</b>, auf dem deine Kisten stehen?",
+          "Früher: zusammengeklickt und vergessen. Heute: <b>Infrastructure as Code</b> – die ganze Infrastruktur als Textdatei! Werkzeug: <b>Terraform</b>. Deklarativ, wie Adas Karten – nur baut es <b>den Hafen selbst</b>.",
+          "Der Bauplan für die Ost-Erweiterung liegt schon da. Drei Schritte trennen uns von neuem Land: <code>init</code> → <code>plan</code> → <code>apply</code>. Eins nach dem anderen!",
         ]},
-        { type: "terminal", brief: "Die Ost-Erweiterung",
+        { type: "terminal", brief: "Bauplan lesen",
           scenario: {
             files: { "main.tf": MAIN_TF },
             tfResources: [
@@ -357,54 +607,123 @@
             ],
           },
           tasks: [
-          { id: "t-ch6-1", text: "Lies zuerst den Bauplan <code>main.tf</code>. Wie viele <code>resource</code>-Blöcke findest du?",
-            accept: [/^cat\s+main\.tf$/], hint: "Dateien anzeigen – wie bei Ada.", solution: "cat main.tf" },
-          { id: "t-ch6-2", text: "Initialisiere das Terraform-Projekt (lädt die Provider-Plugins).",
-            accept: [/^terraform\s+init$/], hint: "Der allererste Befehl in jedem Terraform-Projekt.", solution: "terraform init" },
-          { id: "t-ch6-3", text: "Generalprobe! Lass dir zeigen, was Terraform bauen <b>würde</b> – ohne es zu tun.",
-            accept: [/^terraform\s+plan$/], hint: "Die Generalprobe hieß …?", solution: "terraform plan" },
-          { id: "t-ch6-4", text: "Der Plan sieht gut aus (1 Plateau, 2 Server). Jetzt im Ernst: <b>Baue!</b> Und schau nach Osten!! 🏗️",
-            accept: [/^terraform\s+apply(\s+-auto-approve)?$/], hint: "Nach der Generalprobe kommt die Aufführung.", solution: "terraform apply" },
-          { id: "t-ch6-5", text: "Wirf einen Blick in Terraforms Gedächtnis: Was steht im <b>State</b>?",
-            accept: [/^terraform\s+state\s+list$/], hint: "Muster: terraform state list", solution: "terraform state list" },
-          { id: "t-ch6-6", text: "Führe nochmal <code>terraform plan</code> aus – es sollte „No changes“ melden. Soll = Ist!",
-            accept: [/^terraform\s+plan$/], check: sim => sim.tf.applied, hint: "Einfach nochmal plan.", solution: "terraform plan" },
-          { id: "t-ch6-7", text: "Der Rat will erst nächstes Jahr bauen … und Übungs-Land kostet Miete. Reiß es wieder ab!",
-            accept: [/^terraform\s+destroy(\s+-auto-approve)?$/], hint: "Das zerstörerische Gegenteil von apply …", solution: "terraform destroy" },
+          { id: "t-theo-1", text: "Lies den Bauplan: <code>cat main.tf</code>. Wie viele <code>resource</code>-Blöcke siehst du?", accept: [/^cat\s+main\.tf$/], solution: "cat main.tf", hint: "Wie bei Ada." },
         ]},
+        { type: "teach", brief: "Werkzeug laden", cmd: {
+          id: "t-init", intro: "🆕 Neuer Befehl: <code>terraform init</code> – lädt die Provider-Plugins. Immer Schritt 1!",
+          text: "Initialisiere das Projekt.",
+          accept: [/^terraform\s+init$/], solution: "terraform init", hint: "Der allererste Befehl jedes Terraform-Projekts." } },
+        { type: "teach", brief: "Generalprobe", cmd: {
+          id: "t-plan", intro: "🆕 Neuer Befehl: <code>terraform plan</code> – zeigt, was passieren WÜRDE. Profis lesen IMMER erst den Plan!",
+          text: "Lass dir den Plan zeigen – ohne dass etwas passiert.",
+          accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Die Generalprobe." } },
         { type: "choice", npc: "theo", reviewId: "q-ch6-2",
-          q: "Theo will's genau wissen: plan vs. apply?",
+          q: "Bevor du baust – plan vs. apply?",
           options: [
             { t: "plan zeigt nur, was passieren würde – apply führt es wirklich aus.", ok: true,
-              reply: "Korrekt! Und die eiserne Regel der Profis: NIEMALS apply ohne vorher den plan zu lesen. Das hat schon ganze Häfen gerettet." },
-            { t: "plan ist für kleine, apply für große Bauprojekte.", ok: false,
-              reply: "Nein – Größe ist egal! plan = Generalprobe (passiert nichts), apply = Aufführung (wird gebaut). Immer in dieser Reihenfolge." },
+              reply: "Korrekt! Und jetzt … BAU DAS LAND! Ich kann nicht hinsehen. Doch. Ich sehe hin!" },
+            { t: "plan ist für kleine, apply für große Projekte.", ok: false,
+              reply: "Nein: plan = Generalprobe (passiert nichts), apply = Aufführung. IMMER in der Reihenfolge." },
+          ]},
+        { type: "teach", brief: "LAND IN SICHT!", cmd: {
+          id: "t-apply-tf", intro: "🆕 Neuer Befehl: <code>terraform apply</code> – der Plan wird Wirklichkeit.",
+          text: "Baue die Ost-Erweiterung – und schau nach Osten aufs Wasser!! 🏗️",
+          accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply", hint: "Nach der Generalprobe die Aufführung." } },
+        { type: "dialog", npc: "theo", lines: [
+          "DA! NEUES LAND! Du hast mit einer TEXTDATEI eine Insel gebaut! <i>*wischt sich eine Träne weg*</i> Geh ruhig mal drauf spazieren. Morgen zeige ich dir Terraforms Gedächtnis.",
+        ]},
+      ]},
+
+    { id: "q13", title: "Gedächtnis und Abriss", giver: "theo", rewardXp: 45, rewardCoins: 35,
+      steps: [
+        { type: "dialog", npc: "theo", lines: [
+          "Terraform führt Buch über alles, was es gebaut hat: den <b>State</b> – sein Gedächtnis. Beim nächsten plan vergleicht es: Was steht in den Dateien (Soll)? Was existiert (Ist)? Nur die <b>Differenz</b> wird umgesetzt.",
+        ]},
+        { type: "teach", brief: "Ins Gedächtnis schauen", cmd: {
+          id: "t-state", intro: "🆕 Neuer Befehl: <code>terraform state list</code> – was steht im Gedächtnis?",
+          text: "Zeig den State an – alle drei gebauten Ressourcen sollten drinstehen.",
+          accept: [/^terraform\s+state\s+list$/], solution: "terraform state list", hint: "terraform state …" } },
+        { type: "terminal", brief: "Der Beweis", tasks: [
+          { id: "t-theo-2", text: "Führe nochmal <code>terraform plan</code> aus. Es muss „No changes“ melden – Soll = Ist!",
+            accept: [/^terraform\s+plan$/], check: sim => sim.tf.applied, solution: "terraform plan", hint: "Einfach nochmal plan." },
+        ]},
+        { type: "teach", brief: "Kontrollierter Abriss", cmd: {
+          id: "t-destroy", intro: "🆕 Neuer Befehl: <code>terraform destroy</code> – reißt ALLES wieder ab, was Terraform gebaut hat.",
+          text: "Der Rat baut erst nächstes Jahr, und Übungs-Land kostet Miete: Reiß die Erweiterung ab!",
+          accept: [/^terraform\s+destroy(\s+-auto-approve)?$/], solution: "terraform destroy", hint: "Das Gegenteil von apply." } },
+        { type: "choice", npc: "theo", reviewId: "q-ch6-3",
+          q: "Was ist der Terraform-State?",
+          options: [
+            { t: "Terraforms Gedächtnis: eine Datei mit allem, was es bereits gebaut hat.", ok: true,
+              reply: "Perfekt! Soll (Dateien) vs. Ist (State) → nur die Differenz wird gebaut. Du hast den ganzen Zyklus drauf: init → plan → apply → destroy!" },
+            { t: "Das Fehlerprotokoll von Terraform.", ok: false,
+              reply: "Nein – das Gedächtnis! Es weiß, was schon existiert. Deshalb meldete plan eben „No changes“." },
           ]},
         { type: "dialog", npc: "theo", lines: [
-          "Du hast … mit einer TEXTDATEI … Land erschaffen und wieder abgerissen. Weißt du, wie lange ich dafür gebraucht habe?! <i>*wischt sich eine Träne weg*</i>",
-          "Docker, Kubernetes, YAML, Helm, Terraform – du beherrschst den ganzen Werkzeugkasten. Der Rat hat entschieden: Glückwunsch, <b>Admiral-Anwärter:in</b>!",
-          "Halte dein Wissen frisch – Krabbe Kralle wartet täglich auf dich. Und es gehen Gerüchte um … über die <b>Ingress-Inseln</b>, das <b>GitOps-Archipel</b> und den <b>Monitoring-Leuchtturm</b>. Fortsetzung folgt! ⚓",
+          "Docker, Kubernetes, YAML, Helm, Terraform – fast geschafft! Eine Sache fehlt noch, und sie ist <b>brandgefährlich</b>. Ole wartet schon. Es geht um … die <b>Krake</b>. 🐙",
         ]},
-      ],
-    },
+      ]},
+
+    { id: "q14", title: "Die Hacker-Krake", giver: "ole", rewardXp: 60, rewardCoins: 50,
+      steps: [
+        { type: "dialog", npc: "ole", lines: [
+          "Schlechte Nachrichten. In den Gewässern lauert die <b>Hacker-Krake</b> 🐙 – sie liest ALLES mit, was unverschlüsselt im Cluster liegt. Und jetzt rate, was ich in unserer Konfiguration gefunden habe …",
+          "Ein <b>Passwort im Klartext</b>! In einer ConfigMap! Schau es dir an – mit <code>cat boese-config.yaml</code> – und schäm dich stellvertretend für uns alle.",
+        ]},
+        { type: "terminal", brief: "Das Leck finden",
+          scenario: { files: { "boese-config.yaml": BOESE_CONFIG_YAML } },
+          tasks: [
+          { id: "t-ole-sec1", text: "Lies <code>boese-config.yaml</code>. Siehst du das Problem?",
+            accept: [/^cat\s+boese-config\.yaml$/], solution: "cat boese-config.yaml", hint: "cat <datei>" },
+        ]},
+        { type: "dialog", npc: "ole", lines: [
+          "<code>datenbank_passwort: fisch123</code> – Krakenfutter! Die Regel lautet: <b>Vertrauliches gehört NIE in YAML-Dateien oder ConfigMaps.</b> Dafür gibt es <b>Secrets</b> – Kubernetes' Schatztruhen.",
+        ]},
+        { type: "teach", brief: "Die Schatztruhe", cmd: {
+          id: "t-secret", intro: "🆕 Neuer Befehl: <code>kubectl create secret generic</code> – Vertrauliches sicher ablegen.",
+          text: "Lege ein Secret <code>db-zugang</code> an, mit <code>--from-literal=passwort=tintenfisch88</code>.",
+          accept: [/^kubectl\s+create\s+secret\s+generic\s+db-zugang\s+--from-literal[=\s][\w.-]+=\S+$/],
+          solution: "kubectl create secret generic db-zugang --from-literal=passwort=tintenfisch88",
+          hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert" } },
+        { type: "teach", brief: "Truhen zählen", cmd: {
+          id: "t-getsecrets", intro: "🆕 Neuer Befehl: <code>kubectl get secrets</code> – alle Schatztruhen anzeigen.",
+          text: "Zeig die Secrets an. Beachte: Den INHALT zeigt die Liste nicht – genau das ist der Punkt!",
+          accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …" } },
+        { type: "drill", brief: "Sicherheits-Drill", pool: ["k-secret", "k-get-secrets"], count: 2,
+          intro: "Sicherheit muss sitzen – zwei Wiederholungen:" },
+        { type: "choice", npc: "ole", reviewId: "q-sec-1",
+          q: "Wohin gehören Passwörter und API-Schlüssel im Cluster?",
+          options: [
+            { t: "In Secrets – niemals im Klartext in YAML-Dateien oder ConfigMaps.", ok: true,
+              reply: "DAS rettet Häfen! Die Krake wird trotzdem immer wieder angreifen – aber jetzt weißt du, wie man sie vertreibt." },
+            { t: "In die ConfigMap, da sind sie übersichtlich.", ok: false,
+              reply: "NEIN! ConfigMaps sind Klartext – Krakenfutter! Vertrauliches gehört in Secrets." },
+          ]},
+        { type: "dialog", npc: "ole", lines: [
+          "Damit erkläre ich deine <b>Grundausbildung für abgeschlossen</b>! 🎉 Docker, Kubernetes, YAML, Helm, Terraform, Security – du hast den ganzen Werkzeugkasten.",
+          "Aber Port Kubernia schläft nie: <b>Piraten</b> überfallen die Stege, die <b>Krake</b> schnüffelt nach Klartext, und deine Dienste verdienen rund um die Uhr. Halte den Hafen am Laufen – und übe bei uns allen, wann immer du magst!",
+          "Es gehen übrigens Gerüchte um … über die <b>Ingress-Inseln</b> und das <b>GitOps-Archipel</b>. Fortsetzung folgt, Admiral-Anwärter:in! ⚓",
+        ]},
+      ]},
   ];
 
-  /* ---------- Standard-Dialoge (wenn keine Quest ansteht) ---------- */
+  /* ---------- Standard-Dialoge ---------- */
   const SMALLTALK = {
-    ole: ["Der Hafen läuft wie geschmiert – dank dir! Schau mal bei Krabbe Kralle vorbei, Wissen rostet schneller als Anker.", "Wusstest du? „Kubernetes“ ist griechisch für Steuermann. Und K8s spricht man „Kates“. Klingt wie ein Vorname, ich weiß."],
+    ole: ["Der Hafen läuft wie geschmiert – dank dir!", "K8s spricht man übrigens „Kates“. Klingt wie ein Vorname, ich weiß."],
     bo: ["BO. STAPELT. <i>*zufriedenes Knirschen*</i>", "Bo-Weisheit: Image ist Bauplan. Container läuft. Bo verwechselt nie. Bo ist Stein."],
-    ada: ["Pssst. Ich katalogisiere gerade … alles.", "Falls du es vergisst: Leerzeichen, keine Tabs. LEERZEICHEN. KEINE TABS."],
-    runa: ["Das Steuerrad-Logo von Helm hängt jetzt über meinem Bett. Was? Es ist hübsch!", "helm rollback hat mir mal ein ganzes Wochenende gerettet. Bestes Kommando der Welt."],
+    ada: ["Pssst. Ich katalogisiere gerade … alles.", "Leerzeichen, keine Tabs. LEERZEICHEN. KEINE TABS."],
+    runa: ["Das Helm-Logo hängt über meinem Bett. Was? Es ist hübsch!", "helm rollback hat mir mal ein Wochenende gerettet."],
     theo: ["Ich vermesse gerade die Möglichkeiten. Sie sind … beachtlich.", "terraform plan lesen. IMMER. Frag nicht, woher ich das weiß."],
-    pelle: ["Frische Ware, faire Preise! Na ja – Preise.", "Die Fernrohre sind diese Woche besonders scharf eingestellt!"],
+    pelle: ["Frische Ware, faire Preise! Na ja – Preise.", "Die Kanone da drüben? Bestseller, seit die Piraten wieder da sind."],
   };
 
-  /* ---------- Karteikarten für Krabbe Kralle (Spaced Repetition) ---------- */
+  /* ---------- Karteikarten (Krabbe Kralle) ---------- */
   const CRAB_QUIZ = [
     { id: "q-ch1-1", q: "Welches Problem lösen Software-Container hauptsächlich?", options: ["Eine App läuft mit allem Drumherum überall gleich – Laptop, Server, Cloud.", "Sie machen Programme automatisch schneller.", "Sie verschlüsseln Programme gegen Angriffe.", "Sie sparen Speicherplatz."], correct: 0, explain: "Container packen die App mit allen Abhängigkeiten in eine genormte Box. „Bei mir läuft's aber!“ ist damit Geschichte." },
     { id: "q-ch1-2", q: "Image vs. Container – was ist was?", options: ["Image = Bauplan/Vorlage, Container = laufende Instanz davon.", "Kein Unterschied, zwei Wörter für dasselbe.", "Container = Vorlage, Image = das laufende Programm.", "Images sind für Linux, Container für Windows."], correct: 0, explain: "Tiefkühlpizza (Image) und Pizza im Ofen (Container): Aus einem Image kannst du viele Container starten." },
     { id: "q-ch1-3", q: "Was ist Docker Hub?", options: ["Eine Registry – ein öffentlicher „Supermarkt“ für fertige Images.", "Das Hauptquartier der Firma Docker.", "Ein USB-Hub für Container.", "Ein Überwachungstool."], correct: 0, explain: "Eine Registry speichert Images. docker pull nginx lädt z.B. das nginx-Image von Docker Hub." },
     { id: "q-ch1-4", q: "Was zeigt der Befehl docker ps?", options: ["Alle gerade laufenden Container.", "Alle heruntergeladenen Images.", "Die Prozessorlast.", "Alle Images auf Docker Hub."], correct: 0, explain: "docker ps = laufende Container. Mit -a („all“) siehst du auch die gestoppten." },
+    { id: "q-ch1-5", q: "Woraus besteht ein Docker-Image intern?", options: ["Aus übereinandergestapelten Schichten (Layern) – unten die Basis, oben die App.", "Aus einer einzigen großen Datei ohne Struktur.", "Aus dem Quellcode der App.", "Aus einer virtuellen Festplatte mit Betriebssystem."], correct: 0, explain: "Image = Schichtstapel: Base-Image unten, dann Bibliotheken, oben die App. Unveränderte Schichten kommen aus dem Cache – deshalb sind gute Schicht-Reihenfolgen so wichtig (Stapel-Spiel bei Bo!)." },
     { id: "q-ch2-1", q: "Wofür braucht man Kubernetes, wenn es Docker gibt?", options: ["Es verwaltet viele Container auf vielen Servern automatisch: neu starten, verteilen, skalieren.", "Es ersetzt Docker, weil Docker veraltet ist.", "Es macht Container kleiner.", "Es ist nur eine grafische Oberfläche für Docker."], correct: 0, explain: "Docker startet Container, Kubernetes orchestriert sie in großem Stil – die Hafenmeisterei für hunderte Kisten." },
     { id: "q-ch2-2", q: "Was ist ein Pod?", options: ["Die kleinste Einheit in Kubernetes – meist genau ein Container drin.", "Ein anderes Wort für einen Server.", "Eine Gruppe von mindestens zehn Containern.", "Das Konfigurationsformat von Kubernetes."], correct: 0, explain: "Kubernetes verwaltet nie Container direkt, sondern immer Pods – die Liegeplätze mit den Kisten drauf." },
     { id: "q-ch2-3", q: "Was ist ein Node?", options: ["Ein einzelner Server, der zum Cluster gehört und Pods ausführt.", "Ein Backup des Clusters.", "Ein spezieller Pod für Datenbanken.", "Das Kabel zwischen zwei Clustern."], correct: 0, explain: "Im Hafenbild: ein Steg. Mehrere Nodes zusammen bilden den Cluster." },
@@ -424,26 +743,37 @@
     { id: "q-ch6-2", q: "terraform plan vs. apply?", options: ["plan zeigt nur, was passieren würde – apply führt es aus.", "plan für kleine, apply für große Infrastruktur.", "apply zeigt den Plan, plan wendet an.", "Kein Unterschied."], correct: 0, explain: "Immer erst plan lesen, dann apply. Die Generalprobe vor der Aufführung." },
     { id: "q-ch6-3", q: "Was ist der Terraform-State?", options: ["Terraforms Gedächtnis: was es bereits gebaut hat.", "Der Bundesstaat des Rechenzentrums.", "Eine Statusanzeige der Installation.", "Das Fehlerprotokoll."], correct: 0, explain: "Dank State vergleicht Terraform Soll (.tf-Dateien) mit Ist und setzt nur die Differenz um." },
     { id: "q-ch6-4", q: "Kubernetes und Terraform sind beide deklarativ. Unterschied?", options: ["Kubernetes verwaltet Container im Cluster – Terraform baut die Infrastruktur drumherum.", "Terraform ist nur für Windows-Server.", "Kubernetes ersetzt Terraform.", "Terraform verwaltet nur Datenbanken."], correct: 0, explain: "Terraform baut den Hafen, Kubernetes betreibt den Verkehr darin. Oft baut Terraform sogar den K8s-Cluster." },
+    { id: "q-sec-1", q: "Wohin gehören Passwörter und API-Schlüssel im Cluster?", options: ["In Secrets – niemals im Klartext in YAML oder ConfigMaps.", "In die ConfigMap, da sind sie übersichtlich.", "Als Kommentar ins Manifest.", "In den Image-Namen."], correct: 0, explain: "ConfigMaps sind Klartext – Krakenfutter! Vertrauliches gehört in Secrets (und echte Profis verschlüsseln zusätzlich, z.B. mit Sealed Secrets oder Vault)." },
+    { id: "q-sec-2", q: "Warum sind Klartext-Passwörter in YAML-Dateien doppelt gefährlich?", options: ["Jede:r mit Cluster- oder Git-Zugriff kann sie lesen – YAML landet ja in Git!", "YAML-Dateien werden automatisch veröffentlicht.", "Passwörter machen YAML-Dateien langsam.", "Sie sind nicht gefährlich."], correct: 0, explain: "Deklarative Dateien gehören in Git – und damit wandert jedes Klartext-Passwort in die Versionshistorie. Für immer. Secrets brechen diese Kette." },
   ];
 
   const CMD_CARDS = [
     { id: "c-ch1-1", chapter: "q1", q: "Lade das Image <code>nginx</code> aus der Registry herunter.", accept: [/^docker\s+pull\s+nginx(:\S+)?$/], solution: "docker pull nginx" },
-    { id: "c-ch1-2", chapter: "q1", q: "Zeige alle laufenden Docker-Container an.", accept: [/^docker\s+ps$/], solution: "docker ps" },
-    { id: "c-ch1-3", chapter: "q1", q: "Zeige ALLE Docker-Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a" },
-    { id: "c-ch2-1", chapter: "q2", q: "Zeige alle Nodes deines Clusters an.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes" },
-    { id: "c-ch2-2", chapter: "q2", q: "Zeige alle Pods an.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods" },
-    { id: "c-ch2-3", chapter: "q2", q: "Zeige die Pods im Namespace <code>kube-system</code>.", accept: [/^kubectl\s+get\s+(pods|pod|po)\s+(-n|--namespace)[=\s]?kube-system$/], solution: "kubectl get pods -n kube-system" },
-    { id: "c-ch3-1", chapter: "q3", q: "Erstelle ein Deployment <code>shop</code> mit dem Image <code>nginx</code>.", accept: [/^kubectl\s+create\s+deployment\s+shop\s+--image[=\s]nginx(:\S+)?$/], solution: "kubectl create deployment shop --image=nginx" },
-    { id: "c-ch3-2", chapter: "q3", q: "Skaliere das Deployment <code>shop</code> auf 4 Kopien.", accept: [/^kubectl\s+scale\s+deployment\s+shop\s+--replicas[=\s]4$/], solution: "kubectl scale deployment shop --replicas=4" },
-    { id: "c-ch3-3", chapter: "q3", q: "Stelle einen Service vor das Deployment <code>shop</code>, Port 80.", accept: [/^kubectl\s+expose\s+deployment\s+shop\s+--port[=\s]80(\s.*)?$/], solution: "kubectl expose deployment shop --port=80" },
-    { id: "c-ch4-1", chapter: "q4", q: "Wende die Datei <code>app.yaml</code> deklarativ auf den Cluster an.", accept: [/^kubectl\s+apply\s+-f\s+app\.yaml$/], solution: "kubectl apply -f app.yaml" },
-    { id: "c-ch5-1", chapter: "q5", q: "Installiere das Chart <code>bitnami/redis</code> als Release <code>cache</code>.", accept: [/^helm\s+install\s+cache\s+bitnami\/redis$/], solution: "helm install cache bitnami/redis" },
-    { id: "c-ch5-2", chapter: "q5", q: "Zeige alle installierten Helm-Releases an.", accept: [/^helm\s+(list|ls)$/], solution: "helm list" },
-    { id: "c-ch5-3", chapter: "q5", q: "Rolle das Release <code>cache</code> auf Revision 1 zurück.", accept: [/^helm\s+rollback\s+cache\s+1$/], solution: "helm rollback cache 1" },
-    { id: "c-ch6-1", chapter: "q6", q: "Initialisiere ein frisches Terraform-Projekt.", accept: [/^terraform\s+init$/], solution: "terraform init" },
-    { id: "c-ch6-2", chapter: "q6", q: "Zeige an, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan" },
-    { id: "c-ch6-3", chapter: "q6", q: "Setze die Terraform-Konfiguration wirklich um.", accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply" },
+    { id: "c-ch1-2", chapter: "q2", q: "Zeige alle laufenden Docker-Container an.", accept: [/^docker\s+ps$/], solution: "docker ps" },
+    { id: "c-ch1-3", chapter: "q2", q: "Zeige ALLE Docker-Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a" },
+    { id: "c-ch1-4", chapter: "q3", q: "Starte aus <code>nginx</code> einen Container im Hintergrund namens <code>webserver</code>.", accept: [/^docker\s+run\s+(?=.*-d)(?=.*--name\s+webserver).*nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx" },
+    { id: "c-ch2-1", chapter: "q4", q: "Zeige alle Nodes deines Clusters an.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes" },
+    { id: "c-ch2-2", chapter: "q4", q: "Zeige alle Pods an.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods" },
+    { id: "c-ch2-3", chapter: "q5", q: "Zeige die Pods im Namespace <code>kube-system</code>.", accept: [/^kubectl\s+get\s+(pods|pod|po)\s+(-n|--namespace)[=\s]?kube-system$/], solution: "kubectl get pods -n kube-system" },
+    { id: "c-ch3-1", chapter: "q6", q: "Erstelle ein Deployment <code>shop</code> mit dem Image <code>nginx</code>.", accept: [/^kubectl\s+create\s+deployment\s+shop\s+--image[=\s]nginx(:\S+)?$/], solution: "kubectl create deployment shop --image=nginx" },
+    { id: "c-ch3-2", chapter: "q6", q: "Skaliere das Deployment <code>shop</code> auf 4 Kopien.", accept: [/^kubectl\s+scale\s+deployment\s+shop\s+--replicas[=\s]4$/], solution: "kubectl scale deployment shop --replicas=4" },
+    { id: "c-ch3-3", chapter: "q7", q: "Stelle einen Service vor das Deployment <code>shop</code>, Port 80.", accept: [/^kubectl\s+expose\s+deployment\s+shop\s+--port[=\s]80(\s.*)?$/], solution: "kubectl expose deployment shop --port=80" },
+    { id: "c-ch4-1", chapter: "q8", q: "Wende die Datei <code>app.yaml</code> deklarativ auf den Cluster an.", accept: [/^kubectl\s+apply\s+-f\s+app\.yaml$/], solution: "kubectl apply -f app.yaml" },
+    { id: "c-ch5-1", chapter: "q10", q: "Installiere das Chart <code>bitnami/redis</code> als Release <code>cache</code>.", accept: [/^helm\s+install\s+cache\s+bitnami\/redis$/], solution: "helm install cache bitnami/redis" },
+    { id: "c-ch5-2", chapter: "q10", q: "Zeige alle installierten Helm-Releases an.", accept: [/^helm\s+(list|ls)$/], solution: "helm list" },
+    { id: "c-ch5-3", chapter: "q11", q: "Rolle das Release <code>cache</code> auf Revision 1 zurück.", accept: [/^helm\s+rollback\s+cache\s+1$/], solution: "helm rollback cache 1" },
+    { id: "c-ch6-1", chapter: "q12", q: "Initialisiere ein frisches Terraform-Projekt.", accept: [/^terraform\s+init$/], solution: "terraform init" },
+    { id: "c-ch6-2", chapter: "q12", q: "Zeige an, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan" },
+    { id: "c-ch6-3", chapter: "q13", q: "Setze die Terraform-Konfiguration wirklich um.", accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply" },
+    { id: "c-sec-1", chapter: "q14", q: "Lege ein Secret <code>api-key</code> mit <code>--from-literal=key=abc123</code> an.", accept: [/^kubectl\s+create\s+secret\s+generic\s+api-key\s+--from-literal[=\s][\w.-]+=\S+$/], solution: "kubectl create secret generic api-key --from-literal=key=abc123" },
   ];
 
-  window.KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS };
+  /* ---------- Stapel-Spiel: Docker-Image-Schichten ---------- */
+  const STACK_ROUNDS = [
+    { name: "Webserver-Image", layers: ["FROM ubuntu (Basis-Betriebssystem)", "RUN apt install nginx (Software installieren)", "COPY index.html (deine Dateien)", "CMD nginx (Startbefehl)"] },
+    { name: "Python-App", layers: ["FROM python:3.12 (Basis mit Python)", "COPY requirements.txt (Abhängigkeiten-Liste)", "RUN pip install (Bibliotheken installieren)", "COPY app.py (dein Code)", "CMD python app.py (Startbefehl)"] },
+    { name: "Java-Dienst", layers: ["FROM eclipse-temurin (Basis mit Java)", "COPY build/libs/app.jar (das fertige Programm)", "EXPOSE 8080 (Port freigeben)", "CMD java -jar app.jar (Startbefehl)"] },
+  ];
+
+  window.KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS };
 })();

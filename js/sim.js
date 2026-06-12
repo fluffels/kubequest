@@ -59,6 +59,7 @@
 
       this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
+      this.secrets = (sc.secrets || []).map(s => Object.assign({}, s));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
 
@@ -130,6 +131,7 @@
         dockerContainers: this.docker.containers.map(c => Object.assign({}, c)),
         deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas })),
         services: this.services.map(s => Object.assign({}, s)),
+        secrets: this.secrets.map(s => ({ name: s.name, keys: s.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
         helmRepos: this.helmRepos.slice(),
@@ -194,8 +196,8 @@
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|nodes | describe pod <name>",
-        "             create deployment | scale | expose | delete | apply -f <datei> | logs <pod>",
+        "  kubectl    get pods|deployments|services|nodes|secrets | describe pod <name>",
+        "             create deployment | create secret generic | scale | expose | delete | apply -f <datei> | logs <pod>",
         "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  ls, cat <datei>, clear, help",
@@ -343,6 +345,12 @@
           this.nodes.map(n => [n.name, n.status, n.roles, "3d", n.version]));
       }
 
+      if (["secrets", "secret"].includes(what)) {
+        if (this.secrets.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "TYPE", "DATA", "AGE"],
+          this.secrets.map(s => [s.name, "Opaque", String(s.keys.length), this._age(s.created || 0)]));
+      }
+
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
       return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services oder nodes?");
     }
@@ -377,7 +385,18 @@
     }
 
     _kubectlCreate(t, raw) {
-      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment <name> --image=<image>'.");
+      if (t[2] === "secret") {
+        // kubectl create secret generic <name> --from-literal=schluessel=wert
+        if (t[3] !== "generic") return this._err("Der Simulator kann nur 'kubectl create secret generic <name> --from-literal=k=v'.");
+        const name = t[4];
+        if (!name || name.startsWith("--")) return this._err("kubectl create secret: Der Name fehlt.", "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert");
+        const literals = [...raw.matchAll(/--from-literal[=\s]([\w.-]+)=(\S+)/g)].map(m => m[1]);
+        if (literals.length === 0) return this._err("error: at least one --from-literal is required", "Häng '--from-literal=passwort=geheim123' an.");
+        if (this.secrets.some(s => s.name === name)) return this._err('error: secrets "' + name + '" already exists');
+        this.secrets.push({ name, keys: literals, created: this.clock });
+        return "secret/" + name + " created";
+      }
+      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment ...' und 'kubectl create secret generic ...'.");
       const name = t[3];
       const imgMatch = raw.match(/--image[=\s]+(\S+)/);
       if (!name || name.startsWith("--")) return this._err("kubectl create deployment: Der Name fehlt.", "z.B. 'kubectl create deployment kasse --image=nginx'");
@@ -464,6 +483,13 @@
         if (idx === -1) return this._err('Error from server (NotFound): services "' + name + '" not found');
         this.services.splice(idx, 1);
         return 'service "' + name + '" deleted';
+      }
+
+      if (["secret", "secrets"].includes(what)) {
+        const idx = this.secrets.findIndex(s => s.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): secrets "' + name + '" not found');
+        this.secrets.splice(idx, 1);
+        return 'secret "' + name + '" deleted';
       }
 
       return this._err("kubectl delete: Ressourcentyp '" + what + "' kennt der Simulator nicht.");
