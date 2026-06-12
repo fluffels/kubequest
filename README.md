@@ -1,58 +1,70 @@
-# ⚓ KubeQuest – Vom Landratten-Dasein zur Flottenadmiralin
+# ⚓ KubeQuest – Das Hafen-Abenteuer
 
-Ein Lernspiel für **Kubernetes, Helm und Terraform** – von „Helm? Das setzt man doch auf den Kopf?" bis Profi-Niveau. Komplett offline im Browser, kein Cluster und keine Installation nötig.
+Ein **2D-Lernspiel** für Kubernetes, Helm und Terraform – von „Helm? Das setzt man doch auf den Kopf?" bis zum souveränen Umgang mit den Profi-Werkzeugen. Du läufst durch die Hafenstadt **Port Kubernia**, löst Quests für die Bewohner:innen und funkst echte Befehle an den Cluster.
+
+**Das Besondere: Die Spielwelt IST der Cluster.**
+
+- Die drei Stege am Dock sind deine **Nodes** – jede Kiste darauf ist ein **Pod**, live aus dem Cluster
+- `kubectl scale --replicas=3` → es erscheinen sichtbar Kisten
+- `kubectl delete pod …` → die Kiste platscht ins Wasser und der Kran stellt sofort Ersatz hin (**Self-Healing zum Zugucken!**)
+- Helm-Releases hissen **Flaggen** an der Werft, Services leuchten als **Laternen**
+- `terraform apply` baut **sichtbar neues Land** ins Meer – und `destroy` reißt es wieder ab
 
 ## Spielstart
 
-Einfach die Datei **`index.html` doppelklicken** – fertig. Das Spiel läuft komplett lokal im Browser, der Spielstand wird automatisch im Browser gespeichert (localStorage).
+**`index.html` doppelklicken** – fertig. Läuft komplett lokal im Browser, ohne Installation, ohne echtes Cluster. Der Spielstand speichert sich automatisch (localStorage, also immer denselben Browser benutzen).
 
-> Wichtig: Immer denselben Browser benutzen, sonst fängt der Spielstand woanders bei null an.
+| Taste | Aktion |
+|---|---|
+| WASD / Pfeile | Laufen |
+| E | Reden / Benutzen |
+| T | 📻 Funkgerät (Terminal) |
+| J | 📜 Logbuch (Questlog) |
+| Esc | Fenster schließen |
 
-## So funktioniert das Spiel
+## Die Reise (von 0 auf Profi)
 
-**🏠 Heimathafen** – die Kapitelübersicht. Kapitel schalten sich nacheinander frei:
+1. **Anheuern** – Funkgerät kennenlernen
+2. **Bo und die genormten Kisten** – Container & Docker (Images, Container, Registry)
+3. **Der Hafen wird ein Cluster** – Kubernetes-Grundlagen (Cluster, Nodes, Pods, kubectl)
+4. **Sturmfeste Kisten** – Deployments & Services (Skalieren, Self-Healing live!)
+5. **Adas Seekarten** – YAML & deklaratives Arbeiten (Manifeste, apply)
+6. **Runas Steuerrad** – Helm (Charts, Releases, values, Upgrade & Rollback)
+7. **Neues Land** – Terraform (Infrastructure as Code: init → plan → apply, State)
 
-1. 📦 **Leinen los!** – Container & Docker
-2. ☸️ **Das Orchester** – Kubernetes-Grundlagen (Cluster, Nodes, Pods, kubectl)
-3. ⚙️ **Volle Fahrt** – Deployments & Services (Self-Healing live erleben!)
-4. 🗺️ **Seekarten** – YAML & deklaratives Arbeiten
-5. ☸️ **Das Steuerrad** – Helm (Charts, Releases, Rollbacks)
-6. 🏗️ **Land in Sicht** – Terraform (Infrastructure as Code)
+Dazu: **XP & Ränge** (Landratte → Moses → Deckshand → … → Admiral), **🪙 Dublonen**, ein **Shop** (Hinweis-Fernrohr, Lösungs-Kompass, Haustiere, die dir folgen, Schiffsflaggen) und ein **🔥 Tages-Streak** mit Dublonen-Bonus.
 
-Jedes Kapitel besteht aus drei Teilen:
-
-- **📖 Lektion** – kurze, anfängerfreundliche Erklärungen mit Hafen-Analogien
-- **🎯 Quiz** – Verständnisfragen mit Erklärung zu jeder Antwort
-- **💻 Terminal-Mission** – echte Befehle selbst eintippen, gegen einen simulierten Cluster, der wirklich reagiert (skalieren, löschen, Self-Healing beobachten …). Kaputtmachen unmöglich.
-
-**📋 Tagesrapport** – das Geheimnis, warum das Wissen wirklich hängen bleibt: Alle Fragen und Befehle landen in einem Karteikartenstapel (Spaced Repetition / Leitner-System). Was du gut kannst, kommt seltener – was du verwechselst, öfter. Am besten täglich eine kurze Runde!
-
-**🛒 Hafenladen** – für verdiente 🪙 Dublonen gibt es Hinweis-Fernrohre, Papagei-Joker, Lösungs-Kompasse, Themes und Schiffe.
-
-**🧪 Sandbox** – freies Terminal ohne Aufgaben, zum Ausprobieren aller gelernten Befehle (`help` zeigt, was geht).
-
-**XP & Ränge** – von 🦔 Landratte über ☸️ Steuerfrau bis 🏅 Flottenadmiralin. Tägliches Spielen baut einen 🔥 Streak auf, der bis zu +50 % Dublonen-Bonus bringt.
+**Damit das Wissen bleibt:** Krabbe Kralle 🦀 auf deinem Schiff stellt dir täglich fällige Karteikarten (Spaced Repetition / Leitner-System). Was du verwechselst, kommt öfter – bis es sitzt. Nach den Quests kannst du im Funkgerät jederzeit **frei üben** – die Welt reagiert weiter auf alles.
 
 ## Projektstruktur
 
 ```
 kubequest/
-├── index.html      Einstieg (doppelklicken!)
-├── style.css       Design & Themes
+├── index.html       Einstieg (doppelklicken!)
+├── style.css        UI-Design (HUD, Dialoge, Funkgerät, Shop)
+├── assets/          Grafiken: Kenney "Tiny Town" & "Tiny Dungeon" (CC0)
 ├── js/
-│   ├── sim.js      Terminal-Simulator (docker, kubectl, helm, terraform)
-│   ├── data.js     Lerninhalte: Kapitel, Quizfragen, Missionen, Karteikarten
-│   ├── game.js     Spiellogik: XP, Ränge, Dublonen, Streak, Spaced Repetition, Shop
-│   └── ui.js       Oberfläche: alle Bildschirme
-└── test/
-    └── smoke.js    Test: spielt jede Terminal-Aufgabe mit der Musterlösung durch
+│   ├── sim.js       Cluster-Simulator (docker, kubectl, helm, terraform)
+│   ├── content.js   Quests, Dialoge, NPCs, Ränge, Shop, Karteikarten
+│   ├── game.js      Spielstand, XP, Dublonen, Streak, Spaced Repetition
+│   ├── engine.js    Canvas-Engine (Rendering, Eingabe, Kamera)
+│   ├── world.js     Port Kubernia: Karte, Kollision, Cluster→Welt-Sync
+│   ├── ui.js        Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz
+│   └── main.js      Start & Verdrahtung
+└── test/smoke.js    Test: spielt alle Quest-Aufgaben automatisch durch
 ```
 
 Test ausführen: `node test/smoke.js`
 
-## Ideen für spätere Ausbaustufen
+## Grafiken
 
-- Weitere Kapitel: Namespaces & ConfigMaps/Secrets, Ingress, eigene Helm-Charts schreiben, Terraform-Module, GitOps (Argo CD), Monitoring
-- „Prüfungs-Modus": Bosskampf am Ende jedes Rangs ohne Hinweise
-- „Echter Modus": dieselben Missionen gegen ein lokales kind/minikube-Cluster
-- Story-Ereignisse: nächtlicher Pod-Absturz, Lastspitze, kaputtes Upgrade → Rollback unter Zeitdruck
+Die Pixel-Art stammt aus den Packs **Tiny Town** und **Tiny Dungeon** von [Kenney](https://kenney.nl) – Lizenz **CC0** (public domain), Lizenztexte liegen in `assets/`. Danke, Kenney! 💛
+
+## Roadmap (Fortsetzung folgt)
+
+- **Ingress-Inseln**: Routing & Ingress-Controller
+- **GitOps-Archipel**: Argo CD, Pull-Prinzip, App-of-Apps
+- **Monitoring-Leuchtturm**: Prometheus, Grafana, Alerts
+- **Werft-Ausbau**: eigene Helm-Charts schreiben
+- **Sturm-Ereignisse**: Live-Incidents (Lastspitze, kaputtes Upgrade) unter Zeitdruck lösen
+- **Echter Modus**: dieselben Quests gegen ein lokales kind/minikube-Cluster
