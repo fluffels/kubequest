@@ -11,6 +11,23 @@ const KQSim = window.KQSim;
 let sim;
 beforeEach(() => { sim = new KQSim({}); });
 
+test("docker: Tippfehler im Image-Namen wird mit Vorschlag abgefangen", () => {
+  const r = sim.exec("docker run busyboy");
+  assert.ok(r.error, "Vertipper muss als Fehler gelten");
+  assert.match(r.output, /busybox/, "Vorschlag 'busybox' wird angeboten");
+  assert.equal(sim.docker.containers.length, 0, "kein Container aus kaputtem Image");
+  // korrekte Schreibweise geht durch
+  assert.ok(!sim.exec("docker run busybox").error);
+  // unbekanntes, aber nicht-tippfehler-Image bleibt erlaubt (Ausprobieren)
+  assert.ok(!sim.exec("docker pull mein-eigenes-image").error);
+});
+
+test("unbekannter Befehl bekommt einen 'Meintest du?'-Vorschlag", () => {
+  const r = sim.exec("kubctl get pods");
+  assert.ok(r.error);
+  assert.match(r.output, /kubectl/);
+});
+
 test("docker: pull, run, ps, stop, ps -a", () => {
   assert.match(sim.exec("docker pull nginx").output, /Downloaded newer image/);
   sim.exec("docker run -d --name web nginx");

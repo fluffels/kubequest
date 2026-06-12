@@ -221,6 +221,12 @@ button.primary { background: var(--accent); color: #1a1304; font-weight: bold; b
 .dlg-choices button { text-align: left; line-height: 1.35; }
 .dlg-choices button.correct { background: rgba(111,220,140,0.25); border-color: var(--good); }
 .dlg-choices button.wrong { background: rgba(255,123,123,0.25); border-color: var(--bad); }
+.dlg-choices button.sel {
+  border-color: var(--accent);
+  background: rgba(255, 200, 87, 0.18);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+.dlg-choices button.sel::before { content: "▶ "; color: var(--accent); font-weight: bold; }
 
 /* ===== Panels (Terminal, Logbuch, Shop, Krabbe) ===== */
 .panel {

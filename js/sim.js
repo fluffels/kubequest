@@ -6,6 +6,15 @@
 (function () {
   "use strict";
 
+  // Bekannte Container-Images – Grundlage für die „Meintest du …?"-Tippfehlerhilfe.
+  // Enthält alle im Spiel benutzten plus echte Tools, die man als DevOps kennt.
+  const KNOWN_IMAGES = [
+    "nginx", "redis", "httpd", "busybox", "postgres", "rabbitmq",
+    "mysql", "mariadb", "mongo", "memcached", "node", "python", "golang",
+    "alpine", "ubuntu", "debian", "traefik", "envoy", "haproxy", "vault",
+    "keycloak", "grafana", "prometheus", "wordpress", "nextcloud",
+  ];
+
   let podCounter = 0;
 
   function randSuffix(len) {
@@ -184,10 +193,12 @@
           case "cat": out = this._cat(tokens); break;
           case "clear": return { output: null, error: false, clear: true };
           case "help": out = this._help(); break;
-          default:
-            this.lastError = true;
-            out = "befehl nicht gefunden: " + cmd +
-              "\n💡 Tippe 'help' für eine Liste der Befehle, die hier funktionieren.";
+          default: {
+            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "ls", "cat", "clear", "help"]);
+            out = this._err("⚠️ Den Befehl '" + cmd + "' gibt es hier nicht.",
+              guess ? "Meintest du '" + guess + "'? (Tippe 'help' für alle Befehle.)"
+                    : "Tippe 'help' für eine Liste der Befehle, die hier funktionieren.");
+          }
         }
       } catch (e) {
         this.lastError = true;
@@ -199,6 +210,41 @@
     _err(msg, tip) {
       this.lastError = true;
       return msg + (tip ? "\n💡 " + tip : "");
+    }
+
+    /** Editierdistanz (Levenshtein) – für „Meintest du …?"-Vorschläge. */
+    _editDistance(a, b) {
+      const m = a.length, n = b.length;
+      const d = Array.from({ length: m + 1 }, (_, i) => [i].concat(new Array(n).fill(0)));
+      for (let j = 0; j <= n; j++) d[0][j] = j;
+      for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      }
+      return d[m][n];
+    }
+
+    /** Prüft ein Docker-Image auf Tippfehler. Gibt eine Fehlermeldung zurück oder null (alles ok). */
+    _checkImageTypo(img) {
+      const bare = img.split(":")[0].split("/").pop().toLowerCase();
+      if (KNOWN_IMAGES.includes(bare)) return null;
+      const guess = this._suggest(bare, KNOWN_IMAGES);
+      if (guess) {
+        return this._err('⚠️ Das Image "' + bare + '" kennt die Registry nicht.',
+          "Tippfehler? Meintest du \"" + guess + "\"? (So entsteht im echten Cluster ein ImagePullBackOff!)");
+      }
+      return null; // unbekannt, aber kein klarer Tippfehler -> zum Ausprobieren erlauben
+    }
+
+    /** Nächstliegendes bekanntes Wort, wenn nah genug dran (sonst null). */
+    _suggest(word, list) {
+      let best = null, bestD = Infinity;
+      for (const cand of list) {
+        const dist = this._editDistance(word.toLowerCase(), cand.toLowerCase());
+        if (dist < bestD) { bestD = dist; best = cand; }
+      }
+      const limit = word.length <= 4 ? 1 : 2; // bei kurzen Wörtern strenger
+      return bestD <= limit && bestD > 0 ? best : null;
     }
 
     /** Wert hinter einer Flag finden: unterstützt "-n wert" und "-n=wert". */
@@ -231,6 +277,8 @@
       if (sub === "pull") {
         const img = t[2];
         if (!img) return this._err("docker pull: Welches Image denn?", "z.B. 'docker pull nginx'");
+        const typo = this._checkImageTypo(img);
+        if (typo) return typo;
         const full = img.includes(":") ? img : img + ":latest";
         if (!this.docker.pulled.includes(full)) this.docker.pulled.push(full);
         return [
@@ -264,6 +312,8 @@
           else if (!t[i].startsWith("-")) image = t[i];
         }
         if (!image) return this._err("docker run: Es fehlt das Image.", "z.B. 'docker run -d --name webserver nginx'");
+        const typo = this._checkImageTypo(image);
+        if (typo) return typo;
         if (!name) name = image.split(":")[0] + "-" + randSuffix(4);
         if (this.docker.containers.some(c => c.name === name && c.running)) {
           return this._err('docker: Container-Name "' + name + '" wird schon benutzt.', "Nimm einen anderen Namen oder stoppe den alten Container.");
