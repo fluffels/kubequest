@@ -205,10 +205,43 @@
       });
       addBtn("Nichts, schönen Tag! ⚓", () => this.closeDialogue());
       $("dialogue").classList.remove("hidden");
+      this._initChoiceNav();
+    },
+
+    /* ---------- Tastatur-Navigation für Antwort-Buttons (↑/↓ + Enter, Ziffern) ---------- */
+    _initChoiceNav() {
+      this.choiceBtns = Array.from(document.querySelectorAll("#dlg-choices button"));
+      this.choiceSel = 0;
+      this._highlightChoice();
+    },
+    _highlightChoice() {
+      if (!this.choiceBtns) return;
+      this.choiceBtns.forEach((b, i) => b.classList.toggle("sel", i === this.choiceSel));
+    },
+    hasChoices() {
+      return !!(this.choiceBtns && this.choiceBtns.length && !this.choiceBtns[0].disabled);
+    },
+    dlgMoveSel(delta) {
+      if (!this.hasChoices()) return;
+      const n = this.choiceBtns.length;
+      this.choiceSel = (this.choiceSel + delta + n) % n;
+      this._highlightChoice();
+    },
+    dlgActivateSel() {
+      if (!this.hasChoices()) return false;
+      const btn = this.choiceBtns[this.choiceSel];
+      if (btn) { btn.click(); return true; }
+      return false;
+    },
+    dlgPickNumber(n) {
+      if (!this.hasChoices()) return;
+      const btn = this.choiceBtns[n - 1];
+      if (btn) { this.choiceSel = n - 1; this._highlightChoice(); btn.click(); }
     },
 
     closeDialogue() {
       this.dialogue = null;
+      this.choiceBtns = null;
       $("dialogue").classList.add("hidden");
     },
 
@@ -280,7 +313,8 @@
       $("dlg-name").textContent = npc.name + " · " + npc.title;
       this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
       $("dlg-text").innerHTML = "🤔 " + step.q;
-      $("dlg-next").classList.add("hidden");
+      $("dlg-next").textContent = "↑/↓ wählen · Enter bestätigen";
+      $("dlg-next").classList.remove("hidden");
       const box = $("dlg-choices");
       box.innerHTML = "";
       for (const opt of shuffled(step.options)) {
@@ -290,14 +324,17 @@
         box.appendChild(btn);
       }
       $("dialogue").classList.remove("hidden");
+      this._initChoiceNav();
     },
 
     answerChoice(step, opt, btn) {
       const d = this.dialogue;
       if (!d || d.answered) return;
       d.answered = true;
+      this.choiceBtns = null;
       document.querySelectorAll("#dlg-choices button").forEach(b => {
         b.disabled = true;
+        b.classList.remove("sel");
         if (b === btn) b.classList.add(opt.ok ? "correct" : "wrong");
       });
       Game.choiceResult(step.reviewId, opt.ok);
