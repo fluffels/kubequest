@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KubeQuest ⚓ – Lerne Kubernetes, Helm & Terraform</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-see">
+
+  <header id="topbar">
+    <div class="logo" onclick="UI.goHome()" title="Zum Heimathafen">⚓ <span>KubeQuest</span></div>
+    <div class="player-info">
+      <span id="hud-ship" class="hud-ship" title="Dein Schiff">🛶</span>
+      <div class="hud-rank">
+        <div id="hud-rankname">Landratte</div>
+        <div class="xpbar"><div id="hud-xpfill"></div></div>
+        <div id="hud-xptext" class="xptext">0 XP</div>
+      </div>
+      <span class="hud-coins" title="Dublonen – verdiene sie in Missionen, gib sie im Shop aus">🪙 <b id="hud-coins">0</b></span>
+      <span class="hud-streak" title="Tage-Streak: Spiele jeden Tag für Bonus-Dublonen!">🔥 <b id="hud-streak">0</b></span>
+    </div>
+    <nav>
+      <button onclick="UI.goHome()">🏠 Heimathafen</button>
+      <button onclick="UI.goReview()">📋 Tagesrapport</button>
+      <button onclick="UI.goShop()">🛒 Shop</button>
+      <button onclick="UI.goSandbox()">🧪 Sandbox</button>
+    </nav>
+  </header>
+
+  <main id="app"></main>
+
+  <div id="toasts"></div>
+
+  <footer>
+    <span>KubeQuest – dein Lernspiel für Kubernetes, Helm & Terraform</span>
+    <button class="linklike" onclick="UI.resetGame()">Spielstand zurücksetzen</button>
+  </footer>
+
+  <script src="js/sim.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+/* ===== KubeQuest – Stylesheet ===== */
+
+:root {
+  --bg: #0b1929;
+  --bg2: #11243a;
+  --card: #16304d;
+  --card-hover: #1c3a5c;
+  --border: #28507c;
+  --text: #e8f0fa;
+  --text-dim: #9db4cc;
+  --accent: #ffc857;       /* Gold / Dublonen */
+  --accent2: #4dd0e1;      /* Türkis / Meer */
+  --good: #6fdc8c;
+  --bad: #ff7b7b;
+  --term-bg: #0a0f14;
+  --term-text: #c7f0c2;
+}
+
+body.theme-pirat {
+  --bg: #0d0a0f;
+  --bg2: #161019;
+  --card: #1f1722;
+  --card-hover: #2a1f2e;
+  --border: #4d2c3a;
+  --accent: #ff5c5c;
+  --accent2: #c79bff;
+}
+
+body.theme-morgen {
+  --bg: #f5efe4;
+  --bg2: #efe5d3;
+  --card: #fffaf0;
+  --card-hover: #fdf3dd;
+  --border: #d9c9a8;
+  --text: #2b2417;
+  --text-dim: #6d6147;
+  --accent: #d98e04;
+  --accent2: #0e87a0;
+  --term-bg: #1d2521;
+  --term-text: #bdf0c5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Topbar ===== */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo {
+  font-size: 1.4em;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.hud-ship { font-size: 1.8em; }
+
+.hud-rank { min-width: 140px; }
+#hud-rankname { font-weight: bold; font-size: 0.9em; }
+
+.xpbar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin: 3px 0;
+}
+#hud-xpfill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width 0.4s;
+}
+.xptext { font-size: 0.75em; color: var(--text-dim); }
+
+.hud-coins, .hud-streak { font-size: 1.05em; white-space: nowrap; }
+
+nav { display: flex; gap: 8px; flex-wrap: wrap; }
+
+button {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+button:hover { background: var(--card-hover); }
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+button.primary {
+  background: var(--accent);
+  color: #1a1304;
+  font-weight: bold;
+  border-color: var(--accent);
+}
+button.primary:hover { filter: brightness(1.1); background: var(--accent); }
+
+button.linklike {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  text-decoration: underline;
+  padding: 0;
+  font-size: 0.8em;
+}
+
+/* ===== Main ===== */
+#app {
+  flex: 1;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+}
+
+h1 { color: var(--accent); margin: 0.4em 0; }
+h2 { color: var(--accent2); margin: 0.8em 0 0.4em; }
+.dim { color: var(--text-dim); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin: 12px 0;
+}
+
+/* ===== Kapitel-Karte (Dashboard) ===== */
+.chapter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+.chapter-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+  position: relative;
+}
+.chapter-card:hover { background: var(--card-hover); transform: translateY(-2px); }
+.chapter-card.locked { opacity: 0.5; cursor: not-allowed; }
+.chapter-card.locked:hover { transform: none; }
+.chapter-card .ch-icon { font-size: 2em; }
+.chapter-card .ch-title { font-weight: bold; margin: 6px 0 4px; }
+.chapter-card .ch-sub { font-size: 0.85em; color: var(--text-dim); }
+.chapter-card .ch-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 1.3em;
+}
+
+/* ===== Lektion ===== */
+.lesson-card { font-size: 1.05em; line-height: 1.65; }
+.lesson-card .big-icon { font-size: 2.6em; text-align: center; margin-bottom: 8px; }
+.lesson-card code, .quiz-q code, .task-text code {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: Consolas, monospace;
+  font-size: 0.92em;
+  color: var(--accent2);
+}
+body.theme-morgen .lesson-card code,
+body.theme-morgen .quiz-q code,
+body.theme-morgen .task-text code { background: rgba(0,0,0,0.08); }
+
+.merke {
+  border-left: 4px solid var(--accent);
+  background: rgba(255, 200, 87, 0.08);
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 14px;
+}
+
+/* ===== Quiz ===== */
+.quiz-q { font-size: 1.15em; font-weight: bold; margin-bottom: 14px; line-height: 1.5; }
+.quiz-options { display: flex; flex-direction: column; gap: 10px; }
+.quiz-options button {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 1em;
+  line-height: 1.4;
+}
+.quiz-options button.correct { background: rgba(111, 220, 140, 0.25); border-color: var(--good); }
+.quiz-options button.wrong { background: rgba(255, 123, 123, 0.25); border-color: var(--bad); }
+.quiz-explain {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(77, 208, 225, 0.1);
+  border-left: 4px solid var(--accent2);
+  line-height: 1.5;
+}
+
+/* ===== Terminal ===== */
+.task-text { font-size: 1.05em; line-height: 1.55; }
+.task-done { color: var(--good); }
+
+.terminal {
+  background: var(--term-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.92em;
+  margin-top: 12px;
+}
+.term-out {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--term-text);
+  max-height: 340px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.term-out .t-cmd { color: #ffffff; font-weight: bold; }
+.term-out .t-err { color: #ff9b9b; }
+.term-out .t-tip { color: #ffd97a; }
+.term-inputrow { display: flex; align-items: center; gap: 8px; }
+.term-prompt { color: var(--accent); font-weight: bold; }
+.term-inputrow input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 1em;
+}
+
+.progress-dots { display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+.progress-dots span {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.progress-dots span.done { background: var(--good); border-color: var(--good); }
+.progress-dots span.current { background: var(--accent); border-color: var(--accent); }
+
+/* ===== Shop ===== */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.shop-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shop-item .si-icon { font-size: 2em; }
+.shop-item .si-name { font-weight: bold; }
+.shop-item .si-desc { font-size: 0.85em; color: var(--text-dim); flex: 1; }
+.shop-item .si-owned { color: var(--good); font-size: 0.9em; }
+
+/* ===== Buttons unter Inhalten ===== */
+.actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+
+/* ===== Toasts ===== */
+#toasts {
+  position: fixed;
+  bottom: 70px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+.toast {
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  animation: toast-in 0.25s ease-out, toast-out 0.4s ease-in 3.2s forwards;
+}
+.toast.rankup { border-color: var(--accent2); font-size: 1.05em; }
+@keyframes toast-in { from { transform: translateX(120%); } to { transform: translateX(0); } }
+@keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(10px); } }
+
+/* ===== Footer ===== */
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  font-size: 0.8em;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  #topbar { gap: 8px; }
+  .player-info { min-width: 0; }
+}
