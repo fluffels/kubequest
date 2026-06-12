@@ -639,7 +639,12 @@
       const rate = Math.round(Game.incomeRate() * 10) / 10;
       html += `<div class="ql-stats">Rang: ${r.icon} ${r.name} · ${s.xp} XP · 🪙 ${s.coins} (+${rate}/min) · 🔥 Streak: ${s.streak.count}<br>
         Befehle gefunkt: ${s.stats.commands} · Quiz richtig: ${s.stats.quizRight} · Piraten vertrieben: ${s.stats.piratesBeaten} · Kraken vertrieben: ${s.stats.krakenBeaten}<br>
-        <button class="linklike" style="margin-top:8px" onclick="UI.resetGame()">Spielstand zurücksetzen</button></div>`;
+        <div class="actions" style="margin-top:10px">
+          <button onclick="UI.exportSave()">💾 Spielstand sichern (Datei)</button>
+          <button onclick="document.getElementById('save-import').click()">📂 Spielstand laden</button>
+          <button class="linklike" onclick="UI.resetGame()">Zurücksetzen</button>
+        </div>
+        <div class="dim" style="margin-top:6px">Gespeichert wird automatisch alle 5 Sekunden im Browser. Die Datei brauchst du nur als Backup oder für einen anderen Rechner/Browser.</div></div>`;
       $("quest-body").innerHTML = html;
     },
 
@@ -811,6 +816,35 @@
     nextReviewItem() {
       this.review.idx++;
       this.renderReviewItem();
+    },
+
+    /* ========== Spielstand-Datei ========== */
+    exportSave() {
+      const data = Game.exportData();
+      const blob = new Blob([data], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "kubequest-spielstand.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      this.toast("💾 Spielstand als Datei gesichert!");
+    },
+
+    importSave(ev) {
+      const file = ev.target.files[0];
+      ev.target.value = "";
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          Game.importData(reader.result);
+          this.toast("📂 Spielstand geladen – Spiel startet neu …");
+          setTimeout(() => location.reload(), 800);
+        } catch (e) {
+          this.toast("⚠️ Das ist keine gültige KubeQuest-Spielstand-Datei.");
+        }
+      };
+      reader.readAsText(file);
     },
 
     /* ========== Sonstiges ========== */

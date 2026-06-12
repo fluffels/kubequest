@@ -34,6 +34,15 @@ html, body {
   image-rendering: pixelated;
 }
 
+/* Weiche Vignette über der Spielwelt – mehr „gekauftes Spiel“-Gefühl */
+#vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(5, 9, 18, 0.42) 100%);
+}
+
 .hidden { display: none !important; }
 .dim { color: var(--text-dim); font-weight: normal; }
 
