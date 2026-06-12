@@ -3,43 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KubeQuest ⚓ – Lerne Kubernetes, Helm & Terraform</title>
+  <title>KubeQuest ⚓ – Das Hafen-Abenteuer</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="theme-see">
+<body>
 
-  <header id="topbar">
-    <div class="logo" onclick="UI.goHome()" title="Zum Heimathafen">⚓ <span>KubeQuest</span></div>
-    <div class="player-info">
-      <span id="hud-ship" class="hud-ship" title="Dein Schiff">🛶</span>
-      <div class="hud-rank">
-        <div id="hud-rankname">Landratte</div>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-left">
+      <div class="hud-rank"><span id="hud-rankname">Landratte</span>
         <div class="xpbar"><div id="hud-xpfill"></div></div>
-        <div id="hud-xptext" class="xptext">0 XP</div>
+        <span id="hud-xptext" class="xptext">0 XP</span>
       </div>
-      <span class="hud-coins" title="Dublonen – verdiene sie in Missionen, gib sie im Shop aus">🪙 <b id="hud-coins">0</b></span>
-      <span class="hud-streak" title="Tage-Streak: Spiele jeden Tag für Bonus-Dublonen!">🔥 <b id="hud-streak">0</b></span>
+      <span class="hud-coins">🪙 <b id="hud-coins">0</b></span>
+      <span class="hud-streak" title="Tage-Streak – spiele täglich für Bonus-Dublonen">🔥 <b id="hud-streak">0</b></span>
     </div>
-    <nav>
-      <button onclick="UI.goHome()">🏠 Heimathafen</button>
-      <button onclick="UI.goReview()">📋 Tagesrapport</button>
-      <button onclick="UI.goShop()">🛒 Shop</button>
-      <button onclick="UI.goSandbox()">🧪 Sandbox</button>
-    </nav>
-  </header>
+    <div class="hud-quest" id="hud-quest"></div>
+    <div class="hud-keys">🚶 WASD/Pfeile · 💬 E reden · 📻 T Funkgerät · 📜 J Logbuch</div>
+  </div>
 
-  <main id="app"></main>
+  <!-- Interaktions-Hinweis -->
+  <div id="prompt" class="hidden"></div>
+
+  <!-- Dialog -->
+  <div id="dialogue" class="hidden">
+    <div class="dlg-portrait"><canvas id="dlg-portrait-canvas" width="48" height="48"></canvas></div>
+    <div class="dlg-body">
+      <div class="dlg-name" id="dlg-name"></div>
+      <div class="dlg-text" id="dlg-text"></div>
+      <div class="dlg-choices" id="dlg-choices"></div>
+      <div class="dlg-next" id="dlg-next">▼ weiter (E)</div>
+    </div>
+  </div>
+
+  <!-- Funkgerät / Terminal -->
+  <div id="overlay-terminal" class="panel hidden">
+    <div class="panel-head">📻 Funkgerät <span class="dim">– Verbindung zum Hafen-Cluster</span>
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div class="term-layout">
+      <div id="term-tasks" class="term-tasks"></div>
+      <div class="terminal">
+        <div class="term-out" id="term-out"></div>
+        <div class="term-inputrow">
+          <span class="term-prompt">crew@hafen:~$</span>
+          <input type="text" id="term-input" autocomplete="off" spellcheck="false" placeholder="Befehl eintippen, Enter drücken …">
+        </div>
+      </div>
+    </div>
+    <div class="term-actions" id="term-actions"></div>
+  </div>
+
+  <!-- Logbuch (Questlog) -->
+  <div id="overlay-quest" class="panel hidden">
+    <div class="panel-head">📜 Logbuch
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div id="quest-body" class="panel-body"></div>
+  </div>
+
+  <!-- Shop -->
+  <div id="overlay-shop" class="panel hidden">
+    <div class="panel-head">🛒 Pelles Handelsposten
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div id="shop-body" class="panel-body"></div>
+  </div>
+
+  <!-- Quiz-Krabbe -->
+  <div id="overlay-review" class="panel hidden">
+    <div class="panel-head">🦀 Krabbe Kralle <span class="dim">– die tägliche Wissensrunde</span>
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div id="review-body" class="panel-body"></div>
+  </div>
+
+  <!-- Charakterwahl -->
+  <div id="charselect" class="hidden">
+    <div class="cs-box">
+      <h1>⚓ KubeQuest</h1>
+      <p>Du heuerst im Hafen von <b>Port Kubernia</b> an – ohne Plan, aber mit Neugier.<br>
+      Wer bist du? (Nur der Look – spielen kann jede:r alles!)</p>
+      <div class="cs-chars" id="cs-chars"></div>
+      <p class="dim">Steuerung: WASD oder Pfeiltasten · E = reden/benutzen · T = Funkgerät · J = Logbuch</p>
+    </div>
+  </div>
 
   <div id="toasts"></div>
 
-  <footer>
-    <span>KubeQuest – dein Lernspiel für Kubernetes, Helm & Terraform</span>
-    <button class="linklike" onclick="UI.resetGame()">Spielstand zurücksetzen</button>
-  </footer>
-
   <script src="js/sim.js"></script>
-  <script src="js/data.js"></script>
+  <script src="js/content.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/world.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

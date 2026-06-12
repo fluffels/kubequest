@@ -63,11 +63,14 @@
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
 
       this.helmRepos = (sc.helmRepos || []).slice();
-      this.releases = [];
+      this.releases = (sc.releases || []).map(r => ({
+        name: r.name, chart: r.chart, revision: r.revision, depName: r.depName,
+        history: (r.history || []).map(h => Object.assign({}, h)),
+      }));
 
       this.tf = {
-        initialized: false,
-        applied: false,
+        initialized: !!sc.tfInitialized,
+        applied: !!sc.tfApplied,
         resources: (sc.tfResources || []).slice(), // [{addr, desc}]
       };
 
@@ -99,6 +102,45 @@
 
     _findDeploymentOfPod(podName) {
       return this.deployments.find(d => d.pods.some(p => p.name === podName));
+    }
+
+    /** Quest-Szenario in die laufende Welt mischen (Dateien, Aufträge, Beispiel-Pods …). */
+    mergeScenario(sc) {
+      if (!sc) return;
+      Object.assign(this.files, sc.files || {});
+      Object.assign(this.applyEffects, sc.applyEffects || {});
+      if (sc.tfResources) { this.tf.resources = sc.tfResources.slice(); this.tf.initialized = false; this.tf.applied = false; }
+      for (const img of sc.dockerImages || []) {
+        if (!this.docker.pulled.includes(img)) this.docker.pulled.push(img);
+      }
+      for (const d of sc.deployments || []) {
+        if (!this.deployments.some(x => x.name === d.name)) {
+          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas));
+        }
+      }
+      for (const repo of sc.helmRepos || []) {
+        if (!this.helmRepos.includes(repo)) this.helmRepos.push(repo);
+      }
+    }
+
+    /** Zustand als speicherbares Szenario ausgeben (für localStorage). */
+    snapshot() {
+      return {
+        dockerImages: this.docker.pulled.slice(),
+        dockerContainers: this.docker.containers.map(c => Object.assign({}, c)),
+        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas })),
+        services: this.services.map(s => Object.assign({}, s)),
+        files: Object.assign({}, this.files),
+        applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
+        helmRepos: this.helmRepos.slice(),
+        releases: this.releases.map(r => ({
+          name: r.name, chart: r.chart, revision: r.revision, depName: r.depName,
+          history: r.history.map(h => Object.assign({}, h)),
+        })),
+        tfResources: this.tf.resources.slice(),
+        tfInitialized: this.tf.initialized,
+        tfApplied: this.tf.applied,
+      };
     }
 
     /** Führt eine Befehlszeile aus. Rückgabe: { output, error } */
