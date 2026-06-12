@@ -33,7 +33,9 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
-**15 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) + Einstieg.
+**18 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** + Einstieg.
+
+Die **Sturm-Saison** (bei Sturmwache Juno am Leuchtturm) lehrt das Debugging-Handwerk wie im echten Betrieb: `ImagePullBackOff` diagnostizieren und mit `kubectl set image` heilen, `CrashLoopBackOff` über die **Logs** verstehen und mit Secret + `rollout restart` beheben, `Pending`-Pods durch neue Nodes (Terraform!) einplanen. Das Mantra: **get pods → describe → logs.** Danach ziehen zufällige **Stürme mit Regen und Donner** auf, die live Deployments kaputtmachen – kaputte Dienste verdienen nichts, bis du sie reparierst!
 
 ## Spielsysteme
 
@@ -59,10 +61,13 @@ kubequest/
 │   ├── scene.js      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake, Sound
 │   ├── ui.js         Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel
 │   └── main.js       Start & Tastatur
-└── test/smoke.js     Test: spielt alle Quests & Drills automatisch durch
+└── test/             Test-Suite (Node-Test-Runner)
+    ├── sim.test.js      Unit-Tests des Simulators (inkl. Troubleshooting-Pfade)
+    ├── content.test.js  Konsistenz aller Spielinhalte
+    └── quests.test.js   spielt die komplette Story + alle Drills durch
 ```
 
-Test ausführen: `node test/smoke.js`
+Tests ausführen (im Projektordner): `node --test`
 
 ## Lizenzen
 
@@ -87,7 +92,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
 | 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |
 | 7 | StatefulSets, Volumes, Backups, Datenbanken im Cluster | 🔜 geplant: „Lagerhallen-Viertel“ |
-| 8 | Troubleshooting-Methodik (CrashLoops, OOM, Pending Pods …) | 🔜 geplant: „Sturm-Saison“ (Incident-Events) |
+| 8 | Troubleshooting-Methodik (CrashLoop, ImagePull, Pending …) | ✅ im Spiel („Sturm-Saison“: 3 Quests + Zufalls-Stürme) |
 | 9 | Terraform-Module, Remote State, Cloud-Provider | 🔜 geplant: „Expeditions-Flotte“ |
 | 10 | Eigenes Backend für das Spiel bauen & selbst in K8s deployen | 🔜 der Meister-Abschluss: Spiel trifft Realität |
 

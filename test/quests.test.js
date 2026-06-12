@@ -1,0 +1,85 @@
+/* Durchspiel-Test: spielt ALLE Quest-Schritte (teach/drill/terminal) in
+ * Story-Reihenfolge gegen eine dauerhafte Welt – wie im echten Spiel.
+ * Ausführen mit:  node --test test/
+ */
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+
+global.window = {};
+require("../js/sim.js");
+require("../js/content.js");
+const KQSim = window.KQSim;
+const KQContent = window.KQContent;
+
+function resolvePlaceholder(cmd, sim) {
+  if (!cmd.includes("<")) return cmd;
+  const findPod = prefix => {
+    const dep = sim.deployments.find(d => d.name === prefix) || sim.deployments[0];
+    return dep.pods[0].name;
+  };
+  if (/leuchtfeuer/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("leuchtfeuer"));
+  if (/funkboje/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("funkboje"));
+  if (/frachtplaner/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("frachtplaner"));
+  if (/describe/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("kantine"));
+  if (/delete pod/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("kasse"));
+  if (/docker stop/.test(cmd)) {
+    const c = sim.docker.containers.find(c => c.running);
+    return cmd.replace(/<[^>]+>/, c ? c.name : "fehlt");
+  }
+  return cmd;
+}
+
+function runTask(sim, task, label) {
+  const cmd = resolvePlaceholder(task.solution, sim);
+  const norm = cmd.trim().replace(/\s+/g, " ");
+  const result = sim.exec(cmd);
+  assert.ok(task.accept.some(re => re.test(norm)), label + ": Lösung matcht Regex nicht: " + norm);
+  assert.ok(!result.error, label + ": Simulator-Fehler: " + result.output);
+  assert.ok(!task.check || task.check(sim), label + ": check() nicht erfüllt");
+}
+
+test("Komplette Story ist mit den Musterlösungen durchspielbar", () => {
+  const sim = new KQSim({});
+  for (const quest of KQContent.QUESTS) {
+    for (const step of quest.steps) {
+      if (step.scenario) sim.mergeScenario(step.scenario);
+      if (step.type === "teach") {
+        runTask(sim, step.cmd, quest.id + "/" + step.cmd.id);
+      } else if (step.type === "terminal") {
+        for (const task of step.tasks) runTask(sim, task, quest.id + "/" + task.id);
+      } else if (step.type === "drill") {
+        for (let i = 0; i < step.count; i++) {
+          const drillId = step.pool[i % step.pool.length];
+          runTask(sim, KQContent.DRILLS[drillId](sim), quest.id + "/drill:" + drillId);
+        }
+      }
+    }
+  }
+});
+
+test("Alle Drill-Generatoren liefern lösbare Zufallsaufgaben (je 5x)", () => {
+  const sim = new KQSim({});
+  sim.exec("kubectl create deployment kantine --image=nginx");
+  for (const [id, gen] of Object.entries(KQContent.DRILLS)) {
+    for (let i = 0; i < 5; i++) {
+      const task = gen(sim);
+      assert.ok(task.text && task.hint && task.solution, "Drill " + id + ": Felder fehlen");
+      runTask(sim, task, "DRILL " + id + " #" + i);
+    }
+  }
+});
+
+test("Sturm-Szenario: Buchstabendreher-Image lässt sich immer heilen", () => {
+  // simuliert, was das Sturm-Event im Spiel anrichtet
+  for (const img of ["nginx", "redis", "httpd", "postgres", "rabbitmq", "aa", "abba"]) {
+    const sim = new KQSim({});
+    sim.exec("kubectl create deployment app --image=" + img);
+    const dep = sim.deployments[0];
+    const bad = KQContent.corruptImage(img);
+    dep.broken = { type: "imagepull", badImage: bad };
+    dep.image = bad;
+    assert.notEqual(bad, img, img + ": der Buchstabendreher verändert den Namen wirklich");
+    sim.exec("kubectl set image deployment/app app=" + img);
+    assert.equal(dep.broken, null, img + ": Heilung klappt");
+  }
+});

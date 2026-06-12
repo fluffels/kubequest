@@ -54,6 +54,7 @@
     theo:   { name: "Theo",          title: "Landvermessung",  sprite: 111 },
     pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86 },
     kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110 },
+    juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97 },
   };
 
   const PLAYER_SPRITES = [85, 88, 98, 99, 112, 96];
@@ -184,7 +185,10 @@
       }
       return { text: "Hoppla, das Upgrade von <code>" + r.name + "</code> war ein Fehler – rolle auf Revision <b>1</b> zurück!", accept: [new RegExp("^helm\\s+rollback\\s+" + r.name + "\\s+1$")], solution: "helm rollback " + r.name + " 1", hint: "Muster: helm rollback <release> <revision>" };
     },
-    "tf-plan": () => ({ text: "Zeig, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Die Generalprobe." }),
+    "tf-plan": sim => {
+      if (!sim.tf.initialized) sim.tf.initialized = true; // Übung setzt ein initialisiertes Projekt voraus
+      return { text: "Zeig, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Die Generalprobe." };
+    },
     "tf-state": sim => {
       if (!sim.tf.applied) { sim.tf.initialized = true; sim.exec("terraform apply"); }
       return { text: "Wirf einen Blick in Terraforms Gedächtnis.", accept: [/^terraform\s+state\s+list$/], solution: "terraform state list", hint: "terraform state …" };
@@ -195,6 +199,15 @@
       return { text: "Lege ein Secret <code>" + name + "</code> mit <code>--from-literal=passwort=geheim" + rnd(10, 99) + "x</code> an. (Wert frei wählbar!)", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+generic\\s+" + name + "\\s+--from-literal[=\\s][\\w.-]+=\\S+$")], solution: "kubectl create secret generic " + name + " --from-literal=passwort=geheim123", hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert" };
     },
     "k-get-secrets": () => ({ text: "Zeig alle Secrets an.", accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …" }),
+    "k-logs": sim => {
+      const d = ensureDeployment(sim);
+      const pod = d.pods[0].name;
+      return { text: "Lies die Logs des Pods <code>" + pod + "</code>.", accept: [new RegExp("^kubectl\\s+logs\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl logs " + pod, hint: "kubectl logs <pod-name> – Name per get pods holen." };
+    },
+    "k-rollout": sim => {
+      const d = ensureDeployment(sim);
+      return { text: "Starte alle Pods von <code>" + d.name + "</code> sauber neu (Rolling Restart).", accept: [new RegExp("^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]" + d.name + "$")], solution: "kubectl rollout restart deployment " + d.name, hint: "Muster: kubectl rollout restart deployment <name>" };
+    },
   };
 
   /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
@@ -204,6 +217,7 @@
     ada:  [{ drill: "k-apply", after: "q8" }],
     runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }],
     theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
+    juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
   };
 
   /* =================================================================
@@ -701,8 +715,149 @@
           ]},
         { type: "dialog", npc: "ole", lines: [
           "Damit erkläre ich deine <b>Grundausbildung für abgeschlossen</b>! 🎉 Docker, Kubernetes, YAML, Helm, Terraform, Security – du hast den ganzen Werkzeugkasten.",
-          "Aber Port Kubernia schläft nie: <b>Piraten</b> überfallen die Stege, die <b>Krake</b> schnüffelt nach Klartext, und deine Dienste verdienen rund um die Uhr. Halte den Hafen am Laufen – und übe bei uns allen, wann immer du magst!",
-          "Es gehen übrigens Gerüchte um … über die <b>Ingress-Inseln</b> und das <b>GitOps-Archipel</b>. Fortsetzung folgt, Admiral-Anwärter:in! ⚓",
+          "Aber Port Kubernia schläft nie: <b>Piraten</b> überfallen die Stege, die <b>Krake</b> schnüffelt nach Klartext, und deine Dienste verdienen rund um die Uhr. Halte den Hafen am Laufen!",
+          "Und … hörst du das Donnergrollen? Die <b>Sturm-Saison</b> beginnt. <b>Juno</b>, unsere Sturmwache am Leuchtturm im Osten, braucht dringend jemanden, der kaputte Dienste reparieren kann. Geh zu ihr – jetzt wird es ernst! ⛈️",
+        ]},
+      ]},
+
+    /* ========== STURM-SAISON: Troubleshooting wie im echten Betrieb ========== */
+
+    { id: "q15", title: "Sturmwarnung am Leuchtturm", giver: "juno", rewardXp: 50, rewardCoins: 40,
+      steps: [
+        { type: "dialog", npc: "juno", lines: [
+          "Da bist du ja endlich! Juno, Sturmwache. Während die anderen dir beigebracht haben, Dinge zu <b>bauen</b>, lernst du bei mir, sie zu <b>reparieren</b> – das ist die halbe Miete in diesem Job.",
+          "Der Sturm letzte Nacht hat das <b>leuchtfeuer</b>-Deployment erwischt. Erste Debugging-Regel: <b>STATUS lesen, nicht raten.</b> Schau dir die Pods an!",
+        ]},
+        { type: "terminal", brief: "Diagnose",
+          scenario: { deployments: [{ name: "leuchtfeuer", image: "ngnix:latest", replicas: 1, broken: { type: "imagepull", badImage: "ngnix:latest" } }] },
+          tasks: [
+          { id: "t-j15-1", text: "Zeig die Pods – und lies die STATUS-Spalte genau!",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Der Übersichts-Befehl." },
+          { id: "t-j15-2", text: "<code>ImagePullBackOff</code>! Zweite Regel: <b>describe lesen.</b> Beschreibe den <code>leuchtfeuer</code>-Pod und lies die Events ganz unten.",
+            accept: [/^kubectl\s+describe\s+pods?\s+leuchtfeuer-\S+$/], solution: "kubectl describe pod <leuchtfeuer-pod>", hint: "kubectl describe pod <name> – Name aus get pods." },
+        ]},
+        { type: "choice", npc: "juno", reviewId: "q-ts-2",
+          q: "In den Events steht: Failed to pull image „ngnix:latest“ – repository does not exist. Was ist die Ursache?",
+          options: [
+            { t: "Ein Tippfehler im Image-Namen: „ngnix“ statt „nginx“!", ok: true,
+              reply: "Scharfes Auge! ImagePullBackOff heißt fast immer: Tippfehler im Namen, falscher Tag oder fehlende Zugriffsrechte auf die Registry." },
+            { t: "Der Node ist kaputt.", ok: false,
+              reply: "Nein – lies die Events nochmal: Das IMAGE kann nicht geladen werden. „ngnix“ … fällt dir was auf? Tippfehler!" },
+            { t: "Zu wenig Speicher im Cluster.", ok: false,
+              reply: "Das wäre ein anderes Fehlerbild (Pending/OOM). Hier steht klar: repository does not exist – das Image „ngnix“ gibt es nicht. Tippfehler!" },
+          ]},
+        { type: "teach", brief: "Die Reparatur", cmd: {
+          id: "t-setimage", intro: "🆕 Neuer Befehl: <code>kubectl set image</code> – tauscht das Image eines Deployments aus.",
+          text: "Setze das richtige Image: <code>kubectl set image deployment/leuchtfeuer leuchtfeuer=nginx</code>",
+          accept: [/^kubectl\s+set\s+image\s+deployment\/leuchtfeuer\s+\S+=nginx(:\S+)?$/],
+          solution: "kubectl set image deployment/leuchtfeuer leuchtfeuer=nginx",
+          hint: "Muster: kubectl set image deployment/<name> <container>=<richtiges-image>" } },
+        { type: "terminal", brief: "Verifizieren", tasks: [
+          { id: "t-j15-3", text: "Dritte Regel: <b>Fix immer verifizieren!</b> Laufen die Pods wieder?",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "leuchtfeuer"); return d && !d.broken; },
+            solution: "kubectl get pods", hint: "get pods – STATUS muss Running sein." },
+        ]},
+        { type: "dialog", npc: "juno", lines: [
+          "Sauber repariert! Merk dir das Mantra für IMMER: <b>get pods → describe → logs.</b> Erst gucken, dann verstehen, dann fixen, dann verifizieren. Morgen zeige ich dir den fiesesten Fehler von allen …",
+        ]},
+      ]},
+
+    { id: "q16", title: "Das Flackern", giver: "juno", rewardXp: 55, rewardCoins: 40,
+      steps: [
+        { type: "dialog", npc: "juno", lines: [
+          "Siehst du die <b>funkboje</b> da draußen flackern? Der Pod startet, stürzt ab, startet, stürzt ab … Das nennt sich <b>CrashLoopBackOff</b> – der Klassiker unter den Cluster-Fehlern.",
+          "Das Tückische: Das Image ist OK, der Node ist OK – die <b>App selbst</b> stirbt beim Start. Und warum sie stirbt, verrät nur eines: <b>die Logs.</b> Dritte Stufe des Mantras!",
+        ]},
+        { type: "terminal", brief: "Logs lesen",
+          scenario: { deployments: [{ name: "funkboje", image: "nginx", replicas: 1, broken: { type: "crashloop", needsSecret: "funk-schluessel" } }] },
+          tasks: [
+          { id: "t-j16-1", text: "Verschaff dir den Überblick: get pods. Beachte auch die RESTARTS-Spalte!",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Wie immer zuerst." },
+          { id: "t-j16-2", text: "Jetzt die Wahrheit: Lies die <b>Logs</b> des funkboje-Pods!",
+            accept: [/^kubectl\s+logs\s+funkboje-\S+$/], solution: "kubectl logs <funkboje-pod>", hint: "kubectl logs <pod-name>" },
+        ]},
+        { type: "choice", npc: "juno", reviewId: "q-ts-1",
+          q: "Das Log sagt: FATAL: Secret 'funk-schluessel' nicht gefunden. Was ist der Plan?",
+          options: [
+            { t: "Das fehlende Secret anlegen, dann die Pods neu starten.", ok: true,
+              reply: "Exakt! Die App braucht das Secret zum Start. Erst die Ursache beheben, DANN neu starten – andersrum bringt nichts." },
+            { t: "Ein anderes Image installieren.", ok: false,
+              reply: "Nein – das Image ist in Ordnung! Lies das Log: Der App fehlt das Secret 'funk-schluessel'. Das legen wir an und starten neu." },
+          ]},
+        { type: "terminal", brief: "Ursache beheben", tasks: [
+          { id: "t-j16-3", text: "Lege das fehlende Secret <code>funk-schluessel</code> an (Wert frei wählbar).",
+            accept: [/^kubectl\s+create\s+secret\s+generic\s+funk-schluessel\s+--from-literal[=\s][\w.-]+=\S+$/],
+            solution: "kubectl create secret generic funk-schluessel --from-literal=code=blinkblink1", hint: "kubectl create secret generic <name> --from-literal=k=v" },
+        ]},
+        { type: "teach", brief: "Sauberer Neustart", cmd: {
+          id: "t-rollout", intro: "🆕 Neuer Befehl: <code>kubectl rollout restart</code> – startet alle Pods eines Deployments sauber neu.",
+          text: "Starte das Deployment <code>funkboje</code> neu – jetzt findet es sein Secret!",
+          accept: [/^kubectl\s+rollout\s+restart\s+deployment[\/\s]funkboje$/],
+          solution: "kubectl rollout restart deployment funkboje",
+          hint: "Muster: kubectl rollout restart deployment <name>" } },
+        { type: "terminal", brief: "Verifizieren", tasks: [
+          { id: "t-j16-4", text: "Verifizieren! Leuchtet die funkboje wieder stabil?",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "funkboje"); return d && !d.broken; },
+            solution: "kubectl get pods", hint: "STATUS muss Running sein." },
+        ]},
+        { type: "dialog", npc: "juno", lines: [
+          "Ursache → Fix → Neustart → Verifikation. Du debuggst wie eine alte Sturmwache! Eine Prüfung fehlt noch – und für die brauchen wir … mehr Hafen. Wortwörtlich.",
+        ]},
+      ]},
+
+    { id: "q17", title: "Kein Platz im Hafen", giver: "juno", rewardXp: 70, rewardCoins: 55,
+      steps: [
+        { type: "dialog", npc: "juno", lines: [
+          "Großauftrag! Die Reederei will ihren <b>frachtplaner</b> bei uns laufen lassen. Aber irgendetwas stimmt nicht – die Pods kommen einfach nicht hoch. Kein Absturz, kein Image-Fehler … sie <b>warten</b> nur.",
+        ]},
+        { type: "terminal", brief: "Diagnose",
+          scenario: {
+            deployments: [{ name: "frachtplaner", image: "nginx", replicas: 2, broken: { type: "pending" } }],
+            files: { "main.tf": MAIN_TF },
+            tfResources: [
+              { addr: "hafen_plateau.ost", desc: 'name = "ost-erweiterung"' },
+              { addr: "hafen_server.worker[0]", desc: 'name = "ahoi-worker-3"' },
+              { addr: "hafen_server.worker[1]", desc: 'name = "ahoi-worker-4"' },
+            ],
+          },
+          tasks: [
+          { id: "t-j17-1", text: "Du kennst das Mantra: get pods. Was sagt der STATUS?",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Schritt 1, immer." },
+          { id: "t-j17-2", text: "<code>Pending</code> – die Pods warten auf einen Platz. Warum? describe verrät es in den Events!",
+            accept: [/^kubectl\s+describe\s+pods?\s+frachtplaner-\S+$/], solution: "kubectl describe pod <frachtplaner-pod>", hint: "describe + Events lesen." },
+        ]},
+        { type: "choice", npc: "juno", reviewId: "q-ts-3",
+          q: "Events: „0/3 nodes are available: insufficient capacity“. Diagnose?",
+          options: [
+            { t: "Der Cluster ist voll – wir brauchen mehr Nodes!", ok: true,
+              reply: "Genau! Kein Bug, kein Tippfehler – schlicht kein Platz. Und wer baut Infrastruktur? Na? … TERRAFORM! Theos Bauplan für die Ost-Erweiterung liegt noch bereit." },
+            { t: "Das Image ist kaputt.", ok: false,
+              reply: "Nein – dann stünde da ImagePullBackOff. „insufficient capacity“ = kein Platz auf den Nodes. Wir brauchen MEHR HAFEN!" },
+          ]},
+        { type: "terminal", brief: "Mehr Hafen bauen!", tasks: [
+          { id: "t-j17-3", text: "Der Bauplan liegt bereit (<code>main.tf</code>). Initialisiere Terraform!",
+            accept: [/^terraform\s+init$/], solution: "terraform init", hint: "Schritt 1 jedes Terraform-Projekts." },
+          { id: "t-j17-4", text: "Generalprobe – was wird gebaut?",
+            accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Immer erst lesen." },
+          { id: "t-j17-5", text: "BAUEN! Und dann beobachte: Ost-Plateau + zwei neue Nodes … 🏗️",
+            accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply", hint: "Die Aufführung." },
+          { id: "t-j17-6", text: "Zähl nach: Wie viele Nodes hat dein Cluster jetzt?",
+            accept: [/^kubectl\s+get\s+(nodes|node|no)$/], check: sim => sim.nodes.length > 3, solution: "kubectl get nodes", hint: "kubectl, nicht terraform!" },
+          { id: "t-j17-7", text: "Und der Moment der Wahrheit: Haben die frachtplaner-Pods jetzt Platz gefunden?",
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "frachtplaner"); return d && !d.broken; },
+            solution: "kubectl get pods", hint: "get pods – STATUS lesen." },
+        ]},
+        { type: "choice", npc: "juno", reviewId: "q-ts-4",
+          q: "Letzte Prüfungsfrage: Wie lautet das Debugging-Mantra?",
+          options: [
+            { t: "get pods → describe → logs. Erst gucken, dann verstehen, dann fixen, dann verifizieren.", ok: true,
+              reply: "PERFEKT. Damit löst du draußen 80% aller Cluster-Probleme. Das ist keine Übertreibung." },
+            { t: "Erstmal alles neu starten und hoffen.", ok: false,
+              reply: "HA! Der Klassiker – und manchmal klappt's sogar. Aber Profis diagnostizieren erst: get pods → describe → logs. Dann fixen. Dann verifizieren." },
+          ]},
+        { type: "dialog", npc: "juno", lines: [
+          "Hiermit ernenne ich dich zur <b>Sturmwache ehrenhalber</b>! 🌩️ Die Ost-Erweiterung bleibt stehen – Port Kubernia ist gewachsen, dank dir.",
+          "Ab jetzt gilt: Wenn ein Sturm aufzieht und etwas kaputtgeht, bist DU dran. Du hast das Mantra, du hast die Befehle. Und zwischen den Stürmen? Übe bei mir, halte den Streak, füttere die Krabbe. Der Hafen zählt auf dich, Admiral-Anwärter:in! ⚓",
         ]},
       ]},
   ];
@@ -715,6 +870,7 @@
     runa: ["Das Helm-Logo hängt über meinem Bett. Was? Es ist hübsch!", "helm rollback hat mir mal ein Wochenende gerettet."],
     theo: ["Ich vermesse gerade die Möglichkeiten. Sie sind … beachtlich.", "terraform plan lesen. IMMER. Frag nicht, woher ich das weiß."],
     pelle: ["Frische Ware, faire Preise! Na ja – Preise.", "Die Kanone da drüben? Bestseller, seit die Piraten wieder da sind."],
+    juno: ["Ruhige See heute. ZU ruhig.", "get pods → describe → logs. Träum es. Lebe es.", "Der Leuchtturm hat 99,99% Uptime. Die fehlenden 0,01% verfolgen mich bis heute."],
   };
 
   /* ---------- Karteikarten (Krabbe Kralle) ---------- */
@@ -745,6 +901,11 @@
     { id: "q-ch6-4", q: "Kubernetes und Terraform sind beide deklarativ. Unterschied?", options: ["Kubernetes verwaltet Container im Cluster – Terraform baut die Infrastruktur drumherum.", "Terraform ist nur für Windows-Server.", "Kubernetes ersetzt Terraform.", "Terraform verwaltet nur Datenbanken."], correct: 0, explain: "Terraform baut den Hafen, Kubernetes betreibt den Verkehr darin. Oft baut Terraform sogar den K8s-Cluster." },
     { id: "q-sec-1", q: "Wohin gehören Passwörter und API-Schlüssel im Cluster?", options: ["In Secrets – niemals im Klartext in YAML oder ConfigMaps.", "In die ConfigMap, da sind sie übersichtlich.", "Als Kommentar ins Manifest.", "In den Image-Namen."], correct: 0, explain: "ConfigMaps sind Klartext – Krakenfutter! Vertrauliches gehört in Secrets (und echte Profis verschlüsseln zusätzlich, z.B. mit Sealed Secrets oder Vault)." },
     { id: "q-sec-2", q: "Warum sind Klartext-Passwörter in YAML-Dateien doppelt gefährlich?", options: ["Jede:r mit Cluster- oder Git-Zugriff kann sie lesen – YAML landet ja in Git!", "YAML-Dateien werden automatisch veröffentlicht.", "Passwörter machen YAML-Dateien langsam.", "Sie sind nicht gefährlich."], correct: 0, explain: "Deklarative Dateien gehören in Git – und damit wandert jedes Klartext-Passwort in die Versionshistorie. Für immer. Secrets brechen diese Kette." },
+    { id: "q-ts-1", q: "Ein Pod zeigt CrashLoopBackOff. Was heißt das?", options: ["Die App startet, stürzt ab, startet wieder … – die Ursache steht in den Logs.", "Das Image kann nicht geladen werden.", "Der Pod wartet auf einen freien Node.", "Der Pod wurde absichtlich gestoppt."], correct: 0, explain: "CrashLoop = die App selbst stirbt beim Start (fehlende Config, fehlendes Secret, Bug). kubectl logs verrät, warum." },
+    { id: "q-ts-2", q: "Ein Pod zeigt ImagePullBackOff. Häufigste Ursachen?", options: ["Tippfehler im Image-Namen, falscher Tag oder fehlende Registry-Rechte.", "Zu wenig Arbeitsspeicher.", "Der Service ist falsch konfiguriert.", "Das YAML hat Tabs statt Leerzeichen."], correct: 0, explain: "Das Image kann nicht geladen werden – describe zeigt in den Events den genauen Grund. Fix: kubectl set image mit dem richtigen Namen." },
+    { id: "q-ts-3", q: "Ein Pod hängt ewig in Pending. Was ist los?", options: ["Er findet keinen Platz – kein Node hat genug Kapazität (oder passt nicht).", "Das Image lädt noch herunter.", "Die App ist abgestürzt.", "Pending ist der Normalzustand."], correct: 0, explain: "Pending = noch nicht eingeplant. describe → Events zeigt z.B. „0/3 nodes are available“. Lösung: Platz schaffen oder Nodes hinzufügen (Terraform!)." },
+    { id: "q-ts-4", q: "Das Debugging-Mantra für kaputte Pods?", options: ["get pods → describe → logs, dann fixen und verifizieren.", "Sofort alles löschen und neu deployen.", "Den Cluster neu starten.", "Im Code nach Bugs suchen."], correct: 0, explain: "Erst STATUS lesen (get), dann Events (describe), dann die App-Sicht (logs). Damit findest du 80% aller Ursachen in Minuten." },
+    { id: "q-ts-5", q: "Wann hilft kubectl rollout restart?", options: ["Wenn die Ursache behoben ist (z.B. Secret angelegt) und die Pods sauber neu starten sollen.", "Bei jedem Fehler als erstes.", "Nur bei ImagePullBackOff.", "Um den Node neu zu starten."], correct: 0, explain: "Restart ersetzt alle Pods rollierend. Wichtig: ERST die Ursache beheben, sonst crasht es wieder. Reihenfolge: Ursache → Fix → Restart → Verifikation." },
   ];
 
   const CMD_CARDS = [
@@ -766,6 +927,8 @@
     { id: "c-ch6-2", chapter: "q12", q: "Zeige an, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan" },
     { id: "c-ch6-3", chapter: "q13", q: "Setze die Terraform-Konfiguration wirklich um.", accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply" },
     { id: "c-sec-1", chapter: "q14", q: "Lege ein Secret <code>api-key</code> mit <code>--from-literal=key=abc123</code> an.", accept: [/^kubectl\s+create\s+secret\s+generic\s+api-key\s+--from-literal[=\s][\w.-]+=\S+$/], solution: "kubectl create secret generic api-key --from-literal=key=abc123" },
+    { id: "c-ts-1", chapter: "q15", q: "Tausche das Image des Deployments <code>shop</code> gegen <code>nginx</code> (Container heißt auch <code>shop</code>).", accept: [/^kubectl\s+set\s+image\s+deployment\/shop\s+\S+=nginx(:\S+)?$/], solution: "kubectl set image deployment/shop shop=nginx" },
+    { id: "c-ts-2", chapter: "q16", q: "Starte alle Pods des Deployments <code>shop</code> sauber neu.", accept: [/^kubectl\s+rollout\s+restart\s+deployment[\/\s]shop$/], solution: "kubectl rollout restart deployment shop" },
   ];
 
   /* ---------- Stapel-Spiel: Docker-Image-Schichten ---------- */
@@ -775,5 +938,13 @@
     { name: "Java-Dienst", layers: ["FROM eclipse-temurin (Basis mit Java)", "COPY build/libs/app.jar (das fertige Programm)", "EXPOSE 8080 (Port freigeben)", "CMD java -jar app.jar (Startbefehl)"] },
   ];
 
-  window.KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS };
+  /** Buchstabendreher für Sturm-Events: macht aus jedem Image-Namen garantiert einen anderen. */
+  function corruptImage(img) {
+    for (let i = 1; i < img.length - 1; i++) {
+      if (img[i] !== img[i + 1]) return img.slice(0, i) + img[i + 1] + img[i] + img.slice(i + 2);
+    }
+    return img + "x";
+  }
+
+  window.KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS, corruptImage };
 })();

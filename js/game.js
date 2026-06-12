@@ -18,6 +18,8 @@
     q10: ["q-ch5-3"],
     q13: ["q-ch6-1", "q-ch6-4"],
     q14: ["q-sec-2"],
+    q15: ["q-ts-4"],
+    q16: ["q-ts-5"],
   };
 
   function today() {
@@ -108,10 +110,10 @@
     },
 
     /* ---------- Hafen-Wirtschaft ---------- */
-    /** Dublonen pro Minute: jede Pod-Kopie 0.5, jeder Service 1. */
+    /** Dublonen pro Minute: jede GESUNDE Pod-Kopie 0.5, jeder Service 1. Kaputte Deployments verdienen nichts! */
     incomeRate() {
       if (!this.sim) return 0;
-      const pods = this.sim.deployments.reduce((sum, d) => sum + d.replicas, 0);
+      const pods = this.sim.deployments.reduce((sum, d) => sum + (d.broken ? 0 : d.replicas), 0);
       return pods * 0.5 + this.sim.services.length * 1;
     },
 
