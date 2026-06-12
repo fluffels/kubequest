@@ -8,7 +8,7 @@
 </head>
 <body>
 
-  <canvas id="game"></canvas>
+  <div id="game-container"></div>
 
   <!-- HUD -->
   <div id="hud">
@@ -17,11 +17,17 @@
         <div class="xpbar"><div id="hud-xpfill"></div></div>
         <span id="hud-xptext" class="xptext">0 XP</span>
       </div>
-      <span class="hud-coins">🪙 <b id="hud-coins">0</b></span>
+      <span class="hud-coins">🪙 <b id="hud-coins">0</b> <span id="hud-income" class="hud-income" title="Einnahmen deines Hafens pro Minute"></span></span>
       <span class="hud-streak" title="Tage-Streak – spiele täglich für Bonus-Dublonen">🔥 <b id="hud-streak">0</b></span>
     </div>
     <div class="hud-quest" id="hud-quest"></div>
     <div class="hud-keys">🚶 WASD/Pfeile · 💬 E reden · 📻 T Funkgerät · 📜 J Logbuch</div>
+  </div>
+
+  <!-- Alarm (Piraten / Krake) -->
+  <div id="alarm" class="hidden">
+    <span id="alarm-text"></span>
+    <span id="alarm-timer" class="alarm-timer"></span>
   </div>
 
   <!-- Interaktions-Hinweis -->
@@ -38,7 +44,7 @@
     </div>
   </div>
 
-  <!-- Funkgerät / Terminal -->
+  <!-- Funkgerät -->
   <div id="overlay-terminal" class="panel hidden">
     <div class="panel-head">📻 Funkgerät <span class="dim">– Verbindung zum Hafen-Cluster</span>
       <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
@@ -56,7 +62,7 @@
     <div class="term-actions" id="term-actions"></div>
   </div>
 
-  <!-- Logbuch (Questlog) -->
+  <!-- Logbuch -->
   <div id="overlay-quest" class="panel hidden">
     <div class="panel-head">📜 Logbuch
       <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
@@ -80,6 +86,14 @@
     <div id="review-body" class="panel-body"></div>
   </div>
 
+  <!-- Stapel-Minispiel -->
+  <div id="overlay-stack" class="panel hidden">
+    <div class="panel-head">🎮 Bos Stapel-Spiel <span class="dim">– Docker-Images sind Schichtstapel!</span>
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div id="stack-body" class="panel-body"></div>
+  </div>
+
   <!-- Charakterwahl -->
   <div id="charselect" class="hidden">
     <div class="cs-box">
@@ -93,12 +107,13 @@
 
   <div id="toasts"></div>
 
+  <script src="js/phaser.min.js"></script>
+  <script src="js/assets-data.js"></script>
   <script src="js/sim.js"></script>
   <script src="js/content.js"></script>
   <script src="js/game.js"></script>
-  <script src="js/engine.js"></script>
-  <script src="js/world.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/scene.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
