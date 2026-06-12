@@ -96,6 +96,17 @@
       this.load();
     },
 
+    /* ---------- Spielstand als Datei sichern / laden ---------- */
+    exportData() {
+      this.save();
+      return localStorage.getItem(SAVE_KEY);
+    },
+
+    importData(json) {
+      JSON.parse(json); // wirft bei ungültiger Datei
+      localStorage.setItem(SAVE_KEY, json);
+    },
+
     /* ---------- Hafen-Wirtschaft ---------- */
     /** Dublonen pro Minute: jede Pod-Kopie 0.5, jeder Service 1. */
     incomeRate() {

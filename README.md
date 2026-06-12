@@ -70,10 +70,31 @@ Test ausführen: `node test/smoke.js`
 - **Grafiken** – „Tiny Town" & „Tiny Dungeon" von [Kenney](https://kenney.nl), **CC0** (public domain). Danke, Kenney! 💛
 - Sounds werden zur Laufzeit synthetisiert (WebAudio) – keine Audio-Dateien nötig.
 
-## Roadmap
+## Spielstand
 
-- **Ingress-Inseln**: Routing & Ingress-Controller
-- **GitOps-Archipel**: Argo CD & das Pull-Prinzip
-- **Monitoring-Leuchtturm**: Prometheus, Grafana, Alerts
+Wird **automatisch alle 5 Sekunden** im Browser gespeichert (localStorage). Im 📜 Logbuch (Taste J) gibt es zusätzlich **„Spielstand sichern“** (lädt eine JSON-Datei herunter) und **„Spielstand laden“** – für Backups oder den Umzug auf einen anderen Rechner/Browser.
+
+## Lernpfad: Von 0 zu Senior DevOps (ehrliche Einordnung)
+
+Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch Wissen **plus Betriebserfahrung**; das Spiel baut Wissen und Muskelgedächtnis auf, echte Projekte bauen die Erfahrung.
+
+| Phase | Thema | Status |
+|---|---|---|
+| 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (15 Quests) |
+| 2 | Git & Branching-Workflows, CI/CD-Pipelines | 🔜 geplant: „Pipeline-Passage“ |
+| 3 | Ingress, DNS, TLS, NetworkPolicies | 🔜 geplant: „Ingress-Inseln“ |
+| 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🔜 geplant: „GitOps-Archipel“ |
+| 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
+| 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |
+| 7 | StatefulSets, Volumes, Backups, Datenbanken im Cluster | 🔜 geplant: „Lagerhallen-Viertel“ |
+| 8 | Troubleshooting-Methodik (CrashLoops, OOM, Pending Pods …) | 🔜 geplant: „Sturm-Saison“ (Incident-Events) |
+| 9 | Terraform-Module, Remote State, Cloud-Provider | 🔜 geplant: „Expeditions-Flotte“ |
+| 10 | Eigenes Backend für das Spiel bauen & selbst in K8s deployen | 🔜 der Meister-Abschluss: Spiel trifft Realität |
+
+## Roadmap (nächste Ausbaustufen)
+
+- Phase-2-Inseln (siehe Lernpfad) – je Insel eigene NPCs, Quests und Drills
+- **Sturm-Saison**: kaputte Pods debuggen (CrashLoopBackOff, ImagePullBackOff, OOMKilled) als Events
 - **Werft-Ausbau**: eigene Helm-Charts schreiben
 - **Echter Modus**: dieselben Quests gegen ein lokales kind/minikube-Cluster
+- Mehr Grafik: weitere Kenney-Packs (CC0), z.B. Innenräume für betretbare Gebäude

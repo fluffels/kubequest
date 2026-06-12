@@ -130,6 +130,27 @@
 
       this.scale.on("resize", () => cam.setZoom(window.innerWidth < 900 ? 2.4 : 3));
       this.scheduleEvents(60); // erste Events frühestens nach 1 Minute
+
+      // Möwen für die Hafen-Atmosphäre
+      this.time.addEvent({ delay: 6500, loop: true, callback: () => { if (Math.random() < 0.65) this.spawnGull(); } });
+      this.spawnGull();
+    }
+
+    spawnGull() {
+      const y = Phaser.Math.Between(2, 22) * T;
+      const fromLeft = Math.random() < 0.5;
+      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
+      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
+      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
+      gull.add([w1, w2]);
+      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: gull, y: y + Phaser.Math.Between(-30, 30), duration: 4000, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({
+        targets: gull, x: fromLeft ? this.W * T + 30 : -30,
+        duration: Phaser.Math.Between(10000, 16000),
+        onComplete: () => gull.destroy(),
+      });
     }
 
     set(x, y, v) { this.ground[y * this.W + x] = v; }
@@ -168,7 +189,11 @@
       const W = this.W, H = this.H;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         if (y >= 27) { this.set(x, y, -2); this.solidGrid[y * W + x] = 1; }
-        else this.set(x, y, GRASS[(x * 7 + y * 13) % GRASS.length]);
+        else {
+          // Pseudozufällige Verteilung statt Streifenmuster: meist glatt, etwas Struktur, wenige Blumen
+          const r = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
+          this.set(x, y, r < 80 ? 0 : r < 93 ? 1 : 2);
+        }
       }
       for (let x = 0; x < W; x++) this.tree(x, 0);
       for (let y = 0; y < 27; y++) { this.tree(0, y); this.tree(W - 1, y); }
@@ -264,6 +289,19 @@
       }
     }
 
+    /** Gut lesbares Welt-Label: helle Schrift auf dunkler Pille. */
+    makeLabel(x, y, text, color) {
+      return this.add.text(x, y, text, {
+        fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px", color: color || "#ffffff",
+        backgroundColor: "rgba(8,14,24,0.7)", padding: { x: 2, y: 1 }, resolution: 10,
+      }).setOrigin(0.5, 1).setDepth(9500);
+    }
+
+    /** Weicher Schatten unter einer Figur. */
+    addShadow(x, y, w) {
+      return this.add.ellipse(x, y, w || 10, 4, 0x000000, 0.26).setDepth(1.6);
+    }
+
     renderStatics() {
       // Deko (Bäume, Häuser, Möbel) – Tiefe nach y
       for (const d of this.decoList) {
@@ -280,8 +318,7 @@
 
       // Beschriftungen
       for (const l of this.labels) {
-        this.add.text(l.x * T, l.y * T, l.text, { fontFamily: "Consolas, monospace", fontSize: "5px", color: l.color, resolution: 8 })
-          .setOrigin(0.5, 1).setDepth(10000).setShadow(0.5, 0.5, "#000", 1);
+        this.makeLabel(l.x * T, l.y * T, l.text, l.color).setDepth(10000);
       }
 
       // Terraform-Plateau (Container, an/aus je nach State)
@@ -291,7 +328,7 @@
       for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) tfRt.drawFrame("dungeon", WOOD[(x + y) % 3], x * T, y * T);
       tfRt.fill(FOAM, 0.7, 0, 0, p.w * T, 2);
       this.tfGroup.add(tfRt);
-      const mkLabel = (tx, ty, txt, color) => this.add.text(tx, ty, txt, { fontFamily: "Consolas, monospace", fontSize: "5px", color, resolution: 8 }).setOrigin(0.5, 1);
+      const mkLabel = (tx, ty, txt, color) => this.makeLabel(tx, ty, txt, color);
       this.tfGroup.add(this.add.image((p.x + 1) * T + 8, (p.y + 1) * T + 8, "dungeon", CRATE));
       this.tfGroup.add(this.add.image((p.x + 4) * T + 8, (p.y + 2) * T + 8, "dungeon", CRATE));
       this.tfGroup.add(mkLabel((p.x + 1.5) * T, (p.y + 0.9) * T, "worker-3", "#9fe6a0"));
@@ -320,6 +357,7 @@
       ];
       this.npcs = defs.map(d => {
         const meta = KQContent.NPCS[d.id];
+        this.addShadow(d.x * T + 8, d.y * T + 15);
         const spr = this.add.image(d.x * T + 8, d.y * T + 8, "dungeon", meta.sprite).setDepth(d.y * T + T);
         this.tweens.add({ targets: spr, y: d.y * T + 7, duration: 900 + Math.random() * 400, yoyo: true, repeat: -1, ease: "Sine.inOut" });
         const marker = this.add.text(d.x * T + 8, d.y * T - 6, "!", { fontFamily: "Consolas", fontSize: "8px", color: "#ffc857", fontStyle: "bold", resolution: 8 })
@@ -336,10 +374,13 @@
         y: sp && sp.y ? sp.y : (this.ship.y + 2) * T,
         dir: 1, moving: false,
       };
+      this.playerShadow = this.addShadow(this.playerPos.x, this.playerPos.y + 6);
       this.playerSprite = this.add.image(this.playerPos.x, this.playerPos.y, "dungeon", Game.state.character || 85).setDepth(this.playerPos.y + 8);
+      this.petShadow = this.addShadow(0, 0, 7).setVisible(false);
       this.petSprite = this.add.image(0, 0, "dungeon", 124).setVisible(false).setDepth(1);
       this.petTrail = [];
       this.bobT = 0;
+      this.stepAcc = 0;
     }
     get player() { return this.playerPos; }
 
@@ -408,11 +449,12 @@
           this.slotUsed[slot] = true;
           const pos = this.podSlotPos(slot);
           const hue = hashHue(p.dep);
+          const shadow = this.addShadow(pos.x, pos.y + 7, 11);
           const crate = this.add.image(pos.x, pos.y - 44, "dungeon", CRATE).setDepth(pos.y + 8);
           const band = this.add.image(pos.x, pos.y - 44 - 5, "px").setScale(6, 1.5).setTint(hueColor(hue)).setDepth(pos.y + 9);
           this.tweens.add({ targets: [crate, band], y: "+=44", duration: 550, ease: "Bounce.easeOut",
             onComplete: () => this.burstAt(pos.x, pos.y + 4, "dust") });
-          this.podSlots[p.name] = { slot, crate, band, dep: p.dep };
+          this.podSlots[p.name] = { slot, crate, band, shadow, dep: p.dep };
         }
       }
       for (const name of Object.keys(this.podSlots)) {
@@ -421,7 +463,7 @@
           const pos = this.podSlotPos(info.slot);
           this.burstAt(pos.x, pos.y + 4, "splash");
           SFX.splash();
-          info.crate.destroy(); info.band.destroy();
+          info.crate.destroy(); info.band.destroy(); info.shadow.destroy();
           this.slotUsed[info.slot] = false;
           delete this.podSlots[name];
         }
@@ -446,9 +488,7 @@
 
     rebuildDynamic() {
       this.dynGroup.clear(true, true);
-      const mkText = (x, y, str, color) =>
-        this.add.text(x, y, str, { fontFamily: "Consolas", fontSize: "5px", color, resolution: 8 })
-          .setOrigin(0.5, 1).setDepth(9500).setShadow(0.5, 0.5, "#000", 1);
+      const mkText = (x, y, str, color) => this.makeLabel(x, y, str, color);
 
       // Deployment-Schilder über der ersten Kiste
       const seen = {};
@@ -610,9 +650,13 @@
         this.petTrail.push({ x: pl.x, y: pl.y });
         if (this.petTrail.length > 26) this.petTrail.shift();
         this.bobT += dt * 12;
+        // Staubwölkchen beim Laufen
+        this.stepAcc += dt;
+        if (this.stepAcc > 0.3) { this.stepAcc = 0; this.dust.explode(2, pl.x, pl.y + 6); }
       }
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
       this.playerSprite.setPosition(pl.x, pl.y - 2 - bob).setFlipX(pl.dir === -1).setDepth(pl.y + 8);
+      this.playerShadow.setPosition(pl.x, pl.y + 6);
 
       // Haustier
       if (Game.state.activePet) {
@@ -621,8 +665,10 @@
         this.petSprite.setVisible(true).setTexture("dungeon", item.sprite)
           .setPosition(pos.x, pos.y - 2 + Math.sin(time / 180) * 1.5)
           .setFlipX(pl.x < pos.x).setDepth(pos.y + 7);
+        this.petShadow.setVisible(true).setPosition(pos.x, pos.y + 6);
       } else {
         this.petSprite.setVisible(false);
+        this.petShadow.setVisible(false);
       }
 
       // Schiffsflagge einfärben
