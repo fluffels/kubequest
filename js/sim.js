@@ -51,13 +51,13 @@
         containers: (sc.dockerContainers || []).map(c => Object.assign({}, c)),
       };
 
-      this.nodes = sc.nodes || [
+      this.nodes = (sc.nodes || [
         { name: "ahoi-control", status: "Ready", roles: "control-plane", version: "v1.30.2" },
         { name: "ahoi-worker-1", status: "Ready", roles: "<none>", version: "v1.30.2" },
         { name: "ahoi-worker-2", status: "Ready", roles: "<none>", version: "v1.30.2" },
-      ];
+      ]).map(n => Object.assign({}, n));
 
-      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas));
+      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
       this.secrets = (sc.secrets || []).map(s => Object.assign({}, s));
       this.files = Object.assign({}, sc.files || {});
@@ -79,12 +79,29 @@
       this.lastError = false;
     }
 
-    _makeDeployment(name, image, replicas) {
-      const d = { name, image, replicas, created: this.clock, pods: [] };
+    _makeDeployment(name, image, replicas, broken) {
+      const d = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
       return d;
+    }
+
+    /** Pod-Status eines Deployments (für get/describe/logs). */
+    _podStatus(d) {
+      if (!d.broken) return { status: "Running", ready: "1/1", restarts: 0 };
+      if (d.broken.type === "imagepull") return { status: "ImagePullBackOff", ready: "0/1", restarts: 0 };
+      if (d.broken.type === "crashloop") return { status: "CrashLoopBackOff", ready: "0/1", restarts: 5 };
+      if (d.broken.type === "pending") return { status: "Pending", ready: "0/1", restarts: 0 };
+      return { status: "Running", ready: "1/1", restarts: 0 };
+    }
+
+    /** Pending-Pods bekommen Platz, sobald genug Nodes da sind. */
+    _reschedulePending() {
+      if (this.nodes.length <= 3) return;
+      for (const d of this.deployments) {
+        if (d.broken && d.broken.type === "pending") d.broken = null;
+      }
     }
 
     _age(created) {
@@ -116,7 +133,7 @@
       }
       for (const d of sc.deployments || []) {
         if (!this.deployments.some(x => x.name === d.name)) {
-          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas));
+          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas, d.broken));
         }
       }
       for (const repo of sc.helmRepos || []) {
@@ -129,7 +146,8 @@
       return {
         dockerImages: this.docker.pulled.slice(),
         dockerContainers: this.docker.containers.map(c => Object.assign({}, c)),
-        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas })),
+        nodes: this.nodes.map(n => Object.assign({}, n)),
+        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null })),
         services: this.services.map(s => Object.assign({}, s)),
         secrets: this.secrets.map(s => ({ name: s.name, keys: s.keys.slice() })),
         files: Object.assign({}, this.files),
@@ -197,7 +215,8 @@
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
         "  kubectl    get pods|deployments|services|nodes|secrets | describe pod <name>",
-        "             create deployment | create secret generic | scale | expose | delete | apply -f <datei> | logs <pod>",
+        "             create deployment | create secret generic | scale | expose | delete | apply -f <datei>",
+        "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  ls, cat <datei>, clear, help",
@@ -300,6 +319,8 @@
       if (sub === "delete") return this._kubectlDelete(t);
       if (sub === "apply") return this._kubectlApply(t);
       if (sub === "logs") return this._kubectlLogs(t);
+      if (sub === "set") return this._kubectlSetImage(t);
+      if (sub === "rollout") return this._kubectlRollout(t);
 
       return this._err("kubectl: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
@@ -322,10 +343,14 @@
             : sysPods;
           return table(allNs ? ["NAMESPACE", "NAME", "READY", "STATUS", "RESTARTS", "AGE"] : ["NAME", "READY", "STATUS", "RESTARTS", "AGE"], rows);
         }
-        const pods = this._allPods();
-        if (pods.length === 0) return "No resources found in default namespace.";
-        return table(["NAME", "READY", "STATUS", "RESTARTS", "AGE"],
-          pods.map(p => [p.name, "1/1", "Running", String(p.restarts), this._age(p.created)]));
+        this._reschedulePending();
+        const rows = [];
+        for (const d of this.deployments) {
+          const st = this._podStatus(d);
+          for (const p of d.pods) rows.push([p.name, st.ready, st.status, String(st.restarts || p.restarts), this._age(p.created)]);
+        }
+        if (rows.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "READY", "STATUS", "RESTARTS", "AGE"], rows);
       }
 
       if (["deployments", "deployment", "deploy"].includes(what)) {
@@ -363,25 +388,37 @@
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Tipp: Pod-Namen kannst du aus 'kubectl get pods' kopieren.");
       const dep = this._findDeploymentOfPod(name);
+      const st = this._podStatus(dep);
+      const events = ["  Type    Reason     Age   Message", "  ----    ------     ----  -------"];
+      if (!dep.broken) {
+        events.push("  Normal  Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
+        events.push("  Normal  Pulled     " + this._age(pod.created) + "   Container image \"" + dep.image + "\" already present");
+        events.push("  Normal  Started    " + this._age(pod.created) + "   Started container " + dep.name);
+      } else if (dep.broken.type === "imagepull") {
+        events.push("  Normal   Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
+        events.push("  Warning  Failed     " + this._age(pod.created) + "   Failed to pull image \"" + dep.image + "\": repository does not exist or may require authorization");
+        events.push("  Warning  Failed     " + this._age(pod.created) + "   Error: ImagePullBackOff");
+      } else if (dep.broken.type === "crashloop") {
+        events.push("  Normal   Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
+        events.push("  Normal   Started    " + this._age(pod.created) + "   Started container " + dep.name);
+        events.push("  Warning  BackOff    " + this._age(pod.created) + "   Back-off restarting failed container (Tipp: kubectl logs " + pod.name + ")");
+      } else if (dep.broken.type === "pending") {
+        events.push("  Warning  FailedScheduling  " + this._age(pod.created) + "   0/" + this.nodes.length + " nodes are available: insufficient capacity.");
+      }
       return [
         "Name:         " + pod.name,
         "Namespace:    default",
-        "Node:         " + this.nodes[1].name,
-        "Status:       Running",
-        "IP:           10.244.1." + (10 + Math.floor(Math.random() * 200)),
+        "Node:         " + (dep.broken && dep.broken.type === "pending" ? "<none>" : this.nodes[1].name),
+        "Status:       " + (st.status === "Running" ? "Running" : st.status === "Pending" ? "Pending" : "Waiting (" + st.status + ")"),
+        "IP:           " + (dep.broken && dep.broken.type === "pending" ? "<none>" : "10.244.1." + (10 + Math.floor(Math.random() * 200))),
         "Controlled By: ReplicaSet/" + dep.name,
         "Containers:",
         "  " + dep.name + ":",
         "    Image:        " + dep.image,
-        "    State:        Running",
-        "    Restart Count: " + pod.restarts,
+        "    State:        " + st.status,
+        "    Restart Count: " + (st.restarts || pod.restarts),
         "Events:",
-        "  Type    Reason     Age   Message",
-        "  ----    ------     ----  -------",
-        "  Normal  Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name,
-        "  Normal  Pulled     " + this._age(pod.created) + "   Container image \"" + dep.image + "\" already present",
-        "  Normal  Started    " + this._age(pod.created) + "   Started container " + dep.name,
-      ].join("\n");
+      ].concat(events).join("\n");
     }
 
     _kubectlCreate(t, raw) {
@@ -533,11 +570,63 @@
       if (!name) return this._err("kubectl logs: Welcher Pod?", "Pod-Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found');
+      const dep = this._findDeploymentOfPod(name);
+      if (dep.broken && dep.broken.type === "imagepull") {
+        return this._err('Error from server (BadRequest): container "' + dep.name + '" in pod "' + name + '" is waiting to start: trying and failing to pull image',
+          "Keine Logs ohne Image! Die Ursache steht in den Events: kubectl describe pod " + name);
+      }
+      if (dep.broken && dep.broken.type === "crashloop") {
+        return [
+          "[start] Dienst " + dep.name + " startet …",
+          "[start] Lese Konfiguration …",
+          "FATAL: Secret '" + dep.broken.needsSecret + "' nicht gefunden – Dienst kann nicht starten!",
+          "[exit] Prozess beendet mit Code 1",
+        ].join("\n");
+      }
+      if (dep.broken && dep.broken.type === "pending") {
+        return this._err('Error from server (BadRequest): pod "' + name + '" is not scheduled yet', "Der Pod wartet auf einen freien Node. Schau in die Events: kubectl describe pod " + name);
+      }
       return [
         "10.244.1.1 - - [12/Jun/2026:09:14:02 +0000] \"GET / HTTP/1.1\" 200 615",
         "10.244.1.1 - - [12/Jun/2026:09:14:05 +0000] \"GET /gesundheit HTTP/1.1\" 200 2",
         "10.244.2.7 - - [12/Jun/2026:09:14:11 +0000] \"GET /favicon.ico HTTP/1.1\" 404 153",
       ].join("\n");
+    }
+
+    /** kubectl set image deployment/<name> <container>=<image> */
+    _kubectlSetImage(t) {
+      if (t[2] !== "image") return this._err("Der Simulator kann nur 'kubectl set image deployment/<name> <container>=<image>'.");
+      let depName = null;
+      if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
+      else if (t[3] === "deployment") { depName = t[4]; t = t.slice(0, 4).concat(t.slice(5)); }
+      const kv = t.find(x => x.includes("=") && !x.startsWith("--"));
+      if (!depName || !kv) return this._err("kubectl set image: So nicht ganz.", "Muster: kubectl set image deployment/<name> <container>=<image>");
+      const dep = this.deployments.find(d => d.name === depName);
+      if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found');
+      const newImage = kv.split("=")[1];
+      const oldBad = dep.broken && dep.broken.type === "imagepull" ? dep.broken.badImage : null;
+      dep.image = newImage;
+      if (oldBad && newImage !== oldBad) {
+        dep.broken = null;
+        dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
+      }
+      return "deployment.apps/" + depName + " image updated" + (oldBad && newImage === oldBad ? "\n💡 Hmm – das ist exakt dasselbe (kaputte) Image. Schau nochmal genau auf den Namen!" : "");
+    }
+
+    /** kubectl rollout restart deployment <name> */
+    _kubectlRollout(t) {
+      if (t[2] !== "restart") return this._err("Der Simulator kann nur 'kubectl rollout restart deployment <name>'.");
+      let depName = null;
+      if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
+      else if (t[3] === "deployment") depName = t[4];
+      if (!depName) return this._err("kubectl rollout restart: Welches Deployment?", "Muster: kubectl rollout restart deployment <name>");
+      const dep = this.deployments.find(d => d.name === depName);
+      if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found');
+      if (dep.broken && dep.broken.type === "crashloop" && this.secrets.some(s => s.name === dep.broken.needsSecret)) {
+        dep.broken = null;
+      }
+      dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
+      return "deployment.apps/" + depName + " restarted";
     }
 
     /* ===================== helm ===================== */
@@ -710,6 +799,15 @@
       if (sub === "apply") {
         if (tf.applied) return "No changes. Your infrastructure matches the configuration.\n\nApply complete! Resources: 0 added, 0 changed, 0 destroyed.";
         tf.applied = true;
+        // Neue Server werden echte Cluster-Nodes – wartende Pods bekommen Platz!
+        if (tf.resources.some(r => r.addr.includes("hafen_server"))) {
+          for (const name of ["ahoi-worker-3", "ahoi-worker-4"]) {
+            if (!this.nodes.some(n => n.name === name)) {
+              this.nodes.push({ name, status: "Ready", roles: "<none>", version: "v1.30.2" });
+            }
+          }
+          this._reschedulePending();
+        }
         return tf.resources.map(r => r.addr + ": Creating...\n" + r.addr + ": Creation complete after 2s").join("\n") +
           "\n\nApply complete! Resources: " + tf.resources.length + " added, 0 changed, 0 destroyed.";
       }
@@ -717,6 +815,7 @@
       if (sub === "destroy") {
         if (!tf.applied) return "No changes. No objects need to be destroyed.";
         tf.applied = false;
+        this.nodes = this.nodes.filter(n => !["ahoi-worker-3", "ahoi-worker-4"].includes(n.name));
         return tf.resources.map(r => r.addr + ": Destroying...\n" + r.addr + ": Destruction complete after 1s").join("\n") +
           "\n\nDestroy complete! Resources: " + tf.resources.length + " destroyed.";
       }

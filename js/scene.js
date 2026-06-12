@@ -38,6 +38,7 @@
     alarm() { this.tone(440, 0.18, "sawtooth", 0.04); this.tone(330, 0.18, "sawtooth", 0.04, 0.2); this.tone(440, 0.18, "sawtooth", 0.04, 0.4); },
     fanfare() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.16, "square", 0.04, i * 0.12)); },
     wrong() { this.tone(196, 0.18, "sawtooth", 0.03); },
+    thunder() { this.tone(58, 0.7, "sawtooth", 0.06); this.tone(46, 0.9, "sawtooth", 0.05, 0.12); },
   };
   window.SFX = SFX;
 
@@ -97,7 +98,7 @@
       this.podSlots = {};
       this.slotUsed = new Array(36).fill(false);
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
-      this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null };
+      this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
 
       // Pixel-Textur für Partikel
       const g = this.make.graphics({ add: false });
@@ -122,6 +123,16 @@
         speed: { min: 30, max: 90 }, gravityY: -20, lifespan: 700,
         scale: { start: 1.6, end: 0 }, tint: 0xffc857, emitting: false,
       }).setDepth(9000);
+
+      // Sturm: Regen + dunkler Schleier (anfangs aus)
+      this.rain = this.add.particles(0, 0, "px", {
+        x: { min: 0, max: this.W * T }, y: -8,
+        speedY: { min: 190, max: 250 }, speedX: { min: -35, max: -20 },
+        scaleX: 0.5, scaleY: 2.4, alpha: 0.38, tint: 0xa8c8f0,
+        lifespan: 3800, frequency: 7, quantity: 2,
+      }).setDepth(10400);
+      this.rain.stop();
+      this.stormOverlay = this.add.rectangle(0, 0, this.W * T, this.H * T, 0x0e1830, 0.32).setOrigin(0).setDepth(10300).setVisible(false);
 
       const cam = this.cameras.main;
       cam.setBounds(0, 0, this.W * T, this.H * T);
@@ -185,18 +196,34 @@
       }
     }
 
+    /** Wo trifft Land auf Wasser? Kai & Schiffsbereich gerade, sonst geschwungener Strand. */
+    coastY(x) {
+      if (x >= 3 && x <= 24) return 27;   // Hafenkai: gemauerte, gerade Kante
+      if (x >= 30 && x <= 38) return 27;  // Wasser rund ums Schiff
+      let c = 26 + Math.round(Math.sin(x * 0.9) * 1.2 + Math.sin(x * 0.31) * 0.9);
+      if (x >= 43) c = Math.min(c, 26);   // Platz für Leuchtturm-Strand & Ost-Plateau
+      return Math.max(25, Math.min(28, c));
+    }
+
     buildMap() {
       const W = this.W, H = this.H;
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        if (y >= 27) { this.set(x, y, -2); this.solidGrid[y * W + x] = 1; }
-        else {
-          // Pseudozufällige Verteilung statt Streifenmuster: meist glatt, etwas Struktur, wenige Blumen
-          const r = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
-          this.set(x, y, r < 80 ? 0 : r < 93 ? 1 : 2);
+      const SAND = [24, 25, 26];
+      for (let x = 0; x < W; x++) {
+        const cY = this.coastY(x);
+        const beach = !(x >= 3 && x <= 24) && !(x >= 30 && x <= 38); // Kai/Schiff: kein Sandstrand
+        for (let y = 0; y < H; y++) {
+          if (y >= cY + (beach ? 2 : 0)) {
+            this.set(x, y, -2); this.solidGrid[y * W + x] = 1;       // Wasser
+          } else if (beach && y >= cY) {
+            this.set(x, y, SAND[(x * 5 + y * 7) % 3]);               // Sandstrand (begehbar)
+          } else {
+            const r = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
+            this.set(x, y, r < 80 ? 0 : r < 93 ? 1 : 2);             // Gras, natürlich gemischt
+          }
         }
       }
       for (let x = 0; x < W; x++) this.tree(x, 0);
-      for (let y = 0; y < 27; y++) { this.tree(0, y); this.tree(W - 1, y); }
+      for (let y = 0; y < 24; y++) { this.tree(0, y); this.tree(W - 1, y); }
 
       // Dock-Plattform
       for (let y = 24; y <= 26; y++) for (let x = 3; x <= 24; x++) this.set(x, y, STONE[(x * 3 + y) % 3]);
@@ -254,6 +281,11 @@
 
       this.tfPlatform = { x: 44, y: 28, w: 7, h: 5 };
 
+      // Leuchtturm (Sturmwache Juno)
+      this.lighthouse = { x: 48, y: 24 };
+      for (const [lx, ly] of [[47, 23], [48, 23], [47, 24], [48, 24]]) this.solidGrid[ly * W + lx] = 1;
+      this.labels.push({ x: 48, y: 21.2, text: "Leuchtturm", color: "#ffffff" });
+
       const spots = [[5, 5], [7, 3], [15, 4], [20, 6], [33, 5], [36, 4], [44, 5], [47, 8], [47, 13], [36, 15], [20, 12], [5, 17], [3, 21], [8, 20], [18, 16], [34, 9], [30, 7], [45, 15], [37, 22], [6, 22], [21, 21]];
       spots.forEach(([x, y]) => this.tree(x, y));
       this.deco(16, 21, "town", 29, false);
@@ -264,12 +296,18 @@
 
     renderGround() {
       const rt = this.add.renderTexture(0, 0, this.W * T, this.H * T).setOrigin(0).setDepth(0);
-      rt.fill(WATER, 1, 0, 27 * T, this.W * T, (this.H - 27) * T); // Wasser als EINE Fläche (keine Säume)
+      // Meer in Tiefen-Bändern: zur Küste hell, nach unten dunkler
+      rt.fill(WATER, 1, 0, 24 * T, this.W * T, (this.H - 24) * T);
+      rt.fill(0x3873b4, 1, 0, 32 * T, this.W * T, (this.H - 32) * T);
+      rt.fill(0x315f9c, 1, 0, 36 * T, this.W * T, (this.H - 36) * T);
       for (let y = 0; y < this.H; y++) {
         for (let x = 0; x < this.W; x++) {
           const v = this.get(x, y);
           if (v === -2) {
+            // Schaumkanten überall, wo Land ans Wasser grenzt
             if (this.get(x, y - 1) !== -2 && y > 0) rt.fill(FOAM, 0.8, x * T, y * T, T, 2.5);
+            if (this.get(x - 1, y) !== -2 && x > 0) rt.fill(FOAM, 0.55, x * T, y * T, 2, T);
+            if (this.get(x + 1, y) !== -2 && x < this.W - 1) rt.fill(FOAM, 0.55, x * T + T - 2, y * T, 2, T);
           } else if (v === -10) {
             rt.drawFrame("dungeon", WOOD[(x * 5 + y * 3) % 3], x * T, y * T);
           } else if (v === -11) {
@@ -286,6 +324,20 @@
         const s = this.add.image(x * T + Phaser.Math.Between(2, 12), y * T + Phaser.Math.Between(3, 12), "px")
           .setScale(2.5, 0.8).setTint(FOAM).setAlpha(0).setDepth(1);
         this.tweens.add({ targets: s, alpha: { from: 0, to: 0.55 }, duration: Phaser.Math.Between(900, 1800), yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 2000) });
+      }
+      // Wellen, die Richtung Küste rollen
+      for (let i = 0; i < 14; i++) {
+        const wv = this.add.image(0, 0, "px").setScale(Phaser.Math.Between(6, 11), 0.8).setTint(0xdfeefb).setAlpha(0).setDepth(1);
+        const reset = () => {
+          wv.x = Phaser.Math.Between(2, this.W - 2) * T;
+          wv.y = Phaser.Math.Between(30, this.H - 2) * T;
+        };
+        reset();
+        this.tweens.add({
+          targets: wv, y: "-=10", alpha: { from: 0, to: 0.45 },
+          duration: Phaser.Math.Between(1700, 2700), yoyo: true, repeat: -1,
+          delay: Phaser.Math.Between(0, 2600), onRepeat: reset,
+        });
       }
     }
 
@@ -307,14 +359,62 @@
       for (const d of this.decoList) {
         this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
       }
-      // Schiffsrahmen + Mast + Flagge
+      // === Ein richtiges Schiff: Rumpf mit Bug & Heck, Mast, Rah, Segel, Takelage ===
       const s = this.ship, px = s.x * T, py = s.y * T, pw = s.w * T, ph = s.h * T;
+      const midY = py + ph / 2;
       const gfx = this.add.graphics().setDepth(2);
-      gfx.fillStyle(0x5a4030); gfx.fillRect(px - 3, py - 3, pw + 6, 3); gfx.fillRect(px - 3, py, 3, ph); gfx.fillRect(px + pw, py, 3, ph);
-      gfx.fillStyle(0x4a3426); gfx.fillRect(px - 3, py + ph, pw + 6, 4);
-      gfx.fillStyle(0x6b5436); gfx.fillRect(px + pw / 2 - 1, py - 14, 2, 22);
-      this.shipFlag = this.add.image(px + pw / 2 + 7, py - 10, "px").setScale(6, 4).setDepth(3);
-      this.tweens.add({ targets: this.shipFlag, y: py - 12, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      // Bug (spitz nach Osten) – Rumpf + hellere Deckfläche
+      gfx.fillStyle(0x4a3426);
+      gfx.fillPoints([{ x: px + pw - 1, y: py - 4 }, { x: px + pw + 30, y: midY }, { x: px + pw - 1, y: py + ph + 4 }], true);
+      gfx.fillStyle(0xc89858);
+      gfx.fillPoints([{ x: px + pw - 1, y: py + 4 }, { x: px + pw + 19, y: midY }, { x: px + pw - 1, y: py + ph - 4 }], true);
+      // Heck (rund, Westen)
+      gfx.fillStyle(0x4a3426); gfx.fillRoundedRect(px - 13, py - 4, 16, ph + 8, { tl: 9, bl: 9, tr: 0, br: 0 });
+      gfx.fillStyle(0xc89858); gfx.fillRoundedRect(px - 8, py + 3, 10, ph - 6, { tl: 5, bl: 5, tr: 0, br: 0 });
+      // Bordwände (Reling) mit Holz-Posten
+      gfx.fillStyle(0x4a3426); gfx.fillRect(px - 4, py - 4, pw + 4, 4); gfx.fillRect(px - 4, py + ph, pw + 4, 4);
+      gfx.fillStyle(0x6b4f35);
+      for (let rx = px; rx < px + pw; rx += 12) { gfx.fillRect(rx, py - 5, 3, 5); gfx.fillRect(rx, py + ph, 3, 5); }
+      // Mast mit Rah und gerefftem Segel
+      const mx = px + pw * 0.45;
+      gfx.fillStyle(0x3a2e22); gfx.fillRect(mx - 1.5, midY - 38, 3, 40);
+      gfx.fillRect(mx - 14, midY - 34, 28, 2);                     // Rah (Querbalken)
+      gfx.fillStyle(0xf2ecd9); gfx.fillRoundedRect(mx - 13, midY - 31, 26, 6, 3); // gerefftes Segel
+      gfx.fillStyle(0xddd5bd); gfx.fillRect(mx - 13, midY - 27, 26, 1.5);
+      // Takelage
+      gfx.lineStyle(1, 0x3a2e22, 0.7);
+      gfx.lineBetween(mx, midY - 38, px + pw + 27, midY);
+      gfx.lineBetween(mx, midY - 38, px - 10, midY - 2);
+      // Ausguck + Flagge am Masttop
+      gfx.fillStyle(0x4a3426); gfx.fillRect(mx - 4, midY - 41, 8, 3);
+      this.shipFlag = this.add.image(mx + 7, midY - 44, "px").setScale(6, 4).setDepth(3);
+      this.tweens.add({ targets: this.shipFlag, y: midY - 46, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
+      // === Leuchtturm (Sturmwache) ===
+      const lh = this.lighthouse, lx = lh.x * T + 8, lyB = (lh.y + 1) * T;
+      const lg = this.add.graphics().setDepth(lyB + 4);
+      lg.fillStyle(0x5a6470); lg.fillEllipse(lx, lyB - 1, 26, 8);            // Felsen
+      lg.fillStyle(0xf2f2ee); lg.fillRect(lx - 6, lyB - 40, 12, 36);          // Turm
+      lg.fillStyle(0xd9534f); lg.fillRect(lx - 6, lyB - 34, 12, 6); lg.fillRect(lx - 6, lyB - 20, 12, 6); // rote Bänder
+      lg.fillStyle(0x33363d); lg.fillRect(lx - 7, lyB - 46, 14, 6);           // Kanzel
+      lg.fillStyle(0x2a2c33); lg.fillPoints([{ x: lx - 7, y: lyB - 46 }, { x: lx, y: lyB - 52 }, { x: lx + 7, y: lyB - 46 }], true); // Dach
+      this.lhLight = this.add.image(lx, lyB - 43, "px").setScale(4.5, 2.5).setTint(0xffe28a).setDepth(lyB + 5);
+      this.tweens.add({ targets: this.lhLight, alpha: { from: 0.35, to: 1 }, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
+      // === Schornstein-Rauch (Hafenmeisterei & Kartenhaus) ===
+      for (const [sx, sy] of [[24.6, 10], [38.6, 9]]) {
+        this.add.particles(sx * T, sy * T, "px", {
+          speedY: { min: -14, max: -8 }, speedX: { min: -4, max: 4 },
+          scale: { start: 1.1, end: 2.6 }, alpha: { start: 0.32, end: 0 },
+          tint: 0xcdd4dd, lifespan: 2600, frequency: 650,
+        }).setDepth(9400);
+      }
+
+      // === Schmetterlinge über den Wiesen ===
+      this.butterflies = [[10, 8, 0xffd1e8], [30, 7, 0xfff3a8], [40, 16, 0xc9e8ff], [17, 18, 0xd8ffc4]].map(([bx, by, tint], i) => ({
+        spr: this.add.image(bx * T, by * T, "px").setScale(1.3, 1).setTint(tint).setDepth(9300),
+        ax: bx * T, ay: by * T, ph: i * 1.7, sp: 0.5 + i * 0.13,
+      }));
 
       // Beschriftungen
       for (const l of this.labels) {
@@ -354,6 +454,7 @@
         { id: "ole", x: 26, y: 14.6 }, { id: "bo", x: 8, y: 25 }, { id: "ada", x: 40, y: 13.6 },
         { id: "runa", x: 13, y: 13 }, { id: "theo", x: 44, y: 20.6 }, { id: "pelle", x: 31, y: 17.2 },
         { id: "kralle", x: this.ship.x + 7, y: this.ship.y + 1 },
+        { id: "juno", x: 45.8, y: 24.2 },
       ];
       this.npcs = defs.map(d => {
         const meta = KQContent.NPCS[d.id];
@@ -469,8 +570,15 @@
         }
       }
 
+      // Kaputte Deployments: Kisten rot einfärben
+      const brokenMap = {};
+      for (const d of Game.sim.deployments) brokenMap[d.name] = !!d.broken;
+      for (const info of Object.values(this.podSlots)) {
+        info.crate.setTint(brokenMap[info.dep] ? 0xff8d8d : 0xffffff);
+      }
+
       // Signaturen: Fässer / Flaggen / Laternen / Deployment-Labels nur bei Änderung neu bauen
-      const dSig = Game.sim.deployments.map(d => d.name + d.replicas).join("|");
+      const dSig = Game.sim.deployments.map(d => d.name + d.replicas + (d.broken ? d.broken.type : "")).join("|");
       const bSig = Game.sim.docker.containers.map(c => c.name + c.running).join("|");
       const fSig = Game.sim.releases.map(r => r.name + r.revision).join("|");
       const sSig = Game.sim.services.map(s => s.name).join("|");
@@ -490,14 +598,18 @@
       this.dynGroup.clear(true, true);
       const mkText = (x, y, str, color) => this.makeLabel(x, y, str, color);
 
-      // Deployment-Schilder über der ersten Kiste
+      // Deployment-Schilder über der ersten Kiste (kaputte rot mit Status!)
       const seen = {};
       for (const d of Game.sim.deployments) {
         const first = d.pods[0] && this.podSlots[d.pods[0].name];
         if (first && !seen[d.name]) {
           seen[d.name] = true;
           const pos = this.podSlotPos(first.slot);
-          this.dynGroup.add(mkText(pos.x, pos.y - 12, d.name + " " + d.replicas + "/" + d.replicas, "#" + hueColorLight(hashHue(d.name)).toString(16).padStart(6, "0")));
+          const text = d.broken
+            ? d.name + " ⚠ " + (d.broken.type === "imagepull" ? "ImagePullBackOff" : d.broken.type === "crashloop" ? "CrashLoopBackOff" : "Pending")
+            : d.name + " " + d.replicas + "/" + d.replicas;
+          const color = d.broken ? "#ff9b9b" : "#" + hueColorLight(hashHue(d.name)).toString(16).padStart(6, "0");
+          this.dynGroup.add(mkText(pos.x, pos.y - 12, text, color));
         }
       }
       // Docker-Fässer bei Bo (max. 10 sichtbar, Labels versetzt gegen Überlappung)
@@ -533,10 +645,68 @@
       const now = this.time.now / 1000;
       this.events.nextPirate = now + (delaySec || Phaser.Math.Between(200, 360));
       this.events.nextKraken = now + (delaySec ? delaySec + 90 : Phaser.Math.Between(300, 500));
+      this.events.nextStorm = now + (delaySec ? delaySec + 150 : Phaser.Math.Between(260, 430));
+    }
+
+    anyEventActive() {
+      return !!(this.events.pirate || this.events.kraken || this.events.storm);
+    }
+
+    /* ---------- Sturm: ein Deployment geht kaputt, du reparierst es ---------- */
+    tryStartStorm() {
+      if (this.anyEventActive() || !Game.state.completedQuests.includes("q17")) return;
+      const victims = Game.sim.deployments.filter(d => !d.broken);
+      if (victims.length === 0 || UI.blocking()) { this.events.nextStorm += 25; return; }
+      const dep = Phaser.Utils.Array.GetRandom(victims);
+      const kind = Math.random() < 0.5 ? "imagepull" : "crashloop";
+      let hintCmd;
+      if (kind === "imagepull") {
+        // Der Sturm "verdreht" den Image-Namen (Buchstabendreher)
+        const bad = KQContent.corruptImage(dep.image.split(":")[0]);
+        dep.broken = { type: "imagepull", badImage: bad };
+        dep.image = bad;
+        hintCmd = "Diagnose: <code>kubectl get pods</code> → <code>describe</code>. Fix: <code>kubectl set image deployment/" + dep.name + " …</code>";
+      } else {
+        dep.broken = { type: "crashloop", needsSecret: "sturm-schluessel-" + Phaser.Math.Between(10, 99) };
+        hintCmd = "Diagnose: <code>kubectl get pods</code> → <code>kubectl logs &lt;pod&gt;</code>. Dann Ursache beheben + <code>rollout restart</code>!";
+      }
+      Game.save();
+
+      this.rain.start();
+      this.stormOverlay.setVisible(true);
+      SFX.thunder();
+      this.cameras.main.flash(180, 200, 210, 255);
+      this.cameras.main.shake(280, 0.004);
+      this.events.stormFlash = this.time.addEvent({ delay: 5200, loop: true, callback: () => {
+        this.cameras.main.flash(140, 200, 210, 255);
+        SFX.thunder();
+      }});
+
+      const deadline = 240;
+      this.events.storm = { dep: dep.name, until: this.time.now / 1000 + deadline };
+      UI.showAlarm("⛈️ <b>STURMSCHADEN!</b> Das Deployment <b>" + dep.name + "</b> ist ausgefallen – und verdient nichts mehr! " + hintCmd, deadline);
+    }
+
+    resolveStorm(success) {
+      const ev = this.events.storm;
+      if (!ev) return;
+      this.events.storm = null;
+      if (this.events.stormFlash) { this.events.stormFlash.remove(); this.events.stormFlash = null; }
+      this.rain.stop();
+      this.stormOverlay.setVisible(false);
+      UI.hideAlarm();
+      if (success) {
+        Game.state.stats.stormsFixed = (Game.state.stats.stormsFixed || 0) + 1;
+        UI.reward(35, 50, "⛈️ Sturmschaden behoben!");
+        SFX.fanfare();
+      } else {
+        UI.toast("⛈️ Der Sturm zieht ab – aber <b>" + ev.dep + "</b> bleibt kaputt (und verdient nichts), bis du es reparierst!");
+      }
+      this.scheduleEvents();
     }
 
     tryStartPirate() {
-      if (this.events.pirate || !Game.state.completedQuests.includes("q7")) return;
+      if (this.anyEventActive() || !Game.state.completedQuests.includes("q7")) return;
       const victims = Game.sim.deployments.filter(d => d.replicas >= 2);
       if (victims.length === 0 || UI.blocking()) { this.events.nextPirate += 20; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -586,7 +756,7 @@
     }
 
     tryStartKraken() {
-      if (this.events.kraken || this.events.pirate || !Game.state.completedQuests.includes("q14")) return;
+      if (this.anyEventActive() || !Game.state.completedQuests.includes("q14")) return;
       if (UI.blocking()) { this.events.nextKraken += 20; return; }
       const baseline = Game.sim.secrets.length;
 
@@ -691,10 +861,26 @@
         UI.refreshHud();
       }
 
+      // Schmetterlinge flattern über die Wiesen
+      const t = time / 1000;
+      for (const b of this.butterflies) {
+        b.spr.setPosition(
+          b.ax + Math.sin(t * b.sp + b.ph) * 22,
+          b.ay + Math.sin(t * b.sp * 1.7 + b.ph) * 10 + Math.cos(t * 0.9 + b.ph) * 4
+        ).setScale(1.3, 0.6 + Math.abs(Math.sin(t * 14 + b.ph)) * 0.7);
+      }
+
       // Events
       const now = time / 1000;
       if (now > this.events.nextPirate) this.tryStartPirate();
       if (now > this.events.nextKraken) this.tryStartKraken();
+      if (now > this.events.nextStorm) this.tryStartStorm();
+      if (this.events.storm) {
+        const dep = Game.sim.deployments.find(d => d.name === this.events.storm.dep);
+        if (!dep || !dep.broken) this.resolveStorm(true);
+        else if (now > this.events.storm.until) this.resolveStorm(false);
+        else UI.updateAlarmTimer(Math.ceil(this.events.storm.until - now));
+      }
       if (this.events.pirate) {
         const dep = Game.sim.deployments.find(d => d.name === this.events.pirate.dep);
         if (dep && dep.replicas >= this.events.pirate.want) this.resolvePirate(true);
