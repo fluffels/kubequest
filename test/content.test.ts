@@ -1,13 +1,9 @@
 /* Konsistenz-Tests für die Spielinhalte (Quests, Quiz, Drills, Karten).
  * Ausführen mit:  node --test test/
  */
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-
-global.window = {};
-require("../js/sim.js");
-require("../js/content.js");
-const KQContent = window.KQContent;
+import { test } from "vitest";
+import assert from "node:assert/strict";
+import { KQContent } from "../src/content";
 
 test("Quiz-Karten: IDs eindeutig, correct-Index gültig, Erklärung vorhanden", () => {
   const seen = new Set();

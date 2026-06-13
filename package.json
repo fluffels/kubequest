@@ -1,0 +1,25 @@
+{
+  "name": "kubequest",
+  "version": "3.0.0",
+  "description": "KubeQuest – das Hafen-Abenteuer: ein 2D-Lernspiel für Docker, Kubernetes, Helm & Terraform.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0",
+    "vitest": "^2.1.0"
+  }
+}

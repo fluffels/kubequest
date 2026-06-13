@@ -4,8 +4,10 @@
  * Persistenz läuft über die SaveStore-Schicht (heute localStorage, später + Backend).
  */
 
-(function () {
-  "use strict";
+import { KQContent } from "./content";
+import { Sim as KQSim } from "./sim";
+import { SaveStore } from "./store";
+import type { GameState } from "./types";
 
   const BOX_INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
@@ -27,10 +29,11 @@
     return Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
   }
 
-  const Game = {
-    state: null,
-    sim: null,
+  export const Game = {
+    state: null as GameState | null,
+    sim: null as KQSim | null,
     incomeAcc: 0,
+    offlineEarnings: 0,
 
     defaultState() {
       return {
@@ -86,8 +89,8 @@
 
     save() {
       if (this.sim) this.state.clusterSnapshot = this.sim.snapshot();
-      if (window.WorldScene && WorldScene.player) {
-        this.state.player = { x: WorldScene.player.x, y: WorldScene.player.y };
+      if (window.WorldScene && window.WorldScene.player) {
+        this.state.player = { x: window.WorldScene.player.x, y: window.WorldScene.player.y };
       }
       this.state.lastSeen = Date.now();
       SaveStore.write(JSON.stringify(this.state));
@@ -143,7 +146,7 @@
     },
 
     /* ---------- XP & Rang ---------- */
-    rankIndex(xp) {
+    rankIndex(xp?: number) {
       const v = xp === undefined ? this.state.xp : xp;
       let idx = 0;
       KQContent.RANKS.forEach((r, i) => { if (v >= r.xp) idx = i; });
@@ -311,4 +314,3 @@
   };
 
   window.Game = Game;
-})();

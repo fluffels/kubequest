@@ -3,9 +3,7 @@
  * dann in Zufalls-Varianten geübt (drill), erst dann kommt der nächste.
  * Dazu: Quests, Dialoge, NPCs, Ränge, Shop, Drills, Karteikarten, Events.
  */
-
-(function () {
-  "use strict";
+import type { Quest } from "./types";
 
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -227,7 +225,7 @@
    *  drill            – Zufalls-Übungen aus dem Gelernten
    *  terminal         – feste Aufgabenkette (für Showdowns)
    * ================================================================= */
-  const QUESTS = [
+  const QUESTS: Quest[] = [
 
     { id: "q0", title: "Anheuern in Port Kubernia", giver: "ole", rewardXp: 15, rewardCoins: 10,
       steps: [
@@ -946,5 +944,4 @@
     return img + "x";
   }
 
-  window.KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS, corruptImage };
-})();
+  export const KQContent = { RANKS, SHOP, NPCS, PLAYER_SPRITES, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS, corruptImage };

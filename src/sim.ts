@@ -3,9 +3,6 @@
  * Kein echtes Cluster nötig – aber die Befehle und Ausgaben fühlen sich echt an.
  */
 
-(function () {
-  "use strict";
-
   // Bekannte Container-Images – Grundlage für die „Meintest du …?"-Tippfehlerhilfe.
   // Enthält alle im Spiel benutzten plus echte Tools, die man als DevOps kennt.
   const KNOWN_IMAGES = [
@@ -46,6 +43,21 @@
   }
 
   class Sim {
+    scenario: any;
+    clock: number;
+    docker: { pulled: string[]; containers: any[] };
+    nodes: any[];
+    deployments: any[];
+    services: any[];
+    secrets: any[];
+    files: Record<string, string>;
+    applyEffects: Record<string, any>;
+    helmRepos: string[];
+    releases: any[];
+    tf: { initialized: boolean; applied: boolean; resources: any[] };
+    lastDeletedPod: any;
+    lastError: boolean;
+
     constructor(scenario) {
       this.scenario = scenario || {};
       this.reset();
@@ -88,7 +100,7 @@
       this.lastError = false;
     }
 
-    _makeDeployment(name, image, replicas, broken) {
+    _makeDeployment(name, image, replicas, broken?) {
       const d = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
@@ -207,7 +219,7 @@
       return { output: out, error: this.lastError };
     }
 
-    _err(msg, tip) {
+    _err(msg, tip?) {
       this.lastError = true;
       return msg + (tip ? "\n💡 " + tip : "");
     }
@@ -270,7 +282,7 @@
     }
 
     /* ===================== docker ===================== */
-    _docker(t) {
+    _docker(t, _raw?) {
       const sub = t[1];
       if (!sub) return this._err("docker: Unterbefehl fehlt.", "Probier z.B. 'docker ps'.");
 
@@ -813,7 +825,7 @@
     }
 
     /* ===================== terraform ===================== */
-    _terraform(t) {
+    _terraform(t, _raw?) {
       const sub = t[1];
       if (!sub) return this._err("terraform: Unterbefehl fehlt.", "Probier 'terraform init'.");
       const tf = this.tf;
@@ -897,5 +909,4 @@
     }
   }
 
-  window.KQSim = Sim;
-})();
+  export { Sim };

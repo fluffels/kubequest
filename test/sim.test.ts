@@ -1,12 +1,9 @@
 /* Unit-Tests für den Cluster-Simulator.
  * Ausführen mit:  node --test test/
  */
-const { test, beforeEach } = require("node:test");
-const assert = require("node:assert/strict");
-
-global.window = {};
-require("../js/sim.js");
-const KQSim = window.KQSim;
+import { test, beforeEach } from "vitest";
+import assert from "node:assert/strict";
+import { Sim as KQSim } from "../src/sim";
 
 let sim;
 beforeEach(() => { sim = new KQSim({}); });

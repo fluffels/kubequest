@@ -7,9 +7,6 @@
  * Server-Synchronisation kommt hier INTERN dazu. game.js muss dafür nicht
  * angefasst werden – das ist der ganze Sinn dieser Schicht.
  */
-(function () {
-  "use strict";
-
   const SAVE_KEY = "kubequest-save-v3";
 
   // localStorage ist nicht überall verfügbar (privater Modus, blockierte Cookies,
@@ -31,7 +28,7 @@
     }
   })();
 
-  const SaveStore = {
+  export const SaveStore = {
     /** Roh-JSON des Spielstands lesen – oder null, wenn noch nichts gespeichert ist. */
     read() {
       return backend.getItem(SAVE_KEY);
@@ -48,5 +45,3 @@
     },
   };
 
-  window.SaveStore = SaveStore;
-})();

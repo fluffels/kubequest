@@ -1,9 +1,12 @@
 /* ===== KubeQuest 3.0 – Start =====
  * Spielstand laden, Phaser starten, Tastatur & Charakterwahl verdrahten.
  */
-
-(function () {
-  "use strict";
+import Phaser from "phaser";
+import { Game } from "./game";
+import { UI } from "./ui";
+import { KQContent } from "./content";
+import { KQScenes } from "./scenes";
+import { SFX } from "./sfx";
 
   const $ = id => document.getElementById(id);
 
@@ -21,8 +24,8 @@
       cv.onclick = () => {
         Game.state.character = spriteIdx;
         Game.save();
-        if (window.WorldScene && WorldScene.playerSprite) {
-          WorldScene.playerSprite.setTexture("dungeon", spriteIdx);
+        if (window.WorldScene && window.WorldScene.playerSprite) {
+          window.WorldScene.playerSprite.setTexture("dungeon", spriteIdx);
         }
         $("charselect").classList.add("hidden");
         UI.toast("⚓ Willkommen in Port Kubernia! Folge dem <b>!</b> – Ole wartet vor der Hafenmeisterei.");
@@ -35,9 +38,9 @@
   function wireKeyboard() {
     window.addEventListener("keydown", e => {
       if (window.SFX) SFX.ensure();
-      const tag = e.target.tagName;
+      const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") {
-        if (e.key === "Escape") { UI.closeOverlays(); e.target.blur(); }
+        if (e.key === "Escape") { UI.closeOverlays(); (e.target as HTMLElement).blur(); }
         return;
       }
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -75,8 +78,8 @@
 
     $("term-input").addEventListener("keydown", e => {
       if (e.key === "Enter") {
-        UI.termSubmit(e.target.value);
-        e.target.value = "";
+        UI.termSubmit((e.target as HTMLInputElement).value);
+        (e.target as HTMLInputElement).value = "";
       }
     });
   }
@@ -108,4 +111,3 @@
   }
 
   document.addEventListener("DOMContentLoaded", boot);
-})();
