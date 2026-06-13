@@ -43,20 +43,22 @@
   }
 
   class Sim {
+    // `!` = definite assignment: alle Felder werden in reset() gesetzt, das der
+    // Konstruktor aufruft. TS sieht das nicht durch den Methodenaufruf hindurch.
     scenario: any;
-    clock: number;
-    docker: { pulled: string[]; containers: any[] };
-    nodes: any[];
-    deployments: any[];
-    services: any[];
-    secrets: any[];
-    files: Record<string, string>;
-    applyEffects: Record<string, any>;
-    helmRepos: string[];
-    releases: any[];
-    tf: { initialized: boolean; applied: boolean; resources: any[] };
+    clock!: number;
+    docker!: { pulled: string[]; containers: any[] };
+    nodes!: any[];
+    deployments!: any[];
+    services!: any[];
+    secrets!: any[];
+    files!: Record<string, string>;
+    applyEffects!: Record<string, any>;
+    helmRepos!: string[];
+    releases!: any[];
+    tf!: { initialized: boolean; applied: boolean; resources: any[] };
     lastDeletedPod: any;
-    lastError: boolean;
+    lastError!: boolean;
 
     constructor(scenario) {
       this.scenario = scenario || {};
@@ -101,7 +103,7 @@
     }
 
     _makeDeployment(name, image, replicas, broken?) {
-      const d = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
+      const d = { name, image, replicas, created: this.clock, pods: [] as any[], broken: broken ? Object.assign({}, broken) : null };
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
@@ -134,7 +136,7 @@
     }
 
     _allPods() {
-      const pods = [];
+      const pods: any[] = [];
       for (const d of this.deployments) for (const p of d.pods) pods.push(p);
       return pods;
     }
@@ -214,7 +216,7 @@
         }
       } catch (e) {
         this.lastError = true;
-        out = "Hoppla, da ist im Simulator etwas schiefgegangen: " + e.message;
+        out = "Hoppla, da ist im Simulator etwas schiefgegangen: " + (e instanceof Error ? e.message : String(e));
       }
       return { output: out, error: this.lastError };
     }
@@ -316,7 +318,7 @@
 
       if (sub === "run") {
         // docker run [-d] [--name X] [-p a:b] IMAGE
-        let name = null, image = null;
+        let name: string | null = null, image: string | null = null;
         for (let i = 2; i < t.length; i++) {
           if (t[i] === "--name") { name = t[i + 1]; i++; }
           else if (t[i] === "-d" || t[i] === "--detach") { /* ok */ }
@@ -406,7 +408,7 @@
           return table(allNs ? ["NAMESPACE", "NAME", "READY", "STATUS", "RESTARTS", "AGE"] : ["NAME", "READY", "STATUS", "RESTARTS", "AGE"], rows);
         }
         this._reschedulePending();
-        const rows = [];
+        const rows: any[] = [];
         for (const d of this.deployments) {
           const st = this._podStatus(d);
           for (const p of d.pods) rows.push([p.name, st.ready, st.status, String(st.restarts || p.restarts), this._age(p.created)]);
@@ -545,7 +547,7 @@
         const file = t[3];
         const eff = this.applyEffects[file];
         if (!eff || !this.files[file]) return this._err("error: the path \"" + (file || "?") + "\" does not exist", "Mit 'ls' siehst du, welche Dateien hier liegen.");
-        const out = [];
+        const out: string[] = [];
         if (eff.deployment) {
           const i = this.deployments.findIndex(d => d.name === eff.deployment.name);
           if (i >= 0) { this.deployments.splice(i, 1); out.push('deployment.apps "' + eff.deployment.name + '" deleted'); }
@@ -601,7 +603,7 @@
       if (!this.files[file]) return this._err("error: the path \"" + file + "\" does not exist", "Mit 'ls' siehst du, welche Dateien hier liegen.");
       const eff = this.applyEffects[file];
       if (!eff) return this._err("error: unable to decode " + file);
-      const out = [];
+      const out: string[] = [];
       if (eff.deployment) {
         const existing = this.deployments.find(d => d.name === eff.deployment.name);
         if (existing) {
