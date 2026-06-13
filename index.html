@@ -110,5 +110,27 @@
   <div id="toasts"></div>
 
   <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Sicherheitsnetz: Wird diese index.html ohne den Vite-Dev-Server geöffnet
+    // (z.B. per Doppelklick oder über einen einfachen statischen Server), kann der
+    // Browser das TypeScript-Modul src/main.ts nicht laden – die Seite bliebe leer.
+    // Statt einer rätselhaften leeren Seite zeigen wir dann, wie man es richtig startet.
+    setTimeout(function () {
+      if (window.Game) return; // Spiel lief an – alles gut
+      document.body.insertAdjacentHTML("beforeend",
+        '<div style="position:fixed;inset:0;z-index:99999;background:#0e1b2a;color:#e8eef5;' +
+        'display:flex;align-items:center;justify-content:center;text-align:center;' +
+        'font-family:system-ui,sans-serif;padding:24px;line-height:1.6">' +
+        '<div style="max-width:600px">' +
+        '<h1 style="color:#ffc857;margin:0 0 12px">⚓ KubeQuest startet so nicht</h1>' +
+        '<p>Diese <code>index.html</code> ist die <b>Entwickler-Version</b> und braucht den ' +
+        'Vite-Server, der den Spielcode (TypeScript) erst übersetzt.</p>' +
+        '<p style="margin-top:18px;font-size:1.05em">🎮 <b>Zum Spielen (offline):</b><br>' +
+        'einmal <code>npm run build</code>, dann <code>dist/index.html</code> doppelklicken.</p>' +
+        '<p style="margin-top:14px;font-size:1.05em">🛠️ <b>Zum Entwickeln:</b><br>' +
+        '<code>npm run dev</code> starten und die angezeigte Adresse öffnen.</p>' +
+        '</div></div>');
+    }, 1500);
+  </script>
 </body>
 </html>
