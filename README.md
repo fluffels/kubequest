@@ -80,7 +80,9 @@ kubequest/
 └── dist/             Build-Ausgabe von `npm run build` (nicht eingecheckt)
 ```
 
-Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck`.
+Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (locker, alle Dateien).
+
+**TS-Strenge (Ratchet):** `npm run typecheck:strict` hält die bereits gehärteten Module auf voller Typ-Strenge (`strictNullChecks` u. a.) – aktuell `types`, `store`, `content`. So können dort keine Null-/Typ-Fehler mehr einschleichen. Der Kreis wird Schritt für Schritt erweitert (siehe `tsconfig.strict.json`): als Nächstes `sim.ts`, danach `noImplicitAny` (Parameter-Typen), bis am Ende die ganze `tsconfig.json` auf `strict` steht.
 
 ## Lizenzen
 
