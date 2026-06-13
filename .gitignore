@@ -3,5 +3,6 @@ dist/
 .claude/
 .vscode/
 .idea/
+*.iml
 Thumbs.db
 .DS_Store
