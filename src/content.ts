@@ -45,12 +45,12 @@ import type { Quest } from "./types";
 
   /* ---------- NPCs ---------- */
   const NPCS = {
-    ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100 },
+    ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100, tex: "char_ole" },
     bo:     { name: "Bo",            title: "Dock-Golem",      sprite: 109 },
     ada:    { name: "Ada",           title: "Kartenhaus",      sprite: 84 },
-    runa:   { name: "Runa",          title: "Werftchefin",     sprite: 87 },
+    runa:   { name: "Runa",          title: "Werftchefin",     sprite: 87, tex: "char_runa" },
     theo:   { name: "Theo",          title: "Landvermessung",  sprite: 111 },
-    pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86 },
+    pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
     kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110 },
     juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97 },
   };

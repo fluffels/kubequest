@@ -12,6 +12,7 @@ import { SFX } from "./sfx";
 
   const T = 16;
   const COLS = 12;
+  const CREATURE_COLS = 10; // Tiny Creatures (Clint Bellanger, CC0) ist 10 Spalten breit, nicht 12
 
   /* SFX (Mini-Synthesizer) liegt jetzt in sfx.ts und wird oben importiert. */
 
@@ -19,11 +20,12 @@ import { SFX } from "./sfx";
   const GRASS = [0, 0, 0, 0, 1, 2];
   const DIRT = 25;
   const STONE = [96, 97, 98];
-  const TREES = [5, 16, 28, 27];
   const WOOD = [48, 49, 50, 51, 52, 53];
   const CRATE = 63, BARREL = 82, ANVIL = 74, TABLE = 72, DEVICE = 65, BOOK = 66;
   const WELL = 104, SIGN = 83, CART = 57;
   const WATER = 0x3f7fc4, FOAM = 0xbfe3f5;
+  // PixelLab Wang-Tileset (Wasser->Sand): Eck-Code (NW,NE,SW,SE; Bit=1 => Land/oben) -> Frame im 4x4-Sheet "coast"
+  const WANG = [6, 7, 10, 9, 2, 11, 4, 15, 5, 14, 1, 8, 3, 0, 13, 12];
 
   function hashHue(str) {
     let h = 0;
@@ -37,24 +39,26 @@ import { SFX } from "./sfx";
     [key: string]: any;
     constructor() { super("Boot"); }
     create() {
+      const sheets: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
+      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "crate", "well", "stall", "lamppost", "signpost"]; // Einzelobjekte ohne Slicing
       let loaded = 0;
       const done = () => {
         loaded++;
-        if (loaded < 2) return;
-        for (const key of ["town", "dungeon"]) {
+        if (loaded < sheets.length + plains.length) return;
+        for (const [key, cols] of sheets) {
           const tex = this.textures.get(key);
           const img = tex.getSourceImage();
           const rows = Math.floor(img.height / T);
-          for (let i = 0; i < COLS * rows; i++) {
-            tex.add(i, 0, (i % COLS) * T, Math.floor(i / COLS) * T, T, T);
+          for (let i = 0; i < cols * rows; i++) {
+            tex.add(i, 0, (i % cols) * T, Math.floor(i / cols) * T, T, T);
           }
         }
         this.scene.start("World");
       };
-      this.textures.once("addtexture-town", done);
-      this.textures.once("addtexture-dungeon", done);
-      this.textures.addBase64("town", KQAssets.town);
-      this.textures.addBase64("dungeon", KQAssets.dungeon);
+      for (const [key] of sheets) this.textures.once("addtexture-" + key, done);
+      for (const key of plains) this.textures.once("addtexture-" + key, done);
+      for (const [key] of sheets) this.textures.addBase64(key, (KQAssets as any)[key]);
+      for (const key of plains) this.textures.addBase64(key, (KQAssets as any)[key]);
     }
   }
 
@@ -86,8 +90,12 @@ import { SFX } from "./sfx";
       this.buildMap();
       this.renderGround();
       this.renderStatics();
+      this.spawnFlowers();
       this.spawnNpcs();
       this.spawnPlayer();
+      this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
+      this.scatter("rock", 14, 0.45, [0, 1, 2, -3], true); // Steine: solide, auch am Strand
+      this.scatter("lamppost", 4, 0.55, [0, 1, 2], true);  // ein paar Hafenlaternen
 
       this.splash = this.add.particles(0, 0, "px", {
         speed: { min: 25, max: 80 }, angle: { min: 200, max: 340 }, gravityY: 140,
@@ -151,7 +159,16 @@ import { SFX } from "./sfx";
       this.decoList.push({ x, y, sheet, idx });
       if (solid) this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
     }
-    tree(x, y) { this.deco(x, y, "town", TREES[(x * 11 + y * 17) % TREES.length], true); }
+    tree(x, y) {
+      const kind = ((x * 7 + y * 13) % 3 === 0) ? "pine" : "tree";   // gemischter Wald: meist Laubbaum, dazwischen Tanne
+      this.decoList.push({ x, y, sheet: kind, obj: true, scale: kind === "pine" ? 0.95 : 1.1 }); // ~3 Kacheln (Mensch = 1)
+      this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
+    }
+    objDeco(x, y, tex, scale, solid) {
+      // ein PixelLab-Objekt als Deko (unten verankert, Tiefe nach y), optional solide
+      this.decoList.push({ x, y, sheet: tex, obj: true, scale });
+      if (solid) this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
+    }
     path(x0, y0, x1, y1) {
       let x = x0, y = y0;
       const sx = Math.sign(x1 - x0), sy = Math.sign(y1 - y0);
@@ -185,7 +202,6 @@ import { SFX } from "./sfx";
 
     buildMap() {
       const W = this.W, H = this.H;
-      const SAND = [24, 25, 26];
       for (let x = 0; x < W; x++) {
         const cY = this.coastY(x);
         const beach = !(x >= 3 && x <= 24) && !(x >= 30 && x <= 38); // Kai/Schiff: kein Sandstrand
@@ -193,7 +209,7 @@ import { SFX } from "./sfx";
           if (y >= cY + (beach ? 2 : 0)) {
             this.set(x, y, -2); this.solidGrid[y * W + x] = 1;       // Wasser
           } else if (beach && y >= cY) {
-            this.set(x, y, SAND[(x * 5 + y * 7) % 3]);               // Sandstrand (begehbar)
+            this.set(x, y, -3);                                       // Sandstrand (begehbar, PixelLab-Wang)
           } else {
             const r = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
             this.set(x, y, r < 80 ? 0 : r < 93 ? 1 : 2);             // Gras, natürlich gemischt
@@ -227,16 +243,18 @@ import { SFX } from "./sfx";
 
       // Marktplatz
       for (let y = 16; y <= 22; y++) for (let x = 24; x <= 32; x++) this.set(x, y, DIRT);
-      this.deco(28, 18, "town", WELL, true);
-      this.deco(31, 16, "town", CART, true);
+      this.objDeco(28, 18, "well", 0.55, true);
+      this.objDeco(31, 16, "stall", 0.6, true);
       this.labels.push({ x: 31.5, y: 15.4, text: "Markt", color: "#ffffff" });
-      this.deco(24, 22, "town", SIGN, true);
+      this.objDeco(24, 22, "signpost", 0.6, false);
 
       this.path(28, 22, 28, 24);
       this.path(26, 16, 26, 14);
       this.path(24, 19, 13, 19); this.path(13, 19, 13, 15);
       this.path(32, 19, 41, 19);
       this.path(33, 16, 40, 13);
+      this.path(26, 14, 26, 13);   // Weg bis vor die Tür der Hafenmeisterei
+      this.path(40, 13, 40, 12);   // Weg bis vor die Tür des Kartenhauses
 
       // Gebäude & Zonen
       this.house(23, 10, 7, "stone");
@@ -266,32 +284,53 @@ import { SFX } from "./sfx";
 
       const spots = [[5, 5], [7, 3], [15, 4], [20, 6], [33, 5], [36, 4], [44, 5], [47, 8], [47, 13], [36, 15], [20, 12], [5, 17], [3, 21], [8, 20], [18, 16], [34, 9], [30, 7], [45, 15], [37, 22], [6, 22], [21, 21]];
       spots.forEach(([x, y]) => this.tree(x, y));
-      this.deco(16, 21, "town", 29, false);
-      this.deco(35, 12, "town", 17, false);
-      this.deco(10, 17, "town", 30, false);
-      this.deco(42, 11, "town", 31, false);
+      this.deco(16, 21, "town", 29, false);   // Pilze (Kenney) – noch kein PixelLab-Ersatz, bleibt vorerst
     }
 
     renderGround() {
       const rt = this.add.renderTexture(0, 0, this.W * T, this.H * T).setOrigin(0).setDepth(0);
-      // Meer in Tiefen-Bändern: zur Küste hell, nach unten dunkler
+      // Meer als Hintergrund-Fallback (wird von den Wang-Wasserkacheln überdeckt)
       rt.fill(WATER, 1, 0, 24 * T, this.W * T, (this.H - 24) * T);
-      rt.fill(0x3873b4, 1, 0, 32 * T, this.W * T, (this.H - 32) * T);
-      rt.fill(0x315f9c, 1, 0, 36 * T, this.W * T, (this.H - 36) * T);
+
+      // PixelLab-Terrain: Wasser(0) < Sand(1) < Gras/Land(2) < Weg(3). Wasser-Ränder nach Material.
+      const lv = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        const c = this.ground[iy * this.W + ix];
+        return c === -2 ? 0 : c === -3 ? 1 : c === 25 ? 3 : 2;
+      };
+      const rawAt = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        return this.ground[iy * this.W + ix];
+      };
+      // Eck-Code (NW,NE,SW,SE) gegen Schwelle hi: Ecke >= hi => "oben" (Bit gesetzt)
+      const corners = (x: number, y: number, hi: number) =>
+        (((lv(x - 1, y - 1) >= hi ? 1 : 0) << 3) | ((lv(x, y - 1) >= hi ? 1 : 0) << 2) |
+         ((lv(x - 1, y) >= hi ? 1 : 0) << 1) | (lv(x, y) >= hi ? 1 : 0));
+      const has = (x: number, y: number, t: number) =>
+        lv(x - 1, y - 1) === t || lv(x, y - 1) === t || lv(x - 1, y) === t || lv(x, y) === t;
+      // Wasser-Rand-Set nach Nachbar-Material: Holz (Steg/Schiff) > Stein (Kai) > Sand (Küste)
+      const edgeSet = (x: number, y: number) => {
+        const cs = [rawAt(x - 1, y - 1), rawAt(x, y - 1), rawAt(x - 1, y), rawAt(x, y)];
+        if (cs.some((c) => c === -10 || c === -11)) return "dock";
+        if (cs.some((c) => c === 96 || c === 97 || c === 98)) return "kai";
+        return "coast";
+      };
+
       for (let y = 0; y < this.H; y++) {
         for (let x = 0; x < this.W; x++) {
           const v = this.get(x, y);
-          if (v === -2) {
-            // Schaumkanten überall, wo Land ans Wasser grenzt
-            if (this.get(x, y - 1) !== -2 && y > 0) rt.fill(FOAM, 0.8, x * T, y * T, T, 2.5);
-            if (this.get(x - 1, y) !== -2 && x > 0) rt.fill(FOAM, 0.55, x * T, y * T, 2, T);
-            if (this.get(x + 1, y) !== -2 && x < this.W - 1) rt.fill(FOAM, 0.55, x * T + T - 2, y * T, 2, T);
-          } else if (v === -10) {
-            rt.drawFrame("dungeon", WOOD[(x * 5 + y * 3) % 3], x * T, y * T);
-          } else if (v === -11) {
-            rt.drawFrame("dungeon", WOOD[3 + (x + y) % 3], x * T, y * T);
-          } else {
-            rt.drawFrame("town", v, x * T, y * T);
+          if (has(x, y, 0)) {                                              // berührt Wasser -> Rand-Set nach Material
+            rt.drawFrame(edgeSet(x, y), WANG[corners(x, y, 1)], x * T, y * T);
+          } else if (v === -10 || v === -11) {                            // Steg/Schiffsdeck innen -> volle Planke
+            rt.drawFrame("dock", WANG[15], x * T, y * T);
+          } else if (v === 96 || v === 97 || v === 98) {                  // Stein-Kai innen -> voller Stein
+            rt.drawFrame("kai", WANG[15], x * T, y * T);
+          } else if (has(x, y, 3)) {                                      // Gras/Weg-Ebene
+            rt.drawFrame("path", WANG[corners(x, y, 3)], x * T, y * T);
+          } else {                                                        // Sand/Gras-Ebene
+            rt.drawFrame("meadow", WANG[corners(x, y, 2)], x * T, y * T);
           }
         }
       }
@@ -332,10 +371,47 @@ import { SFX } from "./sfx";
       return this.add.ellipse(x, y, w || 10, 4, 0x000000, 0.26).setDepth(1.6);
     }
 
+    spawnFlowers() {
+      // Wildblumen (PixelLab) gestreut auf freie Gras-Zellen – bricht das wiederholte Gras-Tile
+      let placed = 0, tries = 0;
+      while (placed < 30 && tries < 500) {
+        tries++;
+        const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
+        const v = this.ground[y * this.W + x];
+        if ((v !== 0 && v !== 1 && v !== 2) || this.solidGrid[y * this.W + x]) continue;
+        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(4, 14), "flowers")
+          .setScale(0.35).setDepth(y * T + 6);
+        placed++;
+      }
+    }
+
+    scatter(tex: string, count: number, scale: number, kinds: number[], solid = false) {
+      // PixelLab-Objekte streuen: nur passende Felder, nie auf/neben Wege, nicht auf Solids, Spieler-Start frei
+      const isDirt = (x: number, y: number) => this.ground[y * this.W + x] === 25;
+      const pcx = Math.round(this.playerPos.x / T), pcy = Math.round(this.playerPos.y / T);
+      let placed = 0, tries = 0;
+      while (placed < count && tries < count * 25) {
+        tries++;
+        const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
+        const v = this.ground[y * this.W + x];
+        if (kinds.indexOf(v) < 0 || this.solidGrid[y * this.W + x]) continue;
+        if (isDirt(x, y - 1) || isDirt(x, y + 1) || isDirt(x - 1, y) || isDirt(x + 1, y)) continue; // nicht an Wege grenzen
+        if (Math.abs(x - pcx) <= 1 && Math.abs(y - pcy) <= 1) continue;                              // Spieler-Start freihalten
+        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(6, 13), tex)
+          .setOrigin(0.5, 0.7).setScale(scale).setDepth(y * T + 7);
+        if (solid) this.solidGrid[y * this.W + x] = 1;
+        placed++;
+      }
+    }
+
     renderStatics() {
       // Deko (Bäume, Häuser, Möbel) – Tiefe nach y
       for (const d of this.decoList) {
-        this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
+        if (d.obj) {
+          this.add.image(d.x * T + 8, d.y * T + 10, d.sheet).setOrigin(0.5, 0.7).setScale(d.scale || 1).setDepth(d.y * T + T);
+        } else {
+          this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
+        }
       }
       // === Ein richtiges Schiff: Rumpf mit Bug & Heck, Mast, Rah, Segel, Takelage ===
       const s = this.ship, px = s.x * T, py = s.y * T, pw = s.w * T, ph = s.h * T;
@@ -407,8 +483,8 @@ import { SFX } from "./sfx";
       tfRt.fill(FOAM, 0.7, 0, 0, p.w * T, 2);
       this.tfGroup.add(tfRt);
       const mkLabel = (tx, ty, txt, color) => this.makeLabel(tx, ty, txt, color);
-      this.tfGroup.add(this.add.image((p.x + 1) * T + 8, (p.y + 1) * T + 8, "dungeon", CRATE));
-      this.tfGroup.add(this.add.image((p.x + 4) * T + 8, (p.y + 2) * T + 8, "dungeon", CRATE));
+      this.tfGroup.add(this.add.image((p.x + 1) * T + 8, (p.y + 1) * T + 8, "crate").setScale(0.6));
+      this.tfGroup.add(this.add.image((p.x + 4) * T + 8, (p.y + 2) * T + 8, "crate").setScale(0.6));
       this.tfGroup.add(mkLabel((p.x + 1.5) * T, (p.y + 0.9) * T, "worker-3", "#9fe6a0"));
       this.tfGroup.add(mkLabel((p.x + 4.5) * T, (p.y + 1.9) * T, "worker-4", "#9fe6a0"));
       this.tfGroup.add(mkLabel((p.x + 3.5) * T, (p.y - 0.2) * T, "ost-erweiterung", "#ffd97a"));
@@ -437,8 +513,11 @@ import { SFX } from "./sfx";
       this.npcs = defs.map(d => {
         const meta = KQContent.NPCS[d.id];
         this.addShadow(d.x * T + 8, d.y * T + 15);
-        const spr = this.add.image(d.x * T + 8, d.y * T + 8, "dungeon", meta.sprite).setDepth(d.y * T + T);
-        this.tweens.add({ targets: spr, y: d.y * T + 7, duration: 900 + Math.random() * 400, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+        const baseY = meta.tex ? d.y * T + 15 : d.y * T + 8;   // tex-Figur an den Schatten (d.y*T+15) verankern, Füße = Schatten
+        const spr = meta.tex
+          ? this.add.image(d.x * T + 8, baseY, meta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(d.y * T + T)
+          : this.add.image(d.x * T + 8, baseY, "dungeon", meta.sprite).setDepth(d.y * T + T);
+        this.tweens.add({ targets: spr, y: baseY - 1, duration: 900 + Math.random() * 400, yoyo: true, repeat: -1, ease: "Sine.inOut" });
         const marker = this.add.text(d.x * T + 8, d.y * T - 6, "!", { fontFamily: "Consolas", fontSize: "8px", color: "#ffc857", fontStyle: "bold", resolution: 8 })
           .setOrigin(0.5, 1).setDepth(10000).setShadow(0.5, 0.5, "#000", 1);
         this.tweens.add({ targets: marker, y: d.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
@@ -454,7 +533,7 @@ import { SFX } from "./sfx";
         dir: 1, moving: false,
       };
       this.playerShadow = this.addShadow(this.playerPos.x, this.playerPos.y + 6);
-      this.playerSprite = this.add.image(this.playerPos.x, this.playerPos.y, "dungeon", Game.state.character || 85).setDepth(this.playerPos.y + 8);
+      this.playerSprite = this.add.image(this.playerPos.x, this.playerPos.y + 6, "char_player").setOrigin(0.5, 0.81).setScale(0.6).setDepth(this.playerPos.y + 8);
       this.petShadow = this.addShadow(0, 0, 7).setVisible(false);
       this.petSprite = this.add.image(0, 0, "dungeon", 124).setVisible(false).setDepth(1);
       this.petTrail = [];
@@ -529,7 +608,7 @@ import { SFX } from "./sfx";
           const pos = this.podSlotPos(slot);
           const hue = hashHue(p.dep);
           const shadow = this.addShadow(pos.x, pos.y + 7, 11);
-          const crate = this.add.image(pos.x, pos.y - 44, "dungeon", CRATE).setDepth(pos.y + 8);
+          const crate = this.add.image(pos.x, pos.y - 44, "crate").setScale(0.6).setDepth(pos.y + 8);
           const band = this.add.image(pos.x, pos.y - 44 - 5, "px").setScale(6, 1.5).setTint(hueColor(hue)).setDepth(pos.y + 9);
           this.tweens.add({ targets: [crate, band], y: "+=44", duration: 550, ease: "Bounce.easeOut",
             onComplete: () => this.burstAt(pos.x, pos.y + 4, "dust") });
@@ -593,7 +672,7 @@ import { SFX } from "./sfx";
       // Docker-Fässer bei Bo (max. 10 sichtbar, Labels versetzt gegen Überlappung)
       Game.sim.docker.containers.slice(-10).forEach((c, i) => {
         const bx = (4 + (i % 5) * 2) * T + 8, by = (26 + Math.floor(i / 5) * 0.0) * T + 8;
-        const barrel = this.add.image(bx, by, "dungeon", BARREL).setDepth(by + 8).setAlpha(c.running ? 1 : 0.45);
+        const barrel = this.add.image(bx, by, "barrel").setScale(0.5).setDepth(by + 8).setAlpha(c.running ? 1 : 0.45);
         this.dynGroup.add(barrel);
         this.dynGroup.add(mkText(bx, by - 9 - (i % 2) * 7, c.name, c.running ? "#9fe6a0" : "#8a98a8"));
       });
@@ -803,7 +882,7 @@ import { SFX } from "./sfx";
         if (this.stepAcc > 0.3) { this.stepAcc = 0; this.dust.explode(2, pl.x, pl.y + 6); }
       }
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
-      this.playerSprite.setPosition(pl.x, pl.y - 2 - bob).setFlipX(pl.dir === -1).setDepth(pl.y + 8);
+      this.playerSprite.setPosition(pl.x, pl.y + 6 - bob).setFlipX(pl.dir === -1).setDepth(pl.y + 8);
       this.playerShadow.setPosition(pl.x, pl.y + 6);
 
       // Haustier
