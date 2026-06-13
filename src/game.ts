@@ -29,40 +29,43 @@ import type { GameState } from "./types";
     return Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
   }
 
+  /** Frischer Spielstand – genau die Form von GameState. */
+  function makeDefaultState(): GameState {
+    return {
+      xp: 0,
+      coins: 40,
+      character: null,
+      player: { x: 0, y: 0 },
+      questIdx: 0,
+      questStep: 0,
+      taskIdx: 0,
+      completedQuests: [],
+      inventory: {},
+      owned: [],
+      activePet: null,
+      activeFlag: null,
+      review: {},
+      streak: { count: 0, lastDay: 0 },
+      stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
+      lastSeen: 0,
+      clusterSnapshot: null,
+    };
+  }
+
   export const Game = {
-    state: null as GameState | null,
-    sim: null as KQSim | null,
+    // state & sim sind ab Modul-Init gesetzt (und werden von load() ersetzt) –
+    // nie null. Das spart Null-Prüfungen in der gesamten Spiel-/Szenen-Logik.
+    state: makeDefaultState(),
+    sim: new KQSim({}),
     incomeAcc: 0,
     offlineEarnings: 0,
-
-    defaultState() {
-      return {
-        xp: 0,
-        coins: 40,
-        character: null,
-        player: { x: 0, y: 0 },
-        questIdx: 0,
-        questStep: 0,
-        taskIdx: 0,
-        completedQuests: [],
-        inventory: {},
-        owned: [],
-        activePet: null,
-        activeFlag: null,
-        review: {},
-        streak: { count: 0, lastDay: 0 },
-        stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
-        lastSeen: 0,
-        clusterSnapshot: null,
-      };
-    },
 
     load() {
       try {
         const raw = SaveStore.read();
-        this.state = raw ? Object.assign(this.defaultState(), JSON.parse(raw)) : this.defaultState();
+        this.state = raw ? Object.assign(makeDefaultState(), JSON.parse(raw)) : makeDefaultState();
       } catch (e) {
-        this.state = this.defaultState();
+        this.state = makeDefaultState();
       }
       this.sim = new KQSim(this.state.clusterSnapshot || {});
       // Szenarien bereits erreichter Funk-Schritte wieder einmischen
@@ -89,8 +92,9 @@ import type { GameState } from "./types";
 
     save() {
       if (this.sim) this.state.clusterSnapshot = this.sim.snapshot();
-      if (window.WorldScene && window.WorldScene.player) {
-        this.state.player = { x: window.WorldScene.player.x, y: window.WorldScene.player.y };
+      const ws = (window as any).WorldScene; // Globals-Shim (siehe vite-env.d.ts)
+      if (ws && ws.player) {
+        this.state.player = { x: ws.player.x, y: ws.player.y };
       }
       this.state.lastSeen = Date.now();
       SaveStore.write(JSON.stringify(this.state));
@@ -296,7 +300,7 @@ import type { GameState } from "./types";
 
     dueReviewItems(limit) {
       const t = today();
-      const due = [];
+      const due: { id: string; box: number }[] = [];
       for (const [id, info] of Object.entries(this.state.review)) {
         if (info.due <= t) due.push({ id, box: info.box });
       }
@@ -313,4 +317,4 @@ import type { GameState } from "./types";
     },
   };
 
-  window.Game = Game;
+  (window as any).Game = Game; // Globals-Shim (siehe vite-env.d.ts)

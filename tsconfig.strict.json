@@ -5,12 +5,17 @@
   // Stufe 1 (jetzt): strictNullChecks & Co. für die puren Domänen-Module, die
   //   sauber bestehen. Lockt deren Null-/Property-Sicherheit ein – künftige
   //   Edits, die das verletzen, fallen sofort auf.
-  // Geplant: sim.ts härten (eigener Durchgang) -> dann noImplicitAny anschalten
-  //   (Param-Typen) -> am Ende kann die Basis-tsconfig selbst auf strict.
+  // Stand: types, store, content, sim, game sind null-sicher eingelockt.
+  // Geplant: noImplicitAny anschalten (echte Param-/Feld-Typen statt `any`,
+  //   eigene Interfaces für Pod/Deployment/Service …) -> dann scenes/ui
+  //   nachziehen -> am Ende kann die Basis-tsconfig selbst auf strict.
+  // Bewusst OHNE vite-env.d.ts: dessen `import("./ui")`/`import(...)`-Referenzen
+  //   würden ui.ts & Co. in den Strict-Graph ziehen. Die wenigen window-Globals
+  //   in game.ts sind daher lokal gecastet (Migrations-Shim), bis ui/scenes dran sind.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": false
   },
-  "include": ["src/types.ts", "src/store.ts", "src/content.ts"]
+  "include": ["src/types.ts", "src/store.ts", "src/content.ts", "src/sim.ts", "src/game.ts"]
 }
