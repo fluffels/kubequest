@@ -29,6 +29,14 @@ import { SFX } from "./sfx";
     img.src = KQAssets[key];
     sheetImgs[key] = img;
   }
+  // PixelLab-NPC-Figuren fürs Dialog-Porträt vorladen (Kopf/Schulter-Ausschnitt)
+  for (const npc of Object.values(KQContent.NPCS) as any[]) {
+    if (npc.tex && KQAssets[npc.tex] && !sheetImgs[npc.tex]) {
+      const img = new Image();
+      img.src = KQAssets[npc.tex];
+      sheetImgs[npc.tex] = img;
+    }
+  }
 
   export const UI = {
     dialogue: null,
@@ -49,6 +57,21 @@ import { SFX } from "./sfx";
       const sx = (idx % 12) * 16, sy = Math.floor(idx / 12) * 16;
       if (img.complete) ctx.drawImage(img, sx, sy, 16, 16, 0, 0, canvas.width, canvas.height);
       else img.addEventListener("load", () => ctx.drawImage(img, sx, sy, 16, 16, 0, 0, canvas.width, canvas.height), { once: true });
+    },
+
+    // NPC-Porträt aus der PixelLab-Figur (Kopf/Schulter-Ausschnitt der 48x48-Textur),
+    // mit Fallback aufs alte Kenney-Icon, falls die Figur (noch) keine tex hat.
+    drawNpcPortrait(canvas, npc) {
+      const img = npc && npc.tex ? sheetImgs[npc.tex] : null;
+      if (!img) { this.drawPortrait(canvas, npc.sprite); return; }
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      const draw = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 11, 4, 26, 26, 0, 0, canvas.width, canvas.height);
+      };
+      if (img.complete && img.naturalWidth) draw();
+      else img.addEventListener("load", draw, { once: true });
     },
 
     /* ========== Blockierung ========== */
@@ -182,7 +205,7 @@ import { SFX } from "./sfx";
       const npc = KQContent.NPCS[npcId];
       this.dialogue = { npcId, lines: [], idx: 0, choice: { menu: true }, onDone: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
+      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
       $("dlg-text").innerHTML = "Was kann ich für dich tun?";
       $("dlg-next").classList.add("hidden");
       const box = $("dlg-choices");
@@ -285,7 +308,7 @@ import { SFX } from "./sfx";
       const npc = KQContent.NPCS[npcId];
       this.dialogue = { npcId, lines, idx: 0, onDone, choice: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
+      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
       $("dlg-choices").innerHTML = "";
       $("dialogue").classList.remove("hidden");
       this.renderDialogueLine();
@@ -314,7 +337,7 @@ import { SFX } from "./sfx";
       const npc = KQContent.NPCS[step.npc];
       this.dialogue = { npcId: step.npc, lines: [], idx: 0, onDone, choice: step };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawPortrait($("dlg-portrait-canvas"), npc.sprite);
+      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
       $("dlg-text").innerHTML = "🤔 " + step.q;
       $("dlg-next").textContent = "↑/↓ wählen · Enter bestätigen";
       $("dlg-next").classList.remove("hidden");

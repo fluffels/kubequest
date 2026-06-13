@@ -40,7 +40,7 @@ import { SFX } from "./sfx";
     constructor() { super("Boot"); }
     create() {
       const sheets: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "crate", "well", "stall", "lamppost", "signpost"]; // Einzelobjekte ohne Slicing
+      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost"]; // Einzelobjekte ohne Slicing
       let loaded = 0;
       const done = () => {
         loaded++;
