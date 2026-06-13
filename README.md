@@ -57,6 +57,7 @@ kubequest/
 │   ├── assets-data.js Spritesheets als Base64 (ermöglicht Doppelklick-Start)
 │   ├── sim.js        Cluster-Simulator (docker, kubectl, helm, terraform, secrets)
 │   ├── content.js    Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
+│   ├── store.js      Persistenz-Schicht (SaveStore): kapselt localStorage, Andockpunkt fürs spätere Backend
 │   ├── game.js       Spielstand, XP, Wirtschaft, Spaced Repetition
 │   ├── scene.js      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake, Sound
 │   ├── ui.js         Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel

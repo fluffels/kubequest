@@ -1,12 +1,12 @@
 /* ===== KubeQuest 3.0 – Spiel-Logik =====
  * Spielstand, XP/Ränge, Dublonen, Hafen-Wirtschaft, Streak, Shop,
- * Quest-Fortschritt und Spaced Repetition. Alles in localStorage.
+ * Quest-Fortschritt und Spaced Repetition.
+ * Persistenz läuft über die SaveStore-Schicht (heute localStorage, später + Backend).
  */
 
 (function () {
   "use strict";
 
-  const SAVE_KEY = "kubequest-save-v3";
   const BOX_INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
@@ -56,7 +56,7 @@
 
     load() {
       try {
-        const raw = localStorage.getItem(SAVE_KEY);
+        const raw = SaveStore.read();
         this.state = raw ? Object.assign(this.defaultState(), JSON.parse(raw)) : this.defaultState();
       } catch (e) {
         this.state = this.defaultState();
@@ -90,23 +90,23 @@
         this.state.player = { x: WorldScene.player.x, y: WorldScene.player.y };
       }
       this.state.lastSeen = Date.now();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
+      SaveStore.write(JSON.stringify(this.state));
     },
 
     reset() {
-      localStorage.removeItem(SAVE_KEY);
+      SaveStore.remove();
       this.load();
     },
 
     /* ---------- Spielstand als Datei sichern / laden ---------- */
     exportData() {
       this.save();
-      return localStorage.getItem(SAVE_KEY);
+      return SaveStore.read();
     },
 
     importData(json) {
       JSON.parse(json); // wirft bei ungültiger Datei
-      localStorage.setItem(SAVE_KEY, json);
+      SaveStore.write(json);
     },
 
     /* ---------- Hafen-Wirtschaft ---------- */
