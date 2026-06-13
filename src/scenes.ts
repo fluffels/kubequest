@@ -3,44 +3,17 @@
  * WorldScene: Port Kubernia – Karte, Spieler:in, NPCs, Cluster→Welt-Sync,
  *             Piraten-Überfälle, Hacker-Krake, Hafen-Wirtschaft, Sound.
  */
-
-(function () {
-  "use strict";
+import Phaser from "phaser";
+import { Game } from "./game";
+import { UI } from "./ui";
+import { KQContent } from "./content";
+import { KQAssets } from "./assets-data";
+import { SFX } from "./sfx";
 
   const T = 16;
   const COLS = 12;
 
-  /* ---------- Mini-Synthesizer (kein Audio-File nötig) ---------- */
-  const SFX = {
-    ctx: null,
-    ensure() {
-      if (!this.ctx) {
-        try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* kein Ton */ }
-      }
-      return this.ctx;
-    },
-    tone(freq, dur, type, vol, delay) {
-      const ctx = this.ensure();
-      if (!ctx) return;
-      const t0 = ctx.currentTime + (delay || 0);
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type || "square";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(vol || 0.035, t0);
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t0); osc.stop(t0 + dur);
-    },
-    coin() { this.tone(880, 0.07); this.tone(1318, 0.1, "square", 0.035, 0.07); },
-    success() { this.tone(523, 0.09); this.tone(659, 0.09, "square", 0.035, 0.09); this.tone(784, 0.14, "square", 0.035, 0.18); },
-    splash() { this.tone(180, 0.2, "sine", 0.05); this.tone(90, 0.25, "sine", 0.04, 0.05); },
-    alarm() { this.tone(440, 0.18, "sawtooth", 0.04); this.tone(330, 0.18, "sawtooth", 0.04, 0.2); this.tone(440, 0.18, "sawtooth", 0.04, 0.4); },
-    fanfare() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.16, "square", 0.04, i * 0.12)); },
-    wrong() { this.tone(196, 0.18, "sawtooth", 0.03); },
-    thunder() { this.tone(58, 0.7, "sawtooth", 0.06); this.tone(46, 0.9, "sawtooth", 0.05, 0.12); },
-  };
-  window.SFX = SFX;
+  /* SFX (Mini-Synthesizer) liegt jetzt in sfx.ts und wird oben importiert. */
 
   /* ---------- Kartendaten (wie v2, bewährt) ---------- */
   const GRASS = [0, 0, 0, 0, 1, 2];
@@ -61,6 +34,7 @@
   function hueColorLight(h) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
 
   class BootScene extends Phaser.Scene {
+    [key: string]: any;
     constructor() { super("Boot"); }
     create() {
       let loaded = 0;
@@ -85,6 +59,10 @@
   }
 
   class WorldScene extends Phaser.Scene {
+    [key: string]: any;
+    // Das Spiel nutzt this.events als eigenen Event-/Timer-Beutel und überschreibt
+    // damit Phasers geerbten EventEmitter-Typ (reines Typ-Override, kein Verhalten).
+    events: any;
     constructor() { super("World"); }
 
     /* ============ Aufbau ============ */
@@ -101,7 +79,7 @@
       this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
 
       // Pixel-Textur für Partikel
-      const g = this.make.graphics({ add: false });
+      const g = this.make.graphics({ add: false } as any);
       g.fillStyle(0xffffff); g.fillRect(0, 0, 2, 2);
       g.generateTexture("px", 2, 2); g.destroy();
 
@@ -350,7 +328,7 @@
     }
 
     /** Weicher Schatten unter einer Figur. */
-    addShadow(x, y, w) {
+    addShadow(x, y, w?) {
       return this.add.ellipse(x, y, w || 10, 4, 0x000000, 0.26).setDepth(1.6);
     }
 
@@ -573,7 +551,7 @@
       // Kaputte Deployments: Kisten rot einfärben
       const brokenMap = {};
       for (const d of Game.sim.deployments) brokenMap[d.name] = !!d.broken;
-      for (const info of Object.values(this.podSlots)) {
+      for (const info of Object.values(this.podSlots) as any[]) {
         info.crate.setTint(brokenMap[info.dep] ? 0xff8d8d : 0xffffff);
       }
 
@@ -641,7 +619,7 @@
     }
 
     /* ============ Events: Piraten & Krake ============ */
-    scheduleEvents(delaySec) {
+    scheduleEvents(delaySec?) {
       const now = this.time.now / 1000;
       this.events.nextPirate = now + (delaySec || Phaser.Math.Between(200, 360));
       this.events.nextKraken = now + (delaySec ? delaySec + 90 : Phaser.Math.Between(300, 500));
@@ -897,5 +875,4 @@
     }
   }
 
-  window.KQScenes = { BootScene, WorldScene };
-})();
+  export const KQScenes = { BootScene, WorldScene };

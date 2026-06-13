@@ -2,14 +2,10 @@
  * Story-Reihenfolge gegen eine dauerhafte Welt – wie im echten Spiel.
  * Ausführen mit:  node --test test/
  */
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-
-global.window = {};
-require("../js/sim.js");
-require("../js/content.js");
-const KQSim = window.KQSim;
-const KQContent = window.KQContent;
+import { test } from "vitest";
+import assert from "node:assert/strict";
+import { Sim as KQSim } from "../src/sim";
+import { KQContent } from "../src/content";
 
 function resolvePlaceholder(cmd, sim) {
   if (!cmd.includes("<")) return cmd;

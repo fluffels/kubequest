@@ -2,9 +2,10 @@
  * Dialoge, Funkgerät (teach/drill/terminal + freies Üben), Shop,
  * Krabben-Quiz, Stapel-Minispiel, Alarm-Leiste, HUD.
  */
-
-(function () {
-  "use strict";
+import { Game } from "./game";
+import { KQContent } from "./content";
+import { KQAssets } from "./assets-data";
+import { SFX } from "./sfx";
 
   const $ = id => document.getElementById(id);
 
@@ -22,14 +23,14 @@
   }
 
   // Spritesheet-Bilder für Porträts (unabhängig von Phaser, geht auch per file://)
-  const sheetImgs = {};
+  const sheetImgs: Record<string, HTMLImageElement> = {};
   for (const key of ["town", "dungeon"]) {
     const img = new Image();
     img.src = KQAssets[key];
     sheetImgs[key] = img;
   }
 
-  const UI = {
+  export const UI = {
     dialogue: null,
     termLog: [],
     review: null,
@@ -37,6 +38,8 @@
     _drillTask: null, // aktuelle generierte Drill-Aufgabe des Quest-Schritts
     stack: null,      // Stapel-Minispiel
     failCount: 0,
+    choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
+    choiceSel: 0,
 
     drawPortrait(canvas, idx) {
       const ctx = canvas.getContext("2d");
@@ -66,8 +69,8 @@
       const rank = Game.rank();
       const next = Game.nextRank();
       $("hud-rankname").textContent = rank.icon + " " + rank.name;
-      $("hud-coins").textContent = s.coins;
-      $("hud-streak").textContent = s.streak.count;
+      $("hud-coins").textContent = String(s.coins);
+      $("hud-streak").textContent = String(s.streak.count);
       const rate = Game.incomeRate();
       $("hud-income").textContent = rate > 0 ? "+" + (Math.round(rate * 10) / 10) + "/min" : "";
       if (next) {
@@ -97,7 +100,7 @@
       }
     },
 
-    toast(msg, cls) {
+    toast(msg, cls?) {
       const t = document.createElement("div");
       t.className = "toast" + (cls ? " " + cls : "");
       t.innerHTML = msg;
@@ -105,7 +108,7 @@
       setTimeout(() => t.remove(), 4200);
     },
 
-    reward(xp, coins, label) {
+    reward(xp, coins, label?) {
       const rankUp = Game.addXp(xp);
       const realCoins = coins > 0 ? Game.addCoins(coins) : 0;
       let msg = "+" + xp + " XP";
@@ -117,7 +120,7 @@
         const r = Game.rank();
         this.toast("🎉 <b>Beförderung!</b> Du bist jetzt <b>" + r.icon + " " + r.name + "</b>!", "rankup");
         if (window.SFX) SFX.fanfare();
-        if (window.WorldScene) WorldScene.burstAtPlayer("sparkle");
+        if (window.WorldScene) window.WorldScene.burstAtPlayer("sparkle");
       }
       this.refreshHud();
     },
@@ -143,7 +146,7 @@
     updatePrompt() {
       const p = $("prompt");
       if (this.blocking() || !window.WorldScene) { p.classList.add("hidden"); return; }
-      const near = WorldScene.nearestNpc();
+      const near = window.WorldScene.nearestNpc();
       if (!near) { p.classList.add("hidden"); return; }
       const meta = KQContent.NPCS[near.id];
       let label = "💬 Mit " + meta.name + " reden";
@@ -155,7 +158,7 @@
 
     interact() {
       if (!window.WorldScene) return;
-      const near = WorldScene.nearestNpc();
+      const near = window.WorldScene.nearestNpc();
       if (!near) return;
       const npcId = near.id;
       if (npcId === "pelle") return this.openShop();
@@ -263,7 +266,7 @@
         const q = result.questDone;
         Game.registerQuestCards(q.id);
         this.reward(q.rewardXp, q.rewardCoins, "🏁 Quest „" + q.title + "“ abgeschlossen!");
-        if (window.WorldScene) WorldScene.burstAtPlayer("sparkle");
+        if (window.WorldScene) window.WorldScene.burstAtPlayer("sparkle");
         return;
       }
       const next = Game.currentStep();
@@ -278,7 +281,7 @@
     },
 
     /* ========== Dialog ========== */
-    showDialogue(npcId, lines, onDone) {
+    showDialogue(npcId, lines, onDone?) {
       const npc = KQContent.NPCS[npcId];
       this.dialogue = { npcId, lines, idx: 0, onDone, choice: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
@@ -333,7 +336,7 @@
       d.answered = true;
       this.choiceBtns = null;
       document.querySelectorAll("#dlg-choices button").forEach(b => {
-        b.disabled = true;
+        (b as HTMLButtonElement).disabled = true;
         b.classList.remove("sel");
         if (b === btn) b.classList.add(opt.ok ? "correct" : "wrong");
       });
@@ -733,7 +736,7 @@
       html += "</div>";
       $("shop-body").innerHTML = html;
       document.querySelectorAll("#shop-body canvas[data-sprite]").forEach(cv => {
-        this.drawPortrait(cv, parseInt(cv.dataset.sprite, 10));
+        this.drawPortrait(cv, parseInt((cv as HTMLElement).dataset.sprite, 10));
       });
     },
 
@@ -819,8 +822,8 @@
       const q = r.current.content.q;
       const correct = optionIndex === q.correct;
       document.querySelectorAll("#quiz-options button").forEach(btn => {
-        const oi = parseInt(btn.dataset.oi, 10);
-        btn.disabled = true;
+        const oi = parseInt((btn as HTMLElement).dataset.oi, 10);
+        (btn as HTMLButtonElement).disabled = true;
         if (oi === q.correct) btn.classList.add("correct");
         else if (oi === optionIndex) btn.classList.add("wrong");
       });
@@ -893,4 +896,3 @@
   };
 
   window.UI = UI;
-})();

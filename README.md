@@ -11,7 +11,11 @@ Ein **2D-Lernspiel** (gebaut mit **Phaser 3**) für Docker, Kubernetes, Helm, Te
 
 ## Spielstart
 
-**`index.html` doppelklicken** – fertig. Läuft komplett lokal im Browser (die Grafiken sind eingebettet, deshalb braucht auch Phaser keinen Server). Spielstand speichert automatisch im Browser.
+**Entwickeln:** einmalig `npm install`, dann `npm run dev` – startet einen lokalen Server mit Auto-Reload (Vite). Im Browser unter der angezeigten Adresse öffnen.
+
+**Offline spielen / weitergeben:** `npm run build` erzeugt **eine einzige, in sich geschlossene Datei** `dist/index.html` (Code, Grafiken und Engine sind eingebettet). Die kann man **doppelklicken** – läuft komplett offline, ohne Server.
+
+Spielstand speichert automatisch im Browser.
 
 | Taste | Aktion |
 |---|---|
@@ -47,28 +51,36 @@ Die **Sturm-Saison** (bei Sturmwache Juno am Leuchtturm) lehrt das Debugging-Han
 
 ## Projektstruktur
 
+Gebaut mit **Vite** + **TypeScript** (ES-Module). `index.html` lädt nur `src/main.ts`; Vite bündelt den Rest. Phaser kommt als npm-Paket (nicht mehr als Datei im Repo).
+
 ```
 kubequest/
-├── index.html        Einstieg (doppelklicken!)
+├── index.html        Einstieg (lädt src/main.ts)
 ├── style.css         UI (HUD, Dialoge, Funkgerät, Shop, Alarm, Minispiel)
+├── package.json      Abhängigkeiten & Skripte (dev/build/test/typecheck)
+├── vite.config.ts    Build-Konfiguration (Single-File-Plugin für den Offline-Build)
+├── tsconfig.json     TypeScript-Einstellungen
 ├── assets/           Kenney "Tiny Town" & "Tiny Dungeon" (CC0) + Lizenzen
-├── js/
-│   ├── phaser.min.js Phaser 3 Engine (MIT-Lizenz, kostenlos)
-│   ├── assets-data.js Spritesheets als Base64 (ermöglicht Doppelklick-Start)
-│   ├── sim.js        Cluster-Simulator (docker, kubectl, helm, terraform, secrets)
-│   ├── content.js    Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
-│   ├── store.js      Persistenz-Schicht (SaveStore): kapselt localStorage, Andockpunkt fürs spätere Backend
-│   ├── game.js       Spielstand, XP, Wirtschaft, Spaced Repetition
-│   ├── scene.js      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake, Sound
-│   ├── ui.js         Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel
-│   └── main.js       Start & Tastatur
-└── test/             Test-Suite (Node-Test-Runner)
-    ├── sim.test.js      Unit-Tests des Simulators (inkl. Troubleshooting-Pfade)
-    ├── content.test.js  Konsistenz aller Spielinhalte
-    └── quests.test.js   spielt die komplette Story + alle Drills durch
+├── src/
+│   ├── main.ts        Start & Tastatur (Einstiegspunkt)
+│   ├── sim.ts         Cluster-Simulator (docker, kubectl, helm, terraform, secrets)
+│   ├── content.ts     Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
+│   ├── types.ts       Zentrale TypeScript-Typen (GameState, Quest, …)
+│   ├── store.ts       Persistenz-Schicht (SaveStore): kapselt localStorage, Andockpunkt fürs spätere Backend
+│   ├── game.ts        Spielstand, XP, Wirtschaft, Spaced Repetition
+│   ├── scenes.ts      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake
+│   ├── sfx.ts         Mini-Synthesizer (WebAudio-Sounds, keine Audio-Dateien)
+│   ├── ui.ts          Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel
+│   ├── assets-data.ts Spritesheets als Base64 (hält den Offline-Build self-contained)
+│   └── vite-env.d.ts  Typ-Deklarationen (u.a. window-Shim für Inline-Handler)
+├── test/             Test-Suite (Vitest)
+│   ├── sim.test.ts      Unit-Tests des Simulators (inkl. Troubleshooting-Pfade)
+│   ├── content.test.ts  Konsistenz aller Spielinhalte
+│   └── quests.test.ts   spielt die komplette Story + alle Drills durch
+└── dist/             Build-Ausgabe von `npm run build` (nicht eingecheckt)
 ```
 
-Tests ausführen (im Projektordner): `node --test`
+Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck`.
 
 ## Lizenzen
 
