@@ -28,7 +28,14 @@ Gemeinsame Basis-Tile-IDs (zum Weiter-Verketten neuer Sets):
 
 ## Objekte (`create_map_object`, transparent)
 `flowers` 0b39f8ca · `tree` 5875d1ff · `pine` 646df3e0 · `bush` 60c32cf5 · `rock` fc3a7be6 ·
-`crate` 80a6f6c4 · `barrel` 694b9ecc · `well` edd57bbc · `stall` 1f189047 · `lamppost` ce7a86df · `signpost` b05d7ca2
+`crate` 80a6f6c4 · `barrel` 694b9ecc · `well` edd57bbc · `stall` 1f189047 · `lamppost` ce7a86df · `signpost` b05d7ca2 · `sign` f6d5f12f
+`lighthouse` d132cfe0 · `house_office` 66ac5306 · `house_forge` 83dc3d8d · `house_chart` d83f271c
+`pet_ratte` 6dac5de9 · `pet_fledermaus` 3a6daee7 · `pet_geist` 8cb7a436 (Shop-Haustiere, folgen der Figur; `scenes.ts` petSprite + `ui.ts` `drawTexIcon` fürs Shop-Icon)
+
+> **Leuchtturm** (`lighthouse`, side-view, 72×128 → 45×100): löst den alten code-gezeichneten Turm ab; in `scenes.ts` als Bild + Felsen-Ellipse, dazu ein **rotierender Lichtkegel** (Code: weiches ADD-Blend-Dreieck `lhbeam`, 360°-Tween) und das pulsierende Lämpchen.
+> **Gebäude** (`house_office` Stein/Hafenmeisterei, `house_forge` Werft, `house_chart` Kartenhaus; `view: high top-down`, 2.5D): lösen die Kenney-„town"-Tile-Häuser ab. Gerendert über `building(x,y,w,tex,scale)` — Grundfläche (w×3 Tiles) bleibt solide, das hohe Dach ragt nach oben, Tiefe nach Fußlinie (korrektes Vorne/Hinten zur Figur).
+
+> **`sign`** (Holz-Schildbrett, `view: side`, 96×40 → auf Inhalt zugeschnitten **75×30**, Aufhänge-Knäufe oben abgeschnitten) ist die Grundlage der **festen Orts-Schilder**. Es wird in `scenes.ts` per **Phaser `NineSlice`** (Insets 8/8/8/6) auf jede Textlänge gedehnt – Rahmen bleibt fix, Holzmitte streckt. So genügt **eine** Grafik für alle Schilder (`makeSign`). Die *dynamischen* Cluster-Labels nutzen bewusst KEIN Holz, sondern „digitale" Tech-Tags (`makeTechTag`, Monospace + Status-Punkt, Nähe-Aufdeckung).
 
 ## Figuren (`create_character`, 4-dir, nur `south.png` genutzt)
 `char_player` daae9195 · `char_ole` b89f37e2 · `char_runa` 723246a6 · `char_pelle` 793f0232
@@ -41,6 +48,8 @@ Gemeinsame Basis-Tile-IDs (zum Weiter-Verketten neuer Sets):
 
 > ⚠️ **Map-Objekte & Figuren werden serverseitig nach 8 h gelöscht.** Die IDs sind nur historisch —
 > die dauerhafte Quelle sind die PNGs hier + das Base64 in `src/assets-data.ts`. Tilesets bleiben abrufbar.
+
+> 💳 **Account-Stand (2026-06-15):** PixelLab läuft jetzt auf einem **Abo (Tier 1)** mit großem Generierungs-Kontingent (~2000) — die alte „4/40 Free-Trial"-Knappheit ist vorbei. Tier 1 erlaubt zudem **größere Bilder (mehr Pixel pro Bild)** → gut für große Objekte wie **Häuser, Bäume, Gebäude** (höher auflösen statt klein generieren + hochskalieren). Generieren ist unkritisch.
 
 ## Wie das Autotiling funktioniert (`src/scenes.ts`, `renderGround`)
 - **Format `tileset15`:** 4×4-Sheet, Tile = Funktion der 4 Eck-Terrains. Eck-Code

@@ -23,7 +23,8 @@
       <span class="hud-streak" title="Tage-Streak – spiele täglich für Bonus-Dublonen">🔥 <b id="hud-streak">0</b></span>
     </div>
     <div class="hud-quest" id="hud-quest"></div>
-    <div class="hud-keys">🚶 WASD/Pfeile · 💬 E reden · 📻 T Funkgerät · 📜 J Logbuch</div>
+    <div class="hud-keys">🚶 WASD/Pfeile · 💬 E reden · 📻 T Funkgerät · 📜 J Logbuch · ☰ Esc Menü</div>
+    <button id="hud-menu-btn" class="hud-menu-btn" onclick="UI.openMenu()" title="Menü öffnen (Esc)">☰ Menü</button>
   </div>
 
   <!-- Alarm (Piraten / Krake) -->
@@ -94,6 +95,22 @@
       <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
     </div>
     <div id="stack-body" class="panel-body"></div>
+  </div>
+
+  <!-- Menü / Pause -->
+  <div id="overlay-menu" class="panel hidden">
+    <div class="panel-head">⚓ Menü
+      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+    </div>
+    <div id="menu-body" class="panel-body">
+      <div class="menu-actions">
+        <button class="primary" onclick="UI.closeOverlays()">▶️ Weiterspielen</button>
+        <button onclick="UI.exportSave()">💾 Spielstand sichern (Datei)</button>
+        <button onclick="document.getElementById('save-import').click()">📂 Spielstand laden (Datei)</button>
+        <button class="danger" onclick="UI.resetGame()">♻️ Spielstand zurücksetzen</button>
+      </div>
+      <div class="dim" style="margin-top:14px">Gespeichert wird automatisch alle 5 Sekunden im Browser. Die Datei brauchst du nur als Backup oder für einen anderen Rechner/Browser. „Zurücksetzen“ löscht den kompletten Fortschritt – das lässt sich nicht rückgängig machen.</div>
+    </div>
   </div>
 
   <!-- Charakterwahl -->

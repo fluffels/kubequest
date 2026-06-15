@@ -48,7 +48,7 @@ import { SFX } from "./sfx";
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
 
       if (!$("charselect").classList.contains("hidden")) return;
-      if (k === "Escape") { UI.closeOverlays(); return; }
+      if (k === "Escape") { if (UI.blocking()) UI.closeOverlays(); else UI.openMenu(); return; }
       if (UI.dialogue) {
         if (UI.hasChoices()) {
           // Antwort-Auswahl per Tastatur: ↑/↓ (oder W/S) navigieren, Enter/E/Leer bestätigen, 1–4 direkt
