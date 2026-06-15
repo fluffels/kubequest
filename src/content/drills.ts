@@ -248,6 +248,28 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     sim.files[fn] = "x"; sim.exec("git add " + fn); sim.exec('git commit -m "Auslieferung"'); sim.exec("git push");
     return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> – der Befehl fürs Nachschauen." };
   },
+  // Git-Team-Alltag (#69). Bewusst NACH "ci-status" (das pusht) und vor den k8s-Drills,
+  // damit kein folgender Drill von einem offenen Konflikt überrascht wird.
+  "git-pull": sim => {
+    ensureGit(sim);
+    sim.git.conflict = null; // Reste aufräumen, sonst lehnt pull ab
+    sim.git.remoteAhead = rnd(1, 3);
+    return { text: "Das Team hat gepusht: hol die neuen Commits in deinen Branch (holen + zusammenführen).", accept: [/^git\s+pull$/], solution: "git pull", hint: "git + ein Wort fürs „herziehen“." };
+  },
+  "git-resolve": sim => {
+    ensureGit(sim);
+    // Jeden Durchlauf frisch starten: einen evtl. offenen Konflikt vorher wegräumen.
+    sim.git.conflict = null;
+    sim.git.pendingConflict = null;
+    let br = "kollege-" + rnd(2, 99);
+    while (sim.git.branches.includes(br)) br = "kollege-" + rnd(100, 99999);
+    const fn = "route-" + sim.clock + "-" + rnd(100, 9999) + ".md";
+    sim.mergeScenario({ gitConflict: { branch: br, file: fn, ours: "Route A (deine)", theirs: "Route B (von " + br + ")" } });
+    sim.exec("git merge " + br); // löst den Konflikt aus – jetzt steckt er in fn
+    const side = pick(["--ours", "--theirs"]);
+    const wer = side === "--ours" ? "<b>eigene</b>" : "<b>hereinkommende</b>";
+    return { text: "Merge-Konflikt in <code>" + fn + "</code>: übernimm die " + wer + " Version.", accept: [new RegExp("^git\\s+checkout\\s+" + side + "\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git checkout " + side + " " + fn, hint: "Muster: git checkout --ours/--theirs <datei>" };
+  },
   "k-get-netpol": sim => {
     ensureNetworkPolicy(sim);
     return { text: "Zeig alle Hafenmauern (NetworkPolicies) im Cluster.", accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." };
@@ -274,7 +296,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
 export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }, { drill: "docker-build", after: "q3b" }, { drill: "docker-tag", after: "q3b" }],
   ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
-  ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }, { drill: "k-secret-tls", after: "q23" }, { drill: "k-get-ingress", after: "q23" }],
+  ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }, { drill: "git-pull", after: "q25" }, { drill: "git-resolve", after: "q25" }, { drill: "k-secret-tls", after: "q23" }, { drill: "k-get-ingress", after: "q23" }],
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
   juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }],

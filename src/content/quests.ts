@@ -891,6 +891,89 @@ export const QUESTS: Quest[] = [
       ] },
     ]},
 
+  /* Git-Alltag im Team: holen (fetch/pull) und Merge-Konflikte lösen (#69).
+   * Folge auf Adas Git-Track (q18 commit → q19 branch/merge → q20 pipeline).
+   * Die ID ist fortlaufend angehängt (q25), die Quest steht aber bewusst HIER,
+   * direkt nach den Git-Grundlagen – die Spielreihenfolge ergibt sich aus der
+   * Array-Position, nicht aus der Nummer. (Bestehende IDs behalten so ihre
+   * Bedeutung in drills/quiz/Spielständen; nur die Position verschiebt sich.) */
+  { id: "q25", title: "Zwei Karten, eine Linie", giver: "ada", rewardXp: 55, rewardCoins: 40,
+    steps: [
+      { type: "dialog", npc: "ada", lines: [
+        "Zurück, Kartograph:in! Bisher hast du allein an der Seekarte gearbeitet. Im echten Hafen sind aber <b>mehrere</b> dran – heute lernst du das, was Tag eins von Junioren am meisten frustriert: <b>zusammenarbeiten, ohne sich gegenseitig die Arbeit zu überschreiben.</b>",
+        "Mein Kollege <b>Lennart</b> hat über Nacht auch an der <code>seekarte.md</code> gearbeitet und seine Commits auf den Server (origin) geschoben. Goldene Regel: <b>erst holen, dann arbeiten.</b> Sieh zuerst nur nach, OB es Neues gibt – ohne dir gleich etwas reinzuziehen: <code>git fetch</code>.",
+      ] },
+      { type: "teach", brief: "Erst nachsehen",
+        scenario: { gitRemoteAhead: 2, gitConflict: { branch: "lennart-route", file: "seekarte.md",
+          ours: "Nordpassage: dicht am Riff entlang – kurz, aber eng.",
+          theirs: "Nordpassage: weiter Bogen ums Riff – sicher, etwas laenger." } },
+        cmd: {
+        id: "t-git-fetch", intro: "🆕 Neuer Befehl: <code>git fetch</code> – holt die Infos vom Server (origin), <b>ohne</b> sie in deine Arbeit einzufügen. Du siehst, was da wäre, riskierst aber nichts.",
+        text: "Sieh nach, ob origin etwas Neues hat.",
+        accept: [/^git\s+fetch$/], check: (sim: Sim) => sim.git.fetched, solution: "git fetch", hint: "git + ein Wort fürs „abholen, aber nicht einfügen“." } },
+      { type: "dialog", npc: "ada", lines: [
+        "Zwei Commits warten auf origin. <code>git fetch</code> hat sie nur <b>heruntergeladen</b> – deine Karte ist noch unberührt. Jetzt zieh sie wirklich in deine Arbeit: <code>git pull</code> (das ist fetch + zusammenführen in einem).",
+      ] },
+      { type: "teach", brief: "Holen + einfügen", cmd: {
+        id: "t-git-pull", intro: "🆕 Neuer Befehl: <code>git pull</code> – holt die Commits vom Server UND führt sie in deinen aktuellen Branch zusammen (fetch + merge).",
+        text: "Hol Lennarts Commits in deinen <code>main</code>.",
+        accept: [/^git\s+pull$/], check: (sim: Sim) => sim.git.remoteAhead === 0, solution: "git pull", hint: "git + ein Wort fürs „herziehen“." } },
+      { type: "dialog", npc: "ada", lines: [
+        "Sauber, jetzt bist du auf dem Stand des Teams. <b>Merk dir:</b> erst <code>pull</code> (holen), dann erst deine <code>push</code> – sonst weist der Server deinen Push ab, weil du veraltet bist.",
+        "Aber Lennart hat noch einen <b>Experiment-Branch</b> dagelassen: <code>lennart-route</code>. Dummerweise hat er dort <b>dieselbe Zeile</b> der Seekarte geändert wie du. Führ ihn zusammen – und sieh, was passiert: <code>git merge lennart-route</code>.",
+      ] },
+      { type: "teach", brief: "Zusammenführen – Knall", cmd: {
+        id: "t-git-merge-conflict", intro: "↩︎ <code>git merge &lt;branch&gt;</code> kennst du. Diesmal haben BEIDE Seiten dieselbe Stelle geändert – Git kann nicht entscheiden und meldet einen <b>Merge-Konflikt</b>. Das ist <b>normal</b>, kein Fehler von dir!",
+        text: "Führe <code>lennart-route</code> in <code>main</code> zusammen.",
+        accept: [/^git\s+merge\s+lennart-route$/], check: (sim: Sim) => !!sim.git.conflict, solution: "git merge lennart-route", hint: "Muster: git merge <branch>" } },
+      { type: "dialog", npc: "ada", lines: [
+        "Da ist er, der berüchtigte <b>CONFLICT</b>. Kein Grund zur Panik – Git hat einfach beide Versionen in die Datei geschrieben und fragt DICH, welche gilt. Schau rein: <code>cat seekarte.md</code>. Zwischen <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> und <code>=======</code> steht DEINE Zeile, darunter bis <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> Lennarts.",
+      ] },
+      { type: "terminal", brief: "Konflikt lösen", tasks: [
+        { id: "t-conf-cat", text: "Schau dir den Konflikt in <code>seekarte.md</code> an (die Marker <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> / <code>=======</code> / <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>).",
+          accept: [/^cat\s+seekarte\.md$/], solution: "cat seekarte.md", hint: "cat <datei> – wie bei jeder Seekarte." },
+        { id: "t-conf-status", text: "Frag Git nach dem Stand – es nennt dir die „nicht zusammengeführten Pfade“.",
+          accept: [/^git\s+status$/], solution: "git status", hint: "Der vertraute Stand-Befehl." },
+        { id: "t-conf-theirs", text: "Entscheide dich: Lennarts <b>sichere</b> Route ist besser. Übernimm die <b>hereinkommende</b> Version mit <code>git checkout --theirs seekarte.md</code>.",
+          accept: [/^git\s+checkout\s+--theirs\s+seekarte\.md$/], check: (sim: Sim) => sim.files["seekarte.md"] === "Nordpassage: weiter Bogen ums Riff – sicher, etwas laenger." && !!sim.git.conflict,
+          solution: "git checkout --theirs seekarte.md", hint: "git checkout --theirs <datei> wählt die hereinkommende Seite (--ours wäre deine)." },
+        { id: "t-conf-add", text: "Markiere den Konflikt als gelöst: merk die Datei vor mit <code>git add seekarte.md</code>.",
+          accept: [/^git\s+add\s+seekarte\.md$/], check: (sim: Sim) => !sim.git.conflict && sim.git.staged.includes("seekarte.md"),
+          solution: "git add seekarte.md", hint: "Wie immer: git add <datei> – das sagt Git „erledigt“." },
+        { id: "t-conf-commit", text: "Schließ den Merge ab mit einem Commit, z.B. <code>git commit -m \"Konflikt geloest: Lennarts Route\"</code>.",
+          accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], check: (sim: Sim) => !sim.git.conflict,
+          solution: 'git commit -m "Konflikt geloest: Lennarts Route"', hint: 'Muster: git commit -m "Nachricht"' },
+      ]},
+      { type: "dialog", npc: "ada", lines: [
+        "<b>Gelöst!</b> Genau so läuft's im Alltag: Git markiert die Kollision, du wählst (oder mischst von Hand), <code>add</code>, <code>commit</code> – fertig. Jetzt darfst du teilen: <code>git push</code>.",
+      ] },
+      { type: "teach", brief: "Jetzt teilen", cmd: {
+        id: "t-git-push-resolved", intro: "↩︎ <code>git push</code> – jetzt gefahrlos, weil du vorher gepullt und den Konflikt gelöst hast.",
+        text: "Schieb deinen gelösten Stand zum Server.",
+        accept: [/^git\s+push$/], check: (sim: Sim) => sim.git.pushed, solution: "git push", hint: "Wirklich nur: git push" } },
+      { type: "choice", npc: "ada", reviewId: "q-git-4",
+        q: "Du beginnst den Tag und willst deine gestrige Arbeit teilen. Womit fängst du an?",
+        options: [
+          { t: "Erst git pull (holen), dann erst git push – sonst bin ich veraltet und der Server weist den Push ab.", ok: true,
+            reply: "Genau. „Erst holen, dann pushen.“ Das erspart dir die meisten unnötigen Konflikte." },
+          { t: "Sofort git push – meine Arbeit ist ja fertig.", ok: false,
+            reply: "Riskant: hat das Team inzwischen gepusht, lehnt der Server ab (oder du überschreibst fremde Arbeit). Erst pull!" },
+        ] },
+      { type: "choice", npc: "ada", reviewId: "q-git-5",
+        q: "Was bedeutet ein Merge-Konflikt eigentlich?",
+        options: [
+          { t: "Zwei Seiten haben dieselbe Stelle unterschiedlich geändert – Git kann nicht entscheiden und lässt MICH wählen.", ok: true,
+            reply: "Richtig. Ein Konflikt ist keine Katastrophe, sondern eine Rückfrage: „Welche Version gilt?“" },
+          { t: "Git ist kaputt und das Repository ist verloren.", ok: false,
+            reply: "Keineswegs! Nichts ist verloren – Git hat nur beide Versionen nebeneinandergelegt und wartet auf deine Entscheidung." },
+        ] },
+      { type: "drill", brief: "Adas Übungsrunde", pool: ["git-pull", "git-resolve"], count: 2,
+        intro: "Holen und Lösen sitzen erst mit Übung: pull holt, --theirs/--ours wählt die Seite." },
+      { type: "dialog", npc: "ada", lines: [
+        "Du hast den Team-Alltag drauf: <b>fetch</b> (nachsehen) → <b>pull</b> (holen) → arbeiten → Konflikt? <b>lösen</b> (Seite wählen, add, commit) → <b>push</b> (teilen). Damit überlebst du jeden ersten Arbeitstag. 🧭",
+      ] },
+    ]},
+
   { id: "q21", title: "Werft-Ausbau: dein eigenes Chart", giver: "runa", rewardXp: 60, rewardCoins: 45,
     steps: [
       { type: "dialog", npc: "runa", lines: [
