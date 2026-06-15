@@ -7,9 +7,9 @@ import assert from "node:assert/strict";
 import { Sim as KQSim } from "../src/sim";
 import { KQContent } from "../src/content";
 
-function resolvePlaceholder(cmd, sim) {
+function resolvePlaceholder(cmd: string, sim: KQSim) {
   if (!cmd.includes("<")) return cmd;
-  const findPod = prefix => {
+  const findPod = (prefix: string) => {
     const dep = sim.deployments.find(d => d.name === prefix) || sim.deployments[0];
     return dep.pods[0].name;
   };
@@ -25,11 +25,11 @@ function resolvePlaceholder(cmd, sim) {
   return cmd;
 }
 
-function runTask(sim, task, label) {
+function runTask(sim: KQSim, task: any, label: string) {
   const cmd = resolvePlaceholder(task.solution, sim);
   const norm = cmd.trim().replace(/\s+/g, " ");
   const result = sim.exec(cmd);
-  assert.ok(task.accept.some(re => re.test(norm)), label + ": Lösung matcht Regex nicht: " + norm);
+  assert.ok(task.accept.some((re: RegExp) => re.test(norm)), label + ": Lösung matcht Regex nicht: " + norm);
   assert.ok(!result.error, label + ": Simulator-Fehler: " + result.output);
   assert.ok(!task.check || task.check(sim), label + ": check() nicht erfüllt");
 }

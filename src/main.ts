@@ -8,7 +8,8 @@ import { KQContent } from "./content";
 import { KQScenes } from "./scenes";
 import { SFX } from "./sfx";
 
-  const $ = id => document.getElementById(id);
+  // Wie in ui.ts: die DOM-Knoten liegen fest in index.html, darum nicht-nullbar.
+  const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
   // Tasten-Zustand für die Szene (window-Listener statt Phaser-Keyboard,
   // damit Eingabefelder in Overlays normal funktionieren)

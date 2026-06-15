@@ -11,7 +11,7 @@ export const SFX = {
     }
     return this.ctx;
   },
-  tone(freq, dur, type?, vol?, delay?) {
+  tone(freq: number, dur: number, type?: OscillatorType, vol?: number, delay?: number) {
     const ctx = this.ensure();
     if (!ctx) return;
     const t0 = ctx.currentTime + (delay || 0);

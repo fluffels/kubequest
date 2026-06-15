@@ -7,13 +7,20 @@ import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
 
-  const $ = id => document.getElementById(id);
+  // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
+  // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
+  const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
-  function esc(s) {
+  // NPC-/Smalltalk-Tabellen werden per NPC-Id (Laufzeit-String) nachgeschlagen –
+  // als String-indizierbare Maps typisiert, statt jeden Zugriff einzeln zu casten.
+  const NPCS = KQContent.NPCS as Record<string, { name: string; title: string; sprite: number; tex?: string }>;
+  const SMALLTALK = KQContent.SMALLTALK as Record<string, string[]>;
+
+  function esc(s: unknown) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  function shuffled(arr) {
+  function shuffled<T>(arr: T[]): T[] {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -24,41 +31,42 @@ import { SFX } from "./sfx";
 
   // Spritesheet-Bilder für Porträts (unabhängig von Phaser, geht auch per file://)
   const sheetImgs: Record<string, HTMLImageElement> = {};
+  const assets = KQAssets as Record<string, string>;
   for (const key of ["town", "dungeon"]) {
     const img = new Image();
-    img.src = KQAssets[key];
+    img.src = assets[key];
     sheetImgs[key] = img;
   }
   // PixelLab-NPC-Figuren fürs Dialog-Porträt vorladen (Kopf/Schulter-Ausschnitt)
   for (const npc of Object.values(KQContent.NPCS) as any[]) {
-    if (npc.tex && KQAssets[npc.tex] && !sheetImgs[npc.tex]) {
+    if (npc.tex && assets[npc.tex] && !sheetImgs[npc.tex]) {
       const img = new Image();
-      img.src = KQAssets[npc.tex];
+      img.src = assets[npc.tex];
       sheetImgs[npc.tex] = img;
     }
   }
   // PixelLab-Shop-Grafiken (Haustiere) fürs Shop-Icon vorladen
   for (const item of KQContent.SHOP as any[]) {
-    if (item.tex && KQAssets[item.tex] && !sheetImgs[item.tex]) {
+    if (item.tex && assets[item.tex] && !sheetImgs[item.tex]) {
       const img = new Image();
-      img.src = KQAssets[item.tex];
+      img.src = assets[item.tex];
       sheetImgs[item.tex] = img;
     }
   }
 
   export const UI = {
-    dialogue: null,
-    termLog: [],
-    review: null,
-    practice: null,   // { npcId, drills, idx, task }
-    _drillTask: null, // aktuelle generierte Drill-Aufgabe des Quest-Schritts
-    stack: null,      // Stapel-Minispiel
+    dialogue: null as any,
+    termLog: [] as any[],
+    review: null as any,
+    practice: null as any,   // { npcId, drills, idx, task }
+    _drillTask: null as any, // aktuelle generierte Drill-Aufgabe des Quest-Schritts
+    stack: null as any,      // Stapel-Minispiel
     failCount: 0,
     choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
     choiceSel: 0,
 
-    drawPortrait(canvas, idx) {
-      const ctx = canvas.getContext("2d");
+    drawPortrait(canvas: HTMLCanvasElement, idx: number) {
+      const ctx = canvas.getContext("2d")!;
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const img = sheetImgs.dungeon;
@@ -68,10 +76,10 @@ import { SFX } from "./sfx";
     },
 
     // Ganzes PixelLab-Bild (z.B. Haustier) zentriert in ein Icon-Canvas zeichnen (contain).
-    drawTexIcon(canvas, texKey) {
+    drawTexIcon(canvas: HTMLCanvasElement, texKey: string) {
       const img = sheetImgs[texKey];
       if (!img) return;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d")!;
       ctx.imageSmoothingEnabled = false;
       const draw = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -85,10 +93,10 @@ import { SFX } from "./sfx";
 
     // NPC-Porträt aus der PixelLab-Figur (Kopf/Schulter-Ausschnitt der 48x48-Textur),
     // mit Fallback aufs alte Kenney-Icon, falls die Figur (noch) keine tex hat.
-    drawNpcPortrait(canvas, npc) {
+    drawNpcPortrait(canvas: HTMLCanvasElement, npc: any) {
       const img = npc && npc.tex ? sheetImgs[npc.tex] : null;
       if (!img) { this.drawPortrait(canvas, npc.sprite); return; }
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d")!;
       ctx.imageSmoothingEnabled = false;
       const draw = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -148,12 +156,12 @@ import { SFX } from "./sfx";
       if (Game.isFunkStep(step)) {
         el.innerHTML = "📜 <b>" + q.title + "</b> – 📻 Funkgerät öffnen (<b>T</b>)!";
       } else {
-        const npc = KQContent.NPCS[step.npc];
+        const npc = NPCS[step.npc];
         el.innerHTML = "📜 <b>" + q.title + "</b> – Sprich mit <b>" + npc.name + "</b> (" + npc.title + ")";
       }
     },
 
-    toast(msg, cls?) {
+    toast(msg: string, cls?: string) {
       const t = document.createElement("div");
       t.className = "toast" + (cls ? " " + cls : "");
       t.innerHTML = msg;
@@ -161,7 +169,7 @@ import { SFX } from "./sfx";
       setTimeout(() => t.remove(), 4200);
     },
 
-    reward(xp, coins, label?) {
+    reward(xp: number, coins: number, label?: string) {
       const rankUp = Game.addXp(xp);
       const realCoins = coins > 0 ? Game.addCoins(coins) : 0;
       let msg = "+" + xp + " XP";
@@ -178,12 +186,12 @@ import { SFX } from "./sfx";
       this.refreshHud();
     },
 
-    showAlarm(html, seconds) {
+    showAlarm(html: string, seconds: number) {
       $("alarm").classList.remove("hidden");
       $("alarm-text").innerHTML = html;
       $("alarm-timer").textContent = seconds + "s";
     },
-    updateAlarmTimer(seconds) {
+    updateAlarmTimer(seconds: number) {
       $("alarm-timer").textContent = seconds + "s";
     },
     hideAlarm() {
@@ -191,7 +199,7 @@ import { SFX } from "./sfx";
     },
 
     /* ========== Interaktion ========== */
-    questMarkerFor(npcId) {
+    questMarkerFor(npcId: string) {
       const step = Game.currentStep();
       return !!(step && (step.type === "dialog" || step.type === "choice") && step.npc === npcId);
     },
@@ -201,7 +209,7 @@ import { SFX } from "./sfx";
       if (this.blocking() || !window.WorldScene) { p.classList.add("hidden"); return; }
       const near = window.WorldScene.nearestNpc();
       if (!near) { p.classList.add("hidden"); return; }
-      const meta = KQContent.NPCS[near.id];
+      const meta = NPCS[near.id];
       let label = "💬 Mit " + meta.name + " reden";
       if (near.id === "pelle") label = "🛒 Bei Pelle einkaufen";
       if (near.id === "kralle") label = "🦀 Quizrunde mit Kralle";
@@ -225,29 +233,29 @@ import { SFX } from "./sfx";
     },
 
     /** Menü: Plaudern / Üben / Stapel-Spiel */
-    showNpcMenu(npcId) {
+    showNpcMenu(npcId: string) {
       const drills = Game.practiceDrillsFor(npcId);
       const stackOk = npcId === "bo" && Game.state.completedQuests.includes("q2");
       if (drills.length === 0 && !stackOk) {
-        const lines = KQContent.SMALLTALK[npcId] || ["…"];
+        const lines = SMALLTALK[npcId] || ["…"];
         return this.showDialogue(npcId, [lines[Math.floor(Math.random() * lines.length)]]);
       }
-      const npc = KQContent.NPCS[npcId];
+      const npc = NPCS[npcId];
       this.dialogue = { npcId, lines: [], idx: 0, choice: { menu: true }, onDone: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
+      this.drawNpcPortrait($("dlg-portrait-canvas") as HTMLCanvasElement, npc);
       $("dlg-text").innerHTML = "Was kann ich für dich tun?";
       $("dlg-next").classList.add("hidden");
       const box = $("dlg-choices");
       box.innerHTML = "";
-      const addBtn = (label, fn) => {
+      const addBtn = (label: string, fn: () => void) => {
         const b = document.createElement("button");
         b.innerHTML = label;
         b.onclick = fn;
         box.appendChild(b);
       };
       addBtn("💬 Plaudern", () => {
-        const lines = KQContent.SMALLTALK[npcId] || ["…"];
+        const lines = SMALLTALK[npcId] || ["…"];
         this.closeDialogue();
         this.showDialogue(npcId, [lines[Math.floor(Math.random() * lines.length)]]);
       });
@@ -272,12 +280,12 @@ import { SFX } from "./sfx";
     },
     _highlightChoice() {
       if (!this.choiceBtns) return;
-      this.choiceBtns.forEach((b, i) => b.classList.toggle("sel", i === this.choiceSel));
+      this.choiceBtns.forEach((b: HTMLButtonElement, i: number) => b.classList.toggle("sel", i === this.choiceSel));
     },
     hasChoices() {
       return !!(this.choiceBtns && this.choiceBtns.length && !this.choiceBtns[0].disabled);
     },
-    dlgMoveSel(delta) {
+    dlgMoveSel(delta: number) {
       if (!this.hasChoices()) return;
       const n = this.choiceBtns.length;
       this.choiceSel = (this.choiceSel + delta + n) % n;
@@ -289,7 +297,7 @@ import { SFX } from "./sfx";
       if (btn) { btn.click(); return true; }
       return false;
     },
-    dlgPickNumber(n) {
+    dlgPickNumber(n: number) {
       if (!this.hasChoices()) return;
       const btn = this.choiceBtns[n - 1];
       if (btn) { this.choiceSel = n - 1; this._highlightChoice(); btn.click(); }
@@ -334,11 +342,11 @@ import { SFX } from "./sfx";
     },
 
     /* ========== Dialog ========== */
-    showDialogue(npcId, lines, onDone?) {
-      const npc = KQContent.NPCS[npcId];
+    showDialogue(npcId: string, lines: string[], onDone?: () => void) {
+      const npc = NPCS[npcId];
       this.dialogue = { npcId, lines, idx: 0, onDone, choice: null };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
+      this.drawNpcPortrait($("dlg-portrait-canvas") as HTMLCanvasElement, npc);
       $("dlg-choices").innerHTML = "";
       $("dialogue").classList.remove("hidden");
       this.renderDialogueLine();
@@ -363,17 +371,17 @@ import { SFX } from "./sfx";
       }
     },
 
-    showChoice(step, onDone) {
-      const npc = KQContent.NPCS[step.npc];
+    showChoice(step: any, onDone: () => void) {
+      const npc = NPCS[step.npc];
       this.dialogue = { npcId: step.npc, lines: [], idx: 0, onDone, choice: step };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
-      this.drawNpcPortrait($("dlg-portrait-canvas"), npc);
+      this.drawNpcPortrait($("dlg-portrait-canvas") as HTMLCanvasElement, npc);
       $("dlg-text").innerHTML = "🤔 " + step.q;
       $("dlg-next").textContent = "↑/↓ wählen · Enter bestätigen";
       $("dlg-next").classList.remove("hidden");
       const box = $("dlg-choices");
       box.innerHTML = "";
-      for (const opt of shuffled(step.options)) {
+      for (const opt of shuffled<any>(step.options)) {
         const btn = document.createElement("button");
         btn.innerHTML = opt.t;
         btn.onclick = () => this.answerChoice(step, opt, btn);
@@ -383,7 +391,7 @@ import { SFX } from "./sfx";
       this._initChoiceNav();
     },
 
-    answerChoice(step, opt, btn) {
+    answerChoice(step: any, opt: any, btn: HTMLButtonElement) {
       const d = this.dialogue;
       if (!d || d.answered) return;
       d.answered = true;
@@ -419,7 +427,7 @@ import { SFX } from "./sfx";
     funkSession() {
       if (this.practice && this.practice.idx < this.practice.drills.length) return { kind: "practice" };
       const step = Game.currentStep();
-      if (Game.isFunkStep(step)) return { kind: "quest", step };
+      if (step && Game.isFunkStep(step)) return { kind: "quest", step };
       return { kind: "free" };
     },
 
@@ -432,7 +440,7 @@ import { SFX } from "./sfx";
         return p.task;
       }
       if (s.kind === "quest") {
-        const step = s.step;
+        const step = s.step!;
         if (step.type === "drill") {
           if ((Game.state.taskIdx || 0) >= step.count) return null;
           if (!this._drillTask) this._drillTask = KQContent.DRILLS[step.pool[Math.floor(Math.random() * step.pool.length)]](Game.sim);
@@ -465,12 +473,12 @@ import { SFX } from "./sfx";
 
       if (s.kind === "practice") {
         const p = this.practice;
-        const npc = KQContent.NPCS[p.npcId];
+        const npc = NPCS[p.npcId];
         html += `<div class="tt-head">🏋️ Üben bei ${npc.name} (${Math.min(p.idx + 1, p.drills.length)}/${p.drills.length})</div>`;
         if (task) html += `<div class="tt-item current">▶️ ${task.text}</div>`;
         html += `<div id="tt-feedback"></div>`;
       } else {
-        const step = s.step;
+        const step = s.step!;
         const q = Game.currentQuest();
         html += `<div class="tt-head">📜 ${q.title}: ${step.brief}</div>`;
         if (step.type === "teach") {
@@ -482,7 +490,7 @@ import { SFX } from "./sfx";
           if (task) html += `<div class="tt-item current">▶️ ${task.text}</div>`;
         } else {
           const taskIdx = Game.state.taskIdx || 0;
-          step.tasks.forEach((t, i) => {
+          step.tasks.forEach((t: any, i: number) => {
             const cls = i < taskIdx ? "done" : i === taskIdx ? "current" : "";
             const mark = i < taskIdx ? "✅" : i === taskIdx ? "▶️" : "·";
             html += `<div class="tt-item ${cls}">${mark} ${i <= taskIdx ? t.text : "???"}</div>`;
@@ -506,7 +514,7 @@ import { SFX } from "./sfx";
       out.scrollTop = out.scrollHeight;
     },
 
-    termSubmit(line) {
+    termSubmit(line: string) {
       if (!line.trim()) return;
       const result = Game.sim.exec(line);
       if (result.clear) { this.termLog = []; this.termRedraw(); return; }
@@ -523,7 +531,7 @@ import { SFX } from "./sfx";
       const task = this.currentTask();
       if (!task) return;
       const norm = line.trim().replace(/\s+/g, " ");
-      const cmdOk = task.accept.some(re => re.test(norm));
+      const cmdOk = task.accept.some((re: RegExp) => re.test(norm));
       const checkOk = !task.check || task.check(Game.sim);
 
       if (cmdOk && !result.error && checkOk) {
@@ -559,7 +567,7 @@ import { SFX } from "./sfx";
       }
 
       // Quest-Schritt
-      const step = s.step;
+      const step = s.step!;
       this.reward(12, 7);
       if (step.type === "drill") {
         this._drillTask = null;
@@ -597,7 +605,7 @@ import { SFX } from "./sfx";
       const fb = $("tt-feedback");
       if (fb) {
         if (next && !Game.isFunkStep(next) && next.npc) {
-          const npc = KQContent.NPCS[next.npc];
+          const npc = NPCS[next.npc];
           fb.innerHTML = `<div class="tt-feedback">🎉 Geschafft! <b>${npc.name}</b> will dich sprechen. (Esc schließt das Funkgerät)</div>`;
         } else if (next && Game.isFunkStep(next)) {
           fb.innerHTML = `<div class="tt-feedback">🎉 Weiter geht's direkt hier ⤴</div>`;
@@ -632,9 +640,9 @@ import { SFX } from "./sfx";
     },
 
     /* ========== Üben ========== */
-    startPractice(npcId) {
+    startPractice(npcId: string) {
       const available = Game.practiceDrillsFor(npcId);
-      const drills = [];
+      const drills: string[] = [];
       for (let i = 0; i < 3; i++) drills.push(available[Math.floor(Math.random() * available.length)]);
       this.practice = { npcId, drills, idx: 0, task: null };
       this.toggleTerminal();
@@ -682,7 +690,7 @@ import { SFX } from "./sfx";
       }
     },
 
-    placeLayer(layer, btn) {
+    placeLayer(layer: string, btn: HTMLButtonElement) {
       const st = this.stack;
       if (!st) return;
       if (layer === st.target[st.placed]) {
@@ -745,7 +753,7 @@ import { SFX } from "./sfx";
       const step = Game.currentStep();
       if (!step) return "";
       if (Game.isFunkStep(step)) return "📻 Öffne dein Funkgerät (T) und erledige die Aufgaben.";
-      const npc = KQContent.NPCS[step.npc];
+      const npc = NPCS[step.npc];
       return "💬 Sprich mit <b>" + npc.name + "</b> (" + npc.title + ").";
     },
 
@@ -757,7 +765,7 @@ import { SFX } from "./sfx";
       let html = `<p class="dim">„Willkommen! Frische Ware, faire Preise!“ – Du hast <b>${s.coins} 🪙</b>.
         Dein 🔥 Streak (${s.streak.count}) gibt bis zu +50% auf Belohnungen, dein Hafen verdient +${Math.round(Game.incomeRate() * 10) / 10}/min.</p>
         <div class="shop-grid">`;
-      for (const item of KQContent.SHOP) {
+      for (const item of KQContent.SHOP as any[]) {
         const ownedCount = s.inventory[item.id] || 0;
         const ownedPerm = s.owned.includes(item.id);
         let action;
@@ -791,14 +799,16 @@ import { SFX } from "./sfx";
       html += "</div>";
       $("shop-body").innerHTML = html;
       document.querySelectorAll("#shop-body canvas[data-sprite]").forEach(cv => {
-        this.drawPortrait(cv, parseInt((cv as HTMLElement).dataset.sprite, 10));
+        const c = cv as HTMLCanvasElement;
+        this.drawPortrait(c, parseInt(c.dataset.sprite!, 10));
       });
       document.querySelectorAll("#shop-body canvas[data-tex]").forEach(cv => {
-        this.drawTexIcon(cv, (cv as HTMLElement).dataset.tex);
+        const c = cv as HTMLCanvasElement;
+        this.drawTexIcon(c, c.dataset.tex!);
       });
     },
 
-    buyItem(itemId) {
+    buyItem(itemId: string) {
       const result = Game.buy(itemId);
       this.toast(result.ok ? "🛒 " + result.msg : "⚠️ " + result.msg);
       if (result.ok && window.SFX) SFX.coin();
@@ -806,8 +816,9 @@ import { SFX } from "./sfx";
       this.openShop();
     },
 
-    toggleItem(itemId, on) {
+    toggleItem(itemId: string, on: boolean) {
       const item = KQContent.SHOP.find(s => s.id === itemId);
+      if (!item) return;
       if (item.type === "pet") Game.state.activePet = on ? itemId : null;
       if (item.type === "flag") Game.state.activeFlag = on ? itemId : null;
       Game.save();
@@ -833,7 +844,7 @@ import { SFX } from "./sfx";
       this.renderReviewItem();
     },
 
-    renderReviewItem() {
+    renderReviewItem(): void {
       const r = this.review;
       if (r.idx >= r.ids.length) {
         Game.state.stats.reviews++;
@@ -854,14 +865,14 @@ import { SFX } from "./sfx";
 
       let body;
       if (content.kind === "quiz") {
-        const q = content.q;
-        r.current.order = shuffled(q.options.map((_, i) => i));
+        const q = content.q!;
+        r.current.order = shuffled(q.options.map((_: unknown, i: number) => i));
         body = `<div class="quiz-q">${q.q}</div>
           <div class="quiz-options" id="quiz-options">
-            ${r.current.order.map(oi => `<button data-oi="${oi}" onclick="UI.answerReviewQuiz(${oi})">${esc(q.options[oi])}</button>`).join("")}
+            ${r.current.order.map((oi: number) => `<button data-oi="${oi}" onclick="UI.answerReviewQuiz(${oi})">${esc(q.options[oi])}</button>`).join("")}
           </div><div id="review-explain"></div>`;
       } else {
-        const card = content.card;
+        const card = content.card!;
         body = `<div class="quiz-q">⌨️ ${card.q}</div>
           <div class="review-cmd-row"><span class="term-prompt">crew@hafen:~$</span>
             <input type="text" id="review-input" autocomplete="off" spellcheck="false"
@@ -873,14 +884,14 @@ import { SFX } from "./sfx";
       if (inp) inp.focus();
     },
 
-    answerReviewQuiz(optionIndex) {
+    answerReviewQuiz(optionIndex: number) {
       const r = this.review;
       if (!r || r.current.answered) return;
       r.current.answered = true;
       const q = r.current.content.q;
       const correct = optionIndex === q.correct;
       document.querySelectorAll("#quiz-options button").forEach(btn => {
-        const oi = parseInt((btn as HTMLElement).dataset.oi, 10);
+        const oi = parseInt((btn as HTMLElement).dataset.oi!, 10);
         (btn as HTMLButtonElement).disabled = true;
         if (oi === q.correct) btn.classList.add("correct");
         else if (oi === optionIndex) btn.classList.add("wrong");
@@ -888,7 +899,7 @@ import { SFX } from "./sfx";
       this.finishReviewItem(correct, q.explain);
     },
 
-    answerReviewCmd(ev) {
+    answerReviewCmd(ev: any) {
       if (ev.key !== "Enter") return;
       const r = this.review;
       if (!r || r.current.answered) return;
@@ -897,11 +908,11 @@ import { SFX } from "./sfx";
       r.current.answered = true;
       ev.target.disabled = true;
       const card = r.current.content.card;
-      const correct = card.accept.some(re => re.test(line));
+      const correct = card.accept.some((re: RegExp) => re.test(line));
       this.finishReviewItem(correct, "Die Lösung: <code>" + esc(card.solution) + "</code>");
     },
 
-    finishReviewItem(correct, explainHtml) {
+    finishReviewItem(correct: boolean, explainHtml: string) {
       const r = this.review;
       Game.reviewResult(r.current.itemId, correct);
       if (correct) { r.right++; this.reward(4, 3); }
@@ -919,6 +930,7 @@ import { SFX } from "./sfx";
     /* ========== Spielstand-Datei ========== */
     exportSave() {
       const data = Game.exportData();
+      if (data == null) { this.toast("⚠️ Kein Spielstand zum Sichern gefunden."); return; }
       const blob = new Blob([data], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -928,7 +940,7 @@ import { SFX } from "./sfx";
       this.toast("💾 Spielstand als Datei gesichert!");
     },
 
-    importSave(ev) {
+    importSave(ev: any) {
       const file = ev.target.files[0];
       ev.target.value = "";
       if (!file) return;

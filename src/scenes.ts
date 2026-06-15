@@ -27,13 +27,13 @@ import { SFX } from "./sfx";
   // PixelLab Wang-Tileset (Wasser->Sand): Eck-Code (NW,NE,SW,SE; Bit=1 => Land/oben) -> Frame im 4x4-Sheet "coast"
   const WANG = [6, 7, 10, 9, 2, 11, 4, 15, 5, 14, 1, 8, 3, 0, 13, 12];
 
-  function hashHue(str) {
+  function hashHue(str: string) {
     let h = 0;
     for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
     return h;
   }
-  function hueColor(h) { return Phaser.Display.Color.HSLToColor(h / 360, 0.7, 0.55).color; }
-  function hueColorLight(h) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
+  function hueColor(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.7, 0.55).color; }
+  function hueColorLight(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
 
   class BootScene extends Phaser.Scene {
     [key: string]: any;
@@ -151,26 +151,26 @@ import { SFX } from "./sfx";
       });
     }
 
-    set(x, y, v) { this.ground[y * this.W + x] = v; }
-    get(x, y) {
+    set(x: number, y: number, v: number) { this.ground[y * this.W + x] = v; }
+    get(x: number, y: number) {
       if (x < 0 || y < 0 || x >= this.W || y >= this.H) return -2;
       return this.ground[y * this.W + x];
     }
-    deco(x, y, sheet, idx, solid) {
+    deco(x: number, y: number, sheet: string, idx: number, solid?: boolean) {
       this.decoList.push({ x, y, sheet, idx });
       if (solid) this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
     }
-    tree(x, y) {
+    tree(x: number, y: number) {
       const kind = ((x * 7 + y * 13) % 3 === 0) ? "pine" : "tree";   // gemischter Wald: meist Laubbaum, dazwischen Tanne
       this.decoList.push({ x, y, sheet: kind, obj: true, scale: kind === "pine" ? 0.95 : 1.1 }); // ~3 Kacheln (Mensch = 1)
       this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
     }
-    objDeco(x, y, tex, scale, solid) {
+    objDeco(x: number, y: number, tex: string, scale: number, solid?: boolean) {
       // ein PixelLab-Objekt als Deko (unten verankert, Tiefe nach y), optional solide
       this.decoList.push({ x, y, sheet: tex, obj: true, scale });
       if (solid) this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
     }
-    path(x0, y0, x1, y1) {
+    path(x0: number, y0: number, x1: number, y1: number) {
       let x = x0, y = y0;
       const sx = Math.sign(x1 - x0), sy = Math.sign(y1 - y0);
       while (x !== x1) { this.set(x, y, DIRT); x += sx; }
@@ -180,14 +180,14 @@ import { SFX } from "./sfx";
     /** PixelLab-Gebäude: ein ganzes Haus als Bild über der w×3-Kachel-Grundfläche.
      *  Kollision = die Grundfläche solide (wie früher); das hohe Dach ragt sichtbar
      *  nach oben (begehbar dahinter, Tiefe nach Fußlinie → korrektes Vorne/Hinten). */
-    building(x, y, w, tex, scale) {
+    building(x: number, y: number, w: number, tex: string, scale: number) {
       for (let i = 0; i < w; i++) for (let r = 0; r < 3; r++) this.solidGrid[(y + r) * this.W + (x + i)] = 1;
       const cx = (x + w / 2) * T, baseY = (y + 3) * T;
       this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY);
     }
 
     /** Wo trifft Land auf Wasser? Kai & Schiffsbereich gerade, sonst geschwungener Strand. */
-    coastY(x) {
+    coastY(x: number) {
       if (x >= 3 && x <= 24) return 27;   // Hafenkai: gemauerte, gerade Kante
       if (x >= 30 && x <= 38) return 27;  // Wasser rund ums Schiff
       let c = 26 + Math.round(Math.sin(x * 0.9) * 1.2 + Math.sin(x * 0.31) * 0.9);
@@ -355,7 +355,7 @@ import { SFX } from "./sfx";
 
     /** Festes Orts-Schild: eingravierte Schrift auf einem PixelLab-Holzbrett,
      *  per 9-Slice auf jede Textlänge gedehnt (Rahmen bleibt fix, Mitte streckt). */
-    makeSign(x, y, text) {
+    makeSign(x: number, y: number, text: string) {
       const txt = this.add.text(0, 0, text, {
         fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px",
         color: "#3a2410", resolution: 10,
@@ -369,7 +369,7 @@ import { SFX } from "./sfx";
 
     /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
      *  / gelb Warnung). Startet unsichtbar – wird per Nähe-Aufdeckung eingeblendet. */
-    makeTechTag(x, y, text, statusColor) {
+    makeTechTag(x: number, y: number, text: string, statusColor: number) {
       const txt = this.add.text(0, 0, text, {
         fontFamily: "Consolas, 'Courier New', monospace", fontSize: "5px", color: "#e3edf8",
         backgroundColor: "rgba(10,16,28,0.82)", padding: { left: 8, right: 4, top: 1, bottom: 1 }, resolution: 10,
@@ -380,7 +380,7 @@ import { SFX } from "./sfx";
     }
 
     /** Weicher Schatten unter einer Figur. */
-    addShadow(x, y, w?) {
+    addShadow(x: number, y: number, w?: number) {
       return this.add.ellipse(x, y, w || 10, 4, 0x000000, 0.26).setDepth(1.6);
     }
 
@@ -508,7 +508,7 @@ import { SFX } from "./sfx";
       for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) tfRt.drawFrame("dungeon", WOOD[(x + y) % 3], x * T, y * T);
       tfRt.fill(FOAM, 0.7, 0, 0, p.w * T, 2);
       this.tfGroup.add(tfRt);
-      const mkSign = (tx, ty, txt) => this.makeSign(tx, ty, txt);
+      const mkSign = (tx: number, ty: number, txt: string) => this.makeSign(tx, ty, txt);
       this.tfGroup.add(this.add.image((p.x + 1) * T + 8, (p.y + 1) * T + 8, "crate").setScale(0.6));
       this.tfGroup.add(this.add.image((p.x + 4) * T + 8, (p.y + 2) * T + 8, "crate").setScale(0.6));
       this.tfGroup.add(mkSign((p.x + 1.5) * T, (p.y + 0.9) * T, "worker-3"));
@@ -537,7 +537,7 @@ import { SFX } from "./sfx";
         { id: "juno", x: 45.8, y: 24.2 },
       ];
       this.npcs = defs.map(d => {
-        const meta = KQContent.NPCS[d.id];
+        const meta = KQContent.NPCS[d.id as keyof typeof KQContent.NPCS];
         this.addShadow(d.x * T + 8, d.y * T + 15);
         const baseY = meta.tex ? d.y * T + 15 : d.y * T + 8;   // tex-Figur an den Schatten (d.y*T+15) verankern, Füße = Schatten
         const spr = meta.tex
@@ -569,7 +569,7 @@ import { SFX } from "./sfx";
     get player() { return this.playerPos; }
 
     /* ============ Kollision & Bewegung ============ */
-    isSolidAt(px, py) {
+    isSolidAt(px: number, py: number) {
       const tx = Math.floor(px / T), ty = Math.floor(py / T);
       if (tx < 0 || ty < 0 || tx >= this.W || ty >= this.H) return true;
       const p = this.tfPlatform;
@@ -579,9 +579,9 @@ import { SFX } from "./sfx";
       return !!this.solidGrid[ty * this.W + tx];
     }
 
-    tryMove(dx, dy) {
+    tryMove(dx: number, dy: number) {
       const pl = this.playerPos;
-      const probe = (nx, ny) =>
+      const probe = (nx: number, ny: number) =>
         this.isSolidAt(nx - 5, ny - 2) || this.isSolidAt(nx + 5, ny - 2) ||
         this.isSolidAt(nx - 5, ny + 5) || this.isSolidAt(nx + 5, ny + 5);
       if (!probe(pl.x + dx, pl.y)) pl.x += dx;
@@ -599,20 +599,20 @@ import { SFX } from "./sfx";
     }
 
     /* ============ Effekte (von der UI aufrufbar) ============ */
-    burstAt(x, y, kind) {
+    burstAt(x: number, y: number, kind: string) {
       const e = kind === "splash" ? this.splash : kind === "dust" ? this.dust : this.sparkle;
       e.explode(kind === "splash" ? 14 : 10, x, y);
     }
-    burstAtPlayer(kind) { this.burstAt(this.playerPos.x, this.playerPos.y - 8, kind); }
+    burstAtPlayer(kind: string) { this.burstAt(this.playerPos.x, this.playerPos.y - 8, kind); }
 
-    floatText(x, y, str, color) {
+    floatText(x: number, y: number, str: string, color?: string) {
       const t = this.add.text(x, y, str, { fontFamily: "Consolas", fontSize: "6px", color: color || "#ffd97a", resolution: 8 })
         .setOrigin(0.5).setDepth(10001).setShadow(0.5, 0.5, "#000", 1);
       this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: 1400, ease: "Sine.out", onComplete: () => t.destroy() });
     }
 
     /* ============ Cluster → Welt ============ */
-    podSlotPos(slot) {
+    podSlotPos(slot: number) {
       const pier = this.piers[Math.floor(slot / 12)];
       const i = slot % 12;
       const col = i % 2 === 0 ? 0 : 2;
@@ -628,7 +628,7 @@ import { SFX } from "./sfx";
 
       for (const p of pods) {
         if (!this.podSlots[p.name]) {
-          let slot = this.slotUsed.findIndex(u => !u);
+          let slot = this.slotUsed.findIndex((u: boolean) => !u);
           if (slot === -1) slot = 0;
           this.slotUsed[slot] = true;
           const pos = this.podSlotPos(slot);
@@ -654,7 +654,7 @@ import { SFX } from "./sfx";
       }
 
       // Kaputte Deployments: Kisten rot einfärben
-      const brokenMap = {};
+      const brokenMap: Record<string, boolean> = {};
       for (const d of Game.sim.deployments) brokenMap[d.name] = !!d.broken;
       for (const info of Object.values(this.podSlots) as any[]) {
         info.crate.setTint(brokenMap[info.dep] ? 0xff8d8d : 0xffffff);
@@ -673,7 +673,7 @@ import { SFX } from "./sfx";
       // Terraform-Plateau & Bojen
       const applied = Game.sim.tf.applied;
       this.tfGroup.setVisible(applied);
-      this.tfBuoys.forEach(b => b.setVisible(Game.sim.tf.initialized && !applied));
+      this.tfBuoys.forEach((b: Phaser.GameObjects.Image) => b.setVisible(Game.sim.tf.initialized && !applied));
       this.cannon.setVisible(Game.hasUpgrade("kanone"));
     }
 
@@ -682,14 +682,14 @@ import { SFX } from "./sfx";
       this.dynLabels = [];
       // Digitales Cluster-Tag bauen + für die Nähe-Aufdeckung registrieren.
       // (lx,ly) = Tag-Position, (ax,ay) = Bezugspunkt des Objekts (Distanz zur Figur).
-      const mkTag = (lx, ly, str, status, ax, ay) => {
+      const mkTag = (lx: number, ly: number, str: string, status: number, ax: number, ay: number) => {
         const tag = this.makeTechTag(lx, ly, str, status);
         this.dynGroup.add(tag);
         this.dynLabels.push({ obj: tag, x: ax, y: ay });
       };
 
       // Deployment-Tags über der ersten Kiste (kaputte rot mit Status!)
-      const seen = {};
+      const seen: Record<string, boolean> = {};
       for (const d of Game.sim.deployments) {
         const first = d.pods[0] && this.podSlots[d.pods[0].name];
         if (first && !seen[d.name]) {
@@ -742,7 +742,7 @@ import { SFX } from "./sfx";
     }
 
     /* ============ Events: Piraten & Krake ============ */
-    scheduleEvents(delaySec?) {
+    scheduleEvents(delaySec?: number) {
       const now = this.time.now / 1000;
       this.events.nextPirate = now + (delaySec || Phaser.Math.Between(200, 360));
       this.events.nextKraken = now + (delaySec ? delaySec + 90 : Phaser.Math.Between(300, 500));
@@ -788,7 +788,7 @@ import { SFX } from "./sfx";
       UI.showAlarm("⛈️ <b>STURMSCHADEN!</b> Das Deployment <b>" + dep.name + "</b> ist ausgefallen – und verdient nichts mehr! " + hintCmd, deadline);
     }
 
-    resolveStorm(success) {
+    resolveStorm(success: boolean) {
       const ev = this.events.storm;
       if (!ev) return;
       this.events.storm = null;
@@ -838,7 +838,7 @@ import { SFX } from "./sfx";
         "Skaliere zurück auf <b>" + want + "</b>: <code>kubectl scale deployment " + dep.name + " --replicas=" + want + "</code>", deadline);
     }
 
-    resolvePirate(success) {
+    resolvePirate(success: boolean) {
       const ev = this.events.pirate;
       if (!ev) return;
       this.tweens.add({ targets: ev.boat, x: this.W * T + 40, duration: 1800, ease: "Sine.in", onComplete: () => ev.boat.destroy() });
@@ -880,7 +880,7 @@ import { SFX } from "./sfx";
         "<code>kubectl create secret generic &lt;name&gt; --from-literal=passwort=&lt;wert&gt;</code>", deadline);
     }
 
-    resolveKraken(success) {
+    resolveKraken(success: boolean) {
       const ev = this.events.kraken;
       if (!ev) return;
       this.tweens.add({ targets: ev.kraken, y: "+=40", alpha: 0, duration: 700, ease: "Sine.in", onComplete: () => ev.kraken.destroy() });
@@ -900,7 +900,7 @@ import { SFX } from "./sfx";
     }
 
     /* ============ Update-Schleife ============ */
-    update(time, delta) {
+    update(time: number, delta: number) {
       const dt = Math.min(0.05, delta / 1000);
       const pl = this.playerPos;
       const keys = window.KQKeys || {};
@@ -930,8 +930,8 @@ import { SFX } from "./sfx";
       this.playerShadow.setPosition(pl.x, pl.y + 6);
 
       // Haustier
-      if (Game.state.activePet) {
-        const item = KQContent.SHOP.find(s => s.id === Game.state.activePet);
+      const item = Game.state.activePet ? KQContent.SHOP.find(s => s.id === Game.state.activePet) : undefined;
+      if (item) {
         const pos = this.petTrail[Math.max(0, this.petTrail.length - 16)] || pl;
         this.petSprite.setVisible(true).setTexture(item.tex).setScale(0.4)
           .setPosition(pos.x, pos.y - 2 + Math.sin(time / 180) * 1.5)

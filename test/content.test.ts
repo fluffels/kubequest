@@ -25,13 +25,13 @@ test("Befehls-Karten: Lösung matcht die eigene accept-Regex", () => {
 
 test("Quests: NPCs existieren, Choices haben genau richtige Antworten, reviewIds gültig", () => {
   for (const quest of KQContent.QUESTS) {
-    assert.ok(KQContent.NPCS[quest.giver], quest.id + ": unbekannter Questgeber");
+    assert.ok(KQContent.NPCS[quest.giver as keyof typeof KQContent.NPCS], quest.id + ": unbekannter Questgeber");
     for (const step of quest.steps) {
       if (step.type === "dialog" || step.type === "choice") {
-        assert.ok(KQContent.NPCS[step.npc], quest.id + ": unbekannter NPC " + step.npc);
+        assert.ok(KQContent.NPCS[step.npc as keyof typeof KQContent.NPCS], quest.id + ": unbekannter NPC " + step.npc);
       }
       if (step.type === "choice") {
-        assert.equal(step.options.filter(o => o.ok).length, 1, quest.id + ": Choice braucht genau eine richtige Antwort");
+        assert.equal(step.options.filter((o: any) => o.ok).length, 1, quest.id + ": Choice braucht genau eine richtige Antwort");
         if (step.reviewId) {
           assert.ok(KQContent.CRAB_QUIZ.some(q => q.id === step.reviewId), quest.id + ": unbekannte reviewId " + step.reviewId);
         }
@@ -48,7 +48,7 @@ test("Quests: NPCs existieren, Choices haben genau richtige Antworten, reviewIds
 
 test("Übungs-Pools: verweisen auf existierende Drills und Quests", () => {
   for (const [npcId, pool] of Object.entries(KQContent.PRACTICE)) {
-    assert.ok(KQContent.NPCS[npcId], "unbekannter NPC: " + npcId);
+    assert.ok(KQContent.NPCS[npcId as keyof typeof KQContent.NPCS], "unbekannter NPC: " + npcId);
     for (const p of pool) {
       assert.ok(KQContent.DRILLS[p.drill], npcId + ": unbekannter Drill " + p.drill);
       assert.ok(KQContent.QUESTS.some(q => q.id === p.after), npcId + ": unbekannte Quest " + p.after);

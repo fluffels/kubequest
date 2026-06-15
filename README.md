@@ -86,7 +86,7 @@ kubequest/
 
 Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (locker, alle Dateien).
 
-**TS-Strenge (Ratchet):** `npm run typecheck:strict` hält die gehärteten Module auf voller Typ-Strenge – `types`, `store`, `content`, `sim` und `game` laufen jetzt komplett `strict` **inklusive `noImplicitAny`** (echte Parameter-/Feld-Typen statt `any`; die Cluster-Interfaces Pod/Deployment/Service … liegen in `src/sim.ts`). So können dort weder Null-/Typ- noch versteckte `any`-Fehler mehr einschleichen. Der Kreis wird Schritt für Schritt erweitert (siehe `tsconfig.strict.json`): als Nächstes `scenes`/`ui` nachziehen, bis am Ende die ganze `tsconfig.json` auf `strict` steht.
+**TS-Strenge:** Der schrittweise Strenge-Ratchet ist **abgeschlossen** – die Basis-`tsconfig.json` steht selbst auf `"strict": true` und deckt das **ganze Projekt** ab: alle `src`-Module (inkl. `scenes`, `ui`, `main`, `sfx`), die Tests und `vite.config`. Echte Parameter-/Feld-Typen statt `any`, durchgängige Null-Prüfung; die Cluster-Interfaces Pod/Deployment/Service … liegen in `src/sim.ts`. So können weder Null-/Typ- noch versteckte `any`-Fehler mehr einschleichen. `npm run typecheck` prüft das; `npm run typecheck:strict` ist nur noch ein Alias darauf (siehe `tsconfig.strict.json`).
 
 ## Lizenzen
 
