@@ -180,6 +180,14 @@ import { worldScene, interiorOpen } from "./runtime";
       this.refreshQuestHint();
     },
 
+    /** Uhrzeit + Datum im HUD setzen. Wird vom Tag-Nacht-Zyklus jeden Frame
+     *  aufgerufen, damit die Anzeige synchron zum Lichtschleier läuft. (#39) */
+    setClock(dateLabel: string, timeLabel: string, title: string) {
+      $("hud-date").textContent = dateLabel;
+      $("hud-time").textContent = timeLabel;
+      $("hud-clock").title = title;
+    },
+
     refreshQuestHint() {
       const el = $("hud-quest");
       if (Game.allQuestsDone()) {

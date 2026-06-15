@@ -13,6 +13,7 @@ import { SFX } from "./sfx";
 import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, type Door } from "./world";
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
 import { pickPlacements, strSeed, hash01 } from "./decor";
+import { gameClock } from "./clock";
 
   const T = 16;
   const COLS = 12;
@@ -522,6 +523,9 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
       // Laternen an die Schleier-Dichte koppeln: glühen, sobald es dämmert
       const lampLvl = Phaser.Math.Clamp(alpha / 0.42, 0, 1) * 0.7;
       for (const lg of this.lampGlows) lg.setAlpha(lampLvl);
+      // Uhrzeit + Datum aus derselben time/CYCLE-Quelle → garantiert synchron zum Schleier (#39)
+      const clock = gameClock(time, CYCLE);
+      UI.setClock(clock.dateLabel, clock.timeLabel, clock.title);
     }
 
     renderStatics() {
