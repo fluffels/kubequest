@@ -345,3 +345,96 @@ test("ingress: Szenario-Seeding + snapshot/restore erhalten das Tor", () => {
   assert.match(restored.exec("kubectl get ingress").output!, /tor-1/);
   assert.match(restored.exec("kubectl get ingress").output!, /tor-2/);
 });
+
+/* ===================== NetworkPolicy (Hafenmauer) – Issue #20 ===================== */
+
+// Kleiner Helfer: ein NetworkPolicy-Manifest in die Welt legen, so wie es eine Quest täte.
+function legeNetpolManifest(s: KQSim, datei = "netpol.yaml") {
+  s.files[datei] = "kind: NetworkPolicy …";
+  s.applyEffects[datei] = { networkPolicy: { name: "hafenmauer", podSelector: "lager", allowFrom: "hafentor" } };
+}
+
+test("networkpolicy: get zeigt 'No resources', solange keine existiert", () => {
+  // Negativfall: noch keine Mauer -> kein Eintrag, kein Crash.
+  const r = sim.exec("kubectl get networkpolicies");
+  assert.ok(!r.error, "leere Liste ist kein Fehler");
+  assert.match(r.output!, /No resources found/);
+});
+
+test("networkpolicy: apply -f zieht die Hafenmauer hoch, get zeigt Name + Selektor", () => {
+  legeNetpolManifest(sim);
+  const created = sim.exec("kubectl apply -f netpol.yaml");
+  assert.match(created.output!, /networkpolicy\.networking\.k8s\.io\/hafenmauer created/);
+  assert.equal(sim.networkPolicies.length, 1, "genau eine NetworkPolicy angelegt");
+
+  const get = sim.exec("kubectl get networkpolicies");
+  assert.match(get.output!, /hafenmauer/);
+  assert.match(get.output!, /app=lager/, "POD-SELECTOR-Spalte zeigt das geschützte Label");
+  // Kurzformen liefern dasselbe.
+  assert.match(sim.exec("kubectl get netpol").output!, /hafenmauer/);
+  assert.match(sim.exec("kubectl get networkpolicy").output!, /hafenmauer/);
+});
+
+test("networkpolicy: apply ist idempotent (zweites apply -> unchanged, kein Duplikat)", () => {
+  legeNetpolManifest(sim);
+  assert.match(sim.exec("kubectl apply -f netpol.yaml").output!, /created/);
+  assert.match(sim.exec("kubectl apply -f netpol.yaml").output!, /unchanged/);
+  assert.equal(sim.networkPolicies.filter(n => n.name === "hafenmauer").length, 1, "keine doppelte Mauer");
+});
+
+test("networkpolicy: describe nennt Selektor + erlaubte Quelle; Unbekanntes meldet NotFound", () => {
+  legeNetpolManifest(sim);
+  sim.exec("kubectl apply -f netpol.yaml");
+  const d = sim.exec("kubectl describe networkpolicy hafenmauer");
+  assert.ok(!d.error);
+  assert.match(d.output!, /PodSelector:\s+app=lager/);
+  assert.match(d.output!, /Allowing ingress traffic/);
+  assert.match(d.output!, /app=hafentor/, "die erlaubte Quelle steht in den from-Regeln");
+
+  // Negativfall: describe auf nicht existierende Mauer.
+  const miss = sim.exec("kubectl describe netpol geistermauer");
+  assert.ok(miss.error);
+  assert.match(miss.output!, /NotFound/);
+});
+
+test("networkpolicy: default-deny – eine Policy ganz ohne erlaubte Quelle macht dicht", () => {
+  // allowFrom leer = niemand darf rein (default-deny), describe macht das transparent.
+  sim.files["deny.yaml"] = "kind: NetworkPolicy …";
+  sim.applyEffects["deny.yaml"] = { networkPolicy: { name: "abriegelung", podSelector: "kasse" } };
+  sim.exec("kubectl apply -f deny.yaml");
+  const d = sim.exec("kubectl describe networkpolicy abriegelung");
+  assert.match(d.output!, /default-deny/);
+});
+
+test("networkpolicy: delete per Name und per -f entfernt die Mauer; Unbekanntes meldet NotFound", () => {
+  legeNetpolManifest(sim);
+  sim.exec("kubectl apply -f netpol.yaml");
+
+  // per Name (inkl. Kurzform).
+  assert.match(sim.exec("kubectl delete netpol hafenmauer").output!, /hafenmauer" deleted/);
+  assert.equal(sim.networkPolicies.length, 0);
+
+  // per -f.
+  sim.exec("kubectl apply -f netpol.yaml");
+  assert.match(sim.exec("kubectl delete -f netpol.yaml").output!, /hafenmauer" deleted/);
+  assert.equal(sim.networkPolicies.length, 0);
+
+  // Negativfall: Unbekanntes löschen.
+  const miss = sim.exec("kubectl delete networkpolicy geistermauer");
+  assert.ok(miss.error);
+  assert.match(miss.output!, /NotFound/);
+});
+
+test("networkpolicy: Szenario-Seeding + snapshot/restore erhalten die Mauer", () => {
+  const seeded = new KQSim({ networkPolicies: [{ name: "wall-1", podSelector: "db", allowFrom: "api" }] });
+  assert.match(seeded.exec("kubectl get netpol").output!, /wall-1/);
+
+  // mergeScenario fügt eine zweite hinzu, ohne die erste zu doppeln.
+  seeded.mergeScenario({ networkPolicies: [{ name: "wall-1", podSelector: "db", allowFrom: "api" }, { name: "wall-2", podSelector: "web", allowFrom: "lb" }] });
+  assert.equal(seeded.networkPolicies.length, 2, "Duplikat wird nicht erneut angelegt");
+
+  // snapshot/restore behält beide Mauern.
+  const restored = new KQSim(JSON.parse(JSON.stringify(seeded.snapshot())));
+  assert.match(restored.exec("kubectl get netpol").output!, /wall-1/);
+  assert.match(restored.exec("kubectl get netpol").output!, /wall-2/);
+});
