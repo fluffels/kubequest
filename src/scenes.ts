@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, type Door } from "./world";
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
@@ -242,8 +242,8 @@ import { gameClock } from "./clock";
       }
       this.labels.push({ x: 6.5, y: 23.4, text: "Bos Dock", color: "#ffffff" });
 
-      // Dein Schiff
-      this.ship = { x: 30, y: 29, w: 9, h: 6 };
+      // Dein Schiff (Grundfläche aus world.ts SHIP – Single Source of Truth, #42)
+      this.ship = { x: SHIP.x, y: SHIP.y, w: SHIP.w, h: SHIP.h };
       for (let y = this.ship.y; y < this.ship.y + this.ship.h; y++)
         for (let x = this.ship.x; x < this.ship.x + this.ship.w; x++) {
           this.set(x, y, -11); this.solidGrid[y * W + x] = 0;
@@ -628,6 +628,15 @@ import { gameClock } from "./clock";
       gfx.fillStyle(0x4a3426); gfx.fillRect(mx - 4, midY - 41, 8, 3);
       this.shipFlag = this.add.image(mx + 7, midY - 44, "px").setScale(6, 4).setDepth(3);
       this.tweens.add({ targets: this.shipFlag, y: midY - 46, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
+      // Companionway-Luke (#42): begehbarer Eingang zur Kajüte. Liegt auf SHIP_DOOR,
+      // damit der Trigger (doorAt) optisch sichtbar ist. Tiefe knapp unter der Figur,
+      // damit man sichtbar darüber steht, bevor der Szenenwechsel auslöst.
+      const hx = SHIP_DOOR.tx * T + 8, hy = SHIP_DOOR.ty * T + 8, hatch = this.add.graphics().setDepth(SHIP_DOOR.ty * T);
+      hatch.fillStyle(0x3a2e22); hatch.fillRoundedRect(hx - 8, hy - 7, 16, 14, 3);   // Holzrahmen
+      hatch.fillStyle(0x140d08); hatch.fillRoundedRect(hx - 6, hy - 5, 12, 10, 2);   // dunkle Öffnung
+      hatch.fillStyle(0x6b4f35); for (let i = 0; i < 3; i++) hatch.fillRect(hx - 5, hy - 3 + i * 3, 10, 1.4); // Leitersprossen
+      this.labels.push({ x: SHIP_DOOR.tx + 0.5, y: SHIP_DOOR.ty - 0.7, text: "↓ Kajüte", color: "#ffe9b0" });
 
       // === Leuchtturm (Sturmwache) – PixelLab-Turm + rotierender Lichtkegel ===
       const lh = this.lighthouse, lx = lh.x * T + 8, lyB = (lh.y + 1) * T;
@@ -1208,6 +1217,8 @@ import { gameClock } from "./clock";
     office: [{ frame: TABLE, tx: 3, ty: 2 }, { frame: DEVICE, tx: 7, ty: 2 }, { frame: BOOK, tx: 8, ty: 2 }, { frame: CRATE, tx: 2, ty: 5 }, { frame: BARREL, tx: 8, ty: 5 }],
     forge:  [{ frame: ANVIL, tx: 3, ty: 2 }, { frame: TABLE, tx: 7, ty: 2 }, { frame: DEVICE, tx: 8, ty: 2 }, { frame: BARREL, tx: 2, ty: 5 }, { frame: CRATE, tx: 8, ty: 5 }],
     chart:  [{ frame: TABLE, tx: 3, ty: 2 }, { frame: BOOK, tx: 7, ty: 2 }, { frame: BOOK, tx: 8, ty: 2 }, { frame: CRATE, tx: 2, ty: 5 }, { frame: BARREL, tx: 8, ty: 5 }],
+    // Kajüte (#42): Kartentisch + Logbuch, Navigationsgerät, Proviant
+    ship:   [{ frame: TABLE, tx: 2, ty: 2 }, { frame: BOOK, tx: 3, ty: 2 }, { frame: DEVICE, tx: 8, ty: 2 }, { frame: BARREL, tx: 2, ty: 5 }, { frame: CRATE, tx: 8, ty: 5 }],
   };
 
   class InteriorScene extends Phaser.Scene {
@@ -1217,22 +1228,36 @@ import { gameClock } from "./clock";
     create(data: { door: Door }) {
       const door = data.door;
       this.door = door;
+      const isShip = door.theme === "ship";   // #42: Kajüte statt Hausinnenraum
       const RW = 11, RH = 8;
       this.RW = RW; this.RH = RH;
       this.solid = new Uint8Array(RW * RH);
       this.exitTx = Math.floor(RW / 2);   // 5
       this.exitTy = RH - 1;               // 7 (Tür-Schwelle unten Mitte)
 
-      // Boden (Holz) + Wände (Stein); Schwelle unten Mitte bleibt frei.
+      // Boden (Holz) + Wände (Haus: Stein / Schiff: Holzrumpf); Schwelle unten Mitte frei.
+      const wallTiles = isShip ? WOOD : STONE;
       const rt = this.add.renderTexture(0, 0, RW * T, RH * T).setOrigin(0).setDepth(0);
       for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
         const wall = y === 0 || x === 0 || x === RW - 1 || (y === RH - 1 && x !== this.exitTx);
-        if (wall) { rt.drawFrame("dungeon", STONE[(x + y) % STONE.length], x * T, y * T); this.solid[y * RW + x] = 1; }
+        if (wall) { rt.drawFrame("dungeon", wallTiles[(x + y) % wallTiles.length], x * T, y * T); this.solid[y * RW + x] = 1; }
         else rt.drawFrame("dungeon", WOOD[(x * 3 + y) % WOOD.length], x * T, y * T);
       }
-      // Tür-Schwelle (Ausgangs-Matte) optisch markieren
-      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 12, 14, 0x6b4a2a).setOrigin(0.5, 1).setDepth(1);
-      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 9, 3, 0x2a1c0d).setOrigin(0.5, 1).setDepth(1.1);
+      // Schiff: Wände abdunkeln (Rumpf) + Bullaugen mit Blick aufs Meer
+      if (isShip) {
+        for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+          const wall = y === 0 || x === 0 || x === RW - 1 || (y === RH - 1 && x !== this.exitTx);
+          if (wall) this.add.rectangle(x * T, y * T, T, T, 0x0a1219, 0.42).setOrigin(0).setDepth(0.4);
+        }
+        for (const px of [3, 7]) {
+          this.add.ellipse(px * T + 8, 8, 11, 11, 0x2f6f8f).setDepth(0.5);          // Meer durchs Bullauge
+          this.add.ellipse(px * T + 8, 8, 11, 11).setStrokeStyle(2.5, 0x8a6b3f).setDepth(0.51); // Messingring
+          this.add.rectangle(px * T + 8, 8, 11, 2, 0xbfe0ec, 0.7).setDepth(0.52);   // Wellenglanz
+        }
+      }
+      // Schwelle (Haus: Tür-Matte / Schiff: Decksluke) optisch markieren
+      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 12, 14, isShip ? 0x2a1c0d : 0x6b4a2a).setOrigin(0.5, 1).setDepth(1);
+      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 9, 3, isShip ? 0x6b4f35 : 0x2a1c0d).setOrigin(0.5, 1).setDepth(1.1);
 
       // Themengerechte Möbel (solide, damit man sie nicht durchläuft)
       for (const f of (INTERIORS[door.theme] || [])) {
@@ -1240,8 +1265,8 @@ import { gameClock } from "./clock";
         this.solid[f.ty * RW + f.tx] = 1;
       }
 
-      // NPC-Figur des Hauses (Deko – reden weiterhin draußen) + Namensschild
-      const meta = (KQContent.NPCS as any)[door.npc];
+      // NPC-Figur des Hauses/Schiffs (Deko – reden weiterhin draußen) + Namensschild
+      const meta = door.npc ? (KQContent.NPCS as any)[door.npc] : undefined;
       const ntx = this.exitTx, nty = 2;
       this.solid[nty * RW + ntx] = 1;
       const nbaseY = nty * T + 15;
@@ -1260,7 +1285,7 @@ import { gameClock } from "./clock";
       // Kamera: Raum füllend, mit dunklem Innenraum-Hintergrund
       const cam = this.cameras.main;
       cam.setBounds(0, 0, RW * T, RH * T);
-      cam.setBackgroundColor(0x140f0a);
+      cam.setBackgroundColor(isShip ? 0x0a1822 : 0x140f0a);
       cam.centerOn(RW * T / 2, RH * T / 2);
       const fit = Math.min(window.innerWidth / (RW * T), window.innerHeight / (RH * T)) * 0.85;
       cam.setZoom(Phaser.Math.Clamp(fit, 2.4, 6));
@@ -1268,11 +1293,11 @@ import { gameClock } from "./clock";
       // Fixierte Beschriftung (oben Titel, unten Hinweis)
       const cw = cam.width, ch = cam.height;
       const npcName = meta ? meta.name + " · " + meta.title : "";
-      this.add.text(cw / 2, 12, "🚪 " + door.title, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
+      this.add.text(cw / 2, 12, (isShip ? "⚓ " : "🚪 ") + door.title, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
         .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
       if (npcName) this.add.text(cw / 2, 32, npcName, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "11px", color: "#cdd9e8", resolution: 2 })
         .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
-      this.add.text(cw / 2, ch - 22, "E – Hinausgehen   ·   ↓ durch die Tür", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "12px", color: "#ffd97a", resolution: 2 })
+      this.add.text(cw / 2, ch - 22, isShip ? "E – an Deck   ·   ↓ durch die Luke" : "E – Hinausgehen   ·   ↓ durch die Tür", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "12px", color: "#ffd97a", resolution: 2 })
         .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
 
       // E war beim Betreten evtl. noch gedrückt – erst nach Loslassen reagieren.

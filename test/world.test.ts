@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR } from "../src/world";
 
 const W = 52, H = 40; // wie WorldScene.create()
 
@@ -152,5 +152,34 @@ test("keine Tür-Kachel kollidiert mit einer NPC-Solid-Kachel (Tür muss begehba
 
 test("jede Tür verweist auf einen existierenden NPC-Standort", () => {
   const ids = new Set(NPC_SPAWNS.map((s) => s.id));
-  for (const d of DOORS) expect(ids.has(d.npc), `Tür ${d.id} -> NPC ${d.npc}`).toBe(true);
+  for (const d of DOORS) expect(d.npc !== undefined && ids.has(d.npc), `Tür ${d.id} -> NPC ${d.npc}`).toBe(true);
+});
+
+/* ===== Eigenes Schiff betretbar (#42) ===== */
+
+test("doorAt trifft die Schiffs-Luke und liefert SHIP_DOOR", () => {
+  expect(doorAt(SHIP_DOOR.tx * TILE + 8, SHIP_DOOR.ty * TILE + 8)).toEqual(SHIP_DOOR);
+  // beliebiger Punkt in derselben Kachel zählt auch
+  expect(doorAt(SHIP_DOOR.tx * TILE + 1, SHIP_DOOR.ty * TILE + 15)?.id).toBe("schiff");
+  expect(SHIP_DOOR.theme).toBe("ship");
+});
+
+test("Schiffs-Luke liegt begehbar mitten auf dem Deck (innerhalb der Grundfläche)", () => {
+  expect(SHIP_DOOR.tx >= SHIP.x && SHIP_DOOR.tx < SHIP.x + SHIP.w).toBe(true);
+  expect(SHIP_DOOR.ty >= SHIP.y && SHIP_DOOR.ty < SHIP.y + SHIP.h).toBe(true);
+});
+
+test("kein Re-Trigger-Loop: die Wieder-Einstiegskachel (eine unter der Luke) ist selbst keine Tür", () => {
+  // enterInterior() setzt den Spieler auf (tx, ty+1) zurück – diese Kachel darf nicht selbst triggern.
+  expect(doorAt(SHIP_DOOR.tx * TILE + 8, (SHIP_DOOR.ty + 1) * TILE + 8)).toBeNull();
+});
+
+test("doorAt liefert null neben der Schiffs-Luke (kein versehentliches Betreten beim Deck-Laufen)", () => {
+  expect(doorAt((SHIP_DOOR.tx - 1) * TILE + 8, SHIP_DOOR.ty * TILE + 8)).toBeNull();
+  expect(doorAt((SHIP_DOOR.tx + 1) * TILE + 8, SHIP_DOOR.ty * TILE + 8)).toBeNull();
+});
+
+test("Schiffs-Luke kollidiert mit keiner Haustür-Kachel (eindeutiger Eingang)", () => {
+  const houseKeys = new Set(DOORS.map((d) => d.ty * W + d.tx));
+  expect(houseKeys.has(SHIP_DOOR.ty * W + SHIP_DOOR.tx)).toBe(false);
 });

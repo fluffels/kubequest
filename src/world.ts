@@ -37,8 +37,10 @@ export interface Door {
   tx: number;
   ty: number;
   title: string;
-  theme: "office" | "forge" | "chart";
-  npc: string;
+  theme: "office" | "forge" | "chart" | "ship";
+  /** Bewohner-NPC (Deko-Figur im Innenraum). Beim Schiff die Quiz-Krabbe Kralle,
+   *  die nicht in NPC_SPAWNS steht – darum optional. */
+  npc?: string;
 }
 
 export const DOORS: Door[] = [
@@ -47,11 +49,24 @@ export const DOORS: Door[] = [
   { id: "kartenhaus",     tx: 40, ty: 11, title: "Kartenhaus",     theme: "chart",  npc: "ada" },
 ];
 
-/** Tür auf der Kachel unter (px,py) (Pixel-Koordinaten, gefloort wie isSolidAt),
+/* ===== Eigenes Schiff (#42) – betretbar mit Innenansicht =====
+ * Single Source of Truth der Schiffs-Grundfläche (Kachel-Koordinaten); scenes.ts
+ * baut sein this.ship daraus, damit Trigger-Luke und Rumpf nicht auseinanderdriften. */
+export const SHIP = { x: 30, y: 29, w: 9, h: 6 } as const;
+
+/** Companionway-Luke auf dem Deck: Trigger zum Betreten der Kajüte. Liegt mittig
+ *  im Deck (begehbar), nicht am Steg-Rand – so triggert man bewusst beim Drüberlaufen.
+ *  Bewusst NICHT in DOORS: das Schiff hängt nicht an einem NPC_SPAWN. */
+export const SHIP_DOOR: Door = { id: "schiff", tx: 34, ty: 32, title: "Deine Kajüte", theme: "ship", npc: "kralle" };
+
+/** Alle betretbaren Eingänge (Häuser + Schiff). */
+const ENTRANCES: Door[] = [...DOORS, SHIP_DOOR];
+
+/** Tür/Luke auf der Kachel unter (px,py) (Pixel-Koordinaten, gefloort wie isSolidAt),
  *  oder null. Damit erkennt scenes.ts in der Update-Schleife das Betreten. */
 export function doorAt(px: number, py: number): Door | null {
   const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
-  return DOORS.find((d) => d.tx === tx && d.ty === ty) || null;
+  return ENTRANCES.find((d) => d.tx === tx && d.ty === ty) || null;
 }
 
 /** Die Kachel, auf der ein NPC „steht" – passend zur Flooring-Logik von
