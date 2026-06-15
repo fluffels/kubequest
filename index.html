@@ -10,7 +10,7 @@
 
   <div id="game-container"></div>
   <div id="vignette"></div>
-  <input type="file" id="save-import" accept=".json" class="hidden" onchange="UI.importSave(event)">
+  <input type="file" id="save-import" accept=".json" class="hidden">
 
   <!-- HUD -->
   <div id="hud">
@@ -24,7 +24,7 @@
     </div>
     <div class="hud-quest" id="hud-quest"></div>
     <div class="hud-keys">🚶 WASD/Pfeile · 💬 E reden · 📻 T Funkgerät · 📜 J Logbuch · ☰ Esc Menü</div>
-    <button id="hud-menu-btn" class="hud-menu-btn" onclick="UI.openMenu()" title="Menü öffnen (Esc)">☰ Menü</button>
+    <button id="hud-menu-btn" class="hud-menu-btn" data-action="openMenu" title="Menü öffnen (Esc)">☰ Menü</button>
   </div>
 
   <!-- Alarm (Piraten / Krake) -->
@@ -50,7 +50,7 @@
   <!-- Funkgerät -->
   <div id="overlay-terminal" class="panel hidden">
     <div class="panel-head">📻 Funkgerät <span class="dim">– Verbindung zum Hafen-Cluster</span>
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div class="term-layout">
       <div id="term-tasks" class="term-tasks"></div>
@@ -68,7 +68,7 @@
   <!-- Logbuch -->
   <div id="overlay-quest" class="panel hidden">
     <div class="panel-head">📜 Logbuch
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div id="quest-body" class="panel-body"></div>
   </div>
@@ -76,7 +76,7 @@
   <!-- Shop -->
   <div id="overlay-shop" class="panel hidden">
     <div class="panel-head">🛒 Pelles Handelsposten
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div id="shop-body" class="panel-body"></div>
   </div>
@@ -84,7 +84,7 @@
   <!-- Quiz-Krabbe -->
   <div id="overlay-review" class="panel hidden">
     <div class="panel-head">🦀 Krabbe Kralle <span class="dim">– die tägliche Wissensrunde</span>
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div id="review-body" class="panel-body"></div>
   </div>
@@ -92,7 +92,7 @@
   <!-- Stapel-Minispiel -->
   <div id="overlay-stack" class="panel hidden">
     <div class="panel-head">🎮 Bos Stapel-Spiel <span class="dim">– Docker-Images sind Schichtstapel!</span>
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div id="stack-body" class="panel-body"></div>
   </div>
@@ -100,14 +100,14 @@
   <!-- Menü / Pause -->
   <div id="overlay-menu" class="panel hidden">
     <div class="panel-head">⚓ Menü
-      <button class="close-btn" onclick="UI.closeOverlays()">✕ (Esc)</button>
+      <button class="close-btn" data-action="closeOverlays">✕ (Esc)</button>
     </div>
     <div id="menu-body" class="panel-body">
       <div class="menu-actions">
-        <button class="primary" onclick="UI.closeOverlays()">▶️ Weiterspielen</button>
-        <button onclick="UI.exportSave()">💾 Spielstand sichern (Datei)</button>
-        <button onclick="document.getElementById('save-import').click()">📂 Spielstand laden (Datei)</button>
-        <button class="danger" onclick="UI.resetGame()">♻️ Spielstand zurücksetzen</button>
+        <button class="primary" data-action="closeOverlays">▶️ Weiterspielen</button>
+        <button data-action="exportSave">💾 Spielstand sichern (Datei)</button>
+        <button data-action="importPick">📂 Spielstand laden (Datei)</button>
+        <button class="danger" data-action="resetGame">♻️ Spielstand zurücksetzen</button>
       </div>
       <div class="dim" style="margin-top:14px">Gespeichert wird automatisch alle 5 Sekunden im Browser. Die Datei brauchst du nur als Backup oder für einen anderen Rechner/Browser. „Zurücksetzen“ löscht den kompletten Fortschritt – das lässt sich nicht rückgängig machen.</div>
     </div>
@@ -133,7 +133,7 @@
     // Browser das TypeScript-Modul src/main.ts nicht laden – die Seite bliebe leer.
     // Statt einer rätselhaften leeren Seite zeigen wir dann, wie man es richtig startet.
     setTimeout(function () {
-      if (window.Game) return; // Spiel lief an – alles gut
+      if (document.body.dataset.kqBooted) return; // Spiel lief an – alles gut
       document.body.insertAdjacentHTML("beforeend",
         '<div style="position:fixed;inset:0;z-index:99999;background:#0e1b2a;color:#e8eef5;' +
         'display:flex;align-items:center;justify-content:center;text-align:center;' +

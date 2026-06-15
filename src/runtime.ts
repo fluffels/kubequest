@@ -1,0 +1,43 @@
+/* ===== KubeQuest – Laufzeit-Singletons =====
+ * Diese paar Werte hingen früher als Migrations-Shim am globalen `window`
+ * (siehe alte vite-env.d.ts). Jetzt sind es echte Modul-Exporte – kein
+ * globaler Zustand mehr, dafür sauber typisiert und importierbar.
+ *
+ * Bewusst OHNE Phaser-/UI-Importe (nur ein struktureller Typ), damit zwischen
+ * scenes.ts, ui.ts, main.ts und game.ts kein zyklischer Import entsteht.
+ */
+
+/* ---------- Tastenzustand ----------
+ * main.ts schreibt (keydown/keyup/blur), scenes.ts liest in der Update-Schleife.
+ * Eigenes window-Listener-Modell statt Phaser-Keyboard, damit Eingabefelder in
+ * Overlays normal funktionieren. */
+export const keys: Record<string, boolean> = {};
+
+/** Alle gedrückten Tasten vergessen (z.B. wenn das Fenster den Fokus verliert). */
+export function clearKeys(): void {
+  for (const k of Object.keys(keys)) delete keys[k];
+}
+
+/* ---------- Aktive WorldScene ----------
+ * scenes.ts meldet beim Erstellen die laufende Szene an, ui.ts/main.ts/game.ts
+ * greifen darauf zu (NPC-Nähe, Effekte, Spieler-Position fürs Speichern). Nur
+ * die tatsächlich genutzte Oberfläche ist typisiert – die echte WorldScene hat
+ * viel mehr, ist hier aber strukturell kompatibel. */
+export interface WorldSceneRef {
+  player?: { x: number; y: number };
+  playerSprite?: { setTexture(texture: string, frame: number): void } | null;
+  nearestNpc(): { id: string } | null;
+  burstAtPlayer(kind: string): void;
+}
+
+let _scene: WorldSceneRef | null = null;
+
+/** Von scenes.ts beim create() der WorldScene gesetzt. */
+export function setWorldScene(scene: WorldSceneRef | null): void {
+  _scene = scene;
+}
+
+/** Liefert die aktuell laufende WorldScene oder null (vor dem Szenenstart). */
+export function worldScene(): WorldSceneRef | null {
+  return _scene;
+}
