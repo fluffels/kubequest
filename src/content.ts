@@ -129,6 +129,19 @@ import type { Sim, Deployment } from "./sim";
     if (!sim.git.initialized) sim.exec("git init");
   }
 
+  /** Gültige Chart-Namen (klein, mit Bindestrich) für die Werft-Übungen (#27). */
+  const CHART_NAMES = ["funkdienst", "hafenkarte", "lotsen-app", "moewenruf", "kombuese-api", "ankerwerk"];
+
+  /** Sorgt dafür, dass ein selbst gebautes Chart existiert, und gibt seinen Namen zurück. */
+  function ensureChart(sim: Sim): string {
+    if (sim.charts.length === 0) {
+      let name = pick(CHART_NAMES);
+      while (sim.charts.some(c => c.name === name)) name = pick(CHART_NAMES) + rnd(2, 99);
+      sim.exec("helm create " + name);
+    }
+    return sim.charts[0].name;
+  }
+
   /** Eine generierte Übungsaufgabe (Drill). */
   type DrillTask = { text: string; accept: RegExp[]; solution: string; hint: string };
 
@@ -214,6 +227,25 @@ import type { Sim, Deployment } from "./sim";
       }
       return { text: "Hoppla, das Upgrade von <code>" + r.name + "</code> war ein Fehler – rolle auf Revision <b>1</b> zurück!", accept: [new RegExp("^helm\\s+rollback\\s+" + r.name + "\\s+1$")], solution: "helm rollback " + r.name + " 1", hint: "Muster: helm rollback <release> <revision>" };
     },
+    "helm-create": sim => {
+      let name = pick(CHART_NAMES);
+      while (sim.charts.some(c => c.name === name)) name = pick(CHART_NAMES) + rnd(2, 99);
+      return { text: "Bau ein eigenes Chart-Gerüst namens <code>" + name + "</code>.", accept: [new RegExp("^helm\\s+create\\s+" + name + "$")], solution: "helm create " + name, hint: "Muster: helm create <chart-name>" };
+    },
+    "helm-lint": sim => {
+      const name = ensureChart(sim);
+      return { text: "Prüfe dein Chart <code>" + name + "</code> auf Fehler.", accept: [new RegExp("^helm\\s+lint\\s+(\\.\\/)?" + name + "$")], solution: "helm lint " + name, hint: "Muster: helm lint <chart>" };
+    },
+    "helm-package": sim => {
+      const name = ensureChart(sim);
+      return { text: "Pack dein Chart <code>" + name + "</code> in ein verteilbares Archiv.", accept: [new RegExp("^helm\\s+package\\s+(\\.\\/)?" + name + "$")], solution: "helm package " + name, hint: "Muster: helm package <chart>" };
+    },
+    "helm-install-local": sim => {
+      const name = ensureChart(sim);
+      let rel = pick(NAMES);
+      while (sim.releases.some(r => r.name === rel)) rel = pick(NAMES) + rnd(2, 99);
+      return { text: "Installiere aus deinem eigenen Chart <code>./" + name + "</code> ein Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+\\.\\/" + name + "$")], solution: "helm install " + rel + " ./" + name, hint: "Muster: helm install <release> ./<chart>" };
+    },
     "tf-plan": sim => {
       if (!sim.tf.initialized) sim.tf.initialized = true; // Übung setzt ein initialisiertes Projekt voraus
       return { text: "Zeig, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan", hint: "Die Generalprobe." };
@@ -286,7 +318,7 @@ import type { Sim, Deployment } from "./sim";
     bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
     ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
     ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
-    runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }],
+    runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
     theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
     juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
   };
@@ -1129,6 +1161,47 @@ import type { Sim, Deployment } from "./sim";
           "Und es schließt den Kreis: deine Befehle von Bo (Docker-Build), von mir (Git) und von Ole (kubectl apply) – die Pipeline tippt sie jetzt für dich. Das ist das Herz von modernem DevOps. 🚢",
         ] },
       ]},
+
+    { id: "q21", title: "Werft-Ausbau: dein eigenes Chart", giver: "runa", rewardXp: 60, rewardCoins: 45,
+      steps: [
+        { type: "dialog", npc: "runa", lines: [
+          "Zurück an der Werft? Gut! Bisher hast du <b>fremde</b> Charts installiert (bitnami/nginx & Co.). Heute baust du dein <b>EIGENES</b> – echter Werft-Ausbau!",
+          "Ein Chart ist nur ein Ordner mit fester Struktur: <code>Chart.yaml</code> (der Steckbrief – Name, Version), <code>values.yaml</code> (die Drehknöpfe) und <code>templates/</code> (die Vorlagen, die zu echten Manifesten rendern). <code>helm create</code> legt dir das Gerüst fertig hin.",
+        ]},
+        { type: "teach", brief: "Chart-Gerüst anlegen", cmd: {
+          id: "t-create-chart", intro: "🆕 Neuer Befehl: <code>helm create</code> – ein komplettes Chart-Gerüst anlegen.",
+          text: "Bau dir ein eigenes Chart namens <code>funkdienst</code>. (Tipp danach: <code>ls</code> und <code>cat funkdienst/Chart.yaml</code> – schau dir an, was entstanden ist!)",
+          accept: [/^helm\s+create\s+funkdienst$/], solution: "helm create funkdienst",
+          hint: "Muster: helm create <chart-name>" } },
+        { type: "dialog", npc: "runa", lines: [
+          "Sieh dir <code>cat funkdienst/values.yaml</code> an – das sind die Drehknöpfe (Anzahl Kopien, Image …). Bevor du ein Chart teilst oder ausrollst, prüfst du es auf Fehler. Dafür gibt's <code>helm lint</code>.",
+        ]},
+        { type: "teach", brief: "Chart prüfen", cmd: {
+          id: "t-lint", intro: "🆕 Neuer Befehl: <code>helm lint</code> – ein Chart auf Fehler & Stil prüfen.",
+          text: "Prüfe dein Chart <code>funkdienst</code>.",
+          accept: [/^helm\s+lint\s+(\.\/)?funkdienst$/], solution: "helm lint funkdienst",
+          hint: "Muster: helm lint <chart>" } },
+        { type: "teach", brief: "Chart einpacken", cmd: {
+          id: "t-package", intro: "🆕 Neuer Befehl: <code>helm package</code> – ein Chart in ein <code>.tgz</code>-Archiv packen (zum Teilen / in ein Repo legen).",
+          text: "Pack <code>funkdienst</code> in ein verteilbares Archiv.",
+          accept: [/^helm\s+package\s+(\.\/)?funkdienst$/], solution: "helm package funkdienst",
+          hint: "Muster: helm package <chart>" } },
+        { type: "teach", brief: "Eigenes Chart hissen", cmd: {
+          id: "t-install-local", intro: "🆕 Jetzt aus dem EIGENEN Chart installieren – ein lokaler <b>Pfad</b> statt <code>repo/chart</code>.",
+          text: "Installiere aus <code>./funkdienst</code> ein Release namens <code>mein-funk</code>. (Flaggen-Blick zur Werft!)",
+          accept: [/^helm\s+install\s+mein-funk\s+\.\/funkdienst$/], solution: "helm install mein-funk ./funkdienst",
+          hint: "Muster: helm install <release> ./<chart>" } },
+        { type: "drill", brief: "Runas Werft-Übung", pool: ["helm-create", "helm-lint", "helm-package", "helm-install-local"], count: 4,
+          intro: "Einmal die ganze Kette selbst: create → lint → package → install." },
+        { type: "choice", npc: "runa", reviewId: "q-helm-create",
+          q: "Woraus besteht ein Helm-Chart?",
+          options: [
+            { t: "Aus Chart.yaml (Steckbrief), values.yaml (Drehknöpfe) und templates/ (Vorlagen).", ok: true,
+              reply: "Sitzt! Gerüst mit <code>helm create</code>, prüfen mit <code>lint</code>, packen mit <code>package</code> – jetzt baust du selbst, statt nur fertige Charts zu hissen. ⎈" },
+            { t: "Aus einer einzigen großen YAML-Datei mit allem drin.", ok: false,
+              reply: "Nein – gerade NICHT. Die Stärke ist die Trennung: Vorlage (templates) und Werte (values.yaml) getrennt, Steckbrief in Chart.yaml." },
+          ]},
+      ]},
   ];
 
   /* ---------- Standard-Dialoge ---------- */
@@ -1164,6 +1237,9 @@ import type { Sim, Deployment } from "./sim";
     { id: "q-ch5-2", q: "Chart vs. Release?", options: ["Chart = das Paket (Vorlage), Release = eine installierte Instanz davon.", "Release = die Vorlage, Chart = die Installation.", "Charts sind kostenlos, Releases kosten.", "Kein Unterschied."], correct: 0, explain: "Wie Image und Container! Aus einem Chart können mehrere Releases installiert werden." },
     { id: "q-ch5-3", q: "Wozu dient values.yaml in einem Chart?", options: ["Die einstellbaren Werte (Drehknöpfe) – z.B. Anzahl Kopien – ohne die Vorlage zu ändern.", "Der Preis des Charts.", "Die Passwörter des Clusters.", "Das Änderungsprotokoll."], correct: 0, explain: "Gleiche Vorlage + andere Values = Test, Staging, Produktion aus einem Chart." },
     { id: "q-ch5-4", q: "Dein helm upgrade hat alles kaputt gemacht. Panik?", options: ["Nein – helm rollback bringt das Release auf eine frühere Revision zurück.", "Ja – Cluster löschen, neu aufsetzen.", "Alle YAML-Dateien von Hand zurückändern.", "Nur uninstall + neu installieren hilft."], correct: 0, explain: "Helm führt eine Revisions-Historie pro Release. rollback = Lebensretter." },
+    { id: "q-helm-create", q: "Woraus besteht ein selbst gebautes Helm-Chart?", options: ["Aus Chart.yaml (Steckbrief), values.yaml (Drehknöpfe) und templates/ (Vorlagen).", "Aus einer einzigen großen YAML-Datei mit allem drin.", "Nur aus einem Dockerfile.", "Aus einem fertigen .tgz, das man nicht ändern kann."], correct: 0, explain: "helm create legt genau dieses Gerüst an: Steckbrief, einstellbare Werte und die Vorlagen werden bewusst getrennt – gleiche Vorlage, andere values = andere Umgebung." },
+    { id: "q-helm-lint", q: "Wofür ist helm lint da?", options: ["Es prüft ein Chart auf Fehler und Stil, bevor man es ausrollt oder teilt.", "Es installiert das Chart in den Cluster.", "Es löscht ungenutzte Charts.", "Es zeigt die Logs eines Releases."], correct: 0, explain: "lint ist die Generalprobe fürs Chart: Struktur- und Stilfehler fallen auf, bevor sie im Cluster landen – wie ein Linter für Code." },
+    { id: "q-helm-package", q: "Was macht helm package <chart>?", options: ["Es schnürt das Chart in ein versioniertes .tgz-Archiv – zum Teilen oder in ein Repo legen.", "Es startet das Chart als Container.", "Es löscht das Chart vom Cluster.", "Es lädt ein fremdes Chart herunter."], correct: 0, explain: "package erzeugt <name>-<version>.tgz. Genau diese Archive liegen in Chart-Repos – das ist die Brücke vom eigenen Chart zum Verteilen." },
     { id: "q-ch6-1", q: "Was bedeutet „Infrastructure as Code“?", options: ["Server, Netze & Co. werden als Textdateien beschrieben statt zusammengeklickt.", "Programme laufen ohne Betriebssystem.", "Die Infrastruktur schreibt eigenen Code.", "Rechenzentren werden durch Software ersetzt."], correct: 0, explain: "Die Dateien liegen in Git – nachvollziehbar, wiederholbar, teilbar." },
     { id: "q-ch6-2", q: "terraform plan vs. apply?", options: ["plan zeigt nur, was passieren würde – apply führt es aus.", "plan für kleine, apply für große Infrastruktur.", "apply zeigt den Plan, plan wendet an.", "Kein Unterschied."], correct: 0, explain: "Immer erst plan lesen, dann apply. Die Generalprobe vor der Aufführung." },
     { id: "q-ch6-3", q: "Was ist der Terraform-State?", options: ["Terraforms Gedächtnis: was es bereits gebaut hat.", "Der Bundesstaat des Rechenzentrums.", "Eine Statusanzeige der Installation.", "Das Fehlerprotokoll."], correct: 0, explain: "Dank State vergleicht Terraform Soll (.tf-Dateien) mit Ist und setzt nur die Differenz um." },
@@ -1202,6 +1278,10 @@ import type { Sim, Deployment } from "./sim";
     { id: "c-ch5-1", chapter: "q10", q: "Installiere das Chart <code>bitnami/redis</code> als Release <code>cache</code>.", accept: [/^helm\s+install\s+cache\s+bitnami\/redis$/], solution: "helm install cache bitnami/redis" },
     { id: "c-ch5-2", chapter: "q10", q: "Zeige alle installierten Helm-Releases an.", accept: [/^helm\s+(list|ls)$/], solution: "helm list" },
     { id: "c-ch5-3", chapter: "q11", q: "Rolle das Release <code>cache</code> auf Revision 1 zurück.", accept: [/^helm\s+rollback\s+cache\s+1$/], solution: "helm rollback cache 1" },
+    { id: "c-ch5-4", chapter: "q21", q: "Lege ein eigenes Chart-Gerüst namens <code>funkdienst</code> an.", accept: [/^helm\s+create\s+funkdienst$/], solution: "helm create funkdienst" },
+    { id: "c-ch5-5", chapter: "q21", q: "Prüfe dein Chart <code>funkdienst</code> auf Fehler.", accept: [/^helm\s+lint\s+(\.\/)?funkdienst$/], solution: "helm lint funkdienst" },
+    { id: "c-ch5-6", chapter: "q21", q: "Pack dein Chart <code>funkdienst</code> in ein Archiv.", accept: [/^helm\s+package\s+(\.\/)?funkdienst$/], solution: "helm package funkdienst" },
+    { id: "c-ch5-7", chapter: "q21", q: "Installiere aus deinem eigenen Chart <code>./funkdienst</code> ein Release <code>mein-funk</code>.", accept: [/^helm\s+install\s+mein-funk\s+\.\/funkdienst$/], solution: "helm install mein-funk ./funkdienst" },
     { id: "c-ch6-1", chapter: "q12", q: "Initialisiere ein frisches Terraform-Projekt.", accept: [/^terraform\s+init$/], solution: "terraform init" },
     { id: "c-ch6-2", chapter: "q12", q: "Zeige an, was Terraform tun WÜRDE – ohne es zu tun.", accept: [/^terraform\s+plan$/], solution: "terraform plan" },
     { id: "c-ch6-3", chapter: "q13", q: "Setze die Terraform-Konfiguration wirklich um.", accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply" },

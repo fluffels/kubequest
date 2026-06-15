@@ -12,6 +12,7 @@ import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
 import { NPC_SPAWNS, npcSolidIndices, DOORS, doorAt, type Door } from "./world";
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
+import { pickPlacements, strSeed, hash01 } from "./decor";
 
   const T = 16;
   const COLS = 12;
@@ -442,42 +443,50 @@ import { keys, setWorldScene, setInteriorOpen } from "./runtime";
     }
 
     spawnFlowers() {
-      // Wildblumen (PixelLab) gestreut auf freie Gras-Zellen – bricht das wiederholte Gras-Tile
-      let placed = 0, tries = 0;
-      while (placed < 30 && tries < 500) {
-        tries++;
-        const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
+      // Wildblumen (PixelLab) fest auf freie Gras-Zellen gestreut – bricht das
+      // wiederholte Gras-Tile gleichmäßig auf. Jetzt deterministisch statt bei
+      // jedem Neuladen neu gewürfelt (#3): gleiche Welt → gleiche Blumen.
+      const accept = (x: number, y: number) => {
         const v = this.ground[y * this.W + x];
-        if ((v !== 0 && v !== 1 && v !== 2) || this.solidGrid[y * this.W + x]) continue;
-        // Origin am Boden; leichte statische Zufallsneigung bricht den Gleichtakt – ohne Bewegung (#30)
-        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(8, 15), "flowers")
-          .setOrigin(0.5, 1).setScale(0.35).setDepth(y * T + 6).setAngle(Phaser.Math.Between(-3, 3));
-        placed++;
+        return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
+      };
+      for (const p of pickPlacements({
+        W: this.W, H: this.H, count: 30, seed: strSeed("flowers"), accept,
+        jitter: { x: [2, 14], y: [8, 15] },
+      })) {
+        // Origin am Boden; leichte feste Neigung (-3..+3°) bricht den Gleichtakt – ohne Bewegung (#30)
+        const angle = Math.round(hash01(strSeed("flower-angle"), p.x, p.y) * 6) - 3;
+        this.add.image(p.x * T + p.jx, p.y * T + p.jy, "flowers")
+          .setOrigin(0.5, 1).setScale(0.35).setDepth(p.y * T + 6).setAngle(angle);
       }
     }
 
     scatter(tex: string, count: number, scale: number, kinds: number[], solid = false) {
-      // PixelLab-Objekte streuen: nur passende Felder, nie auf/neben Wege, nicht auf Solids, Spieler-Start frei
+      // PixelLab-Objekte streuen: nur passende Felder, nie auf/neben Wege, nicht auf Solids, Spieler-Start frei.
+      // Platzierung ist deterministisch (#3) – Büsche/Steine/Laternen sitzen bei jedem Laden an festen Stellen.
       const isDirt = (x: number, y: number) => this.ground[y * this.W + x] === 25;
       const pcx = Math.round(this.playerPos.x / T), pcy = Math.round(this.playerPos.y / T);
-      let placed = 0, tries = 0;
-      while (placed < count && tries < count * 25) {
-        tries++;
-        const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
+      const accept = (x: number, y: number) => {
         const v = this.ground[y * this.W + x];
-        if (kinds.indexOf(v) < 0 || this.solidGrid[y * this.W + x]) continue;
-        if (isDirt(x, y - 1) || isDirt(x, y + 1) || isDirt(x - 1, y) || isDirt(x + 1, y)) continue; // nicht an Wege grenzen
-        if (Math.abs(x - pcx) <= 1 && Math.abs(y - pcy) <= 1) continue;                              // Spieler-Start freihalten
-        const ox = x * T + Phaser.Math.Between(2, 14), oy = y * T + Phaser.Math.Between(6, 13);
-        const img = this.add.image(ox, oy, tex).setOrigin(0.5, 0.7).setScale(scale).setDepth(y * T + 7);
+        if (kinds.indexOf(v) < 0 || this.solidGrid[y * this.W + x]) return false;
+        if (isDirt(x, y - 1) || isDirt(x, y + 1) || isDirt(x - 1, y) || isDirt(x + 1, y)) return false; // nicht an Wege grenzen
+        if (Math.abs(x - pcx) <= 1 && Math.abs(y - pcy) <= 1) return false;                             // Spieler-Start freihalten
+        return true;
+      };
+      // Seed je Sorte (aus dem Textur-Namen) → jede Deko-Art bekommt ihr eigenes festes Muster.
+      for (const p of pickPlacements({
+        W: this.W, H: this.H, count, seed: strSeed(tex), accept,
+        jitter: { x: [2, 14], y: [6, 13] },
+      })) {
+        const ox = p.x * T + p.jx, oy = p.y * T + p.jy;
+        const img = this.add.image(ox, oy, tex).setOrigin(0.5, 0.7).setScale(scale).setDepth(p.y * T + 7);
         if (tex === "lamppost") {
           // Warmes Glühen am Laternenkopf – leuchtet bei Dämmerung/Nacht auf (#4)
           const glow = this.add.image(ox, img.getTopCenter().y + 7, "glowSoft").setDisplaySize(26, 26)
-            .setTint(0xffd591).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(y * T + 6);
+            .setTint(0xffd591).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.y * T + 6);
           this.lampGlows.push(glow);
         }
-        if (solid) this.solidGrid[y * this.W + x] = 1;
-        placed++;
+        if (solid) this.solidGrid[p.y * this.W + p.x] = 1;
       }
     }
 
