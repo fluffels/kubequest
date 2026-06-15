@@ -8,7 +8,7 @@
 import type { Quest } from "../types";
 import type { Sim } from "../sim";
 import {
-  DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, BOESE_CONFIG_YAML,
+  DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   MAIN_TF, GITLAB_CI_YML, DOCKERFILE,
 } from "./manifests";
 
@@ -883,5 +883,50 @@ export const QUESTS: Quest[] = [
           { t: "Aus einer einzigen großen YAML-Datei mit allem drin.", ok: false,
             reply: "Nein – gerade NICHT. Die Stärke ist die Trennung: Vorlage (templates) und Werte (values.yaml) getrennt, Steckbrief in Chart.yaml." },
         ]},
+    ]},
+
+  { id: "q22", title: "Die Hafenmauer", giver: "juno", rewardXp: 60, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "juno", lines: [
+        "Sturmwache Juno. Schön, dass du da bist – wir haben ein Sicherheitsproblem. Dein <b>Hafentor</b> (der Ingress) hat den Hafen zum <b>offenen Meer</b> geöffnet. Gut für Besucher … aber jetzt kann <b>jeder Pod mit jedem reden</b>, quer durch den ganzen Cluster.",
+        "Das ist die unbequeme Wahrheit über Kubernetes: <b>standardmäßig ist alles offen</b>. Kein Zaun, keine Mauer. Schleicht sich ein böser Pod ein, klopft er ungestört an jeder Tür – auch beim <code>lager</code> mit den wertvollen Daten.",
+        "Dagegen bauen wir eine <b>Hafenmauer</b>: eine <b>NetworkPolicy</b>. Sie wählt per Label Pods aus und sagt: <i>Zu DENEN darf nur, wen ich ausdrücklich erlaube</i> – alles andere prallt ab. Im Job nennt man das <b>default-deny</b>. Lass uns erst schauen, was schon steht.",
+      ]},
+      { type: "teach", brief: "Mauern zählen", cmd: {
+        id: "t-get-netpol", intro: "🆕 Neue Ressource: <code>kubectl get networkpolicies</code> (kurz <code>netpol</code>) – zeigt alle Hafenmauern.",
+        text: "Schau nach, welche NetworkPolicies schon stehen – noch ist der Hafen schutzlos!",
+        accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies",
+        hint: "Kurzform: kubectl get netpol" } },
+      { type: "terminal", brief: "Mauer hochziehen",
+        scenario: {
+          files: { "netpol.yaml": NETPOL_YAML },
+          applyEffects: {
+            "netpol.yaml": { networkPolicy: { name: "hafenmauer", podSelector: "lager", allowFrom: "hafentor" } },
+          },
+        },
+        tasks: [
+        { id: "t-juno-np-1", text: "Ich habe dir die Karte <code>netpol.yaml</code> hingelegt. Lies sie mit <code>cat</code> – achte auf <code>podSelector</code> (WEN schützt die Mauer?) und <code>ingress.from</code> (WER darf rein?).",
+          accept: [/^cat\s+netpol\.yaml$/], solution: "cat netpol.yaml", hint: "cat <datei>" },
+        { id: "t-juno-np-2", text: "Zieh die Mauer hoch: wende <code>netpol.yaml</code> an. Ab jetzt darf nur noch das <code>hafentor</code> ans <code>lager</code>.",
+          accept: [/^kubectl\s+apply\s+-f\s+netpol\.yaml$/], solution: "kubectl apply -f netpol.yaml", hint: "Gleicher apply wie bei Adas Karten, Datei netpol.yaml." },
+        { id: "t-juno-np-3", text: "Prüf die frische Mauer: <code>kubectl get networkpolicies</code> – jetzt steht <code>hafenmauer</code> in der Liste.",
+          accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], check: (sim: Sim) => sim.networkPolicies.some(n => n.name === "hafenmauer"),
+          solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." },
+        { id: "t-juno-np-4", text: "Schau genau hin: <code>kubectl describe networkpolicy hafenmauer</code> – die Zeile <b>Allowing ingress traffic</b> verrät, wer durchdarf.",
+          accept: [/^kubectl\s+describe\s+(networkpolicy|networkpolicies|netpol|netpols)\s+hafenmauer$/], solution: "kubectl describe networkpolicy hafenmauer", hint: "kubectl describe networkpolicy <name>" },
+      ]},
+      { type: "drill", brief: "Junos Mauer-Übung", pool: ["k-apply-netpol", "k-get-netpol", "k-describe-netpol", "k-delete-netpol"], count: 4,
+        intro: "Einmal die ganze Kette: anwenden → auflisten → beschreiben → wieder einreißen." },
+      { type: "choice", npc: "juno", reviewId: "q-netpol",
+        q: "Ohne jede NetworkPolicy – wer darf im Cluster mit wem reden?",
+        options: [
+          { t: "Jeder mit jedem. Das Netzwerk ist offen, bis eine NetworkPolicy es einschränkt.", ok: true,
+            reply: "Genau – und genau das ist die Gefahr. Eine NetworkPolicy schaltet für die gewählten Pods auf <b>default-deny</b> und lässt nur durch, was du erlaubst. So sichert man im Job Datenbanken & Co. ab. ⚓" },
+          { t: "Niemand. Jede Verbindung muss erst freigegeben werden.", ok: false,
+            reply: "Andersrum! Kubernetes ist von Haus aus <b>offen</b>. Erst eine NetworkPolicy macht für die ausgewählten Pods dicht – vorher kann jeder mit jedem reden." },
+        ]},
+      { type: "dialog", npc: "juno", lines: [
+        "Merk dir die Faustregel: <b>Selektor sagt WEN man schützt, die from-Regel sagt WER rein darf.</b> Fehlt die Policy, ist alles offen. Hafen gesichert – gut gemacht, Lotse!",
+      ]},
     ]},
 ];

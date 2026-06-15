@@ -46,6 +46,13 @@ export interface IngressRes {
   port: string | number; // Ziel-Port des Services
   created?: number;
 }
+/** Hafenmauer: regelt, welche Pods überhaupt zu einem Ziel-Pod durchdürfen (Firewall im Cluster). */
+export interface NetworkPolicyRes {
+  name: string;
+  podSelector: string;   // app-Label der geschützten Pods ("" = alle Pods im Namespace)
+  allowFrom: string;     // app-Label der einzigen erlaubten Quelle ("" = niemand: default-deny)
+  created?: number;
+}
 export interface Secret {
   name: string;
   keys: string[];
@@ -112,6 +119,7 @@ export interface ApplyEffect {
   deployment?: { name: string; image: string; replicas: number };
   service?: { name: string; type?: string; port: string | number };
   ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string };
+  networkPolicy?: { name: string; podSelector?: string; allowFrom?: string };
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
@@ -128,6 +136,7 @@ export interface Scenario {
   deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null }>;
   services?: ServiceRes[];
   ingresses?: IngressRes[];
+  networkPolicies?: NetworkPolicyRes[];
   secrets?: Secret[];
   files?: Record<string, string>;
   applyEffects?: Record<string, ApplyEffect>;
@@ -200,6 +209,7 @@ export interface Scenario {
     deployments!: Deployment[];
     services!: ServiceRes[];
     ingresses!: IngressRes[];
+    networkPolicies!: NetworkPolicyRes[];
     secrets!: Secret[];
     files!: Record<string, string>;
     applyEffects!: Record<string, ApplyEffect>;
@@ -235,6 +245,7 @@ export interface Scenario {
       this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
       this.ingresses = (sc.ingresses || []).map(i => Object.assign({}, i));
+      this.networkPolicies = (sc.networkPolicies || []).map(n => Object.assign({}, n));
       this.secrets = (sc.secrets || []).map(s => Object.assign({}, s));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
@@ -340,6 +351,9 @@ export interface Scenario {
       for (const ing of sc.ingresses || []) {
         if (!this.ingresses.some(x => x.name === ing.name)) this.ingresses.push(Object.assign({}, ing));
       }
+      for (const np of sc.networkPolicies || []) {
+        if (!this.networkPolicies.some(x => x.name === np.name)) this.networkPolicies.push(Object.assign({}, np));
+      }
       if (sc.ciDeploy) this.ci.deploy = Object.assign({}, sc.ciDeploy);
     }
 
@@ -352,6 +366,7 @@ export interface Scenario {
         deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null })),
         services: this.services.map(s => Object.assign({}, s)),
         ingresses: this.ingresses.map(i => Object.assign({}, i)),
+        networkPolicies: this.networkPolicies.map(n => Object.assign({}, n)),
         secrets: this.secrets.map(s => ({ name: s.name, keys: s.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
@@ -469,7 +484,7 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|ingress|nodes|secrets | describe pod|ingress <name>",
+        "  kubectl    get pods|deployments|services|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
@@ -651,8 +666,14 @@ export interface Scenario {
           this.ingresses.map(i => [i.name, i.className, i.host, INGRESS_ADDRESS, "80", this._age(i.created || 0)]));
       }
 
+      if (["networkpolicies", "networkpolicy", "netpol", "netpols"].includes(what)) {
+        if (this.networkPolicies.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "POD-SELECTOR", "AGE"],
+          this.networkPolicies.map(n => [n.name, n.podSelector ? "app=" + n.podSelector : "<none>", this._age(n.created || 0)]));
+      }
+
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, ingress oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, ingress, networkpolicies oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -675,7 +696,22 @@ export interface Scenario {
             (svcExists ? "" : "  (⚠ Service '" + ing.service + "' gibt es nicht – das Tor lotst ins Leere!)"),
         ].join("\n");
       }
-      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>' und 'kubectl describe ingress <name>'.");
+      if (["networkpolicy", "networkpolicies", "netpol", "netpols"].includes(what)) {
+        if (!name) return this._err("kubectl describe networkpolicy: Welche Hafenmauer?", "Die Namen siehst du mit 'kubectl get networkpolicies'.");
+        const np = this.networkPolicies.find(n => n.name === name);
+        if (!np) return this._err('Error from server (NotFound): networkpolicies.networking.k8s.io "' + name + '" not found', "Tipp: Namen aus 'kubectl get networkpolicies' kopieren.");
+        return [
+          "Name:         " + np.name,
+          "Namespace:    default",
+          "PodSelector:  " + (np.podSelector ? "app=" + np.podSelector : "<none> (gilt für alle Pods im Namespace)"),
+          "PolicyTypes:  Ingress",
+          "Allowing ingress traffic:",
+          np.allowFrom
+            ? "  From: Pods mit Label app=" + np.allowFrom
+            : "  <none> (default-deny: niemand darf rein, bis du eine Quelle erlaubst)",
+        ].join("\n");
+      }
+      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>', 'kubectl describe ingress <name>' und 'kubectl describe networkpolicy <name>'.");
       if (!name) return this._err("kubectl describe pod: Welcher Pod?", "Die Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Tipp: Pod-Namen kannst du aus 'kubectl get pods' kopieren.");
@@ -792,6 +828,11 @@ export interface Scenario {
           const i = this.ingresses.findIndex(x => x.name === effIng.name);
           if (i >= 0) { this.ingresses.splice(i, 1); out.push('ingress.networking.k8s.io "' + effIng.name + '" deleted'); }
         }
+        const effNp = eff.networkPolicy;
+        if (effNp) {
+          const i = this.networkPolicies.findIndex(x => x.name === effNp.name);
+          if (i >= 0) { this.networkPolicies.splice(i, 1); out.push('networkpolicy.networking.k8s.io "' + effNp.name + '" deleted'); }
+        }
         return out.join("\n") || "nothing deleted";
       }
 
@@ -834,6 +875,13 @@ export interface Scenario {
         if (idx === -1) return this._err('Error from server (NotFound): ingresses.networking.k8s.io "' + name + '" not found');
         this.ingresses.splice(idx, 1);
         return 'ingress.networking.k8s.io "' + name + '" deleted';
+      }
+
+      if (["networkpolicy", "networkpolicies", "netpol", "netpols"].includes(what)) {
+        const idx = this.networkPolicies.findIndex(n => n.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): networkpolicies.networking.k8s.io "' + name + '" not found');
+        this.networkPolicies.splice(idx, 1);
+        return 'networkpolicy.networking.k8s.io "' + name + '" deleted';
       }
 
       return this._err("kubectl delete: Ressourcentyp '" + what + "' kennt der Simulator nicht.");
@@ -883,6 +931,19 @@ export interface Scenario {
             service: effIng.service, port: effIng.port, created: this.clock,
           });
           out.push("ingress.networking.k8s.io/" + effIng.name + " created");
+        }
+      }
+      const effNp = eff.networkPolicy;
+      if (effNp) {
+        const existing = this.networkPolicies.find(n => n.name === effNp.name);
+        if (existing) {
+          out.push("networkpolicy.networking.k8s.io/" + effNp.name + " unchanged");
+        } else {
+          this.networkPolicies.push({
+            name: effNp.name, podSelector: effNp.podSelector || "",
+            allowFrom: effNp.allowFrom || "", created: this.clock,
+          });
+          out.push("networkpolicy.networking.k8s.io/" + effNp.name + " created");
         }
       }
       return out.join("\n");
