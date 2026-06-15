@@ -15,11 +15,11 @@ import type { GameState, QuestStep } from "./types";
   const EXTRA_CARDS: Record<string, string[]> = {
     q3: ["q-ch1-3", "q-ch1-5"],
     q4: ["q-ch2-1", "q-ch2-4"],
-    q7: ["q-ch3-2"],
+    q7: ["q-ch3-2", "q-tools-ingress"],
     q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3"],
-    q10: ["q-ch5-3"],
+    q10: ["q-ch5-3", "q-tools-stack", "q-tools-monitoring"],
     q13: ["q-ch6-1", "q-ch6-4"],
-    q14: ["q-sec-2"],
+    q14: ["q-sec-2", "q-tools-keycloak"],
     q15: ["q-ts-4"],
     q16: ["q-ts-5"],
   };

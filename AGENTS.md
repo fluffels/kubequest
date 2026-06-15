@@ -7,6 +7,8 @@
 
 - **NIE committen, pushen, deployen.** Katharina committet immer selbst. Du änderst nur Code/Dateien und lieferst die Commit-Nachricht als kopierfertigen Einzeiler mit (`feat(...): …`).
 - **Tests müssen grün bleiben.** Nach jeder Änderung `npm test` (Vitest). Bricht etwas, erst reparieren, bevor du weitermachst.
+- **Alles wird abgetestet – auch Negativfälle.** Neue/geänderte Logik bekommt Tests, die nicht nur den Happy Path prüfen, sondern auch Fehler-/Grenzfälle (kaputter Zustand, falsche Eingabe, „darf NICHT passieren"). Ziel ist echte Abdeckung der Spiel-/Sim-/Wirtschaftslogik, nicht nur ein grüner Lauf.
+- **Tests gegen False Positives absichern (Red-Green).** Ein Test, der auch bei kaputtem Code grün bleibt, ist wertlos. Beim Schreiben kurz beweisen, dass der Test wirklich rot wird, wenn die Logik bricht (Assertion/Implementierung testweise verfälschen → rot sehen → zurücksetzen → grün). **Bei Bugfixes test-first:** erst den fehlschlagenden Repro-Test schreiben (rot), dann fixen (grün) – das beweist gleichzeitig, dass der Test den Bug fängt.
 - **Im Browser verifizieren**, nicht nur „sollte gehen". Sicht- oder spielbare Änderungen mit `npm run dev` (oder dem Single-File-Build) tatsächlich anschauen.
 - **Deutsch mit echten Umlauten** (ä/ö/ü/ß) in Code-Kommentaren, Dialogen und Texten. Ausnahme: Dateinamen bleiben ASCII (ae/oe/ue/ss).
 - **Backlog/TODOs leben in GitHub** (Issues + Project-Board), **nicht** im Code und **nicht** in einem externen Notiz-System. Siehe unten.
@@ -61,6 +63,10 @@ Der Backlog wird als **GitHub Issues** geführt, gruppiert in einem **GitHub Pro
 
 Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `npm test` grün halten + im Browser verifizieren, dann das Issue schließen.
 
-**Projekt-Ausnahme (nur kubequest):** Hier darf der Agent **GitHub-Issues selbst verwalten und schließen** (`gh issue close`, kommentieren, Labels) ohne Rückfrage. Das ist die einzige nach außen wirkende Aktion, die hier freigegeben ist — **committen/pushen/deployen bleibt auch in kubequest tabu** (siehe harte Regeln oben, macht Katharina selbst). Beim Commit kann sie zusätzlich per `Closes #<n>` schließen.
+**Der Agent managt das Board (nur kubequest).** Katharina hat die Issue-Verwaltung hier an den Agenten delegiert. Das heißt konkret:
+- **GitHub ist die Single Source of Truth für den Stand.** Was erledigt ist, wird sofort dort geschlossen (mit kurzem Ergebnis-Kommentar) – nicht nur im Chat berichten. Den Board-Status aktuell halten.
+- **Selbst Issues verwalten** ohne Rückfrage: `gh issue close`, kommentieren, Labels setzen, **neue Tickets schreiben, wenn etwas auffällt** (Bug, Lücke, Tech-Debt, Idee). Lieber ein Ticket zu viel als verlorenes Wissen.
+- **Der Agent priorisiert.** Reihenfolge der Arbeit selbst festlegen (prio-Labels pflegen) und proaktiv die nächste Aufgabe vorschlagen/starten.
+- **Grenze:** Issue-Management ist die einzige nach außen wirkende Aktion, die freigegeben ist — **committen/pushen/deployen bleibt auch hier tabu** (siehe harte Regeln oben, macht Katharina selbst). Da Code uncommitted bleibt: Issues ruhig als erledigt schließen, wenn die Arbeit im Working Tree fertig + getestet ist; falls ihr Review noch was findet, einfach wieder aufmachen.
 
 Issues ansehen: `gh issue list`. Board: `gh project list --owner eckekat`.
