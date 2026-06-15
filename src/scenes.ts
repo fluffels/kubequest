@@ -392,13 +392,9 @@ import { SFX } from "./sfx";
         const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
         const v = this.ground[y * this.W + x];
         if ((v !== 0 && v !== 1 && v !== 2) || this.solidGrid[y * this.W + x]) continue;
-        // Origin am Boden → wiegt wie eine verwurzelte Pflanze; zufällige Phase/Dauer = kein Gleichtakt
-        const f = this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(8, 15), "flowers")
-          .setOrigin(0.5, 1).setScale(0.35).setDepth(y * T + 6).setAngle(-3);
-        this.tweens.add({
-          targets: f, angle: 3, duration: Phaser.Math.Between(1600, 2600),
-          yoyo: true, repeat: -1, ease: "Sine.inOut", delay: Phaser.Math.Between(0, 1400),
-        });
+        // Origin am Boden; leichte statische Zufallsneigung bricht den Gleichtakt – ohne Bewegung (#30)
+        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(8, 15), "flowers")
+          .setOrigin(0.5, 1).setScale(0.35).setDepth(y * T + 6).setAngle(Phaser.Math.Between(-3, 3));
         placed++;
       }
     }
