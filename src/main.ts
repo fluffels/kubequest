@@ -105,6 +105,12 @@ import { keys, clearKeys, worldScene } from "./runtime";
     if (Game.offlineEarnings > 0) {
       setTimeout(() => UI.toast("🌙 Während du weg warst, hat dein Hafen <b>+" + Game.offlineEarnings + " 🪙</b> verdient!"), 1200);
     }
+    // Einmaliger Erklär-Toast: was die 🔥-Flamme im HUD bedeutet (auch ohne Maus sichtbar).
+    if (!Game.state.streakHintShown) {
+      setTimeout(() => UI.toast("🔥 <b>Tages-Streak:</b> Spiele täglich für bis zu <b>+50 % Dublonen</b> auf deine Belohnungen!"), 2600);
+      Game.state.streakHintShown = true;
+      Game.save();
+    }
 
     // Spielstand regelmäßig sichern
     setInterval(() => Game.save(), 5000);

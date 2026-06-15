@@ -47,6 +47,7 @@ import type { GameState, QuestStep } from "./types";
       activeFlag: null,
       review: {},
       streak: { count: 0, lastDay: 0 },
+      streakHintShown: false,
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
