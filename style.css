@@ -373,30 +373,6 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 .ql-quest .ql-title { font-weight: bold; color: var(--accent); }
 .ql-stats { margin-top: 14px; font-size: 0.85em; color: var(--text-dim); }
 
-/* ===== Charakterwahl ===== */
-#charselect {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(ellipse at center, #16304d, #0b1929);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-.cs-box { text-align: center; max-width: 640px; padding: 20px; }
-.cs-box h1 { color: var(--accent); font-size: 2.4em; margin-bottom: 0.2em; }
-.cs-chars { display: flex; gap: 14px; justify-content: center; margin: 24px 0; flex-wrap: wrap; }
-.cs-chars canvas {
-  width: 80px; height: 80px;
-  image-rendering: pixelated;
-  background: var(--panel);
-  border: 2px solid var(--border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.1s, border-color 0.1s;
-}
-.cs-chars canvas:hover { transform: scale(1.1); border-color: var(--accent); }
-
 /* ===== Toasts ===== */
 #toasts {
   position: fixed;
