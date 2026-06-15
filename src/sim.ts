@@ -36,6 +36,16 @@ export interface ServiceRes {
   port: string | number;
   created?: number;
 }
+/** Hafentor: leitet eine Außen-Adresse (host/pfad) an einen Service im Cluster. */
+export interface IngressRes {
+  name: string;
+  className: string;      // z.B. "nginx" – welcher Ingress-Controller zuständig ist
+  host: string;          // z.B. "hafen.de"
+  path: string;          // z.B. "/kasse"
+  service: string;       // Ziel-Service im Cluster
+  port: string | number; // Ziel-Port des Services
+  created?: number;
+}
 export interface Secret {
   name: string;
   keys: string[];
@@ -95,6 +105,7 @@ export interface CiDeploy {
 export interface ApplyEffect {
   deployment?: { name: string; image: string; replicas: number };
   service?: { name: string; type?: string; port: string | number };
+  ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string };
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
@@ -110,6 +121,7 @@ export interface Scenario {
   nodes?: ClusterNode[];
   deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null }>;
   services?: ServiceRes[];
+  ingresses?: IngressRes[];
   secrets?: Secret[];
   files?: Record<string, string>;
   applyEffects?: Record<string, ApplyEffect>;
@@ -137,6 +149,9 @@ export interface Scenario {
     "alpine", "ubuntu", "debian", "traefik", "envoy", "haproxy", "vault",
     "keycloak", "grafana", "prometheus", "wordpress", "nextcloud",
   ];
+
+  // Alle Ingresses teilen sich die Adresse des einen Ingress-Controllers (wie im echten Cluster).
+  const INGRESS_ADDRESS = "203.0.113.10";
 
   let podCounter = 0;
 
@@ -177,6 +192,7 @@ export interface Scenario {
     nodes!: ClusterNode[];
     deployments!: Deployment[];
     services!: ServiceRes[];
+    ingresses!: IngressRes[];
     secrets!: Secret[];
     files!: Record<string, string>;
     applyEffects!: Record<string, ApplyEffect>;
@@ -210,6 +226,7 @@ export interface Scenario {
 
       this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
+      this.ingresses = (sc.ingresses || []).map(i => Object.assign({}, i));
       this.secrets = (sc.secrets || []).map(s => Object.assign({}, s));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
@@ -308,6 +325,9 @@ export interface Scenario {
       for (const repo of sc.helmRepos || []) {
         if (!this.helmRepos.includes(repo)) this.helmRepos.push(repo);
       }
+      for (const ing of sc.ingresses || []) {
+        if (!this.ingresses.some(x => x.name === ing.name)) this.ingresses.push(Object.assign({}, ing));
+      }
       if (sc.ciDeploy) this.ci.deploy = Object.assign({}, sc.ciDeploy);
     }
 
@@ -319,6 +339,7 @@ export interface Scenario {
         nodes: this.nodes.map(n => Object.assign({}, n)),
         deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null })),
         services: this.services.map(s => Object.assign({}, s)),
+        ingresses: this.ingresses.map(i => Object.assign({}, i)),
         secrets: this.secrets.map(s => ({ name: s.name, keys: s.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
@@ -435,7 +456,7 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|nodes|secrets | describe pod <name>",
+        "  kubectl    get pods|deployments|services|ingress|nodes|secrets | describe pod|ingress <name>",
         "             create deployment | create secret generic | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
@@ -611,14 +632,37 @@ export interface Scenario {
           this.secrets.map(s => [s.name, "Opaque", String(s.keys.length), this._age(s.created || 0)]));
       }
 
+      if (["ingress", "ingresses", "ing"].includes(what)) {
+        if (this.ingresses.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "CLASS", "HOSTS", "ADDRESS", "PORTS", "AGE"],
+          this.ingresses.map(i => [i.name, i.className, i.host, INGRESS_ADDRESS, "80", this._age(i.created || 0)]));
+      }
+
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, ingress oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
       const what = (t[2] || "").toLowerCase();
       const name = t[3];
-      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>'.");
+      if (["ingress", "ingresses", "ing"].includes(what)) {
+        if (!name) return this._err("kubectl describe ingress: Welches Hafentor?", "Die Namen siehst du mit 'kubectl get ingress'.");
+        const ing = this.ingresses.find(i => i.name === name);
+        if (!ing) return this._err('Error from server (NotFound): ingresses.networking.k8s.io "' + name + '" not found', "Tipp: Namen aus 'kubectl get ingress' kopieren.");
+        const svcExists = this.services.some(s => s.name === ing.service);
+        return [
+          "Name:             " + ing.name,
+          "Namespace:        default",
+          "Address:          " + INGRESS_ADDRESS,
+          "Ingress Class:    " + ing.className,
+          "Rules:",
+          "  Host        Path  Backends",
+          "  ----        ----  --------",
+          "  " + ing.host + "  " + ing.path + "   " + ing.service + ":" + ing.port +
+            (svcExists ? "" : "  (⚠ Service '" + ing.service + "' gibt es nicht – das Tor lotst ins Leere!)"),
+        ].join("\n");
+      }
+      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>' und 'kubectl describe ingress <name>'.");
       if (!name) return this._err("kubectl describe pod: Welcher Pod?", "Die Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Tipp: Pod-Namen kannst du aus 'kubectl get pods' kopieren.");
@@ -730,6 +774,11 @@ export interface Scenario {
           const i = this.services.findIndex(s => s.name === effSvc.name);
           if (i >= 0) { this.services.splice(i, 1); out.push('service "' + effSvc.name + '" deleted'); }
         }
+        const effIng = eff.ingress;
+        if (effIng) {
+          const i = this.ingresses.findIndex(x => x.name === effIng.name);
+          if (i >= 0) { this.ingresses.splice(i, 1); out.push('ingress.networking.k8s.io "' + effIng.name + '" deleted'); }
+        }
         return out.join("\n") || "nothing deleted";
       }
 
@@ -767,6 +816,13 @@ export interface Scenario {
         return 'secret "' + name + '" deleted';
       }
 
+      if (["ingress", "ingresses", "ing"].includes(what)) {
+        const idx = this.ingresses.findIndex(i => i.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): ingresses.networking.k8s.io "' + name + '" not found');
+        this.ingresses.splice(idx, 1);
+        return 'ingress.networking.k8s.io "' + name + '" deleted';
+      }
+
       return this._err("kubectl delete: Ressourcentyp '" + what + "' kennt der Simulator nicht.");
     }
 
@@ -800,6 +856,20 @@ export interface Scenario {
             port: effSvc.port, created: this.clock,
           });
           out.push("service/" + effSvc.name + " created");
+        }
+      }
+      const effIng = eff.ingress;
+      if (effIng) {
+        const existing = this.ingresses.find(i => i.name === effIng.name);
+        if (existing) {
+          out.push("ingress.networking.k8s.io/" + effIng.name + " unchanged");
+        } else {
+          this.ingresses.push({
+            name: effIng.name, className: effIng.className || "nginx",
+            host: effIng.host, path: effIng.path || "/",
+            service: effIng.service, port: effIng.port, created: this.clock,
+          });
+          out.push("ingress.networking.k8s.io/" + effIng.name + " created");
         }
       }
       return out.join("\n");

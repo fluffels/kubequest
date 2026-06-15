@@ -174,3 +174,97 @@ test("snapshot/restore erhält den kompletten Zustand", () => {
   assert.match(restored.exec("kubectl get secrets").output!, /db/);
   assert.match(restored.exec("helm list").output!, /web/);
 });
+
+/* ===================== Ingress (Hafentor) – Issue #15 ===================== */
+
+// Kleiner Helfer: ein Ingress-Manifest in die Welt legen, so wie es eine Quest täte.
+function legeIngressManifest(s: KQSim, datei = "ingress.yaml") {
+  s.files[datei] = "kind: Ingress …";
+  s.applyEffects[datei] = { ingress: { name: "hafentor", host: "hafen.de", path: "/kasse", service: "kasse", port: "80", className: "nginx" } };
+}
+
+test("ingress: get zeigt 'No resources', solange keins existiert", () => {
+  // Negativfall: Tor noch nicht aufgestellt -> kein Eintrag, kein Crash.
+  const r = sim.exec("kubectl get ingress");
+  assert.ok(!r.error, "leere Ingress-Liste ist kein Fehler");
+  assert.match(r.output!, /No resources found/);
+});
+
+test("ingress: apply -f erzeugt das Hafentor, get zeigt Host/Class/Adresse", () => {
+  legeIngressManifest(sim);
+  const created = sim.exec("kubectl apply -f ingress.yaml");
+  assert.match(created.output!, /ingress\.networking\.k8s\.io\/hafentor created/);
+  assert.equal(sim.ingresses.length, 1, "genau ein Ingress angelegt");
+
+  const get = sim.exec("kubectl get ingress");
+  assert.match(get.output!, /hafentor/);
+  assert.match(get.output!, /hafen\.de/, "HOSTS-Spalte zeigt den Host");
+  assert.match(get.output!, /nginx/, "CLASS-Spalte zeigt den Ingress-Controller");
+  assert.match(get.output!, /203\.0\.113\.10/, "ADDRESS-Spalte zeigt die Controller-Adresse");
+  // Kurzform 'ing' liefert dasselbe.
+  assert.match(sim.exec("kubectl get ing").output!, /hafentor/);
+});
+
+test("ingress: apply ist idempotent (zweites apply -> unchanged, kein Duplikat)", () => {
+  legeIngressManifest(sim);
+  assert.match(sim.exec("kubectl apply -f ingress.yaml").output!, /created/);
+  assert.match(sim.exec("kubectl apply -f ingress.yaml").output!, /unchanged/);
+  assert.equal(sim.ingresses.filter(i => i.name === "hafentor").length, 1, "kein doppeltes Tor");
+});
+
+test("ingress: delete per Name und per -f entfernt das Tor; Unbekanntes meldet NotFound", () => {
+  legeIngressManifest(sim);
+  sim.exec("kubectl apply -f ingress.yaml");
+
+  // Negativfall: löschen, was es nicht gibt.
+  const miss = sim.exec("kubectl delete ingress gibtsnicht");
+  assert.ok(miss.error, "unbekanntes Ingress -> Fehler");
+  assert.match(miss.output!, /NotFound/);
+  assert.equal(sim.ingresses.length, 1, "fehlgeschlagenes delete fasst Bestand nicht an");
+
+  // per Name löschen
+  assert.match(sim.exec("kubectl delete ingress hafentor").output!, /hafentor" deleted/);
+  assert.equal(sim.ingresses.length, 0);
+
+  // erneut anlegen und diesmal per -f löschen
+  sim.exec("kubectl apply -f ingress.yaml");
+  assert.equal(sim.ingresses.length, 1);
+  assert.match(sim.exec("kubectl delete -f ingress.yaml").output!, /hafentor" deleted/);
+  assert.equal(sim.ingresses.length, 0);
+});
+
+test("ingress: describe zeigt Backend – und warnt, wenn der Ziel-Service fehlt", () => {
+  // Tor zeigt auf Service 'kasse', den es (noch) NICHT gibt -> Lern-Warnung.
+  legeIngressManifest(sim);
+  sim.exec("kubectl apply -f ingress.yaml");
+  const ohneSvc = sim.exec("kubectl describe ingress hafentor");
+  assert.match(ohneSvc.output!, /hafen\.de/);
+  assert.match(ohneSvc.output!, /kasse:80/, "Backend Service:Port wird gezeigt");
+  assert.match(ohneSvc.output!, /lotst ins Leere/, "fehlender Service wird angewarnt");
+
+  // Service anlegen -> Warnung verschwindet.
+  sim.exec("kubectl create deployment kasse --image=nginx");
+  sim.exec("kubectl expose deployment kasse --port=80");
+  const mitSvc = sim.exec("kubectl describe ingress hafentor");
+  assert.doesNotMatch(mitSvc.output!, /lotst ins Leere/);
+
+  // Negativfall: describe auf nicht existierendes Tor.
+  const miss = sim.exec("kubectl describe ingress geist");
+  assert.ok(miss.error);
+  assert.match(miss.output!, /NotFound/);
+});
+
+test("ingress: Szenario-Seeding + snapshot/restore erhalten das Tor", () => {
+  // Über das Szenario vorbelegt (wie eine Quest-Welt).
+  const seeded = new KQSim({ ingresses: [{ name: "tor-1", className: "nginx", host: "alt.de", path: "/", service: "alt", port: "80" }] });
+  assert.match(seeded.exec("kubectl get ingress").output!, /tor-1/);
+
+  // mergeScenario fügt ein zweites hinzu, ohne das erste zu doppeln.
+  seeded.mergeScenario({ ingresses: [{ name: "tor-1", className: "nginx", host: "alt.de", path: "/", service: "alt", port: "80" }, { name: "tor-2", className: "nginx", host: "neu.de", path: "/", service: "neu", port: "80" }] });
+  assert.equal(seeded.ingresses.length, 2, "Duplikat wird nicht erneut angelegt");
+
+  // snapshot/restore behält beide Tore.
+  const restored = new KQSim(JSON.parse(JSON.stringify(seeded.snapshot())));
+  assert.match(restored.exec("kubectl get ingress").output!, /tor-1/);
+  assert.match(restored.exec("kubectl get ingress").output!, /tor-2/);
+});
