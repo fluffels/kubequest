@@ -47,6 +47,29 @@ test("docker run: Flags nach dem Image gelten nicht (echte Reihenfolge: Optionen
   assert.ok(!sim.exec("docker run --name echo-test nginx echo hallo").error, "Befehl nach dem Image ist ok");
 });
 
+test("häufige Anfängerfehler werden auch bei kubectl/helm/git abgefangen – Fehler + Hinweis (Issue #19)", () => {
+  // kubectl: Pflicht-Flag fehlt
+  const noImg = sim.exec("kubectl create deployment kasse");
+  assert.ok(noImg.error, "create deployment ohne --image muss meckern");
+  assert.match(noImg.output!, /image/i);
+  assert.ok(!sim.deployments.some(d => d.name === "kasse"), "ohne --image wird KEIN Deployment angelegt");
+  // kubectl: unbekannte Ressource -> Vorschlag
+  const bad = sim.exec("kubectl get bananen");
+  assert.ok(bad.error && /pods|deployments|services|nodes/i.test(bad.output!), "unbekannte Ressource wird erklärt");
+
+  // helm: Chart fehlt
+  assert.ok(sim.exec("helm install meinrelease").error, "helm install ohne Chart muss meckern");
+
+  // git: ohne init kein Repo
+  assert.ok(sim.exec("git status").error, "ohne 'git init' ist es kein Repo");
+  sim.exec("git init");
+  // git commit ohne -m wird erklärt
+  const noMsg = sim.exec("git commit");
+  assert.ok(noMsg.error && /Commit-Nachricht/i.test(noMsg.output!), "commit ohne -m wird erklärt");
+  // git add ohne Datei wird erklärt
+  assert.ok(sim.exec("git add").error, "git add ohne Datei muss meckern");
+});
+
 test("kubectl: create, scale, self-healing nach delete", () => {
   sim.exec("kubectl create deployment kasse --image=nginx");
   sim.exec("kubectl scale deployment kasse --replicas=3");
