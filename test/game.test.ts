@@ -152,6 +152,25 @@ test("dueReviewItems: liefert nur fällige Karten, niedrigste Box zuerst", () =>
   expect(due.indexOf("zuerst")).toBeLessThan(due.indexOf("spaeter")); // Sortierung
 });
 
+test("freeReviewItems: liefert ALLE Karten (auch nicht fällige) und ändert den SR-Plan nicht", () => {
+  const heute = Game.state.streak.lastDay;
+  Game.state.review["faellig"] = { box: 1, due: heute };
+  Game.state.review["nicht-faellig"] = { box: 3, due: heute + 5 };
+
+  const free = Game.freeReviewItems(10);
+  expect(free).toContain("faellig");
+  expect(free).toContain("nicht-faellig");           // Kern: nicht-fällige Karten sind beim freien Üben dabei
+  expect(free.length).toBe(2);
+  for (const id of free) expect(Game.state.review[id]).toBeTruthy(); // nur echte Karten
+
+  // read-only: Box/Fälligkeit dürfen sich NICHT verändert haben
+  expect(Game.state.review["nicht-faellig"].box).toBe(3);
+  expect(Game.state.review["nicht-faellig"].due).toBe(heute + 5);
+
+  // limit deckelt die Anzahl
+  expect(Game.freeReviewItems(1).length).toBe(1);
+});
+
 test("registerQuestCards: hängt die EXTRA_CARDS des Kapitels in die Wiederholung ein", () => {
   Game.registerQuestCards("q10");
   // aus EXTRA_CARDS q10 (inkl. der in #5 ergänzten Tool-Karten)
