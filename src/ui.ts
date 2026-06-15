@@ -6,6 +6,7 @@ import { Game } from "./game";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
+import { worldScene } from "./runtime";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
   // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
@@ -64,6 +65,41 @@ import { SFX } from "./sfx";
     failCount: 0,
     choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
     choiceSel: 0,
+
+    /* ========== Event-Delegation ==========
+     * Ein einziger delegierter Listener am document übersetzt data-action-
+     * Attribute in UI-Methoden – ersetzt die früheren onclick="UI.x()"-Inline-
+     * Handler (die den globalen window.UI-Shim brauchten). Auch dynamisch
+     * erzeugte Buttons in den Overlays sind damit ohne Neu-Verdrahtung
+     * abgedeckt. Wird einmalig beim Start aus main.ts aufgerufen. */
+    bindEvents() {
+      document.addEventListener("click", ev => {
+        const el = (ev.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
+        if (!el) return;
+        const arg = el.dataset.arg;
+        switch (el.dataset.action) {
+          case "openMenu": this.openMenu(); break;
+          case "closeOverlays": this.closeOverlays(); break;
+          case "exportSave": this.exportSave(); break;
+          case "resetGame": this.resetGame(); break;
+          case "importPick": ($("save-import") as HTMLInputElement).click(); break;
+          case "termHint": this.termHint(); break;
+          case "termSolution": this.termSolution(); break;
+          case "buyItem": if (arg) this.buyItem(arg); break;
+          case "toggleItem": if (arg) this.toggleItem(arg, el.dataset.on === "1"); break;
+          case "startFreePractice": this.startFreePractice(); break;
+          case "nextReviewItem": this.nextReviewItem(); break;
+          case "answerReviewQuiz": this.answerReviewQuiz(Number(el.dataset.oi)); break;
+        }
+      });
+      // Spielstand-Datei laden (früher inline onchange am <input>)
+      ($("save-import") as HTMLInputElement).addEventListener("change", ev => this.importSave(ev));
+      // Quiz-Befehlseingabe: Enter wertet aus. Das Eingabefeld wird dynamisch in
+      // #review-body erzeugt, darum delegiert am stabilen Container lauschen.
+      $("review-body").addEventListener("keydown", ev => {
+        if ((ev.target as HTMLElement).id === "review-input") this.answerReviewCmd(ev);
+      });
+    },
 
     drawPortrait(canvas: HTMLCanvasElement, idx: number) {
       const ctx = canvas.getContext("2d")!;
@@ -176,12 +212,12 @@ import { SFX } from "./sfx";
       if (realCoins > 0) msg += " · +" + realCoins + " 🪙";
       if (label) msg = label + " " + msg;
       this.toast(msg);
-      if (window.SFX) SFX.coin();
+      SFX.coin();
       if (rankUp) {
         const r = Game.rank();
         this.toast("🎉 <b>Beförderung!</b> Du bist jetzt <b>" + r.icon + " " + r.name + "</b>!", "rankup");
-        if (window.SFX) SFX.fanfare();
-        if (window.WorldScene) window.WorldScene.burstAtPlayer("sparkle");
+        SFX.fanfare();
+        worldScene()?.burstAtPlayer("sparkle");
       }
       this.refreshHud();
     },
@@ -206,8 +242,9 @@ import { SFX } from "./sfx";
 
     updatePrompt() {
       const p = $("prompt");
-      if (this.blocking() || !window.WorldScene) { p.classList.add("hidden"); return; }
-      const near = window.WorldScene.nearestNpc();
+      const ws = worldScene();
+      if (this.blocking() || !ws) { p.classList.add("hidden"); return; }
+      const near = ws.nearestNpc();
       if (!near) { p.classList.add("hidden"); return; }
       const meta = NPCS[near.id];
       let label = "💬 Mit " + meta.name + " reden";
@@ -218,8 +255,9 @@ import { SFX } from "./sfx";
     },
 
     interact() {
-      if (!window.WorldScene) return;
-      const near = window.WorldScene.nearestNpc();
+      const ws = worldScene();
+      if (!ws) return;
+      const near = ws.nearestNpc();
       if (!near) return;
       const npcId = near.id;
       if (npcId === "pelle") return this.openShop();
@@ -327,7 +365,7 @@ import { SFX } from "./sfx";
         const q = result.questDone;
         Game.registerQuestCards(q.id);
         this.reward(q.rewardXp, q.rewardCoins, "🏁 Quest „" + q.title + "“ abgeschlossen!");
-        if (window.WorldScene) window.WorldScene.burstAtPlayer("sparkle");
+        worldScene()?.burstAtPlayer("sparkle");
         return;
       }
       const next = Game.currentStep();
@@ -403,7 +441,7 @@ import { SFX } from "./sfx";
       });
       Game.choiceResult(step.reviewId, opt.ok);
       if (opt.ok) this.reward(12, 6);
-      else if (window.SFX) SFX.wrong();
+      else SFX.wrong();
       $("dlg-text").innerHTML = (opt.ok ? "✅ " : "❌ ") + opt.reply;
       $("dlg-next").textContent = "✔ weiter (E)";
       $("dlg-next").classList.remove("hidden");
@@ -503,8 +541,8 @@ import { SFX } from "./sfx";
       const fernrohr = Game.state.inventory["fernrohr"] || 0;
       const kompass = Game.state.inventory["kompass"] || 0;
       actions.innerHTML = `
-        <button onclick="UI.termHint()">🔭 Hinweis ${fernrohr > 0 ? "(Fernrohr: " + fernrohr + ")" : "(25 🪙)"}</button>
-        <button onclick="UI.termSolution()">🧭 Lösung ${kompass > 0 ? "(Kompass: " + kompass + ")" : "(50 🪙)"}</button>
+        <button data-action="termHint">🔭 Hinweis ${fernrohr > 0 ? "(Fernrohr: " + fernrohr + ")" : "(25 🪙)"}</button>
+        <button data-action="termSolution">🧭 Lösung ${kompass > 0 ? "(Kompass: " + kompass + ")" : "(50 🪙)"}</button>
         <span class="dim" style="align-self:center">Selbst tippen statt kopieren – das Tippen ist das Training!</span>`;
     },
 
@@ -536,7 +574,7 @@ import { SFX } from "./sfx";
 
       if (cmdOk && !result.error && checkOk) {
         this.failCount = 0;
-        if (window.SFX) SFX.success();
+        SFX.success();
         this.taskSolved();
       } else {
         this.failCount++;
@@ -677,7 +715,7 @@ import { SFX } from "./sfx";
           <h2>${st.score} von ${rounds.reduce((s, r) => s + r.layers.length, 0)} Schichten ohne Fehler!</h2>
           <p class="dim">Merke: Ein Image ist ein <b>Schichtstapel</b>. Unten die Basis (ändert sich selten = bleibt im Cache),
           oben dein Code (ändert sich oft). Gute Reihenfolge = schnelle Builds!</p>
-          <button class="primary" onclick="UI.closeOverlays()">Zurück zu Bo</button></div>`;
+          <button class="primary" data-action="closeOverlays">Zurück zu Bo</button></div>`;
         this.stack = null;
         return;
       }
@@ -708,7 +746,7 @@ import { SFX } from "./sfx";
         div.className = "stack-layer";
         div.textContent = "📦 " + layer;
         $("stack-pile").prepend(div);
-        if (window.SFX) SFX.success();
+        SFX.success();
         if (st.placed >= st.target.length) {
           st.round++;
           setTimeout(() => this.renderStackRound(), 700);
@@ -717,7 +755,7 @@ import { SFX } from "./sfx";
         st.score = Math.max(0, st.score - 1);
         btn.classList.add("wrong");
         setTimeout(() => btn.classList.remove("wrong"), 400);
-        if (window.SFX) SFX.wrong();
+        SFX.wrong();
         const expected = st.placed === 0 ? "der Basis (FROM …)" : "der nächsten Schicht über „" + st.target[st.placed - 1].split(" (")[0] + "“";
         $("stack-pile").insertAdjacentHTML("beforebegin", "");
         this.toast("❌ Nicht ganz – wir sind bei " + expected + ".");
@@ -749,9 +787,9 @@ import { SFX } from "./sfx";
       html += `<div class="ql-stats">Rang: ${r.icon} ${r.name} · ${s.xp} XP · 🪙 ${s.coins} (+${rate}/min) · 🔥 Streak: ${s.streak.count}<br>
         Befehle gefunkt: ${s.stats.commands} · Quiz richtig: ${s.stats.quizRight} · Piraten vertrieben: ${s.stats.piratesBeaten} · Kraken vertrieben: ${s.stats.krakenBeaten}<br>
         <div class="actions" style="margin-top:10px">
-          <button onclick="UI.exportSave()">💾 Spielstand sichern (Datei)</button>
-          <button onclick="document.getElementById('save-import').click()">📂 Spielstand laden</button>
-          <button class="linklike" onclick="UI.resetGame()">Zurücksetzen</button>
+          <button data-action="exportSave">💾 Spielstand sichern (Datei)</button>
+          <button data-action="importPick">📂 Spielstand laden</button>
+          <button class="linklike" data-action="resetGame">Zurücksetzen</button>
         </div>
         <div class="dim" style="margin-top:6px">Gespeichert wird automatisch alle 5 Sekunden im Browser. Die Datei brauchst du nur als Backup oder für einen anderen Rechner/Browser.</div></div>`;
       $("quest-body").innerHTML = html;
@@ -778,7 +816,7 @@ import { SFX } from "./sfx";
         const ownedPerm = s.owned.includes(item.id);
         let action;
         if (item.type === "consumable") {
-          action = `<button class="primary" onclick="UI.buyItem('${item.id}')">Kaufen – ${item.price} 🪙</button>
+          action = `<button class="primary" data-action="buyItem" data-arg="${item.id}">Kaufen – ${item.price} 🪙</button>
             ${ownedCount > 0 ? `<div class="si-owned">Im Beutel: ${ownedCount}</div>` : ""}`;
         } else if (ownedPerm) {
           if (item.type === "upgrade") {
@@ -786,11 +824,11 @@ import { SFX } from "./sfx";
           } else {
             const active = s.activePet === item.id || s.activeFlag === item.id;
             action = active
-              ? `<button onclick="UI.toggleItem('${item.id}', false)">✅ Aktiv – abschalten</button>`
-              : `<button onclick="UI.toggleItem('${item.id}', true)">Aktivieren</button>`;
+              ? `<button data-action="toggleItem" data-arg="${item.id}" data-on="0">✅ Aktiv – abschalten</button>`
+              : `<button data-action="toggleItem" data-arg="${item.id}" data-on="1">Aktivieren</button>`;
           }
         } else {
-          action = `<button class="primary" onclick="UI.buyItem('${item.id}')">Kaufen – ${item.price} 🪙</button>`;
+          action = `<button class="primary" data-action="buyItem" data-arg="${item.id}">Kaufen – ${item.price} 🪙</button>`;
         }
         const icon = item.tex !== undefined
           ? `<canvas width="16" height="16" data-tex="${item.tex}"></canvas>`
@@ -819,7 +857,7 @@ import { SFX } from "./sfx";
     buyItem(itemId: string) {
       const result = Game.buy(itemId);
       this.toast(result.ok ? "🛒 " + result.msg : "⚠️ " + result.msg);
-      if (result.ok && window.SFX) SFX.coin();
+      if (result.ok) SFX.coin();
       this.refreshHud();
       this.openShop();
     },
@@ -845,13 +883,13 @@ import { SFX } from "./sfx";
           ? `<div style="text-align:center">
               <div style="font-size:3em">🦀</div>
               <p>„Schnipp schnapp! Noch keine Karten im Stapel – schließe erst eine Quest ab, dann üben wir täglich!“</p>
-              <button class="primary" onclick="UI.closeOverlays()">Alles klar, Kralle!</button></div>`
+              <button class="primary" data-action="closeOverlays">Alles klar, Kralle!</button></div>`
           : `<div style="text-align:center">
               <div style="font-size:3em">🦀</div>
               <p>„Heute ist nichts mehr fällig – dein Wissen ist frisch wie der Morgenfang! Aber wir können <b>frei üben</b>, so oft du willst. Schnipp!“</p>
               <div class="actions">
-                <button class="primary" onclick="UI.startFreePractice()">🦀 Frei üben</button>
-                <button onclick="UI.closeOverlays()">Später</button>
+                <button class="primary" data-action="startFreePractice">🦀 Frei üben</button>
+                <button data-action="closeOverlays">Später</button>
               </div></div>`;
         return;
       }
@@ -886,8 +924,8 @@ import { SFX } from "./sfx";
             ? "Freies Üben – so oft du willst! (zählt nicht in den täglichen Wiederholungs-Plan)"
             : "Richtige Karten kommen seltener wieder, falsche öfter – bis alles sitzt. Schnipp!"}</p>
           <div class="actions">
-            <button class="primary" onclick="UI.startFreePractice()">🦀 Nochmal frei üben</button>
-            <button onclick="UI.closeOverlays()">Zurück ins Abenteuer</button>
+            <button class="primary" data-action="startFreePractice">🦀 Nochmal frei üben</button>
+            <button data-action="closeOverlays">Zurück ins Abenteuer</button>
           </div></div>`;
         this.review = null;
         return;
@@ -903,14 +941,14 @@ import { SFX } from "./sfx";
         r.current.order = shuffled(q.options.map((_: unknown, i: number) => i));
         body = `<div class="quiz-q">${q.q}</div>
           <div class="quiz-options" id="quiz-options">
-            ${r.current.order.map((oi: number) => `<button data-oi="${oi}" onclick="UI.answerReviewQuiz(${oi})">${esc(q.options[oi])}</button>`).join("")}
+            ${r.current.order.map((oi: number) => `<button data-action="answerReviewQuiz" data-oi="${oi}">${esc(q.options[oi])}</button>`).join("")}
           </div><div id="review-explain"></div>`;
       } else {
         const card = content.card!;
         body = `<div class="quiz-q">⌨️ ${card.q}</div>
           <div class="review-cmd-row"><span class="term-prompt">crew@hafen:~$</span>
             <input type="text" id="review-input" autocomplete="off" spellcheck="false"
-              placeholder="Befehl eintippen, Enter drücken …" onkeydown="UI.answerReviewCmd(event)"></div>
+              placeholder="Befehl eintippen, Enter drücken …"></div>
           <div id="review-explain"></div>`;
       }
       $("review-body").innerHTML = `<p class="dim">🦀 Karte ${r.idx + 1} von ${r.ids.length} · richtig: ${r.right}</p>` + body;
@@ -950,16 +988,16 @@ import { SFX } from "./sfx";
       const r = this.review;
       if (r.free) {
         // Freies Üben: SR-Plan unangetastet lassen, keine Belohnung (kein Farmen)
-        if (correct) { r.right++; if (window.SFX) SFX.success(); }
-        else if (window.SFX) SFX.wrong();
+        if (correct) { r.right++; SFX.success(); }
+        else SFX.wrong();
       } else {
         Game.reviewResult(r.current.itemId, correct);
         if (correct) { r.right++; this.reward(4, 3); }
-        else if (window.SFX) SFX.wrong();
+        else SFX.wrong();
       }
       $("review-explain").innerHTML = `
         <div class="quiz-explain">${correct ? "✅ <b>Richtig!</b> Schnipp-schnapp-applaus! 🦀" : "❌ <b>Nicht ganz.</b>"} ${explainHtml}</div>
-        <div class="actions"><button class="primary" onclick="UI.nextReviewItem()">Weiter ➡️</button></div>`;
+        <div class="actions"><button class="primary" data-action="nextReviewItem">Weiter ➡️</button></div>`;
     },
 
     nextReviewItem() {
@@ -1006,5 +1044,3 @@ import { SFX } from "./sfx";
       location.reload();
     },
   };
-
-  window.UI = UI;
