@@ -37,6 +37,7 @@ import lighthouse from "../assets/pixellab/lighthouse.png";
 import house_office from "../assets/pixellab/house_office.png";
 import house_forge from "../assets/pixellab/house_forge.png";
 import house_chart from "../assets/pixellab/house_chart.png";
+import ship from "../assets/pixellab/ship.png";
 
 // PixelLab-Figuren (nur south-Frame genutzt)
 import char_player from "../assets/pixellab/char_player.png";
@@ -62,7 +63,7 @@ export const KQAssets = {
   coast, meadow, path, kai, dock,
   flowers, tree, pine, bush, rock, barrel, crate, well, stall, lamppost,
   mushroom, seashell, driftwood,
-  signpost, sign, lighthouse, house_office, house_forge, house_chart,
+  signpost, sign, lighthouse, house_office, house_forge, house_chart, ship,
   char_player, char_player_east, char_player_north, char_player_west,
   char_ole, char_runa, char_pelle, char_bo, char_ada, char_theo, char_kralle, char_juno,
   pet_ratte, pet_fledermaus, pet_geist,
