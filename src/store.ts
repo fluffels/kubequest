@@ -19,11 +19,11 @@
       window.localStorage.removeItem(probe);
       return window.localStorage;
     } catch (e) {
-      let mem = Object.create(null);
+      let mem: Record<string, string> = Object.create(null);
       return {
-        getItem: k => (k in mem ? mem[k] : null),
-        setItem: (k, v) => { mem[k] = String(v); },
-        removeItem: k => { delete mem[k]; },
+        getItem: (k: string) => (k in mem ? mem[k] : null),
+        setItem: (k: string, v: string) => { mem[k] = String(v); },
+        removeItem: (k: string) => { delete mem[k]; },
       };
     }
   })();
@@ -35,7 +35,7 @@
     },
 
     /** Roh-JSON-String des Spielstands ablegen. */
-    write(json) {
+    write(json: string) {
       backend.setItem(SAVE_KEY, json);
     },
 

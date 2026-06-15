@@ -935,6 +935,8 @@ import { SFX } from "./sfx";
       const reader = new FileReader();
       reader.onload = () => {
         try {
+          // readAsText liefert immer einen String (nie ArrayBuffer/null) – TS weiß das nicht.
+          if (typeof reader.result !== "string") throw new Error("kein Text");
           Game.importData(reader.result);
           this.toast("📂 Spielstand geladen – Spiel startet neu …");
           setTimeout(() => location.reload(), 800);

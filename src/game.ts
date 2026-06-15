@@ -7,12 +7,12 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
-import type { GameState } from "./types";
+import type { GameState, QuestStep } from "./types";
 
-  const BOX_INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
+  const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
-  const EXTRA_CARDS = {
+  const EXTRA_CARDS: Record<string, string[]> = {
     q3: ["q-ch1-3", "q-ch1-5"],
     q4: ["q-ch2-1", "q-ch2-4"],
     q7: ["q-ch3-2"],
@@ -111,7 +111,7 @@ import type { GameState } from "./types";
       return SaveStore.read();
     },
 
-    importData(json) {
+    importData(json: string) {
       JSON.parse(json); // wirft bei ungültiger Datei
       SaveStore.write(json);
     },
@@ -125,7 +125,7 @@ import type { GameState } from "./types";
     },
 
     /** Wird von der Spielschleife getickt; gibt ausgezahlte Dublonen zurück. */
-    economyTick(dt) {
+    economyTick(dt: number) {
       this.incomeAcc += this.incomeRate() / 60 * dt;
       if (this.incomeAcc >= 1) {
         const payout = Math.floor(this.incomeAcc);
@@ -162,7 +162,7 @@ import type { GameState } from "./types";
       return i < KQContent.RANKS.length - 1 ? KQContent.RANKS[i + 1] : null;
     },
 
-    addXp(amount) {
+    addXp(amount: number) {
       const before = this.rankIndex();
       this.state.xp += amount;
       const after = this.rankIndex();
@@ -170,14 +170,14 @@ import type { GameState } from "./types";
       return after > before;
     },
 
-    addCoins(amount) {
+    addCoins(amount: number) {
       const real = Math.round(amount * this.coinMultiplier());
       this.state.coins += real;
       this.save();
       return real;
     },
 
-    spendCoins(amount) {
+    spendCoins(amount: number) {
       if (this.state.coins < amount) return false;
       this.state.coins -= amount;
       this.save();
@@ -185,7 +185,7 @@ import type { GameState } from "./types";
     },
 
     /* ---------- Shop ---------- */
-    buy(itemId) {
+    buy(itemId: string) {
       const item = KQContent.SHOP.find(s => s.id === itemId);
       if (!item) return { ok: false, msg: "Unbekannte Ware." };
       if (item.type !== "consumable" && this.state.owned.includes(itemId)) {
@@ -205,14 +205,14 @@ import type { GameState } from "./types";
       return { ok: true, msg: item.name + " gekauft!" };
     },
 
-    useConsumable(itemId) {
+    useConsumable(itemId: string) {
       if (!this.state.inventory[itemId]) return false;
       this.state.inventory[itemId]--;
       this.save();
       return true;
     },
 
-    hasUpgrade(id) { return this.state.owned.includes(id); },
+    hasUpgrade(id: string) { return this.state.owned.includes(id); },
 
     /* ---------- Quests ---------- */
     currentQuest() { return KQContent.QUESTS[this.state.questIdx] || null; },
@@ -221,11 +221,11 @@ import type { GameState } from "./types";
       return q ? q.steps[this.state.questStep] || null : null;
     },
     /** Ist der aktuelle Schritt einer fürs Funkgerät? */
-    isFunkStep(step) {
+    isFunkStep(step: QuestStep | null) {
       return step && ["teach", "drill", "terminal"].includes(step.type);
     },
     /** Aufgabenliste eines Funk-Schritts (drills werden von der UI generiert). */
-    stepTasks(step) {
+    stepTasks(step: QuestStep) {
       if (step.type === "terminal") return step.tasks;
       if (step.type === "teach") return [step.cmd];
       return null;
@@ -249,19 +249,19 @@ import type { GameState } from "./types";
     allQuestsDone() { return this.state.questIdx >= KQContent.QUESTS.length; },
 
     /* ---------- Üben (Drills bei NPCs) ---------- */
-    practiceDrillsFor(npcId) {
+    practiceDrillsFor(npcId: string) {
       const pool = KQContent.PRACTICE[npcId] || [];
       return pool.filter(p => this.state.completedQuests.includes(p.after)).map(p => p.drill);
     },
 
     /* ---------- Spaced Repetition (Leitner) ---------- */
-    ensureReviewItem(itemId) {
+    ensureReviewItem(itemId: string) {
       if (!this.state.review[itemId]) {
         this.state.review[itemId] = { box: 1, due: today() + 1 };
       }
     },
 
-    registerQuestCards(questId) {
+    registerQuestCards(questId: string) {
       for (const c of KQContent.CMD_CARDS.filter(c => c.chapter === questId)) this.ensureReviewItem(c.id);
       const quest = KQContent.QUESTS.find(q => q.id === questId);
       if (quest) {
@@ -273,7 +273,7 @@ import type { GameState } from "./types";
       this.save();
     },
 
-    reviewResult(itemId, correct) {
+    reviewResult(itemId: string, correct: boolean) {
       this.ensureReviewItem(itemId);
       const item = this.state.review[itemId];
       if (correct) {
@@ -286,7 +286,7 @@ import type { GameState } from "./types";
       this.save();
     },
 
-    choiceResult(itemId, correct) {
+    choiceResult(itemId: string, correct: boolean) {
       if (itemId) {
         this.ensureReviewItem(itemId);
         if (!correct) {
@@ -298,7 +298,7 @@ import type { GameState } from "./types";
       this.save();
     },
 
-    dueReviewItems(limit) {
+    dueReviewItems(limit?: number) {
       const t = today();
       const due: { id: string; box: number }[] = [];
       for (const [id, info] of Object.entries(this.state.review)) {
@@ -308,7 +308,7 @@ import type { GameState } from "./types";
       return due.slice(0, limit || 10).map(d => d.id);
     },
 
-    findReviewContent(itemId) {
+    findReviewContent(itemId: string) {
       const card = KQContent.CMD_CARDS.find(c => c.id === itemId);
       if (card) return { kind: "cmd", card };
       const q = KQContent.CRAB_QUIZ.find(q => q.id === itemId);

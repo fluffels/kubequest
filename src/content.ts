@@ -4,9 +4,10 @@
  * Dazu: Quests, Dialoge, NPCs, Ränge, Shop, Drills, Karteikarten, Events.
  */
 import type { Quest } from "./types";
+import type { Sim, Deployment } from "./sim";
 
-  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const rnd = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
 
   /* ---------- Ränge (geschlechtsneutral) ---------- */
   const RANKS = [
@@ -106,21 +107,24 @@ import type { Quest } from "./types";
   const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
   const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
 
-  function ensureDeployment(sim) {
+  function ensureDeployment(sim: Sim): Deployment {
     let d = sim.deployments.find(d => !["kantine"].includes(d.name)) || sim.deployments[0];
     if (!d) {
       const name = pick(NAMES);
       sim.exec("kubectl create deployment " + name + " --image=nginx");
-      d = sim.deployments.find(x => x.name === name);
+      d = sim.deployments.find(x => x.name === name)!;
     }
     return d;
   }
 
-  function ensureGit(sim) {
+  function ensureGit(sim: Sim) {
     if (!sim.git.initialized) sim.exec("git init");
   }
 
-  const DRILLS = {
+  /** Eine generierte Übungsaufgabe (Drill). */
+  type DrillTask = { text: string; accept: RegExp[]; solution: string; hint: string };
+
+  const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     "docker-pull": sim => {
       const img = pick(IMAGES);
       return { text: "Lade das Image <code>" + img + "</code> aus der Registry.", accept: [new RegExp("^docker\\s+pull\\s+" + img + "(:\\S+)?$")], solution: "docker pull " + img, hint: "Muster: docker pull <image>" };
@@ -139,7 +143,7 @@ import type { Quest } from "./types";
     "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“." }),
     "docker-stop": sim => {
       let c = sim.docker.containers.find(c => c.running);
-      if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name); }
+      if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name)!; }
       return { text: "Stoppe den Container <code>" + c.name + "</code>.", accept: [new RegExp("^docker\\s+stop\\s+" + c.name + "$")], solution: "docker stop " + c.name, hint: "Muster: docker stop <name>" };
     },
     "k-get-nodes": () => ({ text: "Zeig die Nodes des Clusters.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "kubectl get <ressourcentyp>" }),
@@ -270,7 +274,7 @@ import type { Quest } from "./types";
   };
 
   /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
-  const PRACTICE = {
+  const PRACTICE: Record<string, { drill: string; after: string }[]> = {
     bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
     ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
     ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
@@ -353,7 +357,7 @@ import type { Quest } from "./types";
         { type: "teach", brief: "Kiste stoppen", cmd: {
           id: "t-stop", intro: "🆕 Neuer Befehl: <code>docker stop</code> – hält einen Container an.",
           text: "Stoppe einen deiner laufenden Container. (Name aus <code>docker ps</code> abtippen!)",
-          accept: [/^docker\s+stop\s+\S+$/], check: sim => sim.docker.containers.some(c => !c.running),
+          accept: [/^docker\s+stop\s+\S+$/], check: (sim: Sim) => sim.docker.containers.some(c => !c.running),
           solution: "docker stop <name aus docker ps>", hint: "Erst docker ps für den Namen, dann docker stop <name>." } },
         { type: "dialog", npc: "bo", lines: [
           "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps -a</code> zeigt ALLE – auch gestoppte. Das <code>-a</code> heißt „all“.",
@@ -508,7 +512,7 @@ import type { Quest } from "./types";
           { id: "t-storm-2", text: "💥 Lösche einen <code>kasse</code>-Pod – Dock im Blick behalten!",
             accept: [/^kubectl\s+delete\s+pods?\s+kasse-\S+$/], solution: "kubectl delete pod <kasse-pod-name>", hint: "kubectl delete pod <name>" },
           { id: "t-storm-3", text: "Platsch – und der Kran war schneller! Prüfe: Es müssten wieder 3 sein, einer ganz frisch (kleines AGE).",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.lastDeletedPod !== null, solution: "kubectl get pods", hint: "Nochmal die Pod-Liste." },
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => sim.lastDeletedPod !== null, solution: "kubectl get pods", hint: "Nochmal die Pod-Liste." },
         ]},
         { type: "dialog", npc: "ole", lines: [
           "DAS ist Kubernetes! Soll: 3. Ist: 2. → Differenz sofort behoben. Ein letztes Puzzlestück fehlt: Neue Pods bekommen neue Namen und Adressen. Wie sollen Kund:innen die Kasse finden?",
@@ -522,7 +526,7 @@ import type { Quest } from "./types";
         { type: "teach", brief: "Service-Liste", cmd: {
           id: "t-getsvc", intro: "🆕 Neuer Befehl: <code>kubectl get services</code> – alle festen Adressen.",
           text: "Zeig die Services an – deine <code>kasse</code> hat jetzt eine feste CLUSTER-IP.",
-          accept: [/^kubectl\s+get\s+(services|service|svc)$/], check: sim => sim.services.some(s => s.name === "kasse"),
+          accept: [/^kubectl\s+get\s+(services|service|svc)$/], check: (sim: Sim) => sim.services.some(s => s.name === "kasse"),
           solution: "kubectl get services", hint: "Kurzform svc geht auch." } },
         { type: "drill", brief: "Oles Übungsrunde", pool: ["k-delete-pod", "k-expose", "k-get-svc"], count: 3,
           intro: "Der ganze Werkzeugkasten einmal durch:" },
@@ -616,7 +620,7 @@ import type { Quest } from "./types";
         { type: "terminal", brief: "Was ist da passiert?", tasks: [
           { id: "t-runa-3", text: "Zeig die Releases mit <code>helm list</code>.", accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." },
           { id: "t-runa-4", text: "Und jetzt der Aha-Moment: Schau mit <b>kubectl</b> nach den Pods – Helm hat ganz normale Kubernetes-Ressourcen gebaut!",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => sim.releases.length > 0, solution: "kubectl get pods", hint: "Kennst du im Schlaf." },
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => sim.releases.length > 0, solution: "kubectl get pods", hint: "Kennst du im Schlaf." },
         ]},
         { type: "drill", brief: "Runas Übungsrunde", pool: ["helm-install", "helm-list"], count: 2,
           intro: "Noch ein Release zum Festigen – mehr Flaggen!" },
@@ -718,7 +722,7 @@ import type { Quest } from "./types";
           accept: [/^terraform\s+state\s+list$/], solution: "terraform state list", hint: "terraform state …" } },
         { type: "terminal", brief: "Der Beweis", tasks: [
           { id: "t-theo-2", text: "Führe nochmal <code>terraform plan</code> aus. Es muss „No changes“ melden – Soll = Ist!",
-            accept: [/^terraform\s+plan$/], check: sim => sim.tf.applied, solution: "terraform plan", hint: "Einfach nochmal plan." },
+            accept: [/^terraform\s+plan$/], check: (sim: Sim) => sim.tf.applied, solution: "terraform plan", hint: "Einfach nochmal plan." },
         ]},
         { type: "teach", brief: "Kontrollierter Abriss", cmd: {
           id: "t-destroy", intro: "🆕 Neuer Befehl: <code>terraform destroy</code> – reißt ALLES wieder ab, was Terraform gebaut hat.",
@@ -813,7 +817,7 @@ import type { Quest } from "./types";
           hint: "Muster: kubectl set image deployment/<name> <container>=<richtiges-image>" } },
         { type: "terminal", brief: "Verifizieren", tasks: [
           { id: "t-j15-3", text: "Dritte Regel: <b>Fix immer verifizieren!</b> Laufen die Pods wieder?",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "leuchtfeuer"); return d && !d.broken; },
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "leuchtfeuer"); return d && !d.broken; },
             solution: "kubectl get pods", hint: "get pods – STATUS muss Running sein." },
         ]},
         { type: "dialog", npc: "juno", lines: [
@@ -856,7 +860,7 @@ import type { Quest } from "./types";
           hint: "Muster: kubectl rollout restart deployment <name>" } },
         { type: "terminal", brief: "Verifizieren", tasks: [
           { id: "t-j16-4", text: "Verifizieren! Leuchtet die funkboje wieder stabil?",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "funkboje"); return d && !d.broken; },
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "funkboje"); return d && !d.broken; },
             solution: "kubectl get pods", hint: "STATUS muss Running sein." },
         ]},
         { type: "dialog", npc: "juno", lines: [
@@ -901,9 +905,9 @@ import type { Quest } from "./types";
           { id: "t-j17-5", text: "BAUEN! Und dann beobachte: Ost-Plateau + zwei neue Nodes … 🏗️",
             accept: [/^terraform\s+apply(\s+-auto-approve)?$/], solution: "terraform apply", hint: "Die Aufführung." },
           { id: "t-j17-6", text: "Zähl nach: Wie viele Nodes hat dein Cluster jetzt?",
-            accept: [/^kubectl\s+get\s+(nodes|node|no)$/], check: sim => sim.nodes.length > 3, solution: "kubectl get nodes", hint: "kubectl, nicht terraform!" },
+            accept: [/^kubectl\s+get\s+(nodes|node|no)$/], check: (sim: Sim) => sim.nodes.length > 3, solution: "kubectl get nodes", hint: "kubectl, nicht terraform!" },
           { id: "t-j17-7", text: "Und der Moment der Wahrheit: Haben die frachtplaner-Pods jetzt Platz gefunden?",
-            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: sim => { const d = sim.deployments.find(d => d.name === "frachtplaner"); return d && !d.broken; },
+            accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "frachtplaner"); return d && !d.broken; },
             solution: "kubectl get pods", hint: "get pods – STATUS lesen." },
         ]},
         { type: "choice", npc: "juno", reviewId: "q-ts-4",
@@ -1200,7 +1204,7 @@ import type { Quest } from "./types";
   ];
 
   /** Buchstabendreher für Sturm-Events: macht aus jedem Image-Namen garantiert einen anderen. */
-  function corruptImage(img) {
+  function corruptImage(img: string) {
     for (let i = 1; i < img.length - 1; i++) {
       if (img[i] !== img[i + 1]) return img.slice(0, i) + img[i + 1] + img[i] + img.slice(i + 2);
     }
