@@ -40,7 +40,7 @@ import { SFX } from "./sfx";
     constructor() { super("Boot"); }
     create() {
       const sheets: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
+      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
       let loaded = 0;
       const done = () => {
         loaded++;
@@ -556,7 +556,7 @@ import { SFX } from "./sfx";
       this.playerPos = {
         x: sp && sp.x ? sp.x : (this.ship.x + 4) * T,
         y: sp && sp.y ? sp.y : (this.ship.y + 2) * T,
-        dir: 1, moving: false,
+        dir: 1, moving: false, face: "south",   // face: Blickrichtung für die 4-Richtungs-Sprites
       };
       this.playerShadow = this.addShadow(this.playerPos.x, this.playerPos.y + 6);
       this.playerSprite = this.add.image(this.playerPos.x, this.playerPos.y + 6, "char_player").setOrigin(0.5, 0.81).setScale(0.6).setDepth(this.playerPos.y + 8);
@@ -917,6 +917,11 @@ import { SFX } from "./sfx";
       if (pl.moving) {
         const len = Math.hypot(dx, dy);
         if (dx) pl.dir = Math.sign(dx);
+        // Blickrichtung für die 4 PixelLab-Richtungen (horizontal hat Vorrang bei Diagonale)
+        if (dx < 0) pl.face = "west";
+        else if (dx > 0) pl.face = "east";
+        else if (dy < 0) pl.face = "north";
+        else if (dy > 0) pl.face = "south";
         this.tryMove(dx / len * 75 * dt, dy / len * 75 * dt);
         this.petTrail.push({ x: pl.x, y: pl.y });
         if (this.petTrail.length > 26) this.petTrail.shift();
@@ -926,7 +931,9 @@ import { SFX } from "./sfx";
         if (this.stepAcc > 0.3) { this.stepAcc = 0; this.dust.explode(2, pl.x, pl.y + 6); }
       }
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
-      this.playerSprite.setPosition(pl.x, pl.y + 6 - bob).setFlipX(pl.dir === -1).setDepth(pl.y + 8);
+      // Echte 4-Richtungs-Sprites aus PixelLab (south = Basis-Textur char_player)
+      const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
+      this.playerSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setFlipX(false).setDepth(pl.y + 8);
       this.playerShadow.setPosition(pl.x, pl.y + 6);
 
       // Haustier
