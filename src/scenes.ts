@@ -41,7 +41,7 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
 
   // Sheets werden nach dem Laden in 16er-Frames geschnitten; plains bleiben ganze Bilder.
   const BOOT_SHEETS: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
+  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "mushroom", "seashell", "driftwood", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
 
   class BootScene extends Phaser.Scene {
     [key: string]: any;
@@ -102,6 +102,9 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
       this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
       this.scatter("rock", 14, 0.45, [0, 1, 2, -3], true); // Steine: solide, auch am Strand
       this.scatter("lamppost", 4, 0.55, [0, 1, 2], true);  // ein paar Hafenlaternen
+      this.scatter("mushroom", 10, 0.28, [0, 1, 2]);       // Pilze: kleine Wald-/Wiesendeko, begehbar (#7)
+      this.scatter("seashell", 8, 0.22, [-3]);             // Muscheln: nur am Sandstrand (#7)
+      this.scatter("driftwood", 5, 0.3, [-3]);             // Treibholz: nur am Sandstrand (#7)
 
       this.splash = this.add.particles(0, 0, "px", {
         speed: { min: 25, max: 80 }, angle: { min: 200, max: 340 }, gravityY: 140,
