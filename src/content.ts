@@ -477,7 +477,7 @@ import type { Sim, Deployment } from "./sim";
           "Ein Deployment sagt: „Halte IMMER N Kopien am Laufen.“ Stirbt eine → sofort Ersatz. Erstellt wird es so: <code>kubectl create deployment kasse --image=nginx</code>.",
         ]},
         { type: "teach", brief: "Dauerauftrag erteilen", cmd: {
-          id: "t-create", intro: "🆕 Neuer Befehl: <code>kubectl create deployment</code> – der Dauerauftrag.",
+          id: "t-create", intro: "🆕 Neuer Befehl: <code>kubectl create deployment &lt;name&gt; --image=&lt;image&gt;</code> – der Dauerauftrag (<code>--image</code> ist Pflicht).",
           text: "Erstelle ein Deployment <code>kasse</code> mit dem Image <code>nginx</code>. (Der Fischmarkt braucht eine Kasse!)",
           accept: [/^kubectl\s+create\s+deployment\s+kasse\s+--image[=\s]nginx(:\S+)?$/], solution: "kubectl create deployment kasse --image=nginx",
           hint: "Muster: kubectl create deployment <name> --image=<image>" } },
@@ -485,7 +485,7 @@ import type { Sim, Deployment } from "./sim";
           "Eine Kasse läuft! Aber bei Hochbetrieb brauchen wir mehr. Das Beste am Deployment: <b>Skalieren ist ein Einzeiler</b> – du änderst nur die Wunsch-Zahl.",
         ]},
         { type: "teach", brief: "Hochskalieren", cmd: {
-          id: "t-scale", intro: "🆕 Neuer Befehl: <code>kubectl scale</code> – Anzahl der Kopien ändern.",
+          id: "t-scale", intro: "🆕 Neuer Befehl: <code>kubectl scale deployment &lt;name&gt; --replicas=&lt;zahl&gt;</code> – Anzahl der Kopien ändern.",
           text: "Skaliere <code>kasse</code> auf <b>3</b> Kopien – und beobachte das Dock!",
           accept: [/^kubectl\s+scale\s+deployment\s+kasse\s+--replicas[=\s]3$/], solution: "kubectl scale deployment kasse --replicas=3",
           hint: "Muster: kubectl scale deployment <name> --replicas=<zahl>" } },
