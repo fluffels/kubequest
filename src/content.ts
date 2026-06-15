@@ -101,6 +101,10 @@ import type { Quest } from "./types";
     return d;
   }
 
+  function ensureGit(sim) {
+    if (!sim.git.initialized) sim.exec("git init");
+  }
+
   const DRILLS = {
     "docker-pull": sim => {
       const img = pick(IMAGES);
@@ -206,13 +210,42 @@ import type { Quest } from "./types";
       const d = ensureDeployment(sim);
       return { text: "Starte alle Pods von <code>" + d.name + "</code> sauber neu (Rolling Restart).", accept: [new RegExp("^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]" + d.name + "$")], solution: "kubectl rollout restart deployment " + d.name, hint: "Muster: kubectl rollout restart deployment <name>" };
     },
+    "git-status": sim => {
+      ensureGit(sim);
+      return { text: "Zeig den aktuellen Stand deines Repos (Branch + Änderungen).", accept: [/^git\s+status$/], solution: "git status", hint: "git + ein Wort für „Stand“." };
+    },
+    "git-add": sim => {
+      ensureGit(sim);
+      const fn = "seekarte-" + sim.clock + "-" + rnd(100, 9999) + ".md";
+      sim.files[fn] = "# Karte";
+      return { text: "Merke die neue Datei <code>" + fn + "</code> zum Commit vor.", accept: [new RegExp("^git\\s+add\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git add " + fn, hint: "Muster: git add <datei>" };
+    },
+    "git-commit": sim => {
+      ensureGit(sim);
+      const fn = "notiz-" + sim.clock + "-" + rnd(100, 9999) + ".md";
+      sim.files[fn] = "x"; sim.exec("git add " + fn);
+      const msg = pick(["Seekarte ergänzt", "Tippfehler behoben", "Route aktualisiert", "Hafen kartiert"]);
+      return { text: "Halte die vorgemerkten Änderungen fest – Commit-Nachricht: <code>" + msg + "</code>.", accept: [new RegExp('^git\\s+commit\\s+-m\\s+"' + msg + '"$')], solution: 'git commit -m "' + msg + '"', hint: 'Muster: git commit -m "Nachricht"' };
+    },
+    "git-branch": sim => {
+      ensureGit(sim);
+      let name = "karte-" + rnd(2, 99);
+      while (sim.git.branches.includes(name)) name = "karte-" + rnd(100, 9999);
+      return { text: "Lege einen neuen Branch <code>" + name + "</code> an (nur anlegen, nicht wechseln).", accept: [new RegExp("^git\\s+branch\\s+" + name + "$")], solution: "git branch " + name, hint: "Muster: git branch <name>" };
+    },
+    "git-checkout": sim => {
+      ensureGit(sim);
+      let name = "feature-" + rnd(2, 99);
+      while (sim.git.branches.includes(name)) name = "feature-" + rnd(100, 9999);
+      return { text: "Lege den Branch <code>" + name + "</code> an UND wechsle direkt hinein.", accept: [new RegExp("^git\\s+checkout\\s+-b\\s+" + name + "$")], solution: "git checkout -b " + name, hint: "Muster: git checkout -b <name>" };
+    },
   };
 
   /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
   const PRACTICE = {
     bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
     ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
-    ada:  [{ drill: "k-apply", after: "q8" }],
+    ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }],
     runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }],
     theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
     juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
@@ -858,6 +891,127 @@ import type { Quest } from "./types";
           "Ab jetzt gilt: Wenn ein Sturm aufzieht und etwas kaputtgeht, bist DU dran. Du hast das Mantra, du hast die Befehle. Und zwischen den Stürmen? Übe bei mir, halte den Streak, füttere die Krabbe. Der Hafen zählt auf dich, Admiral-Anwärter:in! ⚓",
         ]},
       ]},
+
+    { id: "q18", title: "Seekarten versionieren", giver: "ada", rewardXp: 45, rewardCoins: 32,
+      steps: [
+        { type: "dialog", npc: "ada",
+          scenario: { files: { "seekarte.md": "# Seekarte Port Kubernia\nHafenbecken, drei Stege, Leuchtturm im Osten." } },
+          lines: [
+            "Pssst. Komm näher. Sieh dir meine <b>Seekarten</b> an – ich ändere sie ständig. Neulich? Falsche Route eingezeichnet, gespeichert, alte Version <b>weg</b>. Eine Woche Arbeit. Futsch.",
+            "Nie wieder. Seitdem nutze ich <b>Git</b> – das Logbuch für Dateien. Es merkt sich <b>jede</b> Version, und du kommst immer zur alten zurück. Profis versionieren so ihren Code, ihre YAMLs, einfach alles.",
+            "Ich hab dir eine Karte hingelegt: <code>seekarte.md</code> (mit <code>ls</code> und <code>cat</code> ansehbar). Stellen wir sie unter Gits Schutz. Zuerst: aus diesem Ordner ein Repository machen.",
+          ] },
+        { type: "teach", brief: "Repo anlegen", cmd: {
+          id: "t-git-init", intro: "🆕 Neuer Befehl: <code>git init</code> – macht aus dem Ordner ein Git-Repository (legt einen versteckten <code>.git</code>-Ordner an).",
+          text: "Initialisiere hier ein Git-Repository.",
+          accept: [/^git\s+init$/], solution: "git init", hint: "Wirklich nur: git init" } },
+        { type: "dialog", npc: "ada", lines: [
+          "Git beobachtet jetzt den Ordner – hält aber nichts von allein fest. Du sagst ihm <b>wann</b>. Frag es zuerst, was es sieht: <code>git status</code> zeigt, welche Dateien noch <b>unversioniert</b> sind.",
+        ] },
+        { type: "teach", brief: "Stand prüfen", cmd: {
+          id: "t-git-status", intro: "🆕 <code>git status</code> – zeigt den aktuellen Stand: welcher Branch, was ist neu / geändert / vorgemerkt.",
+          text: "Lass dir den Status anzeigen. <code>seekarte.md</code> müsste als „unversioniert“ auftauchen.",
+          accept: [/^git\s+status$/], solution: "git status", hint: "git + ein Wort für „Stand“." } },
+        { type: "dialog", npc: "ada", lines: [
+          "Da ist sie, unter „Unversionierte Dateien“. Zwei Schritte bis zur sicheren Version: erst <b>vormerken</b> (<code>git add</code>), dann <b>festhalten</b> (<code>git commit</code>). Das Vormerken heißt <i>Staging</i> – du wählst aus, was in den nächsten Schnappschuss soll.",
+        ] },
+        { type: "teach", brief: "Vormerken", cmd: {
+          id: "t-git-add", intro: "🆕 <code>git add &lt;datei&gt;</code> – merkt eine Datei für den nächsten Commit vor (Staging).",
+          text: "Merke <code>seekarte.md</code> zum Commit vor.",
+          accept: [/^git\s+add\s+seekarte\.md$/], solution: "git add seekarte.md", hint: "Muster: git add <datei>" } },
+        { type: "teach", brief: "Festhalten", cmd: {
+          id: "t-git-commit", intro: "🆕 <code>git commit -m \"…\"</code> – hält die vorgemerkten Änderungen als Schnappschuss in der Historie fest, mit kurzer Nachricht.",
+          text: "Halte die Karte fest – Commit-Nachricht z.B. <code>Erste Seekarte</code>.",
+          accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"', hint: 'Muster: git commit -m "deine Nachricht"' } },
+        { type: "dialog", npc: "ada", lines: [
+          "<b>Festgehalten!</b> Diese Version ist für immer sicher. Jede:r kann später nachlesen, was wann geändert wurde. Schau in die Historie: <code>git log</code>.",
+        ] },
+        { type: "teach", brief: "Historie lesen", cmd: {
+          id: "t-git-log", intro: "🆕 <code>git log</code> – zeigt die Liste aller Commits (die Versions-Historie).",
+          text: "Zeig die Commit-Historie an.",
+          accept: [/^git\s+log$/], solution: "git log", hint: "git + ein Wort für „Logbuch“." } },
+        { type: "drill", brief: "Adas Übungsrunde", pool: ["git-status", "git-add", "git-commit"], count: 3,
+          intro: "Der Dreiklang sitzt erst mit Übung: status → add → commit." },
+        { type: "choice", npc: "ada", reviewId: "q-git-1",
+          q: "Ada prüft: Was macht <code>git commit</code>?",
+          options: [
+            { t: "Es hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht in der Historie fest.", ok: true,
+              reply: "GENAU. Ein Commit ist ein Speicherpunkt, zu dem du immer zurückkannst." },
+            { t: "Es lädt die Dateien sofort auf den Server hoch.", ok: false,
+              reply: "Nein – das wäre git push. Ein Commit bleibt erstmal LOKAL." },
+          ] },
+        { type: "choice", npc: "ada", reviewId: "q-git-3",
+          q: "Und der Unterschied zwischen <code>git add</code> und <code>git commit</code>?",
+          options: [
+            { t: "add merkt Änderungen vor (Staging), commit hält die vorgemerkten dann dauerhaft fest.", ok: true,
+              reply: "Richtig. Erst auswählen (add), dann einrahmen (commit) – zwei bewusste Schritte." },
+            { t: "Kein Unterschied, beides speichert dasselbe.", ok: false,
+              reply: "Doch! add = vormerken, commit = festhalten. Du kannst gezielt nur EINEN Teil committen." },
+          ] },
+        { type: "dialog", npc: "ada", lines: [
+          "Du hast den wichtigsten Rhythmus der Softwarewelt gelernt: <b>ändern → add → commit</b>. Komm wieder, dann zeig ich dir <b>Zweige</b> – wie man gefahrlos experimentiert. Üben kannst du bei mir jederzeit!",
+        ] },
+      ]},
+
+    { id: "q19", title: "Ein eigener Zweig", giver: "ada", rewardXp: 50, rewardCoins: 38,
+      steps: [
+        { type: "dialog", npc: "ada",
+          scenario: { files: { "route-neu.md": "# Experimentelle Route\n(Entwurf – noch nicht sicher!)" } },
+          lines: [
+            "Zurück! Heute das Mächtigste an Git: <b>Branches</b> (Zweige). Stell dir vor, du willst eine <b>riskante neue Route</b> ausprobieren – aber die geprüfte Hauptkarte (<code>main</code>) soll heil bleiben.",
+            "Lösung: ein eigener Zweig. Dort arbeitest du frei, und erst wenn es gut ist, führst du ihn mit <code>main</code> zusammen. Genau so arbeiten Teams – jede:r auf eigenem Branch, am Ende wird zusammengeführt (oft nach einem Review).",
+            "Ich hab dir <code>route-neu.md</code> hingelegt. Leg einen Zweig an und wechsle hinein – in einem Rutsch mit <code>git checkout -b</code>.",
+          ] },
+        { type: "teach", brief: "Zweig + wechseln", cmd: {
+          id: "t-git-checkout-b", intro: "🆕 <code>git checkout -b &lt;name&gt;</code> – legt einen neuen Branch an UND wechselt direkt hinein.",
+          text: "Leg den Branch <code>experiment-route</code> an und wechsle hinein.",
+          accept: [/^git\s+checkout\s+-b\s+experiment-route$/], solution: "git checkout -b experiment-route", hint: "Muster: git checkout -b <name>" } },
+        { type: "dialog", npc: "ada", lines: [
+          "Du bist jetzt auf <code>experiment-route</code> – <code>main</code> bleibt unberührt. Mach hier deine Arbeit fest: <code>route-neu.md</code> vormerken und committen (wie gestern gelernt).",
+        ] },
+        { type: "teach", brief: "Vormerken", cmd: {
+          id: "t-git-add2", intro: "↩︎ Wiederholung: <code>git add</code> merkt die Datei vor.",
+          text: "Merke <code>route-neu.md</code> vor.",
+          accept: [/^git\s+add\s+route-neu\.md$/], solution: "git add route-neu.md", hint: "Muster: git add <datei>" } },
+        { type: "teach", brief: "Festhalten", cmd: {
+          id: "t-git-commit2", intro: "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält es fest.",
+          text: "Committe die neue Route, z.B. mit <code>Neue Route skizziert</code>.",
+          accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Neue Route skizziert"', hint: 'Muster: git commit -m "Nachricht"' } },
+        { type: "dialog", npc: "ada", lines: [
+          "Die Route sitzt sicher im Zweig. Jetzt zurück zur Hauptkarte: wechsle nach <code>main</code>.",
+        ] },
+        { type: "teach", brief: "Zurück zu main", cmd: {
+          id: "t-git-checkout-main", intro: "🆕 <code>git checkout &lt;name&gt;</code> (ohne -b) – wechselt auf einen bestehenden Branch.",
+          text: "Wechsle zurück auf <code>main</code>.",
+          accept: [/^git\s+checkout\s+main$/], solution: "git checkout main", hint: "git checkout <branchname>" } },
+        { type: "dialog", npc: "ada", lines: [
+          "Auf <code>main</code> ist die neue Route noch nicht zu sehen – sie lebt im Zweig. Jetzt das Finale: <b>zusammenführen</b> mit <code>git merge</code>.",
+        ] },
+        { type: "teach", brief: "Zusammenführen", cmd: {
+          id: "t-git-merge", intro: "🆕 <code>git merge &lt;branch&gt;</code> – holt die Arbeit aus einem anderen Branch in deinen aktuellen.",
+          text: "Führe <code>experiment-route</code> in <code>main</code> zusammen.",
+          accept: [/^git\s+merge\s+experiment-route$/], solution: "git merge experiment-route", hint: "Muster: git merge <branch>" } },
+        { type: "dialog", npc: "ada", lines: [
+          "Vereint! Zum Schluss teilst du deine Arbeit mit dem Team: <code>git push</code> schiebt deine Commits auf den Server (z.B. GitLab). Erst dann sehen es die anderen.",
+        ] },
+        { type: "teach", brief: "Hochladen", cmd: {
+          id: "t-git-push", intro: "🆕 <code>git push</code> – lädt deine lokalen Commits auf den entfernten Server (origin).",
+          text: "Schiebe deine Arbeit zum Server hoch.",
+          accept: [/^git\s+push$/], solution: "git push", hint: "Wirklich nur: git push" } },
+        { type: "drill", brief: "Adas Übungsrunde", pool: ["git-branch", "git-checkout", "git-status"], count: 3,
+          intro: "Branchen will geübt sein – ein paar Wiederholungen:" },
+        { type: "choice", npc: "ada", reviewId: "q-git-2",
+          q: "Wozu legt man einen eigenen Branch an?",
+          options: [
+            { t: "Um Änderungen abseits von main auszuprobieren und erst später (oft nach Review) zusammenzuführen.", ok: true,
+              reply: "Genau. main bleibt stabil, dein Experiment stört niemanden – bis du bereit bist." },
+            { t: "Damit Git schneller läuft.", ok: false,
+              reply: "Nein, mit Tempo hat das nichts zu tun. Es geht um sicheres, paralleles Arbeiten." },
+          ] },
+        { type: "dialog", npc: "ada", lines: [
+          "Du beherrschst jetzt den vollen Git-Kreis: <b>branch → commit → merge → push</b>. Genau dieser Ablauf treibt später auch die <b>Pipelines</b> an (ein push löst automatische Builds & Deployments aus – aber das ist eine andere Insel). Sauber gemacht, Kartograph:in! 🗺️",
+        ] },
+      ]},
   ];
 
   /* ---------- Standard-Dialoge ---------- */
@@ -904,6 +1058,9 @@ import type { Quest } from "./types";
     { id: "q-ts-3", q: "Ein Pod hängt ewig in Pending. Was ist los?", options: ["Er findet keinen Platz – kein Node hat genug Kapazität (oder passt nicht).", "Das Image lädt noch herunter.", "Die App ist abgestürzt.", "Pending ist der Normalzustand."], correct: 0, explain: "Pending = noch nicht eingeplant. describe → Events zeigt z.B. „0/3 nodes are available“. Lösung: Platz schaffen oder Nodes hinzufügen (Terraform!)." },
     { id: "q-ts-4", q: "Das Debugging-Mantra für kaputte Pods?", options: ["get pods → describe → logs, dann fixen und verifizieren.", "Sofort alles löschen und neu deployen.", "Den Cluster neu starten.", "Im Code nach Bugs suchen."], correct: 0, explain: "Erst STATUS lesen (get), dann Events (describe), dann die App-Sicht (logs). Damit findest du 80% aller Ursachen in Minuten." },
     { id: "q-ts-5", q: "Wann hilft kubectl rollout restart?", options: ["Wenn die Ursache behoben ist (z.B. Secret angelegt) und die Pods sauber neu starten sollen.", "Bei jedem Fehler als erstes.", "Nur bei ImagePullBackOff.", "Um den Node neu zu starten."], correct: 0, explain: "Restart ersetzt alle Pods rollierend. Wichtig: ERST die Ursache beheben, sonst crasht es wieder. Reihenfolge: Ursache → Fix → Restart → Verifikation." },
+    { id: "q-git-1", q: "Was macht git commit?", options: ["Hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht in der Historie fest.", "Lädt die Dateien auf den Server hoch.", "Löscht alle ungespeicherten Änderungen.", "Wechselt auf einen anderen Branch."], correct: 0, explain: "Ein Commit ist ein lokaler Speicherpunkt mit Nachricht. Hochladen zum Server macht erst git push." },
+    { id: "q-git-2", q: "Wozu legt man in Git einen eigenen Branch (Zweig) an?", options: ["Um Änderungen abseits von main auszuprobieren und erst nach Review zusammenzuführen.", "Damit Git schneller läuft.", "Um Speicherplatz zu sparen.", "Um Dateien endgültig zu löschen."], correct: 0, explain: "Branches erlauben sicheres, paralleles Arbeiten: main bleibt stabil, das Experiment lebt im Zweig – am Ende wird gemergt." },
+    { id: "q-git-3", q: "Unterschied zwischen git add und git commit?", options: ["add merkt Änderungen vor (Staging), commit hält die vorgemerkten dauerhaft in der Historie fest.", "Kein Unterschied, beides speichert dasselbe.", "add committet, commit pusht zum Server.", "add ist für neue Dateien, commit für alte."], correct: 0, explain: "Zwei bewusste Schritte: erst auswählen, was in den Schnappschuss soll (add/Staging), dann festhalten (commit)." },
   ];
 
   const CMD_CARDS = [
@@ -927,6 +1084,11 @@ import type { Quest } from "./types";
     { id: "c-sec-1", chapter: "q14", q: "Lege ein Secret <code>api-key</code> mit <code>--from-literal=key=abc123</code> an.", accept: [/^kubectl\s+create\s+secret\s+generic\s+api-key\s+--from-literal[=\s][\w.-]+=\S+$/], solution: "kubectl create secret generic api-key --from-literal=key=abc123" },
     { id: "c-ts-1", chapter: "q15", q: "Tausche das Image des Deployments <code>shop</code> gegen <code>nginx</code> (Container heißt auch <code>shop</code>).", accept: [/^kubectl\s+set\s+image\s+deployment\/shop\s+\S+=nginx(:\S+)?$/], solution: "kubectl set image deployment/shop shop=nginx" },
     { id: "c-ts-2", chapter: "q16", q: "Starte alle Pods des Deployments <code>shop</code> sauber neu.", accept: [/^kubectl\s+rollout\s+restart\s+deployment[\/\s]shop$/], solution: "kubectl rollout restart deployment shop" },
+    { id: "c-git-1", chapter: "q18", q: "Mach aus dem aktuellen Ordner ein Git-Repository.", accept: [/^git\s+init$/], solution: "git init" },
+    { id: "c-git-2", chapter: "q18", q: "Merke die Datei <code>seekarte.md</code> für den nächsten Commit vor.", accept: [/^git\s+add\s+seekarte\.md$/], solution: "git add seekarte.md" },
+    { id: "c-git-3", chapter: "q18", q: "Halte die vorgemerkten Änderungen fest (Nachricht: <code>Erste Seekarte</code>).", accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"' },
+    { id: "c-git-4", chapter: "q19", q: "Lege den Branch <code>experiment-route</code> an und wechsle hinein.", accept: [/^git\s+checkout\s+-b\s+experiment-route$/], solution: "git checkout -b experiment-route" },
+    { id: "c-git-5", chapter: "q19", q: "Führe <code>experiment-route</code> in deinen aktuellen Branch zusammen.", accept: [/^git\s+merge\s+experiment-route$/], solution: "git merge experiment-route" },
   ];
 
   /* ---------- Stapel-Spiel: Docker-Image-Schichten ---------- */
