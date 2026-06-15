@@ -1,6 +1,7 @@
 # AGENTS.md – Arbeitsanweisung für KI-Agenten
 
 > Diese Datei ist für dich als Agent (egal welches Tool). Sie sagt dir, **wie** hier gearbeitet wird.
+> **Neu hier oder nur kurz reinschauen?** Schnellstart-Checkliste & Repo-Landkarte auf einen Blick: [CLAUDE.md](CLAUDE.md). Diese Datei hier ist die ausführliche Fassung (harte Regeln, Board-Workflow, Konventionen).
 > Was das Spiel **ist** (Story, Spielsysteme, Lernpfad), steht in der [README.md](README.md) – nicht doppeln.
 
 ## Das Wichtigste zuerst (harte Regeln)
