@@ -4,7 +4,7 @@
  * Dazu: Quests, Dialoge, NPCs, Ränge, Shop, Drills, Karteikarten, Events.
  */
 import type { Quest } from "./types";
-import type { Sim, Deployment } from "./sim";
+import type { Sim, Deployment, NetworkPolicyRes } from "./sim";
 
   const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
   const rnd = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
@@ -79,6 +79,14 @@ import type { Sim, Deployment } from "./sim";
     "                  number: 6379",
   ].join("\n");
 
+  // Hafenmauer um die Pods von app=lager: standardmäßig dicht, nur das Hafentor darf rein.
+  const NETPOL_YAML = [
+    "apiVersion: networking.k8s.io/v1", "kind: NetworkPolicy", "metadata:", "  name: hafenmauer", "spec:",
+    "  podSelector:", "    matchLabels:", "      app: lager",
+    "  policyTypes:", "    - Ingress",
+    "  ingress:", "    - from:", "        - podSelector:", "            matchLabels:", "              app: hafentor",
+  ].join("\n");
+
   const BOESE_CONFIG_YAML = [
     "apiVersion: v1", "kind: ConfigMap", "metadata:", "  name: kasse-config", "data:",
     "  datenbank_host: db.hafen.local", "  # AUTSCH – Passwort im Klartext! Krakenfutter!",
@@ -140,6 +148,23 @@ import type { Sim, Deployment } from "./sim";
       sim.exec("helm create " + name);
     }
     return sim.charts[0].name;
+  }
+
+  /** Namen & geschützte Apps für die Hafenmauer-Übungen (#20). */
+  const NETPOL_NAMES = ["hafenmauer", "kaimauer", "wellenbrecher", "bollwerk", "schutzwall", "palisade"];
+  const NETPOL_APPS = ["kasse", "lager", "funkdienst", "lotsen", "leuchtfeuer", "kombuese"];
+
+  /** Sorgt dafür, dass mindestens eine Hafenmauer (NetworkPolicy) existiert, und gibt sie zurück. */
+  function ensureNetworkPolicy(sim: Sim): NetworkPolicyRes {
+    if (sim.networkPolicies.length === 0) {
+      let name = pick(NETPOL_NAMES);
+      while (sim.networkPolicies.some(n => n.name === name)) name = pick(NETPOL_NAMES) + rnd(2, 99);
+      const file = "uebung-netpol.yaml";
+      sim.files[file] = NETPOL_YAML;
+      sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
+      sim.exec("kubectl apply -f " + file);
+    }
+    return sim.networkPolicies[0];
   }
 
   /** Eine generierte Übungsaufgabe (Drill). */
@@ -311,6 +336,26 @@ import type { Sim, Deployment } from "./sim";
       sim.files[fn] = "x"; sim.exec("git add " + fn); sim.exec('git commit -m "Auslieferung"'); sim.exec("git push");
       return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> – der Befehl fürs Nachschauen." };
     },
+    "k-get-netpol": sim => {
+      ensureNetworkPolicy(sim);
+      return { text: "Zeig alle Hafenmauern (NetworkPolicies) im Cluster.", accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." };
+    },
+    "k-apply-netpol": sim => {
+      let name = pick(NETPOL_NAMES);
+      while (sim.networkPolicies.some(n => n.name === name)) name = pick(NETPOL_NAMES) + rnd(2, 99);
+      const file = "drill-netpol.yaml";
+      sim.files[file] = NETPOL_YAML;
+      sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
+      return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+-f\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f <datei>" };
+    },
+    "k-describe-netpol": sim => {
+      const np = ensureNetworkPolicy(sim);
+      return { text: "Beschreibe die Hafenmauer <code>" + np.name + "</code> – wer darf rein?", accept: [new RegExp("^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe networkpolicy " + np.name, hint: "kubectl describe networkpolicy <name>" };
+    },
+    "k-delete-netpol": sim => {
+      const np = ensureNetworkPolicy(sim);
+      return { text: "Reiß die Hafenmauer <code>" + np.name + "</code> wieder ein.", accept: [new RegExp("^kubectl\\s+delete\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete networkpolicy " + np.name, hint: "kubectl delete networkpolicy <name>" };
+    },
   };
 
   /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
@@ -320,7 +365,7 @@ import type { Sim, Deployment } from "./sim";
     ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
     runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
     theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
-    juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
+    juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }],
   };
 
   /* =================================================================
@@ -1202,6 +1247,51 @@ import type { Sim, Deployment } from "./sim";
               reply: "Nein – gerade NICHT. Die Stärke ist die Trennung: Vorlage (templates) und Werte (values.yaml) getrennt, Steckbrief in Chart.yaml." },
           ]},
       ]},
+
+    { id: "q22", title: "Die Hafenmauer", giver: "juno", rewardXp: 60, rewardCoins: 45,
+      steps: [
+        { type: "dialog", npc: "juno", lines: [
+          "Sturmwache Juno. Schön, dass du da bist – wir haben ein Sicherheitsproblem. Dein <b>Hafentor</b> (der Ingress) hat den Hafen zum <b>offenen Meer</b> geöffnet. Gut für Besucher … aber jetzt kann <b>jeder Pod mit jedem reden</b>, quer durch den ganzen Cluster.",
+          "Das ist die unbequeme Wahrheit über Kubernetes: <b>standardmäßig ist alles offen</b>. Kein Zaun, keine Mauer. Schleicht sich ein böser Pod ein, klopft er ungestört an jeder Tür – auch beim <code>lager</code> mit den wertvollen Daten.",
+          "Dagegen bauen wir eine <b>Hafenmauer</b>: eine <b>NetworkPolicy</b>. Sie wählt per Label Pods aus und sagt: <i>Zu DENEN darf nur, wen ich ausdrücklich erlaube</i> – alles andere prallt ab. Im Job nennt man das <b>default-deny</b>. Lass uns erst schauen, was schon steht.",
+        ]},
+        { type: "teach", brief: "Mauern zählen", cmd: {
+          id: "t-get-netpol", intro: "🆕 Neue Ressource: <code>kubectl get networkpolicies</code> (kurz <code>netpol</code>) – zeigt alle Hafenmauern.",
+          text: "Schau nach, welche NetworkPolicies schon stehen – noch ist der Hafen schutzlos!",
+          accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies",
+          hint: "Kurzform: kubectl get netpol" } },
+        { type: "terminal", brief: "Mauer hochziehen",
+          scenario: {
+            files: { "netpol.yaml": NETPOL_YAML },
+            applyEffects: {
+              "netpol.yaml": { networkPolicy: { name: "hafenmauer", podSelector: "lager", allowFrom: "hafentor" } },
+            },
+          },
+          tasks: [
+          { id: "t-juno-np-1", text: "Ich habe dir die Karte <code>netpol.yaml</code> hingelegt. Lies sie mit <code>cat</code> – achte auf <code>podSelector</code> (WEN schützt die Mauer?) und <code>ingress.from</code> (WER darf rein?).",
+            accept: [/^cat\s+netpol\.yaml$/], solution: "cat netpol.yaml", hint: "cat <datei>" },
+          { id: "t-juno-np-2", text: "Zieh die Mauer hoch: wende <code>netpol.yaml</code> an. Ab jetzt darf nur noch das <code>hafentor</code> ans <code>lager</code>.",
+            accept: [/^kubectl\s+apply\s+-f\s+netpol\.yaml$/], solution: "kubectl apply -f netpol.yaml", hint: "Gleicher apply wie bei Adas Karten, Datei netpol.yaml." },
+          { id: "t-juno-np-3", text: "Prüf die frische Mauer: <code>kubectl get networkpolicies</code> – jetzt steht <code>hafenmauer</code> in der Liste.",
+            accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], check: (sim: Sim) => sim.networkPolicies.some(n => n.name === "hafenmauer"),
+            solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." },
+          { id: "t-juno-np-4", text: "Schau genau hin: <code>kubectl describe networkpolicy hafenmauer</code> – die Zeile <b>Allowing ingress traffic</b> verrät, wer durchdarf.",
+            accept: [/^kubectl\s+describe\s+(networkpolicy|networkpolicies|netpol|netpols)\s+hafenmauer$/], solution: "kubectl describe networkpolicy hafenmauer", hint: "kubectl describe networkpolicy <name>" },
+        ]},
+        { type: "drill", brief: "Junos Mauer-Übung", pool: ["k-apply-netpol", "k-get-netpol", "k-describe-netpol", "k-delete-netpol"], count: 4,
+          intro: "Einmal die ganze Kette: anwenden → auflisten → beschreiben → wieder einreißen." },
+        { type: "choice", npc: "juno", reviewId: "q-netpol",
+          q: "Ohne jede NetworkPolicy – wer darf im Cluster mit wem reden?",
+          options: [
+            { t: "Jeder mit jedem. Das Netzwerk ist offen, bis eine NetworkPolicy es einschränkt.", ok: true,
+              reply: "Genau – und genau das ist die Gefahr. Eine NetworkPolicy schaltet für die gewählten Pods auf <b>default-deny</b> und lässt nur durch, was du erlaubst. So sichert man im Job Datenbanken & Co. ab. ⚓" },
+            { t: "Niemand. Jede Verbindung muss erst freigegeben werden.", ok: false,
+              reply: "Andersrum! Kubernetes ist von Haus aus <b>offen</b>. Erst eine NetworkPolicy macht für die ausgewählten Pods dicht – vorher kann jeder mit jedem reden." },
+          ]},
+        { type: "dialog", npc: "juno", lines: [
+          "Merk dir die Faustregel: <b>Selektor sagt WEN man schützt, die from-Regel sagt WER rein darf.</b> Fehlt die Policy, ist alles offen. Hafen gesichert – gut gemacht, Lotse!",
+        ]},
+      ]},
   ];
 
   /* ---------- Standard-Dialoge ---------- */
@@ -1261,6 +1351,8 @@ import type { Sim, Deployment } from "./sim";
     { id: "q-tools-keycloak", q: "Deine App braucht Login. Was nimmst du, statt selbst eine Benutzerverwaltung zu bauen?", options: ["Keycloak – einen fertigen Auth-/IDP-Server für Anmeldung, Tokens und Rechte.", "Eine Textdatei mit allen Passwörtern.", "Ein zweites Deployment namens login.", "git commit."], correct: 0, explain: "Keycloak ist ein Identity Provider (IDP): zentrale Anmeldung, Single Sign-On, Rollen/Rechte. Man stellt ihn vor die Apps, statt jede App ihren eigenen Login bauen zu lassen." },
     { id: "q-tools-monitoring", q: "Wofür stehen Prometheus und Grafana im Cluster?", options: ["Prometheus sammelt Messwerte (Metriken), Grafana macht daraus Dashboards.", "Beides sind Datenbanken.", "Prometheus ist ein Webserver, Grafana ein Cache.", "Beides sind Paketmanager."], correct: 0, explain: "Monitoring-Duo: Prometheus zapft laufend Metriken an (CPU, Requests, Fehler), Grafana zeigt sie als Diagramme und schlägt Alarm. So siehst du, ob der Hafen gesund ist." },
     { id: "q-tools-stack", q: "PostgreSQL und Redis – welches Tool ist wofür?", options: ["PostgreSQL = Datenbank (Daten dauerhaft), Redis = schneller Zwischenspeicher (Cache).", "PostgreSQL = Cache, Redis = Webserver.", "Beides sind Webserver.", "PostgreSQL = Monitoring, Redis = Login."], correct: 0, explain: "Typischer App-Stack: PostgreSQL hält die Daten dauerhaft, Redis legt Häufiges blitzschnell in den Arbeitsspeicher. nginx davor als Webserver, Keycloak für den Login." },
+    { id: "q-netpol", q: "Ohne jede NetworkPolicy – wer darf im Cluster mit wem reden?", options: ["Jeder mit jedem – das Netzwerk ist offen, bis eine NetworkPolicy es einschränkt.", "Niemand – jede Verbindung muss erst freigegeben werden.", "Nur Pods im selben Deployment.", "Nur der Ingress-Controller."], correct: 0, explain: "Kubernetes ist von Haus aus offen: jeder Pod erreicht jeden. Erst eine NetworkPolicy schaltet die ausgewählten Pods auf default-deny und lässt nur erlaubte Quellen durch – so sichert man z.B. Datenbanken ab." },
+    { id: "q-netpol-2", q: "Was bestimmt der <code>podSelector</code> einer NetworkPolicy?", options: ["WELCHE Pods die Regel schützt (auf wen sie wirkt).", "WER von außen durchdarf.", "Den Port, der geöffnet wird.", "Den Namen des Ingress-Controllers."], correct: 0, explain: "Der podSelector wählt die geschützten Ziel-Pods (z.B. app=lager). WER zu ihnen durchdarf, steht getrennt in den ingress/from-Regeln. Selektor = WEN man schützt, from = WER rein darf." },
   ];
 
   const CMD_CARDS = [
@@ -1295,6 +1387,8 @@ import type { Sim, Deployment } from "./sim";
     { id: "c-git-5", chapter: "q19", q: "Führe <code>experiment-route</code> in deinen aktuellen Branch zusammen.", accept: [/^git\s+merge\s+experiment-route$/], solution: "git merge experiment-route" },
     { id: "c-ci-1", chapter: "q20", q: "Schau dir den Status der letzten GitLab-Pipeline an.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status" },
     { id: "c-ci-2", chapter: "q20", q: "Merke ALLE Änderungen auf einmal für den nächsten Commit vor.", accept: [/^git\s+add\s+\.$/], solution: "git add ." },
+    { id: "c-np-1", chapter: "q22", q: "Zeige alle NetworkPolicies (Hafenmauern) im Cluster an.", accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies" },
+    { id: "c-np-2", chapter: "q22", q: "Beschreibe die NetworkPolicy <code>hafenmauer</code> – wer darf rein?", accept: [/^kubectl\s+describe\s+(networkpolicy|networkpolicies|netpol|netpols)\s+hafenmauer$/], solution: "kubectl describe networkpolicy hafenmauer" },
   ];
 
   /* ---------- Stapel-Spiel: Docker-Image-Schichten ---------- */
