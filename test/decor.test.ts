@@ -5,7 +5,7 @@
  * werden daher vor allem die harten Garantien – inklusive Negativ-/Grenzfälle
  * und ein Red-Green-Schutz gegen einen Test, der den Seed ignorieren würde. */
 import { test, expect } from "vitest";
-import { hash01, strSeed, pickPlacements, type ScatterSpec } from "../src/decor";
+import { hash01, strSeed, pickPlacements, grassTuftStyle, type ScatterSpec } from "../src/decor";
 
 const W = 52, H = 40;
 /** Standard-Akzeptanz: ganze Karte gültig (Grenzen 1..W-2 / 1..H-2 macht pickPlacements selbst). */
@@ -139,4 +139,59 @@ test("count größer als verfügbare Felder → alle verfügbaren, keine Dopplun
   expect(res.length).toBe(3);
   const seen = new Set(res.map((p) => `${p.x},${p.y}`));
   expect(seen.size).toBe(3);
+});
+
+/* ---------- grassTuftStyle (#40, Stardew-Gras) ---------- */
+
+const GS_SEED = strSeed("grass-style");
+
+test("grassTuftStyle ist deterministisch (gleiche Welt → gleiche Wiese)", () => {
+  expect(grassTuftStyle(GS_SEED, 7, 11, 3)).toEqual(grassTuftStyle(GS_SEED, 7, 11, 3));
+});
+
+test("grassTuftStyle hält alle Eigenschaften in ihren Grenzen", () => {
+  for (let i = 0; i < 400; i++) {
+    const x = (i * 7) % W, y = (i * 13) % H;
+    const s = grassTuftStyle(GS_SEED, x, y, 3);
+    expect(s.variant).toBeGreaterThanOrEqual(0);
+    expect(s.variant).toBeLessThanOrEqual(2);            // 0..variants-1
+    expect(Number.isInteger(s.variant)).toBe(true);
+    expect(s.shade).toBeGreaterThanOrEqual(-1);
+    expect(s.shade).toBeLessThan(1);
+    expect(s.angle).toBeGreaterThanOrEqual(-8);
+    expect(s.angle).toBeLessThanOrEqual(8);
+    expect(Number.isInteger(s.angle)).toBe(true);
+    expect(s.scale).toBeGreaterThanOrEqual(0.8);
+    expect(s.scale).toBeLessThan(1.3);
+    expect(typeof s.flip).toBe("boolean");
+  }
+});
+
+test("grassTuftStyle streut Varianten, Neigung und Spiegelung wirklich (kein konstanter Look)", () => {
+  // Red-Green-Schutz: würde die Funktion die Koordinaten ignorieren, käme überall
+  // dasselbe Büschel heraus – diese Verteilungs-Checks würden dann fehlschlagen.
+  const variants = new Set<number>(), angles = new Set<number>(), flips = new Set<boolean>();
+  for (let x = 1; x <= W - 2; x++) {
+    for (let y = 1; y <= H - 2; y++) {
+      const s = grassTuftStyle(GS_SEED, x, y, 3);
+      variants.add(s.variant); angles.add(s.angle); flips.add(s.flip);
+    }
+  }
+  expect(variants.size).toBe(3);          // alle drei Form-Varianten kommen vor
+  expect(angles.size).toBeGreaterThan(5); // viele verschiedene Neigungen
+  expect(flips.has(true)).toBe(true);     // gespiegelt UND
+  expect(flips.has(false)).toBe(true);    // ungespiegelt
+});
+
+test("grassTuftStyle: variants=1 liefert immer Variante 0 (kein Index-Überlauf)", () => {
+  for (let i = 0; i < 100; i++) {
+    expect(grassTuftStyle(GS_SEED, i, i * 3, 1).variant).toBe(0);
+  }
+});
+
+test("grassTuftStyle: benachbarte Felder sehen unterschiedlich aus (Koordinaten zählen)", () => {
+  // Nicht jedes Nachbarfeld muss anders sein, aber über eine kurze Reihe darf
+  // nicht alles identisch bleiben – sonst entstünde wieder ein Gleichtakt.
+  const styles = [0, 1, 2, 3, 4].map((dx) => JSON.stringify(grassTuftStyle(GS_SEED, 10 + dx, 10, 3)));
+  expect(new Set(styles).size).toBeGreaterThan(1);
 });
