@@ -308,6 +308,18 @@ import type { GameState, QuestStep } from "./types";
       return due.slice(0, limit || 10).map(d => d.id);
     },
 
+    /** Fürs FREIE Üben: alle gelernten Karten, unabhängig von der Fälligkeit, in
+     *  zufälliger Reihenfolge. Rein lesend – verändert den Spaced-Repetition-Plan
+     *  NICHT (anders als reviewResult). So kann man so oft üben, wie man will. */
+    freeReviewItems(limit?: number) {
+      const ids = Object.keys(this.state.review);
+      for (let i = ids.length - 1; i > 0; i--) {       // Fisher-Yates-Shuffle
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      return ids.slice(0, limit || 10);
+    },
+
     findReviewContent(itemId: string) {
       const card = KQContent.CMD_CARDS.find(c => c.id === itemId);
       if (card) return { kind: "cmd", card };

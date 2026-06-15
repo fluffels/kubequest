@@ -837,32 +837,58 @@ import { SFX } from "./sfx";
     openReview() {
       this.closeOverlays();
       $("overlay-review").classList.remove("hidden");
+      const total = Object.keys(Game.state.review).length;
       const dueIds = Game.dueReviewItems(10);
       if (dueIds.length === 0) {
-        const total = Object.keys(Game.state.review).length;
-        $("review-body").innerHTML = `<div style="text-align:center">
-          <div style="font-size:3em">🦀</div>
-          <p>${total === 0
-            ? "„Schnipp schnapp! Noch keine Karten im Stapel – schließe erst eine Quest ab, dann üben wir täglich!“"
-            : "„Heute ist nichts (mehr) fällig! Dein Wissen ist frisch wie der Morgenfang. Komm morgen wieder – schnipp!“"}</p>
-          <button class="primary" onclick="UI.closeOverlays()">Bis morgen, Kralle!</button></div>`;
+        // Kein Dead-End mehr: solange Karten existieren, bieten wir freies Üben an.
+        $("review-body").innerHTML = total === 0
+          ? `<div style="text-align:center">
+              <div style="font-size:3em">🦀</div>
+              <p>„Schnipp schnapp! Noch keine Karten im Stapel – schließe erst eine Quest ab, dann üben wir täglich!“</p>
+              <button class="primary" onclick="UI.closeOverlays()">Alles klar, Kralle!</button></div>`
+          : `<div style="text-align:center">
+              <div style="font-size:3em">🦀</div>
+              <p>„Heute ist nichts mehr fällig – dein Wissen ist frisch wie der Morgenfang! Aber wir können <b>frei üben</b>, so oft du willst. Schnipp!“</p>
+              <div class="actions">
+                <button class="primary" onclick="UI.startFreePractice()">🦀 Frei üben</button>
+                <button onclick="UI.closeOverlays()">Später</button>
+              </div></div>`;
         return;
       }
-      this.review = { ids: dueIds, idx: 0, right: 0 };
+      this.review = { ids: dueIds, idx: 0, right: 0, free: false };
+      this.renderReviewItem();
+    },
+
+    /** Freies Üben: zieht aus ALLEN gelernten Karten, beliebig oft. Lässt den
+     *  Spaced-Repetition-Plan unangetastet und gibt keine Belohnung (kein Farmen). */
+    startFreePractice() {
+      $("overlay-review").classList.remove("hidden");
+      const ids = Game.freeReviewItems(10);
+      if (ids.length === 0) { this.openReview(); return; }
+      this.review = { ids, idx: 0, right: 0, free: true };
       this.renderReviewItem();
     },
 
     renderReviewItem(): void {
       const r = this.review;
       if (r.idx >= r.ids.length) {
-        Game.state.stats.reviews++;
-        Game.save();
-        if (r.right === r.ids.length) this.reward(10, 10, "🌟 Perfekte Quizrunde!");
+        const free = !!r.free;
+        if (!free) {
+          // nur die tägliche fällige Runde zählt für Statistik & Bonus
+          Game.state.stats.reviews++;
+          Game.save();
+          if (r.right === r.ids.length) this.reward(10, 10, "🌟 Perfekte Quizrunde!");
+        }
         $("review-body").innerHTML = `<div style="text-align:center">
           <div style="font-size:3em">🦀</div>
           <h2>${r.right} von ${r.ids.length} richtig!</h2>
-          <p class="dim">Richtige Karten kommen seltener wieder, falsche öfter – bis alles sitzt. Schnipp!</p>
-          <button class="primary" onclick="UI.closeOverlays()">Zurück ins Abenteuer</button></div>`;
+          <p class="dim">${free
+            ? "Freies Üben – so oft du willst! (zählt nicht in den täglichen Wiederholungs-Plan)"
+            : "Richtige Karten kommen seltener wieder, falsche öfter – bis alles sitzt. Schnipp!"}</p>
+          <div class="actions">
+            <button class="primary" onclick="UI.startFreePractice()">🦀 Nochmal frei üben</button>
+            <button onclick="UI.closeOverlays()">Zurück ins Abenteuer</button>
+          </div></div>`;
         this.review = null;
         return;
       }
@@ -922,9 +948,15 @@ import { SFX } from "./sfx";
 
     finishReviewItem(correct: boolean, explainHtml: string) {
       const r = this.review;
-      Game.reviewResult(r.current.itemId, correct);
-      if (correct) { r.right++; this.reward(4, 3); }
-      else if (window.SFX) SFX.wrong();
+      if (r.free) {
+        // Freies Üben: SR-Plan unangetastet lassen, keine Belohnung (kein Farmen)
+        if (correct) { r.right++; if (window.SFX) SFX.success(); }
+        else if (window.SFX) SFX.wrong();
+      } else {
+        Game.reviewResult(r.current.itemId, correct);
+        if (correct) { r.right++; this.reward(4, 3); }
+        else if (window.SFX) SFX.wrong();
+      }
       $("review-explain").innerHTML = `
         <div class="quiz-explain">${correct ? "✅ <b>Richtig!</b> Schnipp-schnapp-applaus! 🦀" : "❌ <b>Nicht ganz.</b>"} ${explainHtml}</div>
         <div class="actions"><button class="primary" onclick="UI.nextReviewItem()">Weiter ➡️</button></div>`;
