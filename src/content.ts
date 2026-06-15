@@ -71,6 +71,14 @@ import type { Sim, Deployment } from "./sim";
     "  selector:", "    app: lager", "  ports:", "    - port: 6379",
   ].join("\n");
 
+  const INGRESS_YAML = [
+    "apiVersion: networking.k8s.io/v1", "kind: Ingress", "metadata:", "  name: hafentor", "spec:",
+    "  ingressClassName: nginx", "  rules:", "    - host: hafen.de", "      http:", "        paths:",
+    "          - path: /lager", "            pathType: Prefix", "            backend:",
+    "              service:", "                name: lager", "                port:",
+    "                  number: 6379",
+  ].join("\n");
+
   const BOESE_CONFIG_YAML = [
     "apiVersion: v1", "kind: ConfigMap", "metadata:", "  name: kasse-config", "data:",
     "  datenbank_host: db.hafen.local", "  # AUTSCH – Passwort im Klartext! Krakenfutter!",
@@ -546,14 +554,15 @@ import type { Sim, Deployment } from "./sim";
         { type: "dialog", npc: "ada", lines: [
           "Pssst! Hier wird nicht gebrüllt. Du rufst dem Cluster alles einzeln zu, hm? <code>create</code> hier, <code>scale</code> da … Das ist <b>imperativ</b>. Tssss.",
           "Profis <b>zeichnen Karten</b>: den Wunschzustand in eine Datei. Das ist <b>deklarativ</b> – und die Datei kann in <b>Git</b> liegen! Diese Karten heißen <b>Manifeste</b>, geschrieben in <b>YAML</b>.",
-          "Vier Stammdaten hat jedes Manifest: <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code>. Und: Einrückung mit <b>Leerzeichen, NIEMALS Tabs</b>. Ich habe dir zwei Karten hingelegt – schau sie dir an!",
+          "Vier Stammdaten hat jedes Manifest: <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code>. Und: Einrückung mit <b>Leerzeichen, NIEMALS Tabs</b>. Ich habe dir drei Karten hingelegt – schau sie dir an!",
         ]},
         { type: "terminal", brief: "Karten lesen",
           scenario: {
-            files: { "deployment.yaml": DEPLOYMENT_YAML, "service.yaml": SERVICE_YAML },
+            files: { "deployment.yaml": DEPLOYMENT_YAML, "service.yaml": SERVICE_YAML, "ingress.yaml": INGRESS_YAML },
             applyEffects: {
               "deployment.yaml": { deployment: { name: "lager", image: "redis:7", replicas: 2 } },
               "service.yaml": { service: { name: "lager", port: "6379" } },
+              "ingress.yaml": { ingress: { name: "hafentor", host: "hafen.de", path: "/lager", service: "lager", port: "6379", className: "nginx" } },
             },
           },
           tasks: [
@@ -568,6 +577,11 @@ import type { Sim, Deployment } from "./sim";
           { id: "t-ada-3", text: "Wende auch <code>service.yaml</code> an.", accept: [/^kubectl\s+apply\s+-f\s+service\.yaml$/], solution: "kubectl apply -f service.yaml", hint: "Gleicher Befehl, andere Datei." },
           { id: "t-ada-4", text: "Adas Lieblingstrick: Denselben apply <b>nochmal</b> – nichts passiert doppelt („unchanged“)!",
             accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "Wirklich nochmal exakt derselbe Befehl." },
+          { id: "t-ada-5", text: "Eine dritte Karte liegt bereit: <code>ingress.yaml</code> – das <b>Hafentor</b>, von dem Ole sprach. Wende es an und öffne den Weg vom offenen Meer zu <code>hafen.de/lager</code>.",
+            accept: [/^kubectl\s+apply\s+-f\s+ingress\.yaml$/], solution: "kubectl apply -f ingress.yaml", hint: "Gleicher apply, Datei ingress.yaml." },
+          { id: "t-ada-6", text: "Schau dir das frische Tor an: <code>kubectl get ingress</code> – Spalte HOSTS zeigt <code>hafen.de</code>.",
+            accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], check: (sim: Sim) => sim.ingresses.some(i => i.name === "hafentor"),
+            solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch." },
         ]},
         { type: "choice", npc: "ada", reviewId: "q-ch4-4",
           q: "Du wendest dieselbe Karte zweimal an. Was passiert beim zweiten Mal?",
