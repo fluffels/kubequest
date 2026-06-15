@@ -11,8 +11,12 @@ import type { ExecResult } from "./types";
 
 /** Art einer absichtlich kaputten Workload (für die Troubleshooting-Quests). */
 export interface Broken {
-  type: string; // "imagepull" | "crashloop" | "pending"
+  type: string; // "imagepull" | "crashloop" | "pending" | "notready"
   badImage?: string;
+  // Fehlendes Secret, das die App braucht. Bei "crashloop" stirbt sie ohne es,
+  // bei "notready" läuft sie zwar (liveness ok), meldet sich aber erst als
+  // bereit, sobald das Secret da ist (readiness). Sobald es existiert, heilt
+  // crashloop per `rollout restart`, notready ganz von selbst (Probe prüft weiter).
   needsSecret?: string;
 }
 /** Eine einzelne Pod-Instanz eines Deployments. */
@@ -301,7 +305,15 @@ export interface Scenario {
       if (d.broken.type === "imagepull") return { status: "ImagePullBackOff", ready: "0/1", restarts: 0 };
       if (d.broken.type === "crashloop") return { status: "CrashLoopBackOff", ready: "0/1", restarts: 5 };
       if (d.broken.type === "pending") return { status: "Pending", ready: "0/1", restarts: 0 };
+      // notready: Container läuft (liveness ok) – aber die Readiness-Probe meldet
+      // "noch nicht bereit", also Running mit READY 0/1 und kein Restart.
+      if (d.broken.type === "notready") return { status: "Running", ready: "0/1", restarts: 0 };
       return { status: "Running", ready: "1/1", restarts: 0 };
+    }
+
+    /** Ein Pod ist bereit (zählt für den Service), wenn er läuft UND ready ist. */
+    _podReady(d: Deployment): boolean {
+      return this._podStatus(d).ready === "1/1";
     }
 
     /** Pending-Pods bekommen Platz, sobald genug Nodes da sind. */
@@ -309,6 +321,17 @@ export interface Scenario {
       if (this.nodes.length <= 3) return;
       for (const d of this.deployments) {
         if (d.broken && d.broken.type === "pending") d.broken = null;
+      }
+    }
+
+    /** Readiness-Probe prüft fortlaufend: liegt das benötigte Secret vor, wird
+     * der notready-Pod von selbst bereit – ganz ohne Neustart (anders als Crash). */
+    _recheckReadiness() {
+      for (const d of this.deployments) {
+        if (d.broken && d.broken.type === "notready" &&
+            (!d.broken.needsSecret || this.secrets.some(s => s.name === d.broken!.needsSecret))) {
+          d.broken = null;
+        }
       }
     }
 
@@ -486,7 +509,7 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
+        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
@@ -615,6 +638,7 @@ export interface Scenario {
       const what = (t[2] || "").toLowerCase();
       const ns = this._flagValue(t, "-n") || this._flagValue(t, "--namespace");
       const allNs = t.includes("-A") || t.includes("--all-namespaces");
+      this._recheckReadiness();
 
       if (["pods", "pod", "po"].includes(what)) {
         if (ns === "kube-system" || allNs) {
@@ -642,13 +666,35 @@ export interface Scenario {
       if (["deployments", "deployment", "deploy"].includes(what)) {
         if (this.deployments.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "READY", "UP-TO-DATE", "AVAILABLE", "AGE"],
-          this.deployments.map(d => [d.name, d.replicas + "/" + d.replicas, String(d.replicas), String(d.replicas), this._age(d.created)]));
+          this.deployments.map(d => {
+            const ready = this._podReady(d) ? d.pods.length : 0;
+            return [d.name, ready + "/" + d.replicas, String(d.replicas), String(ready), this._age(d.created)];
+          }));
       }
 
       if (["services", "service", "svc"].includes(what)) {
         const rows = [["kubernetes", "ClusterIP", "10.96.0.1", "<none>", "443/TCP", "3d"]];
         for (const s of this.services) rows.push([s.name, s.type, s.clusterIP, "<none>", s.port + "/TCP", this._age(s.created || 0)]);
         return table(["NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"], rows);
+      }
+
+      if (["endpoints", "endpoint", "ep"].includes(what)) {
+        // Endpoints = die IPs der BEREITEN Pods hinter einem Service. Genau hier
+        // wird die Readiness-Probe sichtbar: ein nicht-bereiter Pod fehlt in der
+        // Liste, der Service leitet keinen Verkehr an ihn weiter.
+        const wantName = t[3] && !t[3].startsWith("-") ? t[3] : null;
+        const svcs = wantName ? this.services.filter(s => s.name === wantName) : this.services.slice();
+        if (wantName && svcs.length === 0) {
+          return this._err('Error from server (NotFound): endpoints "' + wantName + '" not found', "Service-Namen siehst du mit 'kubectl get services'.");
+        }
+        if (svcs.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "ENDPOINTS", "AGE"], svcs.map(s => {
+          const dep = this.deployments.find(d => d.name === s.name);
+          const ips = dep && this._podReady(dep)
+            ? dep.pods.map((_, i) => "10.244.1." + (20 + i) + ":" + s.port)
+            : [];
+          return [s.name, ips.length ? ips.join(",") : "<none>", this._age(s.created || 0)];
+        }));
       }
 
       if (["nodes", "node", "no"].includes(what)) {
@@ -675,7 +721,7 @@ export interface Scenario {
       }
 
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, ingress, networkpolicies oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -741,12 +787,17 @@ export interface Scenario {
         events.push("  Warning  BackOff    " + this._age(pod.created) + "   Back-off restarting failed container (Tipp: kubectl logs " + pod.name + ")");
       } else if (dep.broken.type === "pending") {
         events.push("  Warning  FailedScheduling  " + this._age(pod.created) + "   0/" + this.nodes.length + " nodes are available: insufficient capacity.");
+      } else if (dep.broken.type === "notready") {
+        events.push("  Normal   Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
+        events.push("  Normal   Started    " + this._age(pod.created) + "   Started container " + dep.name);
+        events.push("  Warning  Unhealthy  " + this._age(pod.created) + "   Readiness probe failed: HTTP probe returned statuscode 503 (Liveness probe ok – der Pod LÄUFT, ist aber nicht bereit)");
       }
       return [
         "Name:         " + pod.name,
         "Namespace:    default",
         "Node:         " + (dep.broken && dep.broken.type === "pending" ? "<none>" : this.nodes[1].name),
         "Status:       " + (st.status === "Running" ? "Running" : st.status === "Pending" ? "Pending" : "Waiting (" + st.status + ")"),
+        "Ready:        " + st.ready,
         "IP:           " + (dep.broken && dep.broken.type === "pending" ? "<none>" : "10.244.1." + (10 + Math.floor(Math.random() * 200))),
         "Controlled By: ReplicaSet/" + dep.name,
         "Containers:",

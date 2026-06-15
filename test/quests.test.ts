@@ -16,6 +16,7 @@ function resolvePlaceholder(cmd: string, sim: KQSim) {
   if (/leuchtfeuer/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("leuchtfeuer"));
   if (/funkboje/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("funkboje"));
   if (/frachtplaner/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("frachtplaner"));
+  if (/kombuese/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("kombuese"));
   if (/describe/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("kantine"));
   if (/delete pod/.test(cmd)) return cmd.replace(/<[^>]+>/, findPod("kasse"));
   if (/docker stop/.test(cmd)) {
