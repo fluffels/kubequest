@@ -6,9 +6,21 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove } from "../src/world";
 
 const W = 52, H = 40; // wie WorldScene.create()
+
+/** Baut ein `solidAt(px,py)` aus den NPC-Solid-Kacheln – wie isSolidAt() in
+ *  scenes.ts: Pixel → Kachel flooren, im Grid nachsehen. */
+function npcSolidAt() {
+  const grid = new Uint8Array(W * H);
+  for (const i of npcSolidIndices(NPC_SPAWNS, W, H)) grid[i] = 1;
+  return (px: number, py: number) => {
+    const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
+    if (tx < 0 || ty < 0 || tx >= W || ty >= H) return true;
+    return grid[ty * W + tx] === 1;
+  };
+}
 
 test("npcTile floored wie isSolidAt: Mittelpunkt x*T+8 / y*T+8", () => {
   // 26 -> floor(26.5)=26 ; 14.6 -> floor(15.1)=15
@@ -58,4 +70,47 @@ test("trotz Blockade bleibt jeder NPC ansprechbar (freie Nachbarkachel in Reichw
 test("out-of-bounds-NPC erzeugt keine Solid-Kachel", () => {
   expect(npcSolidIndices([{ id: "x", x: -5, y: 3 }], W, H)).toEqual([]);
   expect(npcSolidIndices([{ id: "x", x: 3, y: 999 }], W, H)).toEqual([]);
+});
+
+/* ===== #36: Anti-Wedge – Figur darf nicht dauerhaft festklemmen ===== */
+
+test("footprintSolid erkennt eine solide Kachel direkt unter der Figur", () => {
+  const solidAt = npcSolidAt();
+  // Ole: Solid-Kachel (26,15) → Mittelpunkt 26*16+8 / 15*16+8 = 424 / 248
+  expect(footprintSolid(solidAt, 424, 248)).toBe(true);
+  // Freie Fläche weit weg von jedem NPC
+  expect(footprintSolid(solidAt, 8, 8)).toBe(false);
+});
+
+test("#36-Repro: steckt der Footprint in einer Solid-Kachel, muss man herauskommen", () => {
+  const solidAt = npcSolidAt();
+  // Spielstand mitten auf Oles jetzt-solider Kachel (alter Save vor #31)
+  const x0 = 424, y0 = 248;
+  expect(footprintSolid(solidAt, x0, y0)).toBe(true); // Vorbedingung: festgesteckt
+  // Nach links drücken: ohne Anti-Wedge bliebe x unverändert (eingemauert)
+  const moved = resolveMove(solidAt, x0, y0, -1.25, 0);
+  expect(moved.x).toBeLessThan(x0); // bewegt sich tatsächlich vom Fleck
+  // Wer wiederholt nach links läuft, erreicht freie Kacheln und steckt dann nicht mehr
+  let p = { x: x0, y: y0 };
+  for (let i = 0; i < 40; i++) p = resolveMove(solidAt, p.x, p.y, -1.25, 0);
+  expect(footprintSolid(solidAt, p.x, p.y)).toBe(false);
+});
+
+test("normale Kollision bleibt: aus dem Freien NICHT in eine Solid-Kachel laufen", () => {
+  const solidAt = npcSolidAt();
+  // Direkt rechts neben Oles Solid-Kachel (26,15), Footprint frei
+  const x0 = (27 * TILE) + 8, y0 = (15 * TILE) + 8; // 440 / 248
+  expect(footprintSolid(solidAt, x0, y0)).toBe(false); // Vorbedingung: frei
+  // Schritt nach links Richtung Ole muss geblockt werden (man läuft nicht durch NPCs, #31)
+  const blocked = resolveMove(solidAt, x0, y0, -8, 0);
+  expect(blocked.x).toBe(x0); // keine Bewegung in die solide Kachel
+});
+
+test("Achsen-Trennung: an einer Wand blockierte Achse lässt die andere frei gleiten", () => {
+  const solidAt = npcSolidAt();
+  const x0 = (27 * TILE) + 8, y0 = (15 * TILE) + 8; // frei, links liegt Ole
+  // Diagonal nach links-unten: X blockiert (Ole), Y muss trotzdem durchgehen
+  const moved = resolveMove(solidAt, x0, y0, -8, 6);
+  expect(moved.x).toBe(x0);          // X bleibt (Wand)
+  expect(moved.y).toBe(y0 + 6);      // Y gleitet
 });

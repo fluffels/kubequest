@@ -41,3 +41,35 @@ export function npcSolidIndices(spawns: Spawn[], W: number, H: number): number[]
   }
   return out;
 }
+
+/** Solid-Abfrage in Pixel-Koordinaten (in scenes.ts ist das `isSolidAt`). */
+export type SolidAt = (px: number, py: number) => boolean;
+
+/** Kollisions-Footprint der Figur: vier Ecken um den Mittelpunkt – ±5 px breit,
+ *  von 2 px über dem Mittelpunkt bis 5 px darunter (passend zum Sprite-Fuß).
+ *  Identisch zur `probe`-Geometrie, die scenes.ts beim Laufen nutzt. */
+export function footprintSolid(solidAt: SolidAt, x: number, y: number): boolean {
+  return solidAt(x - 5, y - 2) || solidAt(x + 5, y - 2) ||
+         solidAt(x - 5, y + 5) || solidAt(x + 5, y + 5);
+}
+
+/** Achsen-getrennte Bewegungsauflösung mit Anti-Wedge.
+ *
+ *  Normalfall: pro Achse nur verschieben, wenn der Ziel-Footprint frei ist – so
+ *  läuft man nicht durch solide Kacheln oder NPCs hindurch (#31).
+ *
+ *  Sonderfall (#36): Steckt der *aktuelle* Footprint schon in einer soliden
+ *  Kachel – etwa weil ein alter Spielstand auf einer erst nachträglich solide
+ *  gewordenen NPC-Kachel gespeichert wurde – darf die Bewegung NICHT blockiert
+ *  werden. Sonst wäre die Figur für immer eingemauert (dreht sich nur, läuft
+ *  aber in keine Richtung). Dann jede Richtung erlauben, damit man sich wieder
+ *  herausbewegen kann; sobald der Footprint frei ist, greift die normale
+ *  Kollision von selbst wieder. */
+export function resolveMove(
+  solidAt: SolidAt, x: number, y: number, dx: number, dy: number,
+): { x: number; y: number } {
+  const stuck = footprintSolid(solidAt, x, y);
+  if (stuck || !footprintSolid(solidAt, x + dx, y)) x += dx;
+  if (stuck || !footprintSolid(solidAt, x, y + dy)) y += dy;
+  return { x, y };
+}

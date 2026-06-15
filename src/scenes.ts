@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove } from "./world";
 import { keys, setWorldScene } from "./runtime";
 import { pickPlacements, strSeed, hash01 } from "./decor";
 
@@ -658,11 +658,11 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
 
     tryMove(dx: number, dy: number) {
       const pl = this.playerPos;
-      const probe = (nx: number, ny: number) =>
-        this.isSolidAt(nx - 5, ny - 2) || this.isSolidAt(nx + 5, ny - 2) ||
-        this.isSolidAt(nx - 5, ny + 5) || this.isSolidAt(nx + 5, ny + 5);
-      if (!probe(pl.x + dx, pl.y)) pl.x += dx;
-      if (!probe(pl.x, pl.y + dy)) pl.y += dy;
+      // Kollision + Anti-Wedge liegen pur in world.ts (resolveMove) und sind dort
+      // getestet; #36: steckt die Figur in einer soliden Kachel, kommt sie raus.
+      const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx, dy);
+      pl.x = next.x;
+      pl.y = next.y;
     }
 
     nearestNpc() {
