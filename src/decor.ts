@@ -92,3 +92,33 @@ export function pickPlacements(spec: ScatterSpec): Placement[] {
     jy: span(jy, hash01(seed ^ 0x2222, c.x, c.y)),
   }));
 }
+
+/** Aussehen eines einzelnen Gras-Büschels (#40, Stardew-Look). */
+export interface GrassTuft {
+  /** Form-Variante (0 .. variants-1) – verschiedene Büschel-Silhouetten */
+  variant: number;
+  /** Grün-Nuance als Offset in [-1, 1) – leichte Helligkeits-/Farbvariation pro Büschel */
+  shade: number;
+  /** feste Neigung in Grad (ganzzahlig, -8 .. 8) – bricht den Gleichtakt ohne Bewegung */
+  angle: number;
+  /** Skalierung um 1.0 herum (0.8 .. 1.3) */
+  scale: number;
+  /** horizontal gespiegelt? – verdoppelt die optische Vielfalt der Silhouetten */
+  flip: boolean;
+}
+
+/** Leitet rein deterministisch (Seed + Koordinaten, kein globaler Zufall) das
+ *  Aussehen eines Gras-Büschels auf Feld (x,y) ab. Gleiche Welt → exakt gleiche
+ *  Wiese (#3-Prinzip). Jede Eigenschaft zieht aus einem eigenen Hash-Strom, damit
+ *  Variante, Farbe, Neigung und Skalierung voneinander unabhängig streuen.
+ *  `variants` (>= 1) ist die Anzahl verfügbarer Form-Texturen. */
+export function grassTuftStyle(seed: number, x: number, y: number, variants: number): GrassTuft {
+  const n = Math.max(1, Math.floor(variants));
+  return {
+    variant: Math.min(n - 1, Math.floor(hash01(seed ^ 0x3333, x, y) * n)),
+    shade: hash01(seed ^ 0x4444, x, y) * 2 - 1,
+    angle: Math.round((hash01(seed ^ 0x5555, x, y) * 2 - 1) * 8),
+    scale: 0.8 + hash01(seed ^ 0x6666, x, y) * 0.5,
+    flip: hash01(seed ^ 0x7777, x, y) < 0.5,
+  };
+}
