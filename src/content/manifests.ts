@@ -23,6 +23,18 @@ export const INGRESS_YAML = [
   "                  number: 6379",
 ].join("\n");
 
+// Dasselbe Hafentor, jetzt mit TLS: spec.tls referenziert das Zertifikats-Secret,
+// damit der Controller HTTPS für hafen.de terminiert (HTTP wird zu HTTPS).
+export const INGRESS_TLS_YAML = [
+  "apiVersion: networking.k8s.io/v1", "kind: Ingress", "metadata:", "  name: hafentor", "spec:",
+  "  ingressClassName: nginx",
+  "  tls:", "    - hosts:", "        - hafen.de", "      secretName: hafen-tls",
+  "  rules:", "    - host: hafen.de", "      http:", "        paths:",
+  "          - path: /lager", "            pathType: Prefix", "            backend:",
+  "              service:", "                name: lager", "                port:",
+  "                  number: 6379",
+].join("\n");
+
 // Hafenmauer um die Pods von app=lager: standardmäßig dicht, nur das Hafentor darf rein.
 export const NETPOL_YAML = [
   "apiVersion: networking.k8s.io/v1", "kind: NetworkPolicy", "metadata:", "  name: hafenmauer", "spec:",

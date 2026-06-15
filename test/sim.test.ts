@@ -346,6 +346,96 @@ test("ingress: Szenario-Seeding + snapshot/restore erhalten das Tor", () => {
   assert.match(restored.exec("kubectl get ingress").output!, /tor-2/);
 });
 
+/* ===================== TLS-Terminierung am Hafentor – Issue #64 ===================== */
+
+// Helfer: Ingress-Manifest MIT TLS in die Welt legen (verschlüsseltes Tor).
+function legeTlsIngressManifest(s: KQSim, datei = "ingress-tls.yaml") {
+  s.files[datei] = "kind: Ingress … spec.tls …";
+  s.applyEffects[datei] = { ingress: { name: "hafentor", host: "hafen.de", path: "/lager", service: "lager", port: "6379", className: "nginx", tls: { secretName: "hafen-tls" } } };
+}
+
+test("secret tls: create legt ein TLS-Secret an, get zeigt Typ kubernetes.io/tls", () => {
+  const created = sim.exec("kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key");
+  assert.ok(!created.error);
+  assert.match(created.output!, /secret\/hafen-tls created/);
+  const get = sim.exec("kubectl get secrets").output!;
+  assert.match(get, /hafen-tls/);
+  assert.match(get, /kubernetes\.io\/tls/, "TYPE-Spalte zeigt den TLS-Typ, nicht Opaque");
+  assert.match(get, /\b2\b/, "DATA zeigt 2 Schlüssel (tls.crt + tls.key)");
+});
+
+test("secret tls: fehlende --cert/--key und Duplikat werden abgelehnt (Negativfälle)", () => {
+  const ohneFlags = sim.exec("kubectl create secret tls hafen-tls");
+  assert.ok(ohneFlags.error, "ohne --cert/--key -> Fehler");
+  assert.match(ohneFlags.output!, /--cert.*--key|--key/);
+  assert.equal(sim.secrets.length, 0, "fehlgeschlagenes create legt nichts an");
+
+  const nurCert = sim.exec("kubectl create secret tls hafen-tls --cert=tls.crt");
+  assert.ok(nurCert.error, "nur --cert reicht nicht");
+
+  sim.exec("kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key");
+  const doppelt = sim.exec("kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key");
+  assert.ok(doppelt.error, "gleicher Name zweimal -> Fehler");
+  assert.match(doppelt.output!, /already exists/);
+  assert.equal(sim.secrets.filter(s => s.name === "hafen-tls").length, 1, "kein doppeltes Secret");
+});
+
+test("ingress TLS: apply rüstet das bestehende Tor auf HTTPS nach (configured), get zeigt 443", () => {
+  // Erst das normale Tor, dann TLS nachrüsten – wie in der Quest (q23).
+  legeIngressManifest(sim, "ingress.yaml");
+  // legeIngressManifest zeigt auf service 'kasse'; für q23-Optik egal, wir prüfen nur TLS.
+  sim.exec("kubectl apply -f ingress.yaml");
+  assert.match(sim.exec("kubectl get ingress").output!, /\b80\b/);
+  assert.doesNotMatch(sim.exec("kubectl get ingress").output!, /443/, "vor TLS kein 443");
+
+  legeTlsIngressManifest(sim);
+  const configured = sim.exec("kubectl apply -f ingress-tls.yaml");
+  assert.match(configured.output!, /hafentor configured/, "bestehendes Tor wird umkonfiguriert, nicht 'unchanged'");
+  assert.equal(sim.ingresses.filter(i => i.name === "hafentor").length, 1, "kein doppeltes Tor");
+  assert.ok(sim.ingresses[0].tls && sim.ingresses[0].tls.secretName === "hafen-tls");
+
+  assert.match(sim.exec("kubectl get ingress").output!, /80, 443/, "PORTS zeigt jetzt 80, 443");
+
+  // Erneutes apply ist wieder idempotent (TLS schon da -> unchanged).
+  assert.match(sim.exec("kubectl apply -f ingress-tls.yaml").output!, /unchanged/);
+});
+
+test("ingress TLS: apply auf neues Tor legt es direkt mit TLS an", () => {
+  legeTlsIngressManifest(sim);
+  const created = sim.exec("kubectl apply -f ingress-tls.yaml");
+  assert.match(created.output!, /hafentor created/);
+  assert.ok(sim.ingresses[0].tls?.secretName === "hafen-tls");
+});
+
+test("ingress TLS: describe zeigt den TLS-Block und warnt bei fehlendem Zertifikats-Secret", () => {
+  legeTlsIngressManifest(sim);
+  sim.exec("kubectl apply -f ingress-tls.yaml");
+
+  // Secret existiert noch nicht -> describe warnt.
+  const ohneSecret = sim.exec("kubectl describe ingress hafentor");
+  assert.match(ohneSecret.output!, /TLS:/);
+  assert.match(ohneSecret.output!, /hafen-tls terminates hafen\.de/);
+  assert.match(ohneSecret.output!, /HTTPS bleibt zu/, "fehlendes TLS-Secret wird angewarnt");
+
+  // Secret anlegen -> Warnung verschwindet.
+  sim.exec("kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key");
+  assert.doesNotMatch(sim.exec("kubectl describe ingress hafentor").output!, /HTTPS bleibt zu/);
+});
+
+test("ingress ohne TLS: describe zeigt KEINEN TLS-Block (kein False Positive)", () => {
+  legeIngressManifest(sim);
+  sim.exec("kubectl apply -f ingress.yaml");
+  assert.doesNotMatch(sim.exec("kubectl describe ingress hafentor").output!, /TLS:/);
+});
+
+test("ingress TLS: snapshot/restore erhält die TLS-Konfiguration", () => {
+  legeTlsIngressManifest(sim);
+  sim.exec("kubectl apply -f ingress-tls.yaml");
+  const restored = new KQSim(JSON.parse(JSON.stringify(sim.snapshot())));
+  assert.ok(restored.ingresses[0].tls?.secretName === "hafen-tls", "TLS übersteht snapshot/restore");
+  assert.match(restored.exec("kubectl get ingress").output!, /80, 443/);
+});
+
 /* ===================== NetworkPolicy (Hafenmauer) – Issue #20 ===================== */
 
 // Kleiner Helfer: ein NetworkPolicy-Manifest in die Welt legen, so wie es eine Quest täte.
