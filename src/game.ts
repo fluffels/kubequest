@@ -7,6 +7,7 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
+import { SFX } from "./sfx";
 import { worldScene } from "./runtime";
 import type { GameState, QuestStep } from "./types";
 
@@ -51,6 +52,7 @@ import type { GameState, QuestStep } from "./types";
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
+      audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 },
     };
   }
 
@@ -70,6 +72,8 @@ import type { GameState, QuestStep } from "./types";
       } catch (e) {
         this.state = makeDefaultState();
       }
+      // Audio-Einstellungen aus dem Spielstand an die zentrale SFX-Schicht geben.
+      SFX.applyConfig(this.state.audio);
       this.sim = new KQSim(this.state.clusterSnapshot || {});
       // Szenarien bereits erreichter Funk-Schritte wieder einmischen
       for (let qi = 0; qi <= Math.min(this.state.questIdx, KQContent.QUESTS.length - 1); qi++) {

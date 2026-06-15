@@ -34,6 +34,8 @@ export interface GameState {
   };
   lastSeen: number;
   clusterSnapshot: any | null;
+  /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke). */
+  audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number };
 }
 
 /** Ergebnis einer simulierten Befehlszeile (Sim.exec). */

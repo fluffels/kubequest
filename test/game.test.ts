@@ -31,6 +31,20 @@ beforeEach(() => {
   Game.sim = new Sim({}); // leerer Cluster als bekannte Basis
 });
 
+/* ---------- Audio-Einstellungen (#47) ---------- */
+
+test("defaultState: Audio ist standardmäßig an, mit gesetzten Lautstärken", () => {
+  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 });
+});
+
+test("load: alter Spielstand OHNE audio-Feld bekommt die Audio-Defaults", () => {
+  // Stand wie vor #47 gespeichert: keine audio-Eigenschaft.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 5, coins: 99 } }));
+  Game.load();
+  expect(Game.state.coins).toBe(99);                 // Altdaten erhalten
+  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 });
+});
+
 /* ---------- XP & Rang ---------- */
 
 test("rankIndex: Schwellen greifen genau, nicht zu früh", () => {
