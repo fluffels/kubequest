@@ -12,7 +12,7 @@ import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
 import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, type Door } from "./world";
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
-import { pickPlacements, strSeed, hash01 } from "./decor";
+import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 
   const T = 16;
@@ -22,7 +22,9 @@ import { gameClock } from "./clock";
   /* SFX (Mini-Synthesizer) liegt jetzt in sfx.ts und wird oben importiert. */
 
   /* ---------- Kartendaten (wie v2, bewährt) ---------- */
-  const GRASS = [0, 0, 0, 0, 1, 2];
+  // Gras-Tiles tragen im Boden-Raster die Frame-Indizes 0/1/2 (siehe accept() in
+  // spawnFlowers/spawnGrassDetail). Die alte GRASS-Verteilung [0,0,0,0,1,2] aus der
+  // Vor-Wang-Ära wird seit dem PixelLab-Terrain nicht mehr gebraucht und ist entfernt.
   const DIRT = 25;
   const STONE = [96, 97, 98];
   const WOOD = [48, 49, 50, 51, 52, 53];
@@ -98,6 +100,7 @@ import { gameClock } from "./clock";
       this.renderGround();
       this.renderStatics();
       this.spawnFlowers();
+      this.spawnGrassDetail();   // #40: dichtes, variiertes Gras (Stardew-Look)
       this.spawnNpcs();
       this.spawnPlayer();
       this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
@@ -444,6 +447,32 @@ import { gameClock } from "./clock";
         gg.fillCircle(gs / 2, gs / 2, (gs / 2) * t);
       }
       gg.generateTexture("glowSoft", gs, gs); gg.destroy();
+      this.makeGrassTextures();
+    }
+
+    /** Drei kleine Gras-Büschel-Texturen aus schmalen, sich verjüngenden Halmen
+     *  (#40). Bewusst WEISS gezeichnet – die Grün-Nuance kommt erst beim Streuen
+     *  per Tint pro Büschel (grassTuftStyle.shade), damit jede Wiese leicht anders
+     *  schattiert ist statt aus einem einzigen wiederholten Tile zu bestehen. */
+    makeGrassTextures() {
+      // Pro Variante: Liste von Halmen [Versatz-X von der Mitte, Höhe]. Mehr & breitere
+      // Halme = dichteres Büschel; die fächerförmige dritte Variante wirkt am üppigsten.
+      const variants: [number, number][][] = [
+        [[-3, 7], [0, 10], [3, 8]],
+        [[-4, 6], [-1, 9], [2, 10], [4, 7]],
+        [[0, 11], [-2, 8], [2, 8], [-4, 5], [4, 5]],
+      ];
+      const w = 12, h = 13;
+      variants.forEach((blades, i) => {
+        const g = this.make.graphics({ add: false } as any);
+        for (const [bx, bh] of blades) {
+          const baseX = w / 2 + bx;
+          const lean = bx * 0.18;                 // äußere Halme neigen sich leicht nach außen
+          g.fillStyle(0xffffff, 0.92);
+          g.fillTriangle(baseX - 1.3, h, baseX + 1.3, h, baseX + lean, h - bh);
+        }
+        g.generateTexture("grasstuft" + i, w, h); g.destroy();
+      });
     }
 
     spawnFlowers() {
@@ -462,6 +491,38 @@ import { gameClock } from "./clock";
         const angle = Math.round(hash01(strSeed("flower-angle"), p.x, p.y) * 6) - 3;
         this.add.image(p.x * T + p.jx, p.y * T + p.jy, "flowers")
           .setOrigin(0.5, 1).setScale(0.35).setDepth(p.y * T + 6).setAngle(angle);
+      }
+    }
+
+    /** Dichte Gras-Büschel über die Wiese streuen (#40, Stardew-Look). Macht aus
+     *  dem wiederholten Wang-Gras-Tile eine abwechslungsreiche Wiese: viele kleine
+     *  Büschel, jedes per grassTuftStyle deterministisch in Form, Grün-Nuance,
+     *  Neigung, Größe und Spiegelung variiert. Platzierung wie bei den Blumen rein
+     *  deterministisch (#3) – gleiche Welt → gleiche Wiese, kein Flackern beim Laden. */
+    spawnGrassDetail() {
+      const VARIANTS = 3;
+      const accept = (x: number, y: number) => {
+        const v = this.ground[y * this.W + x];
+        return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
+      };
+      // Deutlich mehr Büschel als Blumen → die Wiese wirkt flächig bewachsen statt kahl.
+      for (const p of pickPlacements({
+        W: this.W, H: this.H, count: 140, seed: strSeed("grass-detail"), accept,
+        jitter: { x: [1, 15], y: [6, 15] },
+      })) {
+        const s = grassTuftStyle(strSeed("grass-style"), p.x, p.y, VARIANTS);
+        // Grün-Nuance: Grundton Wiesengrün, Helligkeit/Sättigung leicht je shade verschoben.
+        const tint = Phaser.Display.Color.HSLToColor(
+          (105 + s.shade * 12) / 360,         // Farbton: Gelb-Grün ↔ Blau-Grün
+          0.45 + s.shade * 0.08,              // Sättigung
+          0.34 + s.shade * 0.07,              // Helligkeit
+        ).color;
+        this.add.image(p.x * T + p.jx, p.y * T + p.jy, "grasstuft" + s.variant)
+          .setOrigin(0.5, 1)
+          .setScale((s.flip ? -1 : 1) * s.scale, s.scale)
+          .setAngle(s.angle)
+          .setTint(tint)
+          .setDepth(p.y * T + 4);             // y-sortiert, knapp unter Blumen/Objekten
       }
     }
 
