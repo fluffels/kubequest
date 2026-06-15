@@ -28,6 +28,9 @@ import crate from "../assets/pixellab/crate.png";
 import well from "../assets/pixellab/well.png";
 import stall from "../assets/pixellab/stall.png";
 import lamppost from "../assets/pixellab/lamppost.png";
+import mushroom from "../assets/pixellab/mushroom.png";
+import seashell from "../assets/pixellab/seashell.png";
+import driftwood from "../assets/pixellab/driftwood.png";
 import signpost from "../assets/pixellab/signpost.png";
 import sign from "../assets/pixellab/sign.png";
 import lighthouse from "../assets/pixellab/lighthouse.png";
@@ -58,6 +61,7 @@ export const KQAssets = {
   town, dungeon, creatures,
   coast, meadow, path, kai, dock,
   flowers, tree, pine, bush, rock, barrel, crate, well, stall, lamppost,
+  mushroom, seashell, driftwood,
   signpost, sign, lighthouse, house_office, house_forge, house_chart,
   char_player, char_player_east, char_player_north, char_player_west,
   char_ole, char_runa, char_pelle, char_bo, char_ada, char_theo, char_kralle, char_juno,

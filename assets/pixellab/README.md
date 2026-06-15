@@ -31,6 +31,7 @@ Gemeinsame Basis-Tile-IDs (zum Weiter-Verketten neuer Sets):
 `flowers` 0b39f8ca · `tree` 5875d1ff · `pine` 646df3e0 · `bush` 60c32cf5 · `rock` fc3a7be6 ·
 `crate` 80a6f6c4 · `barrel` 694b9ecc · `well` edd57bbc · `stall` 1f189047 · `lamppost` ce7a86df · `signpost` b05d7ca2 · `sign` f6d5f12f
 `lighthouse` d132cfe0 · `house_office` 66ac5306 · `house_forge` 83dc3d8d · `house_chart` d83f271c
+`mushroom` b5ef64e2 · `seashell` fcecf607 · `driftwood` c7db4671 (Natur-Deko, #7; 64×64, `high top-down`, `selective outline`, `detailed shading`; über `scatter()` in `scenes.ts` gestreut — Pilze auf Land, Muscheln & Treibholz nur auf Sandstrand)
 `pet_ratte` 6dac5de9 · `pet_fledermaus` 3a6daee7 · `pet_geist` 8cb7a436 (Shop-Haustiere, folgen der Figur; `scenes.ts` petSprite + `ui.ts` `drawTexIcon` fürs Shop-Icon)
 
 > **Leuchtturm** (`lighthouse`, side-view, 72×128 → 45×100): löst den alten code-gezeichneten Turm ab; in `scenes.ts` als Bild + Felsen-Ellipse, dazu ein **rotierender Lichtkegel** (Code: weiches ADD-Blend-Dreieck `lhbeam`, 360°-Tween) und das pulsierende Lämpchen.
