@@ -44,7 +44,7 @@ Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bünde
 | `ui.ts` | Dialoge, Funkgerät, Shop, Quiz, Minispiel – Präsentation |
 | `sfx.ts` | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
 | `main.ts` | Start & Tastatur (Einstiegspunkt) |
-| `assets-data.ts` | Spritesheets als Base64 (hält den Offline-Build self-contained) |
+| `assets-data.ts` | Spritesheets als `import`s aus `assets/` (Single-File-Build inlinet sie als Data-URI → Offline-Build self-contained) |
 | `vite-env.d.ts` | Typ-Deklarationen (u.a. window-Shim für Inline-Handler) |
 
 Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `content.test.ts` (Konsistenz aller Inhalte), `quests.test.ts` (spielt die ganze Story + alle Drills durch).
@@ -52,7 +52,7 @@ Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `conten
 ## Konventionen
 
 - **TS-Strenge (Ratchet abgeschlossen).** Die Basis-`tsconfig.json` steht auf `"strict": true` und deckt das **ganze Projekt** ab: alle `src`-Module (inkl. `scenes`, `ui`, `main`, `sfx`), die Tests und `vite.config`. Echte Param-/Feld-Typen statt `any`, durchgängige Null-Prüfung; die Cluster-Interfaces Pod/Deployment/Service … leben in `src/sim.ts`. `tsconfig.strict.json` ist nur noch ein Alias auf die Basis. **Neuer/geänderter Code muss strict-tauglich bleiben** – `npm run typecheck` muss grün sein.
-- **PixelLab-Grafik doppelt ablegen:** Quell-PNG nach `assets/pixellab/` **und** Base64 in `src/assets-data.ts` (damit der Single-File-Build self-contained bleibt). Asset-Liste + IDs: `assets/pixellab/README.md`.
+- **PixelLab-Grafik ablegen:** Quell-PNG nach `assets/pixellab/`, dann in `src/assets-data.ts` per `import` einbinden und ins `KQAssets`-Objekt aufnehmen (Vite inlinet es im Single-File-Build automatisch als Data-URI – kein handgepflegtes Base64 mehr). Asset-Liste + IDs: `assets/pixellab/README.md`.
 - **PixelLab-Zugriff** läuft über den **PixelLab-MCP-Server** (Subscription „Pixel Apprentice"). Der API-Key rotiert: bei „kein Zugriff" trägt fluffels den neuen Key selbst in die MCP-Config ein, danach funktional mit `get_balance` verifizieren (Key nie im Chat anfordern/ausgeben). Grafik-/Asset-Aufgaben werden — wie der ganze Backlog — als **GitHub-Issues** geführt, nicht im Vault/Notiz-System.
 - **Grafik-Stil:** Stardew-angelehnt, 16px, frontale Ansicht (`view: side` für Gebäude, nicht die schräge 2.5D-Sicht). Große Objekte (Häuser, Bäume) in hoher Auflösung generieren und möglichst ganzzahlig skalieren, damit der `pixelArt`-Renderer scharf bleibt.
 - **Spielstände** laufen über die SaveStore-Schicht (`store.ts`), localStorage + Auto-Save alle 5 s + JSON-Export/Import. Formatänderungen brauchen perspektivisch ein `version`-Feld + Migration.
