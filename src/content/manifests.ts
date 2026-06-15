@@ -23,6 +23,14 @@ export const INGRESS_YAML = [
   "                  number: 6379",
 ].join("\n");
 
+// Hafenmauer um die Pods von app=lager: standardmäßig dicht, nur das Hafentor darf rein.
+export const NETPOL_YAML = [
+  "apiVersion: networking.k8s.io/v1", "kind: NetworkPolicy", "metadata:", "  name: hafenmauer", "spec:",
+  "  podSelector:", "    matchLabels:", "      app: lager",
+  "  policyTypes:", "    - Ingress",
+  "  ingress:", "    - from:", "        - podSelector:", "            matchLabels:", "              app: hafentor",
+].join("\n");
+
 export const BOESE_CONFIG_YAML = [
   "apiVersion: v1", "kind: ConfigMap", "metadata:", "  name: kasse-config", "data:",
   "  datenbank_host: db.hafen.local", "  # AUTSCH – Passwort im Klartext! Krakenfutter!",

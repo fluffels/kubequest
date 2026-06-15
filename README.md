@@ -37,7 +37,9 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
-**21 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** → **CI/CD: Pipeline-Passage (1)** + Einstieg.
+**22 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** → **CI/CD: Pipeline-Passage (1)** → **Hafenmauer: NetworkPolicy (1)** + Einstieg.
+
+Die **Hafenmauer** (bei Sturmwache Juno) führt **NetworkPolicies** ein: Kubernetes ist von Haus aus offen – jeder Pod erreicht jeden. Eine NetworkPolicy schaltet die per Label gewählten Pods auf **default-deny** und lässt nur erlaubte Quellen durch (`kubectl get/describe/apply/delete networkpolicy`). Genau so sichert man im Job z.B. Datenbanken ab.
 
 Die **Pipeline-Passage** (bei Ada, direkt nach den Git-Quests) führt **CI/CD** ein: Eine `.gitlab-ci.yml` im Repo macht aus `git push` Automatik – ein Runner arbeitet die Stages **build → test → deploy** ab, und die deploy-Stage rollt den Dienst **ohne Handarbeit** in den Cluster (`glab ci status` zeigt das Ergebnis). Job-Bezug: genau die GitLab-CI-Deploy-Pipelines aus `roads-deployment`.
 
@@ -106,7 +108,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 |---|---|---|
 | 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (15 Quests) |
 | 2 | Git & Branching-Workflows + CI/CD-Pipelines | ✅ im Spiel (Git: 2 Quests bei Ada; CI/CD: „Pipeline-Passage“) |
-| 3 | Ingress, DNS, TLS, NetworkPolicies | 🔜 geplant: „Ingress-Inseln“ |
+| 3 | Ingress, DNS, TLS, NetworkPolicies | 🟡 teilweise im Spiel: Ingress („Hafentor“ bei Ada) + NetworkPolicies („Hafenmauer“ bei Juno); DNS/TLS noch offen |
 | 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🔜 geplant: „GitOps-Archipel“ |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
 | 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |

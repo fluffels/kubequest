@@ -2,8 +2,9 @@
  * Jede Drill-Funktion bekommt den Simulator und liefert eine frische Aufgabe
  * (ggf. mit Vorbereitung der Welt). PRACTICE ordnet die Drills den NPCs zu.
  */
-import type { Sim, Deployment } from "../sim";
+import type { Sim, Deployment, NetworkPolicyRes } from "../sim";
 import { pick, rnd } from "./util";
+import { NETPOL_YAML } from "./manifests";
 
 const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
 const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
@@ -33,6 +34,23 @@ function ensureChart(sim: Sim): string {
     sim.exec("helm create " + name);
   }
   return sim.charts[0].name;
+}
+
+/** Namen & geschützte Apps für die Hafenmauer-Übungen (#20). */
+const NETPOL_NAMES = ["hafenmauer", "kaimauer", "wellenbrecher", "bollwerk", "schutzwall", "palisade"];
+const NETPOL_APPS = ["kasse", "lager", "funkdienst", "lotsen", "leuchtfeuer", "kombuese"];
+
+/** Sorgt dafür, dass mindestens eine Hafenmauer (NetworkPolicy) existiert, und gibt sie zurück. */
+function ensureNetworkPolicy(sim: Sim): NetworkPolicyRes {
+  if (sim.networkPolicies.length === 0) {
+    let name = pick(NETPOL_NAMES);
+    while (sim.networkPolicies.some(n => n.name === name)) name = pick(NETPOL_NAMES) + rnd(2, 99);
+    const file = "uebung-netpol.yaml";
+    sim.files[file] = NETPOL_YAML;
+    sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
+    sim.exec("kubectl apply -f " + file);
+  }
+  return sim.networkPolicies[0];
 }
 
 /** Eine generierte Übungsaufgabe (Drill). */
@@ -204,6 +222,26 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     sim.files[fn] = "x"; sim.exec("git add " + fn); sim.exec('git commit -m "Auslieferung"'); sim.exec("git push");
     return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> – der Befehl fürs Nachschauen." };
   },
+  "k-get-netpol": sim => {
+    ensureNetworkPolicy(sim);
+    return { text: "Zeig alle Hafenmauern (NetworkPolicies) im Cluster.", accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." };
+  },
+  "k-apply-netpol": sim => {
+    let name = pick(NETPOL_NAMES);
+    while (sim.networkPolicies.some(n => n.name === name)) name = pick(NETPOL_NAMES) + rnd(2, 99);
+    const file = "drill-netpol.yaml";
+    sim.files[file] = NETPOL_YAML;
+    sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
+    return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+-f\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f <datei>" };
+  },
+  "k-describe-netpol": sim => {
+    const np = ensureNetworkPolicy(sim);
+    return { text: "Beschreibe die Hafenmauer <code>" + np.name + "</code> – wer darf rein?", accept: [new RegExp("^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe networkpolicy " + np.name, hint: "kubectl describe networkpolicy <name>" };
+  },
+  "k-delete-netpol": sim => {
+    const np = ensureNetworkPolicy(sim);
+    return { text: "Reiß die Hafenmauer <code>" + np.name + "</code> wieder ein.", accept: [new RegExp("^kubectl\\s+delete\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete networkpolicy " + np.name, hint: "kubectl delete networkpolicy <name>" };
+  },
 };
 
 /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
@@ -213,5 +251,5 @@ export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
-  juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
+  juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }],
 };
