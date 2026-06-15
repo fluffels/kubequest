@@ -8,7 +8,7 @@
 import type { Quest } from "../types";
 import type { Sim } from "../sim";
 import {
-  DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
+  DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   MAIN_TF, GITLAB_CI_YML, DOCKERFILE,
 } from "./manifests";
 
@@ -927,6 +927,60 @@ export const QUESTS: Quest[] = [
         ]},
       { type: "dialog", npc: "juno", lines: [
         "Merk dir die Faustregel: <b>Selektor sagt WEN man schützt, die from-Regel sagt WER rein darf.</b> Fehlt die Policy, ist alles offen. Hafen gesichert – gut gemacht, Lotse!",
+      ]},
+    ]},
+
+  { id: "q23", title: "Das verschlüsselte Hafentor", giver: "ada", rewardXp: 65, rewardCoins: 50,
+    steps: [
+      { type: "dialog", npc: "ada", lines: [
+        "Da bist du ja, Lotse! Unser <b>Hafentor</b> (der Ingress) lotst Besucher schon brav zu <code>hafen.de/lager</code> – aber alles reist noch <b>unverschlüsselt</b> über das offene Meer. Jeder Pirat mit Fernglas liest mit.",
+        "Höchste Zeit für ein <b>verschlüsseltes Tor</b>: <b>HTTPS</b> mit <b>TLS</b>. Der Trick heißt <b>TLS-Terminierung</b> – die Verschlüsselung <i>endet</i> am Hafentor: außen sicheres HTTPS, drinnen im Cluster ganz normales HTTP. Der Ingress-Controller macht das Auspacken.",
+        "Dafür braucht das Tor ein <b>Zertifikat</b>. Das legen wir als <b>TLS-Secret</b> ab (eine Karte mit <code>tls.crt</code> + <code>tls.key</code>) und verweisen im Ingress unter <code>spec.tls</code> darauf. Eins noch vorweg: <b>Wie</b> findet <code>hafen.de</code> überhaupt unser Tor? Über <b>DNS</b> – das Adressbuch löst den Namen zur Adresse des Controllers (<code>203.0.113.10</code>) auf. Los, bau das Zertifikat ein!",
+      ]},
+      { type: "teach", brief: "Zertifikat hinterlegen", cmd: {
+        id: "t-secret-tls", intro: "🆕 Neuer Befehl: <code>kubectl create secret tls &lt;name&gt; --cert=&lt;datei&gt; --key=&lt;datei&gt;</code> – legt ein TLS-Zertifikat als Secret ab.",
+        text: "Lege das Zertifikat <code>hafen-tls</code> aus <code>tls.crt</code> und <code>tls.key</code> an.",
+        accept: [/^kubectl\s+create\s+secret\s+tls\s+hafen-tls\s+--cert[=\s]\S+\s+--key[=\s]\S+$/],
+        solution: "kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key",
+        hint: "Muster: kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key" } },
+      { type: "terminal", brief: "HTTPS aufschalten",
+        scenario: {
+          files: { "ingress-tls.yaml": INGRESS_TLS_YAML },
+          applyEffects: {
+            "ingress-tls.yaml": { ingress: { name: "hafentor", host: "hafen.de", path: "/lager", service: "lager", port: "6379", className: "nginx", tls: { secretName: "hafen-tls" } } },
+          },
+        },
+        tasks: [
+        { id: "t-ada-tls-1", text: "Schau dir die neue Karte an: <code>cat ingress-tls.yaml</code> – achte auf den frischen Block <code>spec.tls</code> mit <code>secretName: hafen-tls</code>.",
+          accept: [/^cat\s+ingress-tls\.yaml$/], solution: "cat ingress-tls.yaml", hint: "cat <datei>" },
+        { id: "t-ada-tls-2", text: "Schalt HTTPS auf: wende <code>ingress-tls.yaml</code> an. Das Tor wird umkonfiguriert (<code>configured</code>) – ab jetzt verschlüsselt.",
+          accept: [/^kubectl\s+apply\s+-f\s+ingress-tls\.yaml$/], solution: "kubectl apply -f ingress-tls.yaml", hint: "Gleicher apply wie immer, Datei ingress-tls.yaml." },
+        { id: "t-ada-tls-3", text: "Prüf das Tor: <code>kubectl get ingress</code> – in der Spalte <b>PORTS</b> steht jetzt <code>80, 443</code> (443 = HTTPS).",
+          accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], check: (sim: Sim) => sim.ingresses.some(i => i.name === "hafentor" && !!i.tls),
+          solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch." },
+        { id: "t-ada-tls-4", text: "Schau genau hin: <code>kubectl describe ingress hafentor</code> – die Zeile <b>TLS:</b> verrät, welches Secret welchen Host verschlüsselt.",
+          accept: [/^kubectl\s+describe\s+(ingress|ingresses|ing)\s+hafentor$/], solution: "kubectl describe ingress hafentor", hint: "kubectl describe ingress <name>" },
+      ]},
+      { type: "drill", brief: "Adas TLS-Übung", pool: ["k-secret-tls", "k-get-ingress", "k-get-secrets"], count: 3,
+        intro: "Einmal die Kette üben: Zertifikat anlegen → Tor anschauen → Secrets zählen." },
+      { type: "choice", npc: "ada", reviewId: "q-tls",
+        q: "Was bedeutet <b>TLS-Terminierung</b> am Hafentor?",
+        options: [
+          { t: "Die Verschlüsselung endet am Tor: außen HTTPS, drinnen reicht der Controller normales HTTP weiter.", ok: true,
+            reply: "Genau! Das Zertifikat liegt einmal zentral am Tor (als TLS-Secret), die Services dahinter müssen sich um nichts kümmern. Sauber gelöst. 🔒" },
+          { t: "Der Service wird abgeschaltet, sobald HTTPS aktiv ist.", ok: false,
+            reply: "Nein – „terminieren“ meint hier <b>die TLS-Verbindung beenden/abwickeln</b>, nicht den Service stoppen. Außen HTTPS, drinnen HTTP." },
+        ]},
+      { type: "choice", npc: "ada", reviewId: "q-dns",
+        q: "Wie findet ein Besucher mit <code>hafen.de</code> überhaupt unser Hafentor?",
+        options: [
+          { t: "DNS löst hafen.de zur Adresse des Ingress-Controllers auf; der wählt per host-Regel den richtigen Service.", ok: true,
+            reply: "Richtig! DNS ist das Adressbuch: Name → IP des Controllers (bei uns 203.0.113.10). Am selben Tor können viele Hosts ankommen – die host-Regel sortiert sie. ⚓" },
+          { t: "Der Ingress ruft den Browser des Besuchers von sich aus an.", ok: false,
+            reply: "Andersrum: Der Besucher kommt zum Tor. Erst fragt sein Rechner per <b>DNS</b> nach der Adresse, dann klopft er dort an." },
+        ]},
+      { type: "dialog", npc: "ada", lines: [
+        "Merke: <b>Zertifikat als TLS-Secret ablegen, im Ingress unter spec.tls referenzieren – fertig ist HTTPS am Tor.</b> Die Verschlüsselung endet am Hafentor, dahinter bleibt's einfach. Und DNS sorgt dafür, dass der Name überhaupt bei uns ankommt. Hervorragende Arbeit, Lotse! 🔒⚓",
       ]},
     ]},
 ];

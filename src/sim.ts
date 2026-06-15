@@ -44,6 +44,7 @@ export interface IngressRes {
   path: string;          // z.B. "/kasse"
   service: string;       // Ziel-Service im Cluster
   port: string | number; // Ziel-Port des Services
+  tls?: { secretName: string }; // verschlüsseltes Hafentor: TLS-Terminierung mit diesem Secret
   created?: number;
 }
 /** Hafenmauer: regelt, welche Pods überhaupt zu einem Ziel-Pod durchdürfen (Firewall im Cluster). */
@@ -56,6 +57,7 @@ export interface NetworkPolicyRes {
 export interface Secret {
   name: string;
   keys: string[];
+  type?: string;         // z.B. "kubernetes.io/tls" für TLS-Secrets; sonst "Opaque"
   created?: number;
 }
 export interface ClusterNode {
@@ -118,7 +120,7 @@ export interface CiDeploy {
 export interface ApplyEffect {
   deployment?: { name: string; image: string; replicas: number };
   service?: { name: string; type?: string; port: string | number };
-  ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string };
+  ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string; tls?: { secretName: string } };
   networkPolicy?: { name: string; podSelector?: string; allowFrom?: string };
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
@@ -485,7 +487,7 @@ export interface Scenario {
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | run | ps [-a] | images | stop | rm",
         "  kubectl    get pods|deployments|services|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
-        "             create deployment | create secret generic | scale | expose | delete | apply -f <datei>",
+        "             create deployment | create secret generic|tls | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
@@ -657,13 +659,13 @@ export interface Scenario {
       if (["secrets", "secret"].includes(what)) {
         if (this.secrets.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "TYPE", "DATA", "AGE"],
-          this.secrets.map(s => [s.name, "Opaque", String(s.keys.length), this._age(s.created || 0)]));
+          this.secrets.map(s => [s.name, s.type || "Opaque", String(s.keys.length), this._age(s.created || 0)]));
       }
 
       if (["ingress", "ingresses", "ing"].includes(what)) {
         if (this.ingresses.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "CLASS", "HOSTS", "ADDRESS", "PORTS", "AGE"],
-          this.ingresses.map(i => [i.name, i.className, i.host, INGRESS_ADDRESS, "80", this._age(i.created || 0)]));
+          this.ingresses.map(i => [i.name, i.className, i.host, INGRESS_ADDRESS, i.tls ? "80, 443" : "80", this._age(i.created || 0)]));
       }
 
       if (["networkpolicies", "networkpolicy", "netpol", "netpols"].includes(what)) {
@@ -684,11 +686,17 @@ export interface Scenario {
         const ing = this.ingresses.find(i => i.name === name);
         if (!ing) return this._err('Error from server (NotFound): ingresses.networking.k8s.io "' + name + '" not found', "Tipp: Namen aus 'kubectl get ingress' kopieren.");
         const svcExists = this.services.some(s => s.name === ing.service);
+        const secretExists = ing.tls ? this.secrets.some(s => s.name === ing.tls!.secretName) : true;
         return [
           "Name:             " + ing.name,
           "Namespace:        default",
           "Address:          " + INGRESS_ADDRESS,
           "Ingress Class:    " + ing.className,
+          ...(ing.tls ? [
+            "TLS:",
+            "  " + ing.tls.secretName + " terminates " + ing.host +
+              (secretExists ? "" : "  (⚠ Secret '" + ing.tls.secretName + "' gibt es nicht – HTTPS bleibt zu!)"),
+          ] : []),
           "Rules:",
           "  Host        Path  Backends",
           "  ----        ----  --------",
@@ -752,8 +760,19 @@ export interface Scenario {
 
     _kubectlCreate(t: string[], raw: string) {
       if (t[2] === "secret") {
+        // kubectl create secret tls <name> --cert=<datei> --key=<datei>
+        if (t[3] === "tls") {
+          const name = t[4];
+          if (!name || name.startsWith("--")) return this._err("kubectl create secret tls: Der Name fehlt.", "Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key");
+          const hasCert = /--cert[=\s]\S+/.test(raw);
+          const hasKey = /--key[=\s]\S+/.test(raw);
+          if (!hasCert || !hasKey) return this._err("error: a TLS secret needs --cert and --key", "Häng '--cert=tls.crt --key=tls.key' an.");
+          if (this.secrets.some(s => s.name === name)) return this._err('error: secrets "' + name + '" already exists');
+          this.secrets.push({ name, keys: ["tls.crt", "tls.key"], type: "kubernetes.io/tls", created: this.clock });
+          return "secret/" + name + " created";
+        }
         // kubectl create secret generic <name> --from-literal=schluessel=wert
-        if (t[3] !== "generic") return this._err("Der Simulator kann nur 'kubectl create secret generic <name> --from-literal=k=v'.");
+        if (t[3] !== "generic") return this._err("Der Simulator kann nur 'kubectl create secret generic <name> --from-literal=k=v' und 'kubectl create secret tls <name> --cert=… --key=…'.");
         const name = t[4];
         if (!name || name.startsWith("--")) return this._err("kubectl create secret: Der Name fehlt.", "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert");
         const literals = [...raw.matchAll(/--from-literal[=\s]([\w.-]+)=(\S+)/g)].map(m => m[1]);
@@ -923,12 +942,20 @@ export interface Scenario {
       if (effIng) {
         const existing = this.ingresses.find(i => i.name === effIng.name);
         if (existing) {
-          out.push("ingress.networking.k8s.io/" + effIng.name + " unchanged");
+          // TLS am bestehenden Hafentor nachrüsten: aus HTTP wird HTTPS ("configured").
+          if (effIng.tls && !existing.tls) {
+            existing.tls = { secretName: effIng.tls.secretName };
+            out.push("ingress.networking.k8s.io/" + effIng.name + " configured");
+          } else {
+            out.push("ingress.networking.k8s.io/" + effIng.name + " unchanged");
+          }
         } else {
           this.ingresses.push({
             name: effIng.name, className: effIng.className || "nginx",
             host: effIng.host, path: effIng.path || "/",
-            service: effIng.service, port: effIng.port, created: this.clock,
+            service: effIng.service, port: effIng.port,
+            ...(effIng.tls ? { tls: { secretName: effIng.tls.secretName } } : {}),
+            created: this.clock,
           });
           out.push("ingress.networking.k8s.io/" + effIng.name + " created");
         }
