@@ -5,7 +5,7 @@
 
 ## Das Wichtigste zuerst (harte Regeln)
 
-- **NIE committen, pushen, deployen.** Katharina committet immer selbst. Du änderst nur Code/Dateien und lieferst die Commit-Nachricht als kopierfertigen Einzeiler mit (`feat(...): …`).
+- **Git-Workflow (in kubequest freigegeben).** Hier — und **nur** hier — darf der Agent die komplette Kette selbst fahren: auf eigenem Feature-Branch/Worktree arbeiten → committen → nach `main` mergen → Branch + Worktree aufräumen → Issue schließen. **Push macht Katharina selbst**, außer sie sagt ausdrücklich „und pushen". Commit-Nachricht trotzdem immer als kopierfertigen Einzeiler im Stil `feat(...): …` mitliefern. ⚠️ In **allen anderen Projekten** bleibt committen/pushen/deployen strikt tabu.
 - **Tests müssen grün bleiben.** Nach jeder Änderung `npm test` (Vitest). Bricht etwas, erst reparieren, bevor du weitermachst.
 - **Alles wird abgetestet – auch Negativfälle.** Neue/geänderte Logik bekommt Tests, die nicht nur den Happy Path prüfen, sondern auch Fehler-/Grenzfälle (kaputter Zustand, falsche Eingabe, „darf NICHT passieren"). Ziel ist echte Abdeckung der Spiel-/Sim-/Wirtschaftslogik, nicht nur ein grüner Lauf.
 - **Tests gegen False Positives absichern (Red-Green).** Ein Test, der auch bei kaputtem Code grün bleibt, ist wertlos. Beim Schreiben kurz beweisen, dass der Test wirklich rot wird, wenn die Logik bricht (Assertion/Implementierung testweise verfälschen → rot sehen → zurücksetzen → grün). **Bei Bugfixes test-first:** erst den fehlschlagenden Repro-Test schreiben (rot), dann fixen (grün) – das beweist gleichzeitig, dass der Test den Bug fängt.
@@ -63,10 +63,15 @@ Der Backlog wird als **GitHub Issues** geführt, gruppiert in einem **GitHub Pro
 
 Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `npm test` grün halten + im Browser verifizieren, dann das Issue schließen.
 
+**Kollisionsschutz bei parallelen Agenten (mehrere Chats gleichzeitig).** Jedes Ticket wird auf einem eigenen Branch + Worktree bearbeitet (`git worktree add -b <typ>/<nr>-<slug> ../kubequest-wt-<nr> main`). Damit sich zwei Agenten nicht dasselbe Ticket greifen:
+- **Nur Issues ohne Assignee greifen.** Vor der Auswahl prüfen: `gh issue list --json number,title,assignees` (zusätzlich `git worktree list` + `git branch -a` als Gegencheck).
+- **Beim Start sofort self-assignen:** `gh issue edit <nr> --add-assignee @me`. Das ist der „in Arbeit"-Marker, den jeder andere Chat sieht — der einzige Zustand, den ein paralleler Agent sonst nicht erkennen kann (ein nur „im Kopf" gewähltes Ticket ohne Branch ist unsichtbar).
+- Am Ende: nach `main` mergen, Worktree entfernen (`git worktree remove`), Branch löschen, Issue schließen (schließt den Assignee implizit mit ab).
+
 **Der Agent managt das Board (nur kubequest).** Katharina hat die Issue-Verwaltung hier an den Agenten delegiert. Das heißt konkret:
 - **GitHub ist die Single Source of Truth für den Stand.** Was erledigt ist, wird sofort dort geschlossen (mit kurzem Ergebnis-Kommentar) – nicht nur im Chat berichten. Den Board-Status aktuell halten.
 - **Selbst Issues verwalten** ohne Rückfrage: `gh issue close`, kommentieren, Labels setzen, **neue Tickets schreiben, wenn etwas auffällt** (Bug, Lücke, Tech-Debt, Idee). Lieber ein Ticket zu viel als verlorenes Wissen.
 - **Der Agent priorisiert.** Reihenfolge der Arbeit selbst festlegen (prio-Labels pflegen) und proaktiv die nächste Aufgabe vorschlagen/starten.
-- **Grenze:** Issue-Management ist die einzige nach außen wirkende Aktion, die freigegeben ist — **committen/pushen/deployen bleibt auch hier tabu** (siehe harte Regeln oben, macht Katharina selbst). Da Code uncommitted bleibt: Issues ruhig als erledigt schließen, wenn die Arbeit im Working Tree fertig + getestet ist; falls ihr Review noch was findet, einfach wieder aufmachen.
+- **Git ist hier freigegeben** (anders als sonst): committen → nach `main` mergen → Branch/Worktree aufräumen → Issue schließen darf der Agent selbst, siehe Git-Workflow oben. **Push bleibt Katharinas Job**, außer sie sagt ausdrücklich „und pushen". Issues erst schließen, wenn die Arbeit fertig + getestet (`npm test` grün) + im Browser verifiziert ist; falls ihr Review später was findet, einfach wieder aufmachen.
 
 Issues ansehen: `gh issue list`. Board: `gh project list --owner eckekat`.
