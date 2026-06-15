@@ -1,19 +1,13 @@
 {
-  // Ratchet-Konfig: hält bereits gehärtete Module auf strenger Typprüfung.
-  // Prüfen mit:  npm run typecheck:strict
+  // Strict-Ratchet ABGESCHLOSSEN: die Basis-tsconfig.json steht selbst auf
+  // "strict": true und deckt das ganze Projekt ab (src inkl. scenes/ui/main,
+  // test, vite.config). Diese Datei ist nur noch ein Alias, damit das
+  // gewohnte `npm run typecheck:strict` weiter funktioniert – sie prüft
+  // jetzt exakt dasselbe wie `npm run typecheck`.
   //
-  // Stufe 1 (erledigt): strictNullChecks & Co. für die puren Domänen-Module.
-  // Stufe 2 (jetzt): noImplicitAny an – echte Param-/Feld-Typen statt `any`,
-  //   eigene Interfaces für Pod/Deployment/Service … leben in sim.ts.
-  // Stand: types, store, content, sim, game laufen voll strict (inkl. noImplicitAny).
-  // Geplant (Stufe 3): scenes/ui nachziehen -> am Ende kann die Basis-tsconfig
-  //   selbst auf strict.
-  // Bewusst OHNE vite-env.d.ts: dessen `import("./ui")`/`import(...)`-Referenzen
-  //   würden ui.ts & Co. in den Strict-Graph ziehen. Die wenigen window-Globals
-  //   in game.ts sind daher lokal gecastet (Migrations-Shim), bis ui/scenes dran sind.
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "strict": true
-  },
-  "include": ["src/types.ts", "src/store.ts", "src/content.ts", "src/sim.ts", "src/game.ts"]
+  // Historie der Stufen:
+  //   Stufe 1: strictNullChecks & Co. für die puren Domänen-Module.
+  //   Stufe 2: noImplicitAny für types/store/content/sim/game.
+  //   Stufe 3: scenes/ui/main/sfx + Tests nachgezogen, Basis global auf strict.
+  "extends": "./tsconfig.json"
 }

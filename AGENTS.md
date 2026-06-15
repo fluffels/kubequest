@@ -20,8 +20,8 @@
 | Dev-Server (Hot-Reload) | `npm run dev` → angezeigte Adresse öffnen |
 | Offline-Build (eine self-contained `dist/index.html`) | `npm run build` |
 | Tests | `npm test` (Vitest) |
-| Typen prüfen (locker, alle Dateien) | `npm run typecheck` |
-| Typen prüfen (Strenge-Ratchet, gehärtete Module) | `npm run typecheck:strict` |
+| Typen prüfen (ganzes Projekt, voll strict) | `npm run typecheck` |
+| Typen prüfen (Alias, identisch zu `typecheck`) | `npm run typecheck:strict` |
 
 Einmalig vorher: `npm install`.
 
@@ -51,7 +51,7 @@ Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `conten
 
 ## Konventionen
 
-- **TS-Strenge als Ratchet.** `tsconfig.strict.json` hält die gehärteten Module auf voller Strenge – `types`, `store`, `content`, `sim`, `game` laufen jetzt komplett `strict` **inklusive `noImplicitAny`** (echte Param-/Feld-Typen statt `any`; die Cluster-Interfaces Pod/Deployment/Service … leben in `src/sim.ts`). **Nächster Schritt:** `scenes`/`ui` nachziehen, bis die Basis-`tsconfig.json` selbst auf `strict` steht. Neue/geänderte Module nach Möglichkeit gleich strict-tauglich halten.
+- **TS-Strenge (Ratchet abgeschlossen).** Die Basis-`tsconfig.json` steht auf `"strict": true` und deckt das **ganze Projekt** ab: alle `src`-Module (inkl. `scenes`, `ui`, `main`, `sfx`), die Tests und `vite.config`. Echte Param-/Feld-Typen statt `any`, durchgängige Null-Prüfung; die Cluster-Interfaces Pod/Deployment/Service … leben in `src/sim.ts`. `tsconfig.strict.json` ist nur noch ein Alias auf die Basis. **Neuer/geänderter Code muss strict-tauglich bleiben** – `npm run typecheck` muss grün sein.
 - **PixelLab-Grafik doppelt ablegen:** Quell-PNG nach `assets/pixellab/` **und** Base64 in `src/assets-data.ts` (damit der Single-File-Build self-contained bleibt). Asset-Liste + IDs: `assets/pixellab/README.md`.
 - **PixelLab-Zugriff** läuft über den **PixelLab-MCP-Server** (Subscription „Pixel Apprentice"). Der API-Key rotiert: bei „kein Zugriff" trägt Katharina den neuen Key selbst in die MCP-Config ein, danach funktional mit `get_balance` verifizieren (Key nie im Chat anfordern/ausgeben). Grafik-/Asset-Aufgaben werden — wie der ganze Backlog — als **GitHub-Issues** geführt, nicht im Vault/Notiz-System.
 - **Grafik-Stil:** Stardew-angelehnt, 16px, frontale Ansicht (`view: side` für Gebäude, nicht die schräge 2.5D-Sicht). Große Objekte (Häuser, Bäume) in hoher Auflösung generieren und möglichst ganzzahlig skalieren, damit der `pixelArt`-Renderer scharf bleibt.
