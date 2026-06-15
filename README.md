@@ -37,7 +37,7 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
-**22 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** → **CI/CD: Pipeline-Passage (1)** → **Hafenmauer: NetworkPolicy (1)** + Einstieg.
+**24 Quests:** Einstieg (1) → Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** → **CI/CD: Pipeline-Passage (1)** → **Werft-Ausbau: eigenes Helm-Chart (1)** → **Hafenmauer: NetworkPolicy (1)** → **Hafentor: Ingress/TLS (1)**.
 
 Die **Hafenmauer** (bei Sturmwache Juno) führt **NetworkPolicies** ein: Kubernetes ist von Haus aus offen – jeder Pod erreicht jeden. Eine NetworkPolicy schaltet die per Label gewählten Pods auf **default-deny** und lässt nur erlaubte Quellen durch (`kubectl get/describe/apply/delete networkpolicy`). Genau so sichert man im Job z.B. Datenbanken ab.
 
@@ -57,36 +57,29 @@ Die **Sturm-Saison** (bei Sturmwache Juno am Leuchtturm) lehrt das Debugging-Han
 
 ## Projektstruktur
 
-Gebaut mit **Vite** + **TypeScript** (ES-Module). `index.html` lädt nur `src/main.ts`; Vite bündelt den Rest. Phaser kommt als npm-Paket (nicht mehr als Datei im Repo).
+Gebaut mit **Vite** + **TypeScript** (ES-Module) und **Phaser 3** (als npm-Paket, nicht mehr als Datei im Repo). `index.html` lädt nur `src/main.ts`; Vite bündelt den Rest und erzeugt beim Offline-Build die self-contained `dist/index.html`. Der Code ist in Schichten geordnet (pure Domäne → Anwendung → Präsentation), damit die Spiellogik ohne Phaser testbar bleibt.
+
+Grobe Aufteilung:
 
 ```
 kubequest/
-├── index.html        Einstieg (lädt src/main.ts)
+├── index.html        Dev-Einstieg (lädt src/main.ts; braucht den Vite-Server)
 ├── style.css         UI (HUD, Dialoge, Funkgerät, Shop, Alarm, Minispiel)
-├── package.json      Abhängigkeiten & Skripte (dev/build/test/typecheck)
-├── vite.config.ts    Build-Konfiguration (Single-File-Plugin für den Offline-Build)
-├── tsconfig.json     TypeScript-Einstellungen
-├── assets/           Kenney "Tiny Town" & "Tiny Dungeon" (CC0) + Lizenzen
-├── src/
-│   ├── main.ts        Start & Tastatur (Einstiegspunkt)
+├── src/              Spielcode
 │   ├── sim.ts         Cluster-Simulator (docker, kubectl, helm, terraform, secrets, git)
-│   ├── content.ts     Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
-│   ├── types.ts       Zentrale TypeScript-Typen (GameState, Quest, …)
-│   ├── store.ts       Persistenz-Schicht (SaveStore): kapselt localStorage, Andockpunkt fürs spätere Backend
+│   ├── content.ts     Fassade über src/content/ (Quests, Drills, Quiz, NPCs, Minispiel …)
 │   ├── game.ts        Spielstand, XP, Wirtschaft, Spaced Repetition
 │   ├── scenes.ts      Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake
-│   ├── sfx.ts         Mini-Synthesizer (WebAudio-Sounds, keine Audio-Dateien)
-│   ├── ui.ts          Dialoge, Quest-Steuerung, Funkgerät, Shop, Quiz, Minispiel
-│   ├── assets-data.ts Spritesheets als Base64 (hält den Offline-Build self-contained)
-│   └── vite-env.d.ts  Typ-Deklarationen (u.a. window-Shim für Inline-Handler)
-├── test/             Test-Suite (Vitest)
-│   ├── sim.test.ts      Unit-Tests des Simulators (inkl. Troubleshooting-Pfade)
-│   ├── content.test.ts  Konsistenz aller Spielinhalte
-│   └── quests.test.ts   spielt die komplette Story + alle Drills durch
+│   └── …              ui, world, decor, clock, runtime, store, sfx, types, assets-data
+├── test/             Test-Suite (Vitest) – Simulator, Inhalte, kompletter Story-Durchlauf u.a.
+├── assets/           Kenney- & PixelLab-Grafiken (CC0) + Lizenzen
+├── docs/             Konzept- & Architektur-Analysen
 └── dist/             Build-Ausgabe von `npm run build` (nicht eingecheckt)
 ```
 
-Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (locker, alle Dateien).
+> **Datei-für-Datei-Landkarte** (welches Modul macht was, Schicht für Schicht) steht in **[CLAUDE.md › Repo-Landkarte](CLAUDE.md)**, die Agenten-Regeln & Konventionen in **[AGENTS.md](AGENTS.md)**. Diese Listen werden dort gepflegt – hier bewusst nicht doppelt.
+
+Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (voll strict, ganzes Projekt).
 
 **TS-Strenge:** Der schrittweise Strenge-Ratchet ist **abgeschlossen** – die Basis-`tsconfig.json` steht selbst auf `"strict": true` und deckt das **ganze Projekt** ab: alle `src`-Module (inkl. `scenes`, `ui`, `main`, `sfx`), die Tests und `vite.config`. Echte Parameter-/Feld-Typen statt `any`, durchgängige Null-Prüfung; die Cluster-Interfaces Pod/Deployment/Service … liegen in `src/sim.ts`. So können weder Null-/Typ- noch versteckte `any`-Fehler mehr einschleichen. `npm run typecheck` prüft das; `npm run typecheck:strict` ist nur noch ein Alias darauf (siehe `tsconfig.strict.json`).
 
@@ -106,9 +99,9 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 
 | Phase | Thema | Status |
 |---|---|---|
-| 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (15 Quests) |
+| 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (16 Quests, inkl. eigenes Helm-Chart „Werft-Ausbau“) |
 | 2 | Git & Branching-Workflows + CI/CD-Pipelines | ✅ im Spiel (Git: 2 Quests bei Ada; CI/CD: „Pipeline-Passage“) |
-| 3 | Ingress, DNS, TLS, NetworkPolicies | 🟡 teilweise im Spiel: Ingress („Hafentor“ bei Ada) + NetworkPolicies („Hafenmauer“ bei Juno); DNS/TLS noch offen |
+| 3 | Ingress, DNS, TLS, NetworkPolicies | 🟡 teilweise im Spiel: Ingress + TLS („verschlüsseltes Hafentor“ bei Ada) + NetworkPolicies („Hafenmauer“ bei Juno); DNS noch offen |
 | 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🔜 geplant: „GitOps-Archipel“ |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
 | 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |
@@ -119,8 +112,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 
 ## Roadmap (nächste Ausbaustufen)
 
-- Phase-2-Inseln (siehe Lernpfad) – je Insel eigene NPCs, Quests und Drills
-- **Sturm-Saison**: kaputte Pods debuggen (CrashLoopBackOff, ImagePullBackOff, OOMKilled) als Events
-- **Werft-Ausbau**: eigene Helm-Charts schreiben
+- Weitere Lernpfad-Inseln (siehe Tabelle oben) – GitOps-Archipel, Monitoring-Leuchtturm, Wachturm-Quartier u.a., je Insel eigene NPCs, Quests und Drills
+- **DNS** als letzter offener Baustein von Phase 3 (Ingress, TLS & NetworkPolicies sind schon im Spiel)
 - **Echter Modus**: dieselben Quests gegen ein lokales kind/minikube-Cluster
-- Mehr Grafik: weitere Kenney-Packs (CC0), z.B. Innenräume für betretbare Gebäude
+- Mehr Grafik: weitere CC0-Packs, z.B. Innenräume für betretbare Gebäude
