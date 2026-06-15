@@ -104,6 +104,22 @@ export interface GitCommit {
   branch: string;
   files: string[];
 }
+/** Ein aktiver, noch nicht aufgelöster Merge-Konflikt in genau einer Datei.
+ *  `ours` = die Version deines aktuellen Branches, `theirs` = die hereinkommende. */
+export interface GitConflict {
+  file: string;
+  ours: string;
+  theirs: string;
+  from: string; // Branch, der den Konflikt mitbrachte
+}
+/** Scharf gestellter Konflikt: bricht los, sobald `git merge <branch>` den
+ *  passenden Branch hereinholt. So lässt sich ein Konflikt didaktisch planen. */
+export interface GitPending {
+  branch: string;
+  file: string;
+  ours: string;
+  theirs: string;
+}
 export interface PipelineStage {
   name: string;
   status: string;
@@ -159,6 +175,10 @@ export interface Scenario {
   gitCommitted?: string[];
   gitCommits?: GitCommit[];
   gitPushed?: boolean;
+  gitRemoteAhead?: number;        // Commits, die auf origin/<branch> warten (für fetch/pull)
+  gitFetched?: boolean;           // wurde origin schon geholt (fetch), aber noch nicht eingefügt?
+  gitConflict?: GitPending | null;     // scharf gestellter Konflikt (löst beim merge aus)
+  gitActiveConflict?: GitConflict | null; // laufender, noch offener Konflikt (für Speichern)
   ciPipelines?: Pipeline[];
   ciDeploy?: CiDeploy | null;
 }
@@ -223,7 +243,7 @@ export interface Scenario {
     releases!: Release[];
     charts!: Chart[];
     tf!: { initialized: boolean; applied: boolean; resources: TfResource[] };
-    git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: GitCommit[]; pushed: boolean };
+    git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: GitCommit[]; pushed: boolean; remoteAhead: number; fetched: boolean; conflict: GitConflict | null; pendingConflict: GitPending | null };
     ci!: { pipelines: Pipeline[]; deploy: CiDeploy | null };
     lastDeletedPod: string | null = null;
     lastError!: boolean;
@@ -277,6 +297,12 @@ export interface Scenario {
         committed: (sc.gitCommitted || []).slice(),
         commits: (sc.gitCommits || []).map(c => Object.assign({}, c)),
         pushed: !!sc.gitPushed,
+        remoteAhead: sc.gitRemoteAhead || 0,
+        fetched: !!sc.gitFetched,
+        // Aus einem gespeicherten Stand kommen pending/aktiver Konflikt direkt zurück
+        // (gitConflict trägt hier das gespeicherte pendingConflict, nicht das Quest-„Scharfstellen“).
+        conflict: sc.gitActiveConflict ? Object.assign({}, sc.gitActiveConflict) : null,
+        pendingConflict: sc.gitConflict ? Object.assign({}, sc.gitConflict) : null,
       };
 
       this.ci = {
@@ -380,6 +406,28 @@ export interface Scenario {
         if (!this.networkPolicies.some(x => x.name === np.name)) this.networkPolicies.push(Object.assign({}, np));
       }
       if (sc.ciDeploy) this.ci.deploy = Object.assign({}, sc.ciDeploy);
+      // Kollaborations-Setup (origin voraus + scharf gestellter Konflikt) als EINHEIT
+      // einmischen. game.ts re-merged beim Laden alle erreichten Szenarien – ein nacktes
+      // `remoteAhead = N` würde dabei nach jedem Pull wieder auf N hochschnellen. Deshalb
+      // hängt es am idempotenten Konflikt-Scharfstellen: nur wenn der Branch NEU ist.
+      if (sc.gitConflict && !this.git.branches.includes(sc.gitConflict.branch)) {
+        if (sc.gitRemoteAhead) this.git.remoteAhead = sc.gitRemoteAhead;
+        this._armGitConflict(sc.gitConflict);
+      } else if (sc.gitRemoteAhead && !sc.gitConflict) {
+        // remoteAhead ohne Konflikt ist nicht reload-idempotent – nur für Tests/Drills,
+        // die den Wert ohnehin direkt setzen und nicht über einen Spielstand neu laden.
+        this.git.remoteAhead = sc.gitRemoteAhead;
+      }
+    }
+
+    /** Stellt einen Merge-Konflikt scharf: legt den hereinkommenden Branch an und
+     *  merkt sich, welche Datei beim nächsten `git merge <branch>` kollidiert.
+     *  Idempotent über Reloads: existiert der Branch schon, wird nichts neu gemacht. */
+    _armGitConflict(c?: GitPending | null) {
+      if (!c || this.git.branches.includes(c.branch)) return;
+      this.git.branches.push(c.branch);
+      this.git.pendingConflict = { branch: c.branch, file: c.file, ours: c.ours, theirs: c.theirs };
+      if (!this.files[c.file]) this.files[c.file] = c.ours; // unsere Version liegt im Arbeitsverzeichnis
     }
 
     /** Zustand als speicherbares Szenario ausgeben (für localStorage). */
@@ -411,6 +459,12 @@ export interface Scenario {
         gitCommitted: this.git.committed.slice(),
         gitCommits: this.git.commits.map(c => Object.assign({}, c)),
         gitPushed: this.git.pushed,
+        gitRemoteAhead: this.git.remoteAhead,
+        gitFetched: this.git.fetched,
+        // pendingConflict landet im gitConflict-Feld; _armGitConflict greift beim
+        // Wieder-Einmischen nicht (Branch existiert bereits) -> kein Doppel-Scharfstellen.
+        gitConflict: this.git.pendingConflict ? Object.assign({}, this.git.pendingConflict) : null,
+        gitActiveConflict: this.git.conflict ? Object.assign({}, this.git.conflict) : null,
         ciPipelines: this.ci.pipelines.map(p => ({
           id: p.id, ref: p.ref, status: p.status, created: p.created,
           stages: p.stages.map(s => Object.assign({}, s)),
@@ -514,7 +568,7 @@ export interface Scenario {
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
-        "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push",
+        "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push | fetch | pull",
         "  glab       ci status | ci list  (Pipeline-Status in GitLab)",
         "  ls, cat <datei>, clear, help",
       ].join("\n");
@@ -1369,8 +1423,10 @@ export interface Scenario {
         case "checkout": return this._gitCheckout(t);
         case "merge": return this._gitMerge(t);
         case "push": return this._gitPush();
+        case "fetch": return this._gitFetch();
+        case "pull": return this._gitPull();
         default: {
-          const guess = this._suggest(sub || "", ["init", "status", "add", "commit", "log", "branch", "checkout", "merge", "push"]);
+          const guess = this._suggest(sub || "", ["init", "status", "add", "commit", "log", "branch", "checkout", "merge", "push", "fetch", "pull"]);
           return this._err("⚠️ 'git " + (sub || "") + "' kenne ich hier nicht.",
             guess ? "Meintest du 'git " + guess + "'?" : "Versuch's mit status, add, commit, log, branch, checkout, merge oder push.");
         }
@@ -1386,6 +1442,12 @@ export interface Scenario {
       const g = this.git;
       const untracked = this._gitUntracked();
       let s = "Auf Branch " + g.branch + "\n";
+      if (g.conflict) {
+        s += "Du hast nicht zusammengeführte Pfade.\n  (behebe die Konflikte und committe das Ergebnis mit 'git commit')\n";
+        s += "Nicht zusammengeführte Pfade:\n  beide geändert: " + g.conflict.file + "\n";
+        s += "  ▸ Wähle eine Seite: 'git checkout --ours " + g.conflict.file + "' (deine) oder '--theirs " + g.conflict.file + "' (die hereinkommende), dann 'git add " + g.conflict.file + "'.\n";
+        return s.trimEnd();
+      }
       if (g.staged.length) s += "Zum Commit vorgemerkt:\n" + g.staged.map(f => "  neue Datei: " + f).join("\n") + "\n";
       if (untracked.length) s += "Unversionierte Dateien:\n" + untracked.map(f => "  " + f).join("\n") + "\n  (nutze \"git add <datei>\", um sie aufzunehmen)\n";
       if (!g.staged.length && !untracked.length) s += "Nichts zu committen, Arbeitsverzeichnis sauber ✨";
@@ -1396,6 +1458,17 @@ export interface Scenario {
       const g = this.git;
       const arg = t[2];
       if (!arg) return this._err("git add: Welche Datei?", "z.B. 'git add seekarte.md' – oder 'git add .' für alles.");
+      // Mitten im Konflikt markiert 'git add <konfliktdatei>' (oder 'git add .') ihn als gelöst.
+      if (g.conflict && (arg === "." || arg === g.conflict.file)) {
+        if (this.files[g.conflict.file] && /^(<{7}|={7}|>{7})/m.test(this.files[g.conflict.file])) {
+          return this._err("git add: In '" + g.conflict.file + "' stecken noch Konfliktmarker (<<<<<<<, =======, >>>>>>>).",
+            "Wähle erst eine Seite: 'git checkout --ours " + g.conflict.file + "' oder '--theirs " + g.conflict.file + "'.");
+        }
+        const file = g.conflict.file;
+        if (!g.staged.includes(file)) g.staged.push(file);
+        g.conflict = null;
+        return "Konflikt in '" + file + "' als gelöst markiert (vorgemerkt). ▸ Schließe den Merge jetzt mit 'git commit -m \"…\"' ab.";
+      }
       let toAdd: string[];
       if (arg === ".") {
         toAdd = this._gitUntracked();
@@ -1412,6 +1485,8 @@ export interface Scenario {
       const m = raw.match(/-m\s+"([^"]*)"|-m\s+'([^']*)'|-m\s+(\S+)/);
       const msg = m ? (m[1] || m[2] || m[3]) : null;
       if (!msg) return this._err("git commit: Die Commit-Nachricht fehlt.", 'Muster: git commit -m "Was du geändert hast"');
+      if (g.conflict) return this._err("git commit: Der Konflikt in '" + g.conflict.file + "' ist noch nicht gelöst.",
+        "Seite wählen ('git checkout --ours/--theirs " + g.conflict.file + "'), dann 'git add " + g.conflict.file + "', erst dann committen.");
       if (!g.staged.length) return this._err("git commit: Nichts vorgemerkt (nothing to commit).", "Erst 'git add <datei>', dann committen.");
       const files = g.staged.slice();
       for (const f of files) if (!g.committed.includes(f)) g.committed.push(f);
@@ -1440,6 +1515,16 @@ export interface Scenario {
 
     _gitCheckout(t: string[]) {
       const g = this.git;
+      // Konflikt-Auflösung: eine Seite wählen. 'git checkout --ours/--theirs <datei>'
+      if (t[2] === "--ours" || t[2] === "--theirs") {
+        const side = t[2] === "--ours" ? "ours" : "theirs";
+        const file = t[3];
+        if (!g.conflict) return this._err("git checkout " + t[2] + ": Gerade ist kein Konflikt offen.", "Diese Form wählt im Konflikt eine Seite aus.");
+        if (!file || file !== g.conflict.file) return this._err("git checkout " + t[2] + ": Welche Konfliktdatei?", "Im Konflikt steckt: " + g.conflict.file + ". Also: 'git checkout " + t[2] + " " + g.conflict.file + "'.");
+        this.files[file] = side === "ours" ? g.conflict.ours : g.conflict.theirs;
+        const wer = side === "ours" ? "deine eigene (HEAD)" : "die hereinkommende (" + g.conflict.from + ")";
+        return "'" + file + "' auf " + wer + " Version gesetzt. ▸ Markier die Lösung mit 'git add " + file + "', dann 'git commit'.";
+      }
       let name = t[2], create = false;
       if (t[2] === "-b") { create = true; name = t[3]; }
       if (!name) return this._err("git checkout: Welcher Branch?", "Neu + wechseln: 'git checkout -b <name>'. Nur wechseln: 'git checkout <name>'.");
@@ -1456,16 +1541,63 @@ export interface Scenario {
     _gitMerge(t: string[]) {
       const g = this.git;
       const name = t[2];
+      if (g.conflict) return this._err("git merge: Ein Merge läuft noch – es gibt einen offenen Konflikt in '" + g.conflict.file + "'.",
+        "Erst lösen: Seite wählen ('git checkout --ours/--theirs " + g.conflict.file + "'), 'git add', 'git commit'.");
       if (!name) return this._err("git merge: Welchen Branch reinholen?", "Muster: 'git merge <branch>'.");
       if (!g.branches.includes(name)) return this._err("git merge: Branch '" + name + "' gibt es nicht.");
       if (name === g.branch) return this._err("git merge: Das ist schon dein aktueller Branch.", "Wechsle erst auf den Ziel-Branch, dann merge den anderen rein.");
+      // Scharf gestellter Konflikt? Beide Branches haben dieselbe Datei geändert -> Merge bricht ab.
+      const pc = g.pendingConflict;
+      if (pc && pc.branch === name) {
+        g.pendingConflict = null;
+        g.conflict = { file: pc.file, ours: pc.ours, theirs: pc.theirs, from: name };
+        // Die Datei trägt jetzt die Konfliktmarker – mit 'cat' sichtbar.
+        this.files[pc.file] =
+          "<<<<<<< HEAD (deine Version)\n" + pc.ours +
+          "\n=======\n" + pc.theirs +
+          "\n>>>>>>> " + name + " (hereinkommend)";
+        return "Automatischer Merge von '" + pc.file + "' …\n" +
+          "CONFLICT (content): Merge-Konflikt in " + pc.file + ".\n" +
+          "Automatischer Merge fehlgeschlagen; behebe die Konflikte und committe das Ergebnis.\n" +
+          "▸ Schau rein mit 'cat " + pc.file + "' – zwischen <<<<<<< und >>>>>>> stehen beide Versionen.";
+      }
       const hash = (0xc0ffee + g.commits.length * 7).toString(16).slice(-7);
       g.commits.push({ hash, msg: "Merge Branch '" + name + "' in " + g.branch, branch: g.branch, files: [] });
       return "Merge: '" + name + "' → '" + g.branch + "' ✅ Die Arbeit aus beiden Branches ist jetzt vereint.";
     }
 
+    _gitFetch() {
+      const g = this.git;
+      if (g.remoteAhead > 0) {
+        g.fetched = true;
+        return "Hole von origin … origin/" + g.branch + " ist " + g.remoteAhead + " Commit(s) voraus.\n" +
+          "▸ 'git fetch' LÄDT die Neuigkeiten nur herunter – deine Arbeit bleibt unberührt. Einfügen erst mit 'git pull' (oder 'git merge').";
+      }
+      return "Hole von origin … Schon aktuell – origin/" + g.branch + " hat nichts Neues.";
+    }
+
+    _gitPull() {
+      const g = this.git;
+      if (g.conflict) return this._err("git pull: Ein Konflikt ist noch offen.", "Erst den Merge abschließen, dann wieder pullen.");
+      if (g.remoteAhead > 0) {
+        const n = g.remoteAhead;
+        for (let i = 0; i < n; i++) {
+          const hash = (0xc0ffee + g.commits.length * 7).toString(16).slice(-7);
+          g.commits.push({ hash, msg: "Vom Team geholt (#" + (i + 1) + ")", branch: g.branch, files: [] });
+        }
+        g.remoteAhead = 0;
+        g.fetched = false;
+        return "Hole von origin und führe zusammen … Fast-forward ✅ " + n + " neue Commit(s) vom Team in '" + g.branch + "' geholt.\n" +
+          "▸ Merkregel: erst HOLEN (pull), dann erst deine pushen – so läufst du nicht in vermeidbare Konflikte.";
+      }
+      return "Hole von origin … Bereits auf dem neuesten Stand. ✨";
+    }
+
     _gitPush() {
       const g = this.git;
+      if (g.conflict) return this._err("git push: Ein Merge-Konflikt ist noch offen.", "Erst lösen (Seite wählen, 'git add', 'git commit'), dann pushen.");
+      if (g.remoteAhead > 0) return this._err("git push: origin/" + g.branch + " ist dir voraus (" + g.remoteAhead + " Commit(s)).",
+        "Hol sie erst mit 'git pull', dann push – sonst weist der Server deinen Push ab.");
       if (!g.commits.length) return this._err("git push: Noch nichts zu pushen.", "Erst committen, dann pushen.");
       g.pushed = true;
       let msg = "Schiebe nach origin/" + g.branch + " … ✅ Deine Commits liegen jetzt auf dem Server (z.B. GitLab) – sichtbar fürs Team.";
