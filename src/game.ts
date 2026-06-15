@@ -54,6 +54,95 @@ import type { GameState, QuestStep } from "./types";
     };
   }
 
+  /* ---------- Defensive Validierung beim Laden ----------
+   * readState() (store.ts) hebt einen Alt-Stand aufs aktuelle FORMAT, prüft aber
+   * nicht den INHALT der Felder. Ein manipulierter Import (importData) oder ein
+   * über viele Versionen gewanderter Stand kann kaputte/fremde Werte tragen:
+   * falscher Typ, NaN/Infinity, negativ, Array statt Objekt. Früher übernahm
+   * Object.assign(makeDefaultState(), data) solche Werte ungeprüft – NaN-Münzen
+   * & Co. landeten direkt im Spiel.
+   *
+   * sanitizeState härtet jeden BEKANNTEN Feldwert gegen die Defaults ab:
+   * unplausible Werte fallen auf den Default zurück, fehlende werden ergänzt,
+   * unbekannte Zusatzfelder fallen weg. Ergebnis ist immer ein konsistenter
+   * GameState – kein Crash, kein NaN. */
+  function isPlainObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === "object" && v !== null && !Array.isArray(v);
+  }
+  /** Endliche, nicht-negative Ganzzahl (XP, Münzen, Indizes, Zähler) – sonst Default. */
+  function safeCount(v: unknown, def: number): number {
+    return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : def;
+  }
+  /** Endliche Zahl (Weltkoordinaten dürfen auch negativ sein) – sonst Default. */
+  function safeNum(v: unknown, def: number): number {
+    return typeof v === "number" && Number.isFinite(v) ? v : def;
+  }
+  /** String oder null – jeder andere Typ wird zu null. */
+  function safeStrOrNull(v: unknown): string | null {
+    return typeof v === "string" ? v : null;
+  }
+  /** Array, gefiltert auf reine Strings (verwirft fremde Einträge). */
+  function safeStrArray(v: unknown): string[] {
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  }
+
+  function sanitizeState(raw: unknown): GameState {
+    const def = makeDefaultState();
+    if (!isPlainObject(raw)) return def; // primitiver/kaputter Stand -> komplett frisch
+
+    // Inventar: nur Einträge mit endlicher, nicht-negativer Stückzahl behalten.
+    const inventory: Record<string, number> = {};
+    if (isPlainObject(raw.inventory)) {
+      for (const [id, n] of Object.entries(raw.inventory)) {
+        if (typeof n === "number" && Number.isFinite(n) && n >= 0) inventory[id] = Math.floor(n);
+      }
+    }
+
+    // Spaced-Repetition: nur valide { box (1..5), due } übernehmen.
+    const review: GameState["review"] = {};
+    if (isPlainObject(raw.review)) {
+      for (const [id, info] of Object.entries(raw.review)) {
+        if (!isPlainObject(info)) continue;
+        const box = Math.min(5, Math.max(1, safeCount(info.box, 1)));
+        review[id] = { box, due: safeCount(info.due, 0) };
+      }
+    }
+
+    // Stats: auf den Default-Stats aufsetzen und nur endliche Zahlen überschreiben;
+    // dynamische Zusatz-Stats (z.B. stormsFixed) bleiben erhalten, solange Zahl.
+    const stats = def.stats;
+    if (isPlainObject(raw.stats)) {
+      for (const [k, n] of Object.entries(raw.stats)) {
+        if (typeof n === "number" && Number.isFinite(n)) stats[k] = n;
+      }
+    }
+
+    const player = isPlainObject(raw.player) ? raw.player : {};
+    const streak = isPlainObject(raw.streak) ? raw.streak : {};
+
+    return {
+      xp: safeCount(raw.xp, def.xp),
+      coins: safeCount(raw.coins, def.coins),
+      character: typeof raw.character === "number" && Number.isFinite(raw.character) ? raw.character : null,
+      player: { x: safeNum(player.x, def.player.x), y: safeNum(player.y, def.player.y) },
+      questIdx: safeCount(raw.questIdx, def.questIdx),
+      questStep: safeCount(raw.questStep, def.questStep),
+      taskIdx: safeCount(raw.taskIdx, def.taskIdx),
+      completedQuests: safeStrArray(raw.completedQuests),
+      inventory,
+      owned: safeStrArray(raw.owned),
+      activePet: safeStrOrNull(raw.activePet),
+      activeFlag: safeStrOrNull(raw.activeFlag),
+      review,
+      streak: { count: safeCount(streak.count, 0), lastDay: safeCount(streak.lastDay, 0) },
+      streakHintShown: typeof raw.streakHintShown === "boolean" ? raw.streakHintShown : def.streakHintShown,
+      stats,
+      lastSeen: safeCount(raw.lastSeen, def.lastSeen),
+      // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
+      clusterSnapshot: isPlainObject(raw.clusterSnapshot) ? raw.clusterSnapshot : null,
+    };
+  }
+
   export const Game = {
     // state & sim sind ab Modul-Init gesetzt (und werden von load() ersetzt) –
     // nie null. Das spart Null-Prüfungen in der gesamten Spiel-/Szenen-Logik.
@@ -66,7 +155,9 @@ import type { GameState, QuestStep } from "./types";
       try {
         // readState liest die Versions-Hülle und migriert Alt-Stände aufs aktuelle Format.
         const data = SaveStore.readState();
-        this.state = data ? Object.assign(makeDefaultState(), data) : makeDefaultState();
+        // Defensive Sanitisierung statt blindem Object.assign: kaputte/fremde
+        // Feldwerte fallen auf Defaults zurück, statt ungeprüft ins Spiel zu kommen.
+        this.state = sanitizeState(data);
       } catch (e) {
         this.state = makeDefaultState();
       }
