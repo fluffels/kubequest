@@ -89,6 +89,8 @@ import { keys, setWorldScene } from "./runtime";
       const g = this.make.graphics({ add: false } as any);
       g.fillStyle(0xffffff); g.fillRect(0, 0, 2, 2);
       g.generateTexture("px", 2, 2); g.destroy();
+      this.makeFxTextures();   // weiche Schatten- & Glüh-Textur (#4)
+      this.lampGlows = [];     // Laternen-Glühen, das nachts aufleuchtet (#4)
 
       this.buildMap();
       this.renderGround();
@@ -122,6 +124,9 @@ import { keys, setWorldScene } from "./runtime";
       }).setDepth(10400);
       this.rain.stop();
       this.stormOverlay = this.add.rectangle(0, 0, this.W * T, this.H * T, 0x0e1830, 0.32).setOrigin(0).setDepth(10300).setVisible(false);
+
+      // Tag-Nacht-Lichtschleier (sanft animiert) – über der Welt, aber unter Sturm/Regen (#4)
+      this.dayNight = this.add.rectangle(0, 0, this.W * T, this.H * T, 0x0a1230, 0).setOrigin(0).setDepth(10200);
 
       const cam = this.cameras.main;
       cam.setBounds(0, 0, this.W * T, this.H * T);
@@ -385,9 +390,32 @@ import { keys, setWorldScene } from "./runtime";
       return this.add.container(x, y, [txt, dot]).setDepth(9600).setAlpha(0);
     }
 
-    /** Weicher Schatten unter einer Figur. */
+    /** Weicher Schatten unter einer Figur – radial ausgefranste Textur statt harter Ellipse (#4). */
     addShadow(x: number, y: number, w?: number) {
-      return this.add.ellipse(x, y, w || 10, 4, 0x000000, 0.26).setDepth(1.6);
+      const width = w || 10;
+      return this.add.image(x, y, "shadowSoft").setDisplaySize(width * 1.5, width * 0.6).setAlpha(0.32).setDepth(1.6);
+    }
+
+    /** Einmalig erzeugte FX-Texturen: weicher Schatten (Ellipse mit Verlauf) und
+     *  weiches Glühen (Kreis mit Verlauf, wird beim Einsatz eingefärbt). (#4) */
+    makeFxTextures() {
+      const steps = 10;
+      // Schatten: konzentrische Ellipsen, außen fast transparent → innen dunkel
+      const sw = 48, sh = 24, sg = this.make.graphics({ add: false } as any);
+      for (let i = steps; i >= 1; i--) {
+        const t = i / steps;
+        sg.fillStyle(0x000000, 0.1);
+        sg.fillEllipse(sw / 2, sh / 2, sw * t, sh * t);
+      }
+      sg.generateTexture("shadowSoft", sw, sh); sg.destroy();
+      // Glühen: konzentrische weiße Kreise mit weichem Rand
+      const gs = 40, gg = this.make.graphics({ add: false } as any);
+      for (let i = steps; i >= 1; i--) {
+        const t = i / steps;
+        gg.fillStyle(0xffffff, 0.09);
+        gg.fillCircle(gs / 2, gs / 2, (gs / 2) * t);
+      }
+      gg.generateTexture("glowSoft", gs, gs); gg.destroy();
     }
 
     spawnFlowers() {
@@ -417,11 +445,48 @@ import { keys, setWorldScene } from "./runtime";
         if (kinds.indexOf(v) < 0 || this.solidGrid[y * this.W + x]) continue;
         if (isDirt(x, y - 1) || isDirt(x, y + 1) || isDirt(x - 1, y) || isDirt(x + 1, y)) continue; // nicht an Wege grenzen
         if (Math.abs(x - pcx) <= 1 && Math.abs(y - pcy) <= 1) continue;                              // Spieler-Start freihalten
-        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(6, 13), tex)
-          .setOrigin(0.5, 0.7).setScale(scale).setDepth(y * T + 7);
+        const ox = x * T + Phaser.Math.Between(2, 14), oy = y * T + Phaser.Math.Between(6, 13);
+        const img = this.add.image(ox, oy, tex).setOrigin(0.5, 0.7).setScale(scale).setDepth(y * T + 7);
+        if (tex === "lamppost") {
+          // Warmes Glühen am Laternenkopf – leuchtet bei Dämmerung/Nacht auf (#4)
+          const glow = this.add.image(ox, img.getTopCenter().y + 7, "glowSoft").setDisplaySize(26, 26)
+            .setTint(0xffd591).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(y * T + 6);
+          this.lampGlows.push(glow);
+        }
         if (solid) this.solidGrid[y * this.W + x] = 1;
         placed++;
       }
+    }
+
+    /** Tag-Nacht-Zyklus: sanft animierter Lichtschleier über der Welt + Laternen-Glühen,
+     *  das bei Dämmerung/Nacht aufleuchtet. Ein voller Tag dauert CYCLE ms. (#4) */
+    updateDayNight(time: number) {
+      const CYCLE = 240000;                          // 4 Minuten realer Zeit = ein voller Tag
+      const phase = (time % CYCLE) / CYCLE;          // 0 = Mittag … 0.5 = Mitternacht … 1 = Mittag
+      // Keyframes [phase, r, g, b, alpha] – dazwischen wird linear interpoliert
+      const keys: number[][] = [
+        [0.0,  10,  18, 48, 0.0],
+        [0.2,  10,  18, 48, 0.0],
+        [0.3,  255, 138, 60, 0.2],   // Abendrot
+        [0.42, 40,  36, 80, 0.42],
+        [0.5,  12,  20, 60, 0.55],   // tiefe Nacht
+        [0.62, 12,  20, 60, 0.55],
+        [0.72, 255, 150, 96, 0.26],  // Morgenrot
+        [0.84, 10,  18, 48, 0.0],
+        [1.0,  10,  18, 48, 0.0],
+      ];
+      let a = keys[0], b = keys[keys.length - 1];
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (phase >= keys[i][0] && phase <= keys[i + 1][0]) { a = keys[i]; b = keys[i + 1]; break; }
+      }
+      const t = (phase - a[0]) / ((b[0] - a[0]) || 1);
+      const lerp = (i: number) => a[i] + (b[i] - a[i]) * t;
+      const color = Phaser.Display.Color.GetColor(Math.round(lerp(1)), Math.round(lerp(2)), Math.round(lerp(3)));
+      const alpha = lerp(4);
+      this.dayNight.setFillStyle(color).setAlpha(alpha);
+      // Laternen an die Schleier-Dichte koppeln: glühen, sobald es dämmert
+      const lampLvl = Phaser.Math.Clamp(alpha / 0.42, 0, 1) * 0.7;
+      for (const lg of this.lampGlows) lg.setAlpha(lampLvl);
     }
 
     renderStatics() {
@@ -964,6 +1029,7 @@ import { keys, setWorldScene } from "./runtime";
 
       this.syncCluster();
       this.revealNearbyLabels();
+      this.updateDayNight(time);
 
       // Wirtschaft
       const payout = Game.economyTick(dt);
