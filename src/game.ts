@@ -7,6 +7,7 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
+import { worldScene } from "./runtime";
 import type { GameState, QuestStep } from "./types";
 
   const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
@@ -92,7 +93,7 @@ import type { GameState, QuestStep } from "./types";
 
     save() {
       if (this.sim) this.state.clusterSnapshot = this.sim.snapshot();
-      const ws = (window as any).WorldScene; // Globals-Shim (siehe vite-env.d.ts)
+      const ws = worldScene();
       if (ws && ws.player) {
         this.state.player = { x: ws.player.x, y: ws.player.y };
       }
@@ -328,5 +329,3 @@ import type { GameState, QuestStep } from "./types";
       return null;
     },
   };
-
-  (window as any).Game = Game; // Globals-Shim (siehe vite-env.d.ts)

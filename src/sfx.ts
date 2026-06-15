@@ -7,7 +7,11 @@ export const SFX = {
   ctx: null as any,
   ensure() {
     if (!this.ctx) {
-      try { this.ctx = new (window.AudioContext || window.webkitAudioContext!)(); } catch (e) { /* kein Ton */ }
+      // webkitAudioContext ist die alte Safari-Variante – lokal typisiert,
+      // statt über einen globalen window-Shim.
+      const Ctor = window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      try { if (Ctor) this.ctx = new Ctor(); } catch (e) { /* kein Ton */ }
     }
     return this.ctx;
   },
@@ -32,5 +36,3 @@ export const SFX = {
   wrong() { this.tone(196, 0.18, "sawtooth", 0.03); },
   thunder() { this.tone(58, 0.7, "sawtooth", 0.06); this.tone(46, 0.9, "sawtooth", 0.05, 0.12); },
 };
-
-window.SFX = SFX;

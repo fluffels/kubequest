@@ -9,6 +9,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
+import { keys, setWorldScene } from "./runtime";
 
   const T = 16;
   const COLS = 12;
@@ -71,7 +72,7 @@ import { SFX } from "./sfx";
 
     /* ============ Aufbau ============ */
     create() {
-      window.WorldScene = this;
+      setWorldScene(this);
       this.W = 52; this.H = 40;
       this.ground = new Array(this.W * this.H).fill(0);
       this.solidGrid = new Uint8Array(this.W * this.H);
@@ -899,7 +900,6 @@ import { SFX } from "./sfx";
     update(time: number, delta: number) {
       const dt = Math.min(0.05, delta / 1000);
       const pl = this.playerPos;
-      const keys = window.KQKeys || {};
       const blocked = UI.blocking();
 
       let dx = 0, dy = 0;
