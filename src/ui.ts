@@ -6,7 +6,7 @@ import { Game } from "./game";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
-import { worldScene } from "./runtime";
+import { worldScene, interiorOpen } from "./runtime";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
   // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
@@ -243,7 +243,8 @@ import { worldScene } from "./runtime";
     updatePrompt() {
       const p = $("prompt");
       const ws = worldScene();
-      if (this.blocking() || !ws) { p.classList.add("hidden"); return; }
+      // Im Hausinnenraum (#6) zeigt die InteriorScene ihren eigenen Hinweis.
+      if (this.blocking() || !ws || interiorOpen()) { p.classList.add("hidden"); return; }
       const near = ws.nearestNpc();
       if (!near) { p.classList.add("hidden"); return; }
       const meta = NPCS[near.id];
@@ -255,6 +256,9 @@ import { worldScene } from "./runtime";
     },
 
     interact() {
+      // Während ein Hausinnenraum offen ist, gehört die E-Taste der InteriorScene
+      // (sonst würde man durch die Wand mit Außen-NPCs der pausierten Welt reden).
+      if (interiorOpen()) return;
       const ws = worldScene();
       if (!ws) return;
       const near = ws.nearestNpc();
