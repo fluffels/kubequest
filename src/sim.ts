@@ -57,6 +57,7 @@
     helmRepos!: string[];
     releases!: any[];
     tf!: { initialized: boolean; applied: boolean; resources: any[] };
+    git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: any[]; pushed: boolean };
     lastDeletedPod: any;
     lastError!: boolean;
 
@@ -96,6 +97,16 @@
         initialized: !!sc.tfInitialized,
         applied: !!sc.tfApplied,
         resources: (sc.tfResources || []).slice(), // [{addr, desc}]
+      };
+
+      this.git = {
+        initialized: !!sc.gitInitialized,
+        branch: sc.gitBranch || "main",
+        branches: (sc.gitBranches || ["main"]).slice(),
+        staged: (sc.gitStaged || []).slice(),
+        committed: (sc.gitCommitted || []).slice(),
+        commits: (sc.gitCommits || []).map(c => Object.assign({}, c)),
+        pushed: !!sc.gitPushed,
       };
 
       this.lastDeletedPod = null;
@@ -183,6 +194,13 @@
         tfResources: this.tf.resources.slice(),
         tfInitialized: this.tf.initialized,
         tfApplied: this.tf.applied,
+        gitInitialized: this.git.initialized,
+        gitBranch: this.git.branch,
+        gitBranches: this.git.branches.slice(),
+        gitStaged: this.git.staged.slice(),
+        gitCommitted: this.git.committed.slice(),
+        gitCommits: this.git.commits.map(c => Object.assign({}, c)),
+        gitPushed: this.git.pushed,
       };
     }
 
@@ -203,12 +221,13 @@
           case "kubectl": out = this._kubectl(tokens, raw); break;
           case "helm": out = this._helm(tokens, raw); break;
           case "terraform": out = this._terraform(tokens, raw); break;
+          case "git": out = this._git(tokens, raw); break;
           case "ls": out = this._ls(); break;
           case "cat": out = this._cat(tokens); break;
           case "clear": return { output: null, error: false, clear: true };
           case "help": out = this._help(); break;
           default: {
-            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "ls", "cat", "clear", "help"]);
+            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "git", "ls", "cat", "clear", "help"]);
             out = this._err("⚠️ Den Befehl '" + cmd + "' gibt es hier nicht.",
               guess ? "Meintest du '" + guess + "'? (Tippe 'help' für alle Befehle.)"
                     : "Tippe 'help' für eine Liste der Befehle, die hier funktionieren.");
@@ -279,6 +298,7 @@
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
+        "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push",
         "  ls, cat <datei>, clear, help",
       ].join("\n");
     }
@@ -897,6 +917,129 @@
     }
 
     /* ===================== Dateisystem ===================== */
+    /* ===================== git ===================== */
+    _git(t, raw) {
+      const sub = t[1];
+      const g = this.git;
+      if (sub === "init") {
+        if (g.initialized) return "Hinweis: Hier liegt schon ein Git-Repository (.git existiert bereits).";
+        g.initialized = true;
+        return "Initialisiertes leeres Git-Repository in /hafen/.git/\n📜 Ab jetzt kann Git jede Änderung an deinen Dateien festhalten.";
+      }
+      if (!g.initialized) {
+        return this._err("⚠️ Das hier ist (noch) kein Git-Repository.", "Starte eins mit 'git init'.");
+      }
+      switch (sub) {
+        case "status": return this._gitStatus();
+        case "add": return this._gitAdd(t);
+        case "commit": return this._gitCommit(raw);
+        case "log": return this._gitLog();
+        case "branch": return this._gitBranch(t);
+        case "checkout": return this._gitCheckout(t);
+        case "merge": return this._gitMerge(t);
+        case "push": return this._gitPush();
+        default: {
+          const guess = this._suggest(sub || "", ["init", "status", "add", "commit", "log", "branch", "checkout", "merge", "push"]);
+          return this._err("⚠️ 'git " + (sub || "") + "' kenne ich hier nicht.",
+            guess ? "Meintest du 'git " + guess + "'?" : "Versuch's mit status, add, commit, log, branch, checkout, merge oder push.");
+        }
+      }
+    }
+
+    _gitUntracked() {
+      const g = this.git;
+      return Object.keys(this.files).filter(f => !g.staged.includes(f) && !g.committed.includes(f));
+    }
+
+    _gitStatus() {
+      const g = this.git;
+      const untracked = this._gitUntracked();
+      let s = "Auf Branch " + g.branch + "\n";
+      if (g.staged.length) s += "Zum Commit vorgemerkt:\n" + g.staged.map(f => "  neue Datei: " + f).join("\n") + "\n";
+      if (untracked.length) s += "Unversionierte Dateien:\n" + untracked.map(f => "  " + f).join("\n") + "\n  (nutze \"git add <datei>\", um sie aufzunehmen)\n";
+      if (!g.staged.length && !untracked.length) s += "Nichts zu committen, Arbeitsverzeichnis sauber ✨";
+      return s.trimEnd();
+    }
+
+    _gitAdd(t) {
+      const g = this.git;
+      const arg = t[2];
+      if (!arg) return this._err("git add: Welche Datei?", "z.B. 'git add seekarte.md' – oder 'git add .' für alles.");
+      let toAdd;
+      if (arg === ".") {
+        toAdd = this._gitUntracked();
+      } else {
+        if (!this.files[arg]) return this._err("git add: Die Datei '" + arg + "' gibt es hier nicht.", "Tippe 'ls' für die Dateien in diesem Ordner.");
+        toAdd = g.committed.includes(arg) && !this._gitUntracked().includes(arg) ? [] : [arg];
+      }
+      for (const f of toAdd) if (!g.staged.includes(f)) g.staged.push(f);
+      return toAdd.length ? "Vorgemerkt: " + toAdd.join(", ") + " (bereit zum Commit)." : "Nichts Neues zum Vormerken.";
+    }
+
+    _gitCommit(raw) {
+      const g = this.git;
+      const m = raw.match(/-m\s+"([^"]*)"|-m\s+'([^']*)'|-m\s+(\S+)/);
+      const msg = m ? (m[1] || m[2] || m[3]) : null;
+      if (!msg) return this._err("git commit: Die Commit-Nachricht fehlt.", 'Muster: git commit -m "Was du geändert hast"');
+      if (!g.staged.length) return this._err("git commit: Nichts vorgemerkt (nothing to commit).", "Erst 'git add <datei>', dann committen.");
+      const files = g.staged.slice();
+      for (const f of files) if (!g.committed.includes(f)) g.committed.push(f);
+      g.staged = [];
+      const hash = (0xc0ffee + g.commits.length * 7).toString(16).slice(-7);
+      g.commits.push({ hash, msg, branch: g.branch, files });
+      return "[" + g.branch + " " + hash + "] " + msg + "\n " + files.length + " Datei(en) festgehalten.";
+    }
+
+    _gitLog() {
+      const g = this.git;
+      if (!g.commits.length) return "Noch keine Commits. Mach deinen ersten mit 'git commit -m \"…\"'.";
+      return g.commits.slice().reverse()
+        .map(c => "commit " + c.hash + "  (" + c.branch + ")\n    " + c.msg).join("\n");
+    }
+
+    _gitBranch(t) {
+      const g = this.git;
+      const name = t[2];
+      if (!name) return "Branches:\n" + g.branches.map(b => (b === g.branch ? "* " : "  ") + b).join("\n");
+      if (name.startsWith("-")) return this._err("git branch: So nicht.", "Zum Anlegen: 'git branch <name>'.");
+      if (g.branches.includes(name)) return this._err("git branch: Branch '" + name + "' gibt es schon.");
+      g.branches.push(name);
+      return "Branch '" + name + "' angelegt. (Wechseln mit 'git checkout " + name + "'.)";
+    }
+
+    _gitCheckout(t) {
+      const g = this.git;
+      let name = t[2], create = false;
+      if (t[2] === "-b") { create = true; name = t[3]; }
+      if (!name) return this._err("git checkout: Welcher Branch?", "Neu + wechseln: 'git checkout -b <name>'. Nur wechseln: 'git checkout <name>'.");
+      if (create) {
+        if (g.branches.includes(name)) return this._err("git checkout -b: Branch '" + name + "' gibt es schon.", "Wechsle mit 'git checkout " + name + "'.");
+        g.branches.push(name);
+      } else if (!g.branches.includes(name)) {
+        return this._err("git checkout: Branch '" + name + "' gibt es nicht.", "Neu anlegen + wechseln: 'git checkout -b " + name + "'.");
+      }
+      g.branch = name;
+      return "Gewechselt zu Branch '" + name + "'" + (create ? " (neu angelegt)" : "") + ".";
+    }
+
+    _gitMerge(t) {
+      const g = this.git;
+      const name = t[2];
+      if (!name) return this._err("git merge: Welchen Branch reinholen?", "Muster: 'git merge <branch>'.");
+      if (!g.branches.includes(name)) return this._err("git merge: Branch '" + name + "' gibt es nicht.");
+      if (name === g.branch) return this._err("git merge: Das ist schon dein aktueller Branch.", "Wechsle erst auf den Ziel-Branch, dann merge den anderen rein.");
+      const hash = (0xc0ffee + g.commits.length * 7).toString(16).slice(-7);
+      g.commits.push({ hash, msg: "Merge Branch '" + name + "' in " + g.branch, branch: g.branch, files: [] });
+      return "Merge: '" + name + "' → '" + g.branch + "' ✅ Die Arbeit aus beiden Branches ist jetzt vereint.";
+    }
+
+    _gitPush() {
+      const g = this.git;
+      if (!g.commits.length) return this._err("git push: Noch nichts zu pushen.", "Erst committen, dann pushen.");
+      g.pushed = true;
+      return "Schiebe nach origin/" + g.branch + " … ✅ Deine Commits liegen jetzt auf dem Server (z.B. GitLab) – sichtbar fürs Team.";
+    }
+
     _ls() {
       const names = Object.keys(this.files);
       if (names.length === 0) return "(dieser Ordner ist leer)";

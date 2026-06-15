@@ -37,7 +37,9 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
-**18 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** + Einstieg.
+**20 Quests:** Docker (3) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** + Einstieg.
+
+Die **Git-Quests** (bei Ada im Kartenhaus, „versioniere deine Seekarten") führen den Versionierungs-Alltag ein: `git init`/`status`/`add`/`commit`/`log` (ändern → vormerken → festhalten) und dann Zweige: `checkout -b`, `merge`, `push`. Echter Job-Bezug (Feature-Branch + Review-/Forward-Merge-Workflow) und Grundlage der späteren CI/CD-„Pipeline-Passage".
 
 Die **Sturm-Saison** (bei Sturmwache Juno am Leuchtturm) lehrt das Debugging-Handwerk wie im echten Betrieb: `ImagePullBackOff` diagnostizieren und mit `kubectl set image` heilen, `CrashLoopBackOff` über die **Logs** verstehen und mit Secret + `rollout restart` beheben, `Pending`-Pods durch neue Nodes (Terraform!) einplanen. Das Mantra: **get pods → describe → logs.** Danach ziehen zufällige **Stürme mit Regen und Donner** auf, die live Deployments kaputtmachen – kaputte Dienste verdienen nichts, bis du sie reparierst!
 
@@ -63,7 +65,7 @@ kubequest/
 ├── assets/           Kenney "Tiny Town" & "Tiny Dungeon" (CC0) + Lizenzen
 ├── src/
 │   ├── main.ts        Start & Tastatur (Einstiegspunkt)
-│   ├── sim.ts         Cluster-Simulator (docker, kubectl, helm, terraform, secrets)
+│   ├── sim.ts         Cluster-Simulator (docker, kubectl, helm, terraform, secrets, git)
 │   ├── content.ts     Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel
 │   ├── types.ts       Zentrale TypeScript-Typen (GameState, Quest, …)
 │   ├── store.ts       Persistenz-Schicht (SaveStore): kapselt localStorage, Andockpunkt fürs spätere Backend
@@ -101,7 +103,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 | Phase | Thema | Status |
 |---|---|---|
 | 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (15 Quests) |
-| 2 | Git & Branching-Workflows, CI/CD-Pipelines | 🔜 geplant: „Pipeline-Passage“ |
+| 2 | Git & Branching-Workflows | ✅ im Spiel (2 Quests bei Ada); CI/CD-Pipelines 🔜 „Pipeline-Passage“ |
 | 3 | Ingress, DNS, TLS, NetworkPolicies | 🔜 geplant: „Ingress-Inseln“ |
 | 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🔜 geplant: „GitOps-Archipel“ |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
