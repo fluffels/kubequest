@@ -1,5 +1,6 @@
 /* ===== KubeQuest 3.0 – Phaser-Szenen =====
- * BootScene: lädt die Base64-Spritesheets (funktioniert auch per Doppelklick!).
+ * BootScene: lädt die Spritesheets per Phaser-Loader (KQAssets aus assets-data.ts;
+ *            Single-File-Build inlinet sie als Data-URI → funktioniert auch per Doppelklick!).
  * WorldScene: Port Kubernia – Karte, Spieler:in, NPCs, Cluster→Welt-Sync,
  *             Piraten-Überfälle, Hacker-Krake, Hafen-Wirtschaft, Sound.
  */
@@ -36,30 +37,29 @@ import { NPC_SPAWNS, npcSolidIndices } from "./world";
   function hueColor(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.7, 0.55).color; }
   function hueColorLight(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
 
+  // Sheets werden nach dem Laden in 16er-Frames geschnitten; plains bleiben ganze Bilder.
+  const BOOT_SHEETS: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
+  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
+
   class BootScene extends Phaser.Scene {
     [key: string]: any;
     constructor() { super("Boot"); }
+    preload() {
+      // KQAssets[key] ist im Dev-Server eine URL, im Single-File-Build eine Base64-Data-URI.
+      // Der Phaser-Loader kommt mit beidem klar (Data-URIs laden ohne XHR – Doppelklick-tauglich).
+      for (const [key] of BOOT_SHEETS) this.load.image(key, (KQAssets as any)[key]);
+      for (const key of BOOT_PLAINS) this.load.image(key, (KQAssets as any)[key]);
+    }
     create() {
-      const sheets: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
-      let loaded = 0;
-      const done = () => {
-        loaded++;
-        if (loaded < sheets.length + plains.length) return;
-        for (const [key, cols] of sheets) {
-          const tex = this.textures.get(key);
-          const img = tex.getSourceImage();
-          const rows = Math.floor(img.height / T);
-          for (let i = 0; i < cols * rows; i++) {
-            tex.add(i, 0, (i % cols) * T, Math.floor(i / cols) * T, T, T);
-          }
+      for (const [key, cols] of BOOT_SHEETS) {
+        const tex = this.textures.get(key);
+        const img = tex.getSourceImage();
+        const rows = Math.floor(img.height / T);
+        for (let i = 0; i < cols * rows; i++) {
+          tex.add(i, 0, (i % cols) * T, Math.floor(i / cols) * T, T, T);
         }
-        this.scene.start("World");
-      };
-      for (const [key] of sheets) this.textures.once("addtexture-" + key, done);
-      for (const key of plains) this.textures.once("addtexture-" + key, done);
-      for (const [key] of sheets) this.textures.addBase64(key, (KQAssets as any)[key]);
-      for (const key of plains) this.textures.addBase64(key, (KQAssets as any)[key]);
+      }
+      this.scene.start("World");
     }
   }
 
