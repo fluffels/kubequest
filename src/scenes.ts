@@ -866,9 +866,12 @@ import { gameClock } from "./clock";
     /* ============ Events: Piraten & Krake ============ */
     scheduleEvents(delaySec?: number) {
       const now = this.time.now / 1000;
-      this.events.nextPirate = now + (delaySec || Phaser.Math.Between(200, 360));
-      this.events.nextKraken = now + (delaySec ? delaySec + 90 : Phaser.Math.Between(300, 500));
-      this.events.nextStorm = now + (delaySec ? delaySec + 150 : Phaser.Math.Between(260, 430));
+      // Spiel-Feel (#71): Cozy streckt die Wartezeit, "Aus" schiebt sie auf
+      // Infinity (next* wird nie erreicht → keine Zufalls-Events).
+      const scale = Game.eventProfile().spawnScale;
+      this.events.nextPirate = now + (delaySec || Phaser.Math.Between(200, 360)) * scale;
+      this.events.nextKraken = now + (delaySec ? delaySec + 90 : Phaser.Math.Between(300, 500)) * scale;
+      this.events.nextStorm = now + (delaySec ? delaySec + 150 : Phaser.Math.Between(260, 430)) * scale;
     }
 
     anyEventActive() {
@@ -877,7 +880,7 @@ import { gameClock } from "./clock";
 
     /* ---------- Sturm: ein Deployment geht kaputt, du reparierst es ---------- */
     tryStartStorm() {
-      if (this.anyEventActive() || !Game.state.completedQuests.includes("q17")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q17")) return;
       const victims = Game.sim.deployments.filter(d => !d.broken);
       if (victims.length === 0 || UI.blocking()) { this.events.nextStorm += 25; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -905,7 +908,7 @@ import { gameClock } from "./clock";
         SFX.thunder();
       }});
 
-      const deadline = 240;
+      const deadline = Math.round(240 * Game.eventProfile().deadlineScale);
       this.events.storm = { dep: dep.name, until: this.time.now / 1000 + deadline };
       UI.showAlarm("⛈️ <b>STURMSCHADEN!</b> Das Deployment <b>" + dep.name + "</b> ist ausgefallen – und verdient nichts mehr! " + hintCmd, deadline);
     }
@@ -929,7 +932,7 @@ import { gameClock } from "./clock";
     }
 
     tryStartPirate() {
-      if (this.anyEventActive() || !Game.state.completedQuests.includes("q7")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q7")) return;
       const victims = Game.sim.deployments.filter(d => d.replicas >= 2);
       if (victims.length === 0 || UI.blocking()) { this.events.nextPirate += 20; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -954,7 +957,7 @@ import { gameClock } from "./clock";
 
       SFX.alarm();
       this.cameras.main.shake(250, 0.004);
-      const deadline = 180;
+      const deadline = Math.round(180 * Game.eventProfile().deadlineScale);
       this.events.pirate = { dep: dep.name, want, boat, until: this.time.now / 1000 + deadline };
       UI.showAlarm("🏴‍☠️ <b>PIRATEN-ÜBERFALL!</b> Sie haben Kisten von <b>" + dep.name + "</b> geklaut (nur noch " + dep.replicas + "/" + want + ")! " +
         "Skaliere zurück auf <b>" + want + "</b>: <code>kubectl scale deployment " + dep.name + " --replicas=" + want + "</code>", deadline);
@@ -979,7 +982,7 @@ import { gameClock } from "./clock";
     }
 
     tryStartKraken() {
-      if (this.anyEventActive() || !Game.state.completedQuests.includes("q14")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q14")) return;
       if (UI.blocking()) { this.events.nextKraken += 20; return; }
       const baseline = Game.sim.secrets.length;
 
@@ -996,7 +999,7 @@ import { gameClock } from "./clock";
 
       SFX.alarm();
       this.cameras.main.shake(250, 0.004);
-      const deadline = 120;
+      const deadline = Math.round(120 * Game.eventProfile().deadlineScale);
       this.events.kraken = { kraken, baseline, until: this.time.now / 1000 + deadline };
       UI.showAlarm("🐙 <b>DIE HACKER-KRAKE!</b> Sie schnüffelt nach Klartext-Daten! Vertreibe sie, indem du irgendein neues <b>Secret</b> anlegst: " +
         "<code>kubectl create secret generic &lt;name&gt; --from-literal=passwort=&lt;wert&gt;</code>", deadline);
