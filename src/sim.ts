@@ -75,6 +75,12 @@ export interface Release {
   depName: string;
   history: HistoryEntry[];
 }
+/** Ein lokal mit `helm create` gerüstetes Chart (Werft-Ausbau, Issue #27). */
+export interface Chart {
+  name: string;
+  version: string;
+  packaged: boolean;
+}
 export interface TfResource {
   addr: string;
   desc: string;
@@ -127,6 +133,7 @@ export interface Scenario {
   applyEffects?: Record<string, ApplyEffect>;
   helmRepos?: string[];
   releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
+  charts?: Array<{ name: string; version?: string; packaged?: boolean }>;
   tfInitialized?: boolean;
   tfApplied?: boolean;
   tfResources?: TfResource[];
@@ -198,6 +205,7 @@ export interface Scenario {
     applyEffects!: Record<string, ApplyEffect>;
     helmRepos!: string[];
     releases!: Release[];
+    charts!: Chart[];
     tf!: { initialized: boolean; applied: boolean; resources: TfResource[] };
     git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: GitCommit[]; pushed: boolean };
     ci!: { pipelines: Pipeline[]; deploy: CiDeploy | null };
@@ -236,6 +244,7 @@ export interface Scenario {
         name: r.name, chart: r.chart, revision: r.revision, depName: r.depName,
         history: (r.history || []).map(h => Object.assign({}, h)),
       }));
+      this.charts = (sc.charts || []).map(c => ({ name: c.name, version: c.version || "0.1.0", packaged: !!c.packaged }));
 
       this.tf = {
         initialized: !!sc.tfInitialized,
@@ -325,6 +334,9 @@ export interface Scenario {
       for (const repo of sc.helmRepos || []) {
         if (!this.helmRepos.includes(repo)) this.helmRepos.push(repo);
       }
+      for (const c of sc.charts || []) {
+        if (!this.charts.some(x => x.name === c.name)) this.charts.push({ name: c.name, version: c.version || "0.1.0", packaged: !!c.packaged });
+      }
       for (const ing of sc.ingresses || []) {
         if (!this.ingresses.some(x => x.name === ing.name)) this.ingresses.push(Object.assign({}, ing));
       }
@@ -348,6 +360,7 @@ export interface Scenario {
           name: r.name, chart: r.chart, revision: r.revision, depName: r.depName,
           history: r.history.map(h => Object.assign({}, h)),
         })),
+        charts: this.charts.map(c => Object.assign({}, c)),
         tfResources: this.tf.resources.slice(),
         tfInitialized: this.tf.initialized,
         tfApplied: this.tf.applied,
@@ -459,7 +472,7 @@ export interface Scenario {
         "  kubectl    get pods|deployments|services|ingress|nodes|secrets | describe pod|ingress <name>",
         "             create deployment | create secret generic | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
-        "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
+        "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push",
         "  glab       ci status | ci list  (Pipeline-Status in GitLab)",
@@ -980,15 +993,65 @@ export interface Scenario {
         return table(["NAME", "CHART VERSION", "APP VERSION", "DESCRIPTION"], charts);
       }
 
+      if (sub === "create") {
+        const name = t[2];
+        if (!name || name.startsWith("-")) return this._err("helm create: Chart-Name fehlt.", "Muster: 'helm create <mein-chart>'");
+        if (this.charts.some(c => c.name === name)) return this._err('Error: file "' + name + '" already exists', "Den Namen gibt es schon. Nimm einen anderen.");
+        this.charts.push({ name, version: "0.1.0", packaged: false });
+        // Das Gerüst, das echtes 'helm create' anlegt – als virtuelle Dateien zum Anschauen (ls/cat).
+        this.files[name + "/Chart.yaml"] = [
+          "apiVersion: v2", "name: " + name, "description: Ein Helm-Chart für Kubernetes",
+          "type: application", "version: 0.1.0", "appVersion: \"1.16.0\"",
+        ].join("\n");
+        this.files[name + "/values.yaml"] = [
+          "# Drehknöpfe des Charts – hier ohne die Vorlage zu ändern einstellbar.",
+          "replicaCount: 1", "image:", "  repository: nginx", "  tag: \"latest\"",
+          "service:", "  type: ClusterIP", "  port: 80",
+        ].join("\n");
+        this.files[name + "/templates/deployment.yaml"] = "# Vorlage: rendert mit den Werten aus values.yaml zu einem Deployment.";
+        this.files[name + "/templates/service.yaml"] = "# Vorlage: rendert zum Service.";
+        return "Creating " + name;
+      }
+
+      if (sub === "lint") {
+        const ref = t[2];
+        if (!ref) return this._err("helm lint: Welches Chart?", "Muster: 'helm lint <chart>' – z.B. das von 'helm create'.");
+        const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
+        if (!this.charts.some(c => c.name === name)) return this._err('Error: path "' + ref + '" not found', "Erst 'helm create " + name + "' – oder den Pfad prüfen.");
+        return [
+          "==> Linting " + ref,
+          "[INFO] Chart.yaml: icon is recommended",
+          "",
+          "1 chart(s) linted, 0 chart(s) failed",
+        ].join("\n");
+      }
+
+      if (sub === "package") {
+        const ref = t[2];
+        if (!ref) return this._err("helm package: Welches Chart?", "Muster: 'helm package <chart>'.");
+        const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
+        const chart = this.charts.find(c => c.name === name);
+        if (!chart) return this._err('Error: path "' + ref + '" not found', "Erst 'helm create " + name + "' – oder den Pfad prüfen.");
+        chart.packaged = true;
+        const tgz = name + "-" + chart.version + ".tgz";
+        this.files[tgz] = "(gepacktes Chart-Archiv – bereit zum Teilen oder Installieren)";
+        return "Successfully packaged chart and saved it to: /werft/" + tgz;
+      }
+
       if (sub === "install") {
         const release = t[2], chart = t[3];
-        if (!release || !chart || release.startsWith("-")) return this._err("helm install: Release-Name und Chart fehlen.", "Muster: 'helm install <mein-name> bitnami/nginx'");
-        if (chart.includes("/") && !this.helmRepos.includes(chart.split("/")[0])) {
+        if (!release || !chart || release.startsWith("-")) return this._err("helm install: Release-Name und Chart fehlen.", "Muster: 'helm install <mein-name> bitnami/nginx' oder '<mein-name> ./<eigenes-chart>'");
+        // Lokales Chart (eigenes, mit 'helm create' gebautes) vs. Repo-Chart unterscheiden.
+        const localName = chart.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
+        const isLocal = chart.startsWith(".") || chart.startsWith("/") || this.charts.some(c => c.name === localName);
+        if (isLocal) {
+          if (!this.charts.some(c => c.name === localName)) return this._err('Error: path "' + chart + '" not found', "Erst mit 'helm create " + localName + "' ein Chart anlegen – oder den Pfad prüfen.");
+        } else if (chart.includes("/") && !this.helmRepos.includes(chart.split("/")[0])) {
           return this._err("Error: repo " + chart.split("/")[0] + " not found", "Erst 'helm repo add ...' ausführen.");
         }
         if (this.releases.some(r => r.name === release)) return this._err("Error: INSTALLATION FAILED: cannot re-use a name that is still in use", "Der Release-Name ist schon vergeben. Nimm 'helm upgrade' oder einen anderen Namen.");
         const replicas = this._setValue(raw, "replicaCount") || 1;
-        const chartShort = chart.split("/").pop() || chart;
+        const chartShort = isLocal ? localName : (chart.split("/").pop() || chart);
         const depName = release + "-" + chartShort.split(":")[0];
         this.deployments.push(this._makeDeployment(depName, chartShort + ":latest", replicas));
         this.services.push({ name: depName, type: "ClusterIP", clusterIP: "10.96.40." + Math.floor(Math.random() * 250), port: "80", created: this.clock });
