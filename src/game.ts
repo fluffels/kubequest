@@ -62,8 +62,9 @@ import type { GameState, QuestStep } from "./types";
 
     load() {
       try {
-        const raw = SaveStore.read();
-        this.state = raw ? Object.assign(makeDefaultState(), JSON.parse(raw)) : makeDefaultState();
+        // readState liest die Versions-Hülle und migriert Alt-Stände aufs aktuelle Format.
+        const data = SaveStore.readState();
+        this.state = data ? Object.assign(makeDefaultState(), data) : makeDefaultState();
       } catch (e) {
         this.state = makeDefaultState();
       }
@@ -97,7 +98,7 @@ import type { GameState, QuestStep } from "./types";
         this.state.player = { x: ws.player.x, y: ws.player.y };
       }
       this.state.lastSeen = Date.now();
-      SaveStore.write(JSON.stringify(this.state));
+      SaveStore.writeState(this.state); // legt den Stand in der aktuellen Versions-Hülle ab
     },
 
     reset() {
