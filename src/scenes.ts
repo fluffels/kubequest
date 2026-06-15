@@ -40,7 +40,7 @@ import { SFX } from "./sfx";
     constructor() { super("Boot"); }
     create() {
       const sheets: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost"]; // Einzelobjekte ohne Slicing
+      const plains = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
       let loaded = 0;
       const done = () => {
         loaded++;
@@ -77,6 +77,7 @@ import { SFX } from "./sfx";
       this.solidGrid = new Uint8Array(this.W * this.H);
       this.decoList = [];
       this.labels = [];
+      this.dynLabels = [];   // dynamische Cluster-Tags (Nähe-Aufdeckung): { obj, x, y }
       this.podSlots = {};
       this.slotUsed = new Array(36).fill(false);
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
@@ -176,19 +177,13 @@ import { SFX } from "./sfx";
       while (y !== y1) { this.set(x, y, DIRT); y += sy; }
       this.set(x1, y1, DIRT);
     }
-    house(x, y, w, kind) {
-      const roofTop = kind === "stone" ? [48, 49, 50] : [52, 53, 54];
-      const roofBot = kind === "stone" ? [60, 61, 62] : [64, 65, 66];
-      const wall = kind === "stone" ? { plain: 91, door: 89, win: 88 } : { plain: 87, door: 85, win: 84 };
-      for (let i = 0; i < w; i++) {
-        const pos = i === 0 ? 0 : (i === w - 1 ? 2 : 1);
-        this.deco(x + i, y, "town", roofTop[pos], true);
-        this.deco(x + i, y + 1, "town", roofBot[pos], true);
-        let wt = wall.plain;
-        if (i === Math.floor(w / 2)) wt = wall.door;
-        else if (i % 2 === 1) wt = wall.win;
-        this.deco(x + i, y + 2, "town", wt, true);
-      }
+    /** PixelLab-Gebäude: ein ganzes Haus als Bild über der w×3-Kachel-Grundfläche.
+     *  Kollision = die Grundfläche solide (wie früher); das hohe Dach ragt sichtbar
+     *  nach oben (begehbar dahinter, Tiefe nach Fußlinie → korrektes Vorne/Hinten). */
+    building(x, y, w, tex, scale) {
+      for (let i = 0; i < w; i++) for (let r = 0; r < 3; r++) this.solidGrid[(y + r) * this.W + (x + i)] = 1;
+      const cx = (x + w / 2) * T, baseY = (y + 3) * T;
+      this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY);
     }
 
     /** Wo trifft Land auf Wasser? Kai & Schiffsbereich gerade, sonst geschwungener Strand. */
@@ -257,17 +252,17 @@ import { SFX } from "./sfx";
       this.path(40, 13, 40, 12);   // Weg bis vor die Tür des Kartenhauses
 
       // Gebäude & Zonen
-      this.house(23, 10, 7, "stone");
+      this.building(23, 10, 7, "house_office", 1.05);
       this.labels.push({ x: 26.5, y: 9.4, text: "Hafenmeisterei", color: "#ffffff" });
       for (let y = 10; y <= 15; y++) for (let x = 8; x <= 17; x++) this.set(x, y, DIRT);
-      this.house(8, 8, 5, "brown");
+      this.building(8, 8, 5, "house_forge", 0.82);
       this.deco(12, 12, "dungeon", ANVIL, true);
       this.deco(14, 12, "dungeon", TABLE, true);
       this.deco(14, 11.6, "dungeon", DEVICE, false);
       this.labels.push({ x: 12.5, y: 7.4, text: "Werft", color: "#ffffff" });
       this.flagPoles = [{ x: 9, y: 10 }, { x: 10.5, y: 10 }, { x: 16, y: 10 }];
 
-      this.house(38, 9, 5, "brown");
+      this.building(38, 9, 5, "house_chart", 0.9);
       this.labels.push({ x: 40.5, y: 8.4, text: "Kartenhaus", color: "#ffffff" });
 
       for (let y = 18; y <= 22; y++) for (let x = 41; x <= 46; x++) this.set(x, y, DIRT);
@@ -358,12 +353,30 @@ import { SFX } from "./sfx";
       }
     }
 
-    /** Gut lesbares Welt-Label: helle Schrift auf dunkler Pille. */
-    makeLabel(x, y, text, color) {
-      return this.add.text(x, y, text, {
-        fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px", color: color || "#ffffff",
-        backgroundColor: "rgba(8,14,24,0.7)", padding: { x: 2, y: 1 }, resolution: 10,
-      }).setOrigin(0.5, 1).setDepth(9500);
+    /** Festes Orts-Schild: eingravierte Schrift auf einem PixelLab-Holzbrett,
+     *  per 9-Slice auf jede Textlänge gedehnt (Rahmen bleibt fix, Mitte streckt). */
+    makeSign(x, y, text) {
+      const txt = this.add.text(0, 0, text, {
+        fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px",
+        color: "#3a2410", resolution: 10,
+      }).setOrigin(0.5).setShadow(0, 0.5, "rgba(255,243,214,0.45)", 0);
+      const w = Math.max(22, Math.ceil(txt.width) + 18);
+      const h = Math.max(15, Math.ceil(txt.height) + 12);
+      const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
+      board.y = -h / 2; txt.y = -h / 2;   // unten am Bezugspunkt verankert (wie altes origin 0.5,1)
+      return this.add.container(x, y, [board, txt]).setDepth(10000);
+    }
+
+    /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
+     *  / gelb Warnung). Startet unsichtbar – wird per Nähe-Aufdeckung eingeblendet. */
+    makeTechTag(x, y, text, statusColor) {
+      const txt = this.add.text(0, 0, text, {
+        fontFamily: "Consolas, 'Courier New', monospace", fontSize: "5px", color: "#e3edf8",
+        backgroundColor: "rgba(10,16,28,0.82)", padding: { left: 8, right: 4, top: 1, bottom: 1 }, resolution: 10,
+      }).setOrigin(0.5);
+      const dot = this.add.circle(-txt.width / 2 + 4.5, 0, 1.5, statusColor);
+      txt.y = -txt.height / 2; dot.y = -txt.height / 2;   // unten verankert (über dem Objekt)
+      return this.add.container(x, y, [txt, dot]).setDepth(9600).setAlpha(0);
     }
 
     /** Weicher Schatten unter einer Figur. */
@@ -379,8 +392,13 @@ import { SFX } from "./sfx";
         const x = Phaser.Math.Between(1, this.W - 2), y = Phaser.Math.Between(1, this.H - 2);
         const v = this.ground[y * this.W + x];
         if ((v !== 0 && v !== 1 && v !== 2) || this.solidGrid[y * this.W + x]) continue;
-        this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(4, 14), "flowers")
-          .setScale(0.35).setDepth(y * T + 6);
+        // Origin am Boden → wiegt wie eine verwurzelte Pflanze; zufällige Phase/Dauer = kein Gleichtakt
+        const f = this.add.image(x * T + Phaser.Math.Between(2, 14), y * T + Phaser.Math.Between(8, 15), "flowers")
+          .setOrigin(0.5, 1).setScale(0.35).setDepth(y * T + 6).setAngle(-3);
+        this.tweens.add({
+          targets: f, angle: 3, duration: Phaser.Math.Between(1600, 2600),
+          yoyo: true, repeat: -1, ease: "Sine.inOut", delay: Phaser.Math.Between(0, 1400),
+        });
         placed++;
       }
     }
@@ -444,16 +462,24 @@ import { SFX } from "./sfx";
       this.shipFlag = this.add.image(mx + 7, midY - 44, "px").setScale(6, 4).setDepth(3);
       this.tweens.add({ targets: this.shipFlag, y: midY - 46, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
-      // === Leuchtturm (Sturmwache) ===
+      // === Leuchtturm (Sturmwache) – PixelLab-Turm + rotierender Lichtkegel ===
       const lh = this.lighthouse, lx = lh.x * T + 8, lyB = (lh.y + 1) * T;
-      const lg = this.add.graphics().setDepth(lyB + 4);
-      lg.fillStyle(0x5a6470); lg.fillEllipse(lx, lyB - 1, 26, 8);            // Felsen
-      lg.fillStyle(0xf2f2ee); lg.fillRect(lx - 6, lyB - 40, 12, 36);          // Turm
-      lg.fillStyle(0xd9534f); lg.fillRect(lx - 6, lyB - 34, 12, 6); lg.fillRect(lx - 6, lyB - 20, 12, 6); // rote Bänder
-      lg.fillStyle(0x33363d); lg.fillRect(lx - 7, lyB - 46, 14, 6);           // Kanzel
-      lg.fillStyle(0x2a2c33); lg.fillPoints([{ x: lx - 7, y: lyB - 46 }, { x: lx, y: lyB - 52 }, { x: lx + 7, y: lyB - 46 }], true); // Dach
-      this.lhLight = this.add.image(lx, lyB - 43, "px").setScale(4.5, 2.5).setTint(0xffe28a).setDepth(lyB + 5);
-      this.tweens.add({ targets: this.lhLight, alpha: { from: 0.35, to: 1 }, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const lhSc = 0.5;                                   // 45x100-Bild ~ auf alte Turmhöhe (~50px)
+      this.add.ellipse(lx, lyB - 1, 28, 9, 0x5a6470).setDepth(lyB - 2);   // Felsen-Sockel
+      this.add.image(lx, lyB, "lighthouse").setOrigin(0.5, 1).setScale(lhSc).setDepth(lyB + 4);
+      const lampY = lyB - Math.round(100 * lhSc) + 9;    // Laternenraum nahe der Bildoberkante
+      // Lichtkegel: weiches Dreieck (Spitze = Lampe), per ADD-Blend, dreht sich 360° übers Wasser
+      if (!this.textures.exists("lhbeam")) {
+        const bw = 84, bh = 34, bg = this.make.graphics({ add: false } as any);
+        bg.fillStyle(0xffe9a0, 1); bg.fillTriangle(0, bh / 2, bw, 0, bw, bh);
+        bg.generateTexture("lhbeam", bw, bh); bg.destroy();
+      }
+      this.lhBeam = this.add.image(lx, lampY, "lhbeam").setOrigin(0, 0.5)
+        .setAlpha(0.13).setBlendMode(Phaser.BlendModes.ADD).setDepth(lyB + 3);
+      this.tweens.add({ targets: this.lhBeam, angle: 360, duration: 4600, repeat: -1, ease: "Linear" });
+      // pulsierendes Lämpchen im Laternenraum
+      this.lhLight = this.add.image(lx, lampY, "px").setScale(4.5, 2.5).setTint(0xffe28a).setDepth(lyB + 5);
+      this.tweens.add({ targets: this.lhLight, alpha: { from: 0.5, to: 1 }, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
       // === Schornstein-Rauch (Hafenmeisterei & Kartenhaus) ===
       for (const [sx, sy] of [[24.6, 10], [38.6, 9]]) {
@@ -470,9 +496,9 @@ import { SFX } from "./sfx";
         ax: bx * T, ay: by * T, ph: i * 1.7, sp: 0.5 + i * 0.13,
       }));
 
-      // Beschriftungen
+      // Beschriftungen: feste Orts-Schilder (Holzbrett, 9-Slice)
       for (const l of this.labels) {
-        this.makeLabel(l.x * T, l.y * T, l.text, l.color).setDepth(10000);
+        this.makeSign(l.x * T, l.y * T, l.text);
       }
 
       // Terraform-Plateau (Container, an/aus je nach State)
@@ -482,12 +508,12 @@ import { SFX } from "./sfx";
       for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) tfRt.drawFrame("dungeon", WOOD[(x + y) % 3], x * T, y * T);
       tfRt.fill(FOAM, 0.7, 0, 0, p.w * T, 2);
       this.tfGroup.add(tfRt);
-      const mkLabel = (tx, ty, txt, color) => this.makeLabel(tx, ty, txt, color);
+      const mkSign = (tx, ty, txt) => this.makeSign(tx, ty, txt);
       this.tfGroup.add(this.add.image((p.x + 1) * T + 8, (p.y + 1) * T + 8, "crate").setScale(0.6));
       this.tfGroup.add(this.add.image((p.x + 4) * T + 8, (p.y + 2) * T + 8, "crate").setScale(0.6));
-      this.tfGroup.add(mkLabel((p.x + 1.5) * T, (p.y + 0.9) * T, "worker-3", "#9fe6a0"));
-      this.tfGroup.add(mkLabel((p.x + 4.5) * T, (p.y + 1.9) * T, "worker-4", "#9fe6a0"));
-      this.tfGroup.add(mkLabel((p.x + 3.5) * T, (p.y - 0.2) * T, "ost-erweiterung", "#ffd97a"));
+      this.tfGroup.add(mkSign((p.x + 1.5) * T, (p.y + 0.9) * T, "worker-3"));
+      this.tfGroup.add(mkSign((p.x + 4.5) * T, (p.y + 1.9) * T, "worker-4"));
+      this.tfGroup.add(mkSign((p.x + 3.5) * T, (p.y - 0.2) * T, "ost-erweiterung"));
       this.tfGroup.setVisible(false);
       // Vermessungs-Bojen
       this.tfBuoys = [];
@@ -653,9 +679,16 @@ import { SFX } from "./sfx";
 
     rebuildDynamic() {
       this.dynGroup.clear(true, true);
-      const mkText = (x, y, str, color) => this.makeLabel(x, y, str, color);
+      this.dynLabels = [];
+      // Digitales Cluster-Tag bauen + für die Nähe-Aufdeckung registrieren.
+      // (lx,ly) = Tag-Position, (ax,ay) = Bezugspunkt des Objekts (Distanz zur Figur).
+      const mkTag = (lx, ly, str, status, ax, ay) => {
+        const tag = this.makeTechTag(lx, ly, str, status);
+        this.dynGroup.add(tag);
+        this.dynLabels.push({ obj: tag, x: ax, y: ay });
+      };
 
-      // Deployment-Schilder über der ersten Kiste (kaputte rot mit Status!)
+      // Deployment-Tags über der ersten Kiste (kaputte rot mit Status!)
       const seen = {};
       for (const d of Game.sim.deployments) {
         const first = d.pods[0] && this.podSlots[d.pods[0].name];
@@ -665,16 +698,15 @@ import { SFX } from "./sfx";
           const text = d.broken
             ? d.name + " ⚠ " + (d.broken.type === "imagepull" ? "ImagePullBackOff" : d.broken.type === "crashloop" ? "CrashLoopBackOff" : "Pending")
             : d.name + " " + d.replicas + "/" + d.replicas;
-          const color = d.broken ? "#ff9b9b" : "#" + hueColorLight(hashHue(d.name)).toString(16).padStart(6, "0");
-          this.dynGroup.add(mkText(pos.x, pos.y - 12, text, color));
+          mkTag(pos.x, pos.y - 12, text, d.broken ? 0xff7b7b : 0x6fe09a, pos.x, pos.y);
         }
       }
-      // Docker-Fässer bei Bo (max. 10 sichtbar, Labels versetzt gegen Überlappung)
+      // Docker-Fässer bei Bo (max. 10 sichtbar, Tags versetzt gegen Überlappung)
       Game.sim.docker.containers.slice(-10).forEach((c, i) => {
         const bx = (4 + (i % 5) * 2) * T + 8, by = (26 + Math.floor(i / 5) * 0.0) * T + 8;
         const barrel = this.add.image(bx, by, "barrel").setScale(0.5).setDepth(by + 8).setAlpha(c.running ? 1 : 0.45);
         this.dynGroup.add(barrel);
-        this.dynGroup.add(mkText(bx, by - 9 - (i % 2) * 7, c.name, c.running ? "#9fe6a0" : "#8a98a8"));
+        mkTag(bx, by - 9 - (i % 2) * 7, c.name, c.running ? 0x6fe09a : 0x8a98a8, bx, by);
       });
       // Helm-Flaggen an der Werft
       Game.sim.releases.forEach((r, i) => {
@@ -684,7 +716,7 @@ import { SFX } from "./sfx";
         const flag = this.add.image(fx + 6, fy - 12, "px").setScale(6, 3.5).setTint(hueColor(hashHue(r.name))).setDepth(fy + 31);
         this.tweens.add({ targets: flag, y: fy - 14, duration: 600, yoyo: true, repeat: -1, ease: "Sine.inOut" });
         this.dynGroup.add(mast); this.dynGroup.add(flag);
-        this.dynGroup.add(mkText(fx + 4, fy - 18, r.name + " rev" + r.revision, "#" + hueColorLight(hashHue(r.name)).toString(16).padStart(6, "0")));
+        mkTag(fx + 4, fy - 18, r.name + " rev" + r.revision, 0x6fd0e6, fx, fy - 8);
       });
       // Service-Laternen am Dockrand
       Game.sim.services.forEach((s, i) => {
@@ -693,8 +725,20 @@ import { SFX } from "./sfx";
         const lamp = this.add.image(lx, ly - 5, "px").setScale(3, 2.5).setTint(0xffdc78).setDepth(ly + 9);
         this.tweens.add({ targets: lamp, alpha: { from: 0.55, to: 1 }, duration: 800, yoyo: true, repeat: -1 });
         this.dynGroup.add(post); this.dynGroup.add(lamp);
-        this.dynGroup.add(mkText(lx, ly - 10, s.name, "#ffd97a"));
+        mkTag(lx, ly - 10, s.name, 0x6fd0e6, lx, ly);
       });
+    }
+
+    /** Nähe-Aufdeckung: dynamische Cluster-Tags nur nahe der Figur einblenden
+     *  (sanfter Fade), damit nie alle gleichzeitig sichtbar sind und überlappen. */
+    revealNearbyLabels() {
+      const pl = this.playerPos;
+      const FULL = 42, FADE = 84;   // px: voll sichtbar <=FULL, ausgeblendet >=FADE
+      for (const dl of this.dynLabels) {
+        const d = Math.hypot(dl.x - pl.x, dl.y - pl.y);
+        const a = d <= FULL ? 1 : d >= FADE ? 0 : 1 - (d - FULL) / (FADE - FULL);
+        dl.obj.setAlpha(a).setVisible(a > 0.02);
+      }
     }
 
     /* ============ Events: Piraten & Krake ============ */
@@ -889,7 +933,7 @@ import { SFX } from "./sfx";
       if (Game.state.activePet) {
         const item = KQContent.SHOP.find(s => s.id === Game.state.activePet);
         const pos = this.petTrail[Math.max(0, this.petTrail.length - 16)] || pl;
-        this.petSprite.setVisible(true).setTexture("dungeon", item.sprite)
+        this.petSprite.setVisible(true).setTexture(item.tex).setScale(0.4)
           .setPosition(pos.x, pos.y - 2 + Math.sin(time / 180) * 1.5)
           .setFlipX(pl.x < pos.x).setDepth(pos.y + 7);
         this.petShadow.setVisible(true).setPosition(pos.x, pos.y + 6);
@@ -910,6 +954,7 @@ import { SFX } from "./sfx";
       }
 
       this.syncCluster();
+      this.revealNearbyLabels();
 
       // Wirtschaft
       const payout = Game.economyTick(dt);

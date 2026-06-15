@@ -37,6 +37,14 @@ import { SFX } from "./sfx";
       sheetImgs[npc.tex] = img;
     }
   }
+  // PixelLab-Shop-Grafiken (Haustiere) fürs Shop-Icon vorladen
+  for (const item of KQContent.SHOP as any[]) {
+    if (item.tex && KQAssets[item.tex] && !sheetImgs[item.tex]) {
+      const img = new Image();
+      img.src = KQAssets[item.tex];
+      sheetImgs[item.tex] = img;
+    }
+  }
 
   export const UI = {
     dialogue: null,
@@ -59,6 +67,22 @@ import { SFX } from "./sfx";
       else img.addEventListener("load", () => ctx.drawImage(img, sx, sy, 16, 16, 0, 0, canvas.width, canvas.height), { once: true });
     },
 
+    // Ganzes PixelLab-Bild (z.B. Haustier) zentriert in ein Icon-Canvas zeichnen (contain).
+    drawTexIcon(canvas, texKey) {
+      const img = sheetImgs[texKey];
+      if (!img) return;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      const draw = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const s = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+        const w = img.naturalWidth * s, h = img.naturalHeight * s;
+        ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+      };
+      if (img.complete && img.naturalWidth) draw();
+      else img.addEventListener("load", draw, { once: true });
+    },
+
     // NPC-Porträt aus der PixelLab-Figur (Kopf/Schulter-Ausschnitt der 48x48-Textur),
     // mit Fallback aufs alte Kenney-Icon, falls die Figur (noch) keine tex hat.
     drawNpcPortrait(canvas, npc) {
@@ -77,13 +101,19 @@ import { SFX } from "./sfx";
     /* ========== Blockierung ========== */
     blocking() {
       return !!this.dialogue ||
-        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "charselect"]
+        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu", "charselect"]
           .some(id => !$(id).classList.contains("hidden"));
     },
 
     closeOverlays() {
-      ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack"].forEach(id => $(id).classList.add("hidden"));
+      ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu"].forEach(id => $(id).classList.add("hidden"));
       if (this.practice && this.practice.idx >= this.practice.drills.length) this.practice = null;
+    },
+
+    /* ========== Menü / Pause ========== */
+    openMenu() {
+      this.closeOverlays();
+      $("overlay-menu").classList.remove("hidden");
     },
 
     /* ========== HUD, Toasts, Alarm ========== */
@@ -746,7 +776,9 @@ import { SFX } from "./sfx";
         } else {
           action = `<button class="primary" onclick="UI.buyItem('${item.id}')">Kaufen – ${item.price} 🪙</button>`;
         }
-        const icon = item.sprite !== undefined
+        const icon = item.tex !== undefined
+          ? `<canvas width="16" height="16" data-tex="${item.tex}"></canvas>`
+          : item.sprite !== undefined
           ? `<canvas width="16" height="16" data-sprite="${item.sprite}"></canvas>`
           : item.icon;
         html += `<div class="shop-item">
@@ -760,6 +792,9 @@ import { SFX } from "./sfx";
       $("shop-body").innerHTML = html;
       document.querySelectorAll("#shop-body canvas[data-sprite]").forEach(cv => {
         this.drawPortrait(cv, parseInt((cv as HTMLElement).dataset.sprite, 10));
+      });
+      document.querySelectorAll("#shop-body canvas[data-tex]").forEach(cv => {
+        this.drawTexIcon(cv, (cv as HTMLElement).dataset.tex);
       });
     },
 

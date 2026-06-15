@@ -94,8 +94,21 @@ button.primary { background: var(--accent); color: #1a1304; font-weight: bold; b
   min-width: 200px;
 }
 .hud-keys { font-size: 0.75em; color: var(--text-dim); text-shadow: 0 1px 3px #000; }
+.hud-menu-btn {
+  pointer-events: auto;
+  margin-left: auto;
+  font-size: 0.85em;
+  padding: 5px 12px;
+  background: rgba(8, 14, 24, 0.85);
+}
 
 .hud-income { color: var(--good); font-size: 0.75em; }
+
+/* ===== Menü / Pause ===== */
+.menu-actions { display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
+.menu-actions button { padding: 12px 16px; font-size: 1.0em; text-align: left; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 
 /* ===== Alarm (Piraten / Krake) ===== */
 #alarm {
