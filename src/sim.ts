@@ -3,6 +3,132 @@
  * Kein echtes Cluster nötig – aber die Befehle und Ausgaben fühlen sich echt an.
  */
 
+import type { ExecResult } from "./types";
+
+/* ---------- Cluster-Domänentypen ----------
+ * Echte Interfaces für die simulierten Ressourcen (Pod/Deployment/Service …)
+ * statt `any`. Sie sichern Felder + Mutationen im ganzen Simulator ab. */
+
+/** Art einer absichtlich kaputten Workload (für die Troubleshooting-Quests). */
+export interface Broken {
+  type: string; // "imagepull" | "crashloop" | "pending"
+  badImage?: string;
+  needsSecret?: string;
+}
+/** Eine einzelne Pod-Instanz eines Deployments. */
+export interface PodInstance {
+  name: string;
+  created: number;
+  restarts: number;
+}
+export interface Deployment {
+  name: string;
+  image: string;
+  replicas: number;
+  created: number;
+  pods: PodInstance[];
+  broken: Broken | null;
+}
+export interface ServiceRes {
+  name: string;
+  type: string;
+  clusterIP: string;
+  port: string | number;
+  created?: number;
+}
+export interface Secret {
+  name: string;
+  keys: string[];
+  created?: number;
+}
+export interface ClusterNode {
+  name: string;
+  status: string;
+  roles: string;
+  version: string;
+}
+export interface Container {
+  name: string;
+  image: string;
+  running: boolean;
+  created: number;
+  id: string;
+}
+export interface HistoryEntry {
+  revision: number;
+  replicas: number;
+}
+export interface Release {
+  name: string;
+  chart: string;
+  revision: number;
+  depName: string;
+  history: HistoryEntry[];
+}
+export interface TfResource {
+  addr: string;
+  desc: string;
+}
+export interface GitCommit {
+  hash: string;
+  msg: string;
+  branch: string;
+  files: string[];
+}
+export interface PipelineStage {
+  name: string;
+  status: string;
+}
+export interface Pipeline {
+  id: number;
+  ref: string;
+  status: string;
+  stages: PipelineStage[];
+  created: number;
+}
+export interface CiDeploy {
+  name: string;
+  image: string;
+  replicas: number;
+}
+/** Wirkung eines `kubectl apply -f <datei>` (was die Datei im Cluster erzeugt). */
+export interface ApplyEffect {
+  deployment?: { name: string; image: string; replicas: number };
+  service?: { name: string; type?: string; port: string | number };
+}
+/** Berechneter Anzeige-Status eines Pods (für get/describe). */
+export interface PodStatus {
+  status: string;
+  ready: string;
+  restarts: number;
+}
+
+/** Eingabe-Szenario einer Quest-Welt. Alle Felder optional – reset() füllt Defaults. */
+export interface Scenario {
+  dockerImages?: string[];
+  dockerContainers?: Container[];
+  nodes?: ClusterNode[];
+  deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null }>;
+  services?: ServiceRes[];
+  secrets?: Secret[];
+  files?: Record<string, string>;
+  applyEffects?: Record<string, ApplyEffect>;
+  helmRepos?: string[];
+  releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
+  tfInitialized?: boolean;
+  tfApplied?: boolean;
+  tfResources?: TfResource[];
+  gitInitialized?: boolean;
+  gitBranch?: string;
+  gitBranches?: string[];
+  gitStaged?: string[];
+  gitCommitted?: string[];
+  gitCommits?: GitCommit[];
+  gitPushed?: boolean;
+  ciPipelines?: Pipeline[];
+  ciDeploy?: CiDeploy | null;
+}
+
   // Bekannte Container-Images – Grundlage für die „Meintest du …?"-Tippfehlerhilfe.
   // Enthält alle im Spiel benutzten plus echte Tools, die man als DevOps kennt.
   const KNOWN_IMAGES = [
@@ -14,24 +140,24 @@
 
   let podCounter = 0;
 
-  function randSuffix(len) {
+  function randSuffix(len: number) {
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let s = "";
     for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return s;
   }
 
-  function makePodName(depName) {
+  function makePodName(depName: string) {
     podCounter++;
     return depName + "-" + randSuffix(9) + "-" + randSuffix(5);
   }
 
-  function pad(s, n) {
-    s = String(s);
-    return s.length >= n ? s + "  " : s + " ".repeat(n - s.length);
+  function pad(s: string | number, n: number) {
+    const str = String(s);
+    return str.length >= n ? str + "  " : str + " ".repeat(n - str.length);
   }
 
-  function table(headers, rows) {
+  function table(headers: string[], rows: (string | number)[][]) {
     const widths = headers.map((h, i) =>
       Math.max(h.length, ...rows.map(r => String(r[i]).length)) + 3
     );
@@ -45,24 +171,24 @@
   class Sim {
     // `!` = definite assignment: alle Felder werden in reset() gesetzt, das der
     // Konstruktor aufruft. TS sieht das nicht durch den Methodenaufruf hindurch.
-    scenario: any;
+    scenario: Scenario;
     clock!: number;
-    docker!: { pulled: string[]; containers: any[] };
-    nodes!: any[];
-    deployments!: any[];
-    services!: any[];
-    secrets!: any[];
+    docker!: { pulled: string[]; containers: Container[] };
+    nodes!: ClusterNode[];
+    deployments!: Deployment[];
+    services!: ServiceRes[];
+    secrets!: Secret[];
     files!: Record<string, string>;
-    applyEffects!: Record<string, any>;
+    applyEffects!: Record<string, ApplyEffect>;
     helmRepos!: string[];
-    releases!: any[];
-    tf!: { initialized: boolean; applied: boolean; resources: any[] };
-    git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: any[]; pushed: boolean };
-    ci!: { pipelines: any[]; deploy: any };
-    lastDeletedPod: any;
+    releases!: Release[];
+    tf!: { initialized: boolean; applied: boolean; resources: TfResource[] };
+    git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: GitCommit[]; pushed: boolean };
+    ci!: { pipelines: Pipeline[]; deploy: CiDeploy | null };
+    lastDeletedPod: string | null = null;
     lastError!: boolean;
 
-    constructor(scenario) {
+    constructor(scenario: Scenario = {}) {
       this.scenario = scenario || {};
       this.reset();
     }
@@ -122,8 +248,8 @@
       this.lastError = false;
     }
 
-    _makeDeployment(name, image, replicas, broken?) {
-      const d = { name, image, replicas, created: this.clock, pods: [] as any[], broken: broken ? Object.assign({}, broken) : null };
+    _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null): Deployment {
+      const d: Deployment = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
@@ -131,7 +257,7 @@
     }
 
     /** Pod-Status eines Deployments (für get/describe/logs). */
-    _podStatus(d) {
+    _podStatus(d: Deployment): PodStatus {
       if (!d.broken) return { status: "Running", ready: "1/1", restarts: 0 };
       if (d.broken.type === "imagepull") return { status: "ImagePullBackOff", ready: "0/1", restarts: 0 };
       if (d.broken.type === "crashloop") return { status: "CrashLoopBackOff", ready: "0/1", restarts: 5 };
@@ -147,7 +273,7 @@
       }
     }
 
-    _age(created) {
+    _age(created: number) {
       const secs = (this.clock - created) * 20 + 15;
       if (secs < 60) return secs + "s";
       const mins = Math.floor(secs / 60);
@@ -155,18 +281,18 @@
       return Math.floor(mins / 60) + "h";
     }
 
-    _allPods() {
-      const pods: any[] = [];
+    _allPods(): PodInstance[] {
+      const pods: PodInstance[] = [];
       for (const d of this.deployments) for (const p of d.pods) pods.push(p);
       return pods;
     }
 
-    _findDeploymentOfPod(podName) {
+    _findDeploymentOfPod(podName: string): Deployment | undefined {
       return this.deployments.find(d => d.pods.some(p => p.name === podName));
     }
 
     /** Quest-Szenario in die laufende Welt mischen (Dateien, Aufträge, Beispiel-Pods …). */
-    mergeScenario(sc) {
+    mergeScenario(sc: Scenario | null | undefined) {
       if (!sc) return;
       Object.assign(this.files, sc.files || {});
       Object.assign(this.applyEffects, sc.applyEffects || {});
@@ -220,7 +346,7 @@
     }
 
     /** Führt eine Befehlszeile aus. Rückgabe: { output, error } */
-    exec(line) {
+    exec(line: string): ExecResult {
       this.clock++;
       this.lastError = false;
       const raw = line.trim();
@@ -229,7 +355,7 @@
       const tokens = raw.split(/\s+/);
       const cmd = tokens[0];
 
-      let out;
+      let out: string;
       try {
         switch (cmd) {
           case "docker": out = this._docker(tokens, raw); break;
@@ -256,13 +382,13 @@
       return { output: out, error: this.lastError };
     }
 
-    _err(msg, tip?) {
+    _err(msg: string, tip?: string) {
       this.lastError = true;
       return msg + (tip ? "\n💡 " + tip : "");
     }
 
     /** Editierdistanz (Levenshtein) – für „Meintest du …?"-Vorschläge. */
-    _editDistance(a, b) {
+    _editDistance(a: string, b: string) {
       const m = a.length, n = b.length;
       const d = Array.from({ length: m + 1 }, (_, i) => [i].concat(new Array(n).fill(0)));
       for (let j = 0; j <= n; j++) d[0][j] = j;
@@ -274,8 +400,8 @@
     }
 
     /** Prüft ein Docker-Image auf Tippfehler. Gibt eine Fehlermeldung zurück oder null (alles ok). */
-    _checkImageTypo(img) {
-      const bare = img.split(":")[0].split("/").pop().toLowerCase();
+    _checkImageTypo(img: string) {
+      const bare = (img.split(":")[0].split("/").pop() || "").toLowerCase();
       if (KNOWN_IMAGES.includes(bare)) return null;
       const guess = this._suggest(bare, KNOWN_IMAGES);
       if (guess) {
@@ -286,8 +412,8 @@
     }
 
     /** Nächstliegendes bekanntes Wort, wenn nah genug dran (sonst null). */
-    _suggest(word, list) {
-      let best = null, bestD = Infinity;
+    _suggest(word: string, list: string[]): string | null {
+      let best: string | null = null, bestD = Infinity;
       for (const cand of list) {
         const dist = this._editDistance(word.toLowerCase(), cand.toLowerCase());
         if (dist < bestD) { bestD = dist; best = cand; }
@@ -297,7 +423,7 @@
     }
 
     /** Wert hinter einer Flag finden: unterstützt "-n wert" und "-n=wert". */
-    _flagValue(tokens, flag) {
+    _flagValue(tokens: string[], flag: string): string | null {
       for (let i = 0; i < tokens.length; i++) {
         if (tokens[i] === flag) return tokens[i + 1] || null;
         if (tokens[i].startsWith(flag + "=")) return tokens[i].slice(flag.length + 1);
@@ -321,7 +447,7 @@
     }
 
     /* ===================== docker ===================== */
-    _docker(t, _raw?) {
+    _docker(t: string[], _raw?: string) {
       const sub = t[1];
       if (!sub) return this._err("docker: Unterbefehl fehlt.", "Probier z.B. 'docker ps'.");
 
@@ -408,7 +534,7 @@
     }
 
     /* ===================== kubectl ===================== */
-    _kubectl(t, raw) {
+    _kubectl(t: string[], raw: string) {
       const sub = t[1];
       if (!sub) return this._err("kubectl: Unterbefehl fehlt.", "Probier z.B. 'kubectl get pods'.");
 
@@ -426,7 +552,7 @@
       return this._err("kubectl: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
 
-    _kubectlGet(t) {
+    _kubectlGet(t: string[]) {
       const what = (t[2] || "").toLowerCase();
       const ns = this._flagValue(t, "-n") || this._flagValue(t, "--namespace");
       const allNs = t.includes("-A") || t.includes("--all-namespaces");
@@ -481,14 +607,15 @@
       return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services oder nodes?");
     }
 
-    _kubectlDescribe(t) {
+    _kubectlDescribe(t: string[]) {
       const what = (t[2] || "").toLowerCase();
       const name = t[3];
       if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>'.");
       if (!name) return this._err("kubectl describe pod: Welcher Pod?", "Die Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Tipp: Pod-Namen kannst du aus 'kubectl get pods' kopieren.");
-      const dep = this._findDeploymentOfPod(name);
+      // Pod wurde via _allPods() gefunden -> sein Deployment existiert garantiert.
+      const dep = this._findDeploymentOfPod(name)!;
       const st = this._podStatus(dep);
       const events = ["  Type    Reason     Age   Message", "  ----    ------     ----  -------"];
       if (!dep.broken) {
@@ -522,7 +649,7 @@
       ].concat(events).join("\n");
     }
 
-    _kubectlCreate(t, raw) {
+    _kubectlCreate(t: string[], raw: string) {
       if (t[2] === "secret") {
         // kubectl create secret generic <name> --from-literal=schluessel=wert
         if (t[3] !== "generic") return this._err("Der Simulator kann nur 'kubectl create secret generic <name> --from-literal=k=v'.");
@@ -544,7 +671,7 @@
       return "deployment.apps/" + name + " created";
     }
 
-    _kubectlScale(t, raw) {
+    _kubectlScale(t: string[], raw: string) {
       const name = t[3] === "deployment" ? t[4] : (t[2] === "deployment" ? t[3] : null);
       const repMatch = raw.match(/--replicas[=\s]+(\d+)/);
       if (!name || !repMatch) return this._err("kubectl scale: So nicht ganz.", "Muster: 'kubectl scale deployment <name> --replicas=3'");
@@ -557,7 +684,7 @@
       return "deployment.apps/" + name + " scaled";
     }
 
-    _kubectlExpose(t, raw) {
+    _kubectlExpose(t: string[], raw: string) {
       const name = t[3] === "deployment" ? t[4] : (t[2] === "deployment" ? t[3] : null);
       const portMatch = raw.match(/--port[=\s]+(\d+)/);
       if (!name) return this._err("kubectl expose: Welches Deployment?", "Muster: 'kubectl expose deployment <name> --port=80'");
@@ -576,7 +703,7 @@
       return "service/" + name + " exposed";
     }
 
-    _kubectlDelete(t) {
+    _kubectlDelete(t: string[]) {
       const what = (t[2] || "").toLowerCase();
       const name = t[3];
 
@@ -585,13 +712,15 @@
         const eff = this.applyEffects[file];
         if (!eff || !this.files[file]) return this._err("error: the path \"" + (file || "?") + "\" does not exist", "Mit 'ls' siehst du, welche Dateien hier liegen.");
         const out: string[] = [];
-        if (eff.deployment) {
-          const i = this.deployments.findIndex(d => d.name === eff.deployment.name);
-          if (i >= 0) { this.deployments.splice(i, 1); out.push('deployment.apps "' + eff.deployment.name + '" deleted'); }
+        const effDep = eff.deployment;
+        if (effDep) {
+          const i = this.deployments.findIndex(d => d.name === effDep.name);
+          if (i >= 0) { this.deployments.splice(i, 1); out.push('deployment.apps "' + effDep.name + '" deleted'); }
         }
-        if (eff.service) {
-          const i = this.services.findIndex(s => s.name === eff.service.name);
-          if (i >= 0) { this.services.splice(i, 1); out.push('service "' + eff.service.name + '" deleted'); }
+        const effSvc = eff.service;
+        if (effSvc) {
+          const i = this.services.findIndex(s => s.name === effSvc.name);
+          if (i >= 0) { this.services.splice(i, 1); out.push('service "' + effSvc.name + '" deleted'); }
         }
         return out.join("\n") || "nothing deleted";
       }
@@ -633,7 +762,7 @@
       return this._err("kubectl delete: Ressourcentyp '" + what + "' kennt der Simulator nicht.");
     }
 
-    _kubectlApply(t) {
+    _kubectlApply(t: string[]) {
       const fIdx = t.indexOf("-f");
       const file = fIdx >= 0 ? t[fIdx + 1] : null;
       if (!file) return this._err("error: must specify one of -f or -k", "Muster: 'kubectl apply -f deployment.yaml'");
@@ -641,37 +770,40 @@
       const eff = this.applyEffects[file];
       if (!eff) return this._err("error: unable to decode " + file);
       const out: string[] = [];
-      if (eff.deployment) {
-        const existing = this.deployments.find(d => d.name === eff.deployment.name);
+      const effDep = eff.deployment;
+      if (effDep) {
+        const existing = this.deployments.find(d => d.name === effDep.name);
         if (existing) {
-          out.push("deployment.apps/" + eff.deployment.name + " unchanged");
+          out.push("deployment.apps/" + effDep.name + " unchanged");
         } else {
-          this.deployments.push(this._makeDeployment(eff.deployment.name, eff.deployment.image, eff.deployment.replicas));
-          out.push("deployment.apps/" + eff.deployment.name + " created");
+          this.deployments.push(this._makeDeployment(effDep.name, effDep.image, effDep.replicas));
+          out.push("deployment.apps/" + effDep.name + " created");
         }
       }
-      if (eff.service) {
-        const existing = this.services.find(s => s.name === eff.service.name);
+      const effSvc = eff.service;
+      if (effSvc) {
+        const existing = this.services.find(s => s.name === effSvc.name);
         if (existing) {
-          out.push("service/" + eff.service.name + " unchanged");
+          out.push("service/" + effSvc.name + " unchanged");
         } else {
           this.services.push({
-            name: eff.service.name, type: eff.service.type || "ClusterIP",
+            name: effSvc.name, type: effSvc.type || "ClusterIP",
             clusterIP: "10.96." + Math.floor(Math.random() * 250) + "." + Math.floor(Math.random() * 250),
-            port: eff.service.port, created: this.clock,
+            port: effSvc.port, created: this.clock,
           });
-          out.push("service/" + eff.service.name + " created");
+          out.push("service/" + effSvc.name + " created");
         }
       }
       return out.join("\n");
     }
 
-    _kubectlLogs(t) {
+    _kubectlLogs(t: string[]) {
       const name = t[2];
       if (!name) return this._err("kubectl logs: Welcher Pod?", "Pod-Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found');
-      const dep = this._findDeploymentOfPod(name);
+      // Pod via _allPods() gefunden -> Deployment existiert garantiert.
+      const dep = this._findDeploymentOfPod(name)!;
       if (dep.broken && dep.broken.type === "imagepull") {
         return this._err('Error from server (BadRequest): container "' + dep.name + '" in pod "' + name + '" is waiting to start: trying and failing to pull image',
           "Keine Logs ohne Image! Die Ursache steht in den Events: kubectl describe pod " + name);
@@ -695,9 +827,9 @@
     }
 
     /** kubectl set image deployment/<name> <container>=<image> */
-    _kubectlSetImage(t) {
+    _kubectlSetImage(t: string[]) {
       if (t[2] !== "image") return this._err("Der Simulator kann nur 'kubectl set image deployment/<name> <container>=<image>'.");
-      let depName = null;
+      let depName: string | null = null;
       if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
       else if (t[3] === "deployment") { depName = t[4]; t = t.slice(0, 4).concat(t.slice(5)); }
       const kv = t.find(x => x.includes("=") && !x.startsWith("--"));
@@ -715,15 +847,16 @@
     }
 
     /** kubectl rollout restart deployment <name> */
-    _kubectlRollout(t) {
+    _kubectlRollout(t: string[]) {
       if (t[2] !== "restart") return this._err("Der Simulator kann nur 'kubectl rollout restart deployment <name>'.");
-      let depName = null;
+      let depName: string | null = null;
       if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
       else if (t[3] === "deployment") depName = t[4];
       if (!depName) return this._err("kubectl rollout restart: Welches Deployment?", "Muster: kubectl rollout restart deployment <name>");
       const dep = this.deployments.find(d => d.name === depName);
       if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found');
-      if (dep.broken && dep.broken.type === "crashloop" && this.secrets.some(s => s.name === dep.broken.needsSecret)) {
+      const broken = dep.broken;
+      if (broken && broken.type === "crashloop" && this.secrets.some(s => s.name === broken.needsSecret)) {
         dep.broken = null;
       }
       dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
@@ -731,7 +864,7 @@
     }
 
     /* ===================== helm ===================== */
-    _helm(t, raw) {
+    _helm(t: string[], raw: string) {
       const sub = t[1];
       if (!sub) return this._err("helm: Unterbefehl fehlt.", "Probier z.B. 'helm list'.");
 
@@ -777,8 +910,9 @@
         }
         if (this.releases.some(r => r.name === release)) return this._err("Error: INSTALLATION FAILED: cannot re-use a name that is still in use", "Der Release-Name ist schon vergeben. Nimm 'helm upgrade' oder einen anderen Namen.");
         const replicas = this._setValue(raw, "replicaCount") || 1;
-        const depName = release + "-" + chart.split("/").pop().split(":")[0];
-        this.deployments.push(this._makeDeployment(depName, chart.split("/").pop() + ":latest", replicas));
+        const chartShort = chart.split("/").pop() || chart;
+        const depName = release + "-" + chartShort.split(":")[0];
+        this.deployments.push(this._makeDeployment(depName, chartShort + ":latest", replicas));
         this.services.push({ name: depName, type: "ClusterIP", clusterIP: "10.96.40." + Math.floor(Math.random() * 250), port: "80", created: this.clock });
         this.releases.push({ name: release, chart, revision: 1, depName, history: [{ revision: 1, replicas }] });
         return [
@@ -796,7 +930,7 @@
       if (sub === "list" || sub === "ls") {
         if (this.releases.length === 0) return "NAME   NAMESPACE   REVISION   STATUS   CHART";
         return table(["NAME", "NAMESPACE", "REVISION", "STATUS", "CHART"],
-          this.releases.map(r => [r.name, "default", String(r.revision), "deployed", r.chart.split("/").pop() + "-18.1.0"]));
+          this.releases.map(r => [r.name, "default", String(r.revision), "deployed", (r.chart.split("/").pop() || r.chart) + "-18.1.0"]));
       }
 
       if (sub === "upgrade") {
@@ -858,13 +992,13 @@
       return this._err("helm: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
 
-    _setValue(raw, key) {
+    _setValue(raw: string, key: string): number | null {
       const m = raw.match(new RegExp("--set\\s+" + key + "=(\\d+)"));
       return m ? parseInt(m[1], 10) : null;
     }
 
     /* ===================== terraform ===================== */
-    _terraform(t, _raw?) {
+    _terraform(t: string[], _raw?: string) {
       const sub = t[1];
       if (!sub) return this._err("terraform: Unterbefehl fehlt.", "Probier 'terraform init'.");
       const tf = this.tf;
@@ -935,7 +1069,7 @@
 
     /* ===================== Dateisystem ===================== */
     /* ===================== git ===================== */
-    _git(t, raw) {
+    _git(t: string[], raw: string) {
       const sub = t[1];
       const g = this.git;
       if (sub === "init") {
@@ -978,11 +1112,11 @@
       return s.trimEnd();
     }
 
-    _gitAdd(t) {
+    _gitAdd(t: string[]) {
       const g = this.git;
       const arg = t[2];
       if (!arg) return this._err("git add: Welche Datei?", "z.B. 'git add seekarte.md' – oder 'git add .' für alles.");
-      let toAdd;
+      let toAdd: string[];
       if (arg === ".") {
         toAdd = this._gitUntracked();
       } else {
@@ -993,7 +1127,7 @@
       return toAdd.length ? "Vorgemerkt: " + toAdd.join(", ") + " (bereit zum Commit)." : "Nichts Neues zum Vormerken.";
     }
 
-    _gitCommit(raw) {
+    _gitCommit(raw: string) {
       const g = this.git;
       const m = raw.match(/-m\s+"([^"]*)"|-m\s+'([^']*)'|-m\s+(\S+)/);
       const msg = m ? (m[1] || m[2] || m[3]) : null;
@@ -1014,7 +1148,7 @@
         .map(c => "commit " + c.hash + "  (" + c.branch + ")\n    " + c.msg).join("\n");
     }
 
-    _gitBranch(t) {
+    _gitBranch(t: string[]) {
       const g = this.git;
       const name = t[2];
       if (!name) return "Branches:\n" + g.branches.map(b => (b === g.branch ? "* " : "  ") + b).join("\n");
@@ -1024,7 +1158,7 @@
       return "Branch '" + name + "' angelegt. (Wechseln mit 'git checkout " + name + "'.)";
     }
 
-    _gitCheckout(t) {
+    _gitCheckout(t: string[]) {
       const g = this.git;
       let name = t[2], create = false;
       if (t[2] === "-b") { create = true; name = t[3]; }
@@ -1039,7 +1173,7 @@
       return "Gewechselt zu Branch '" + name + "'" + (create ? " (neu angelegt)" : "") + ".";
     }
 
-    _gitMerge(t) {
+    _gitMerge(t: string[]) {
       const g = this.git;
       const name = t[2];
       if (!name) return this._err("git merge: Welchen Branch reinholen?", "Muster: 'git merge <branch>'.");
@@ -1086,14 +1220,14 @@
     }
 
     /* ===================== glab (GitLab CLI) ===================== */
-    _glab(t) {
+    _glab(t: string[]) {
       if (t[1] !== "ci") return this._err("Der Simulator kann nur 'glab ci ...'.", "z.B. 'glab ci status' oder 'glab ci list'.");
       const action = t[2];
 
       if (action === "status" || action === "view") {
         const p = this.ci.pipelines[this.ci.pipelines.length - 1];
         if (!p) return this._err("Keine Pipeline gefunden.", "Eine Pipeline entsteht beim 'git push' – wenn eine .gitlab-ci.yml im Repo liegt.");
-        const icon = s => (s === "passed" ? "✓" : s === "skipped" ? "–" : "•");
+        const icon = (s: string) => (s === "passed" ? "✓" : s === "skipped" ? "–" : "•");
         const lines = [
           "Pipeline #" + p.id + "  (Branch " + p.ref + ")   Status: " + (p.status === "passed" ? "passed ✅" : p.status),
         ];
@@ -1121,7 +1255,7 @@
       return names.join("\n");
     }
 
-    _cat(t) {
+    _cat(t: string[]) {
       const file = t[1];
       if (!file) return this._err("cat: Welche Datei?", "Mit 'ls' siehst du, was hier liegt.");
       if (!this.files[file]) return this._err("cat: " + file + ": Datei nicht gefunden", "Mit 'ls' siehst du, was hier liegt.");

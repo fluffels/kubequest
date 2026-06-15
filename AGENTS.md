@@ -49,8 +49,9 @@ Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `conten
 
 ## Konventionen
 
-- **TS-Strenge als Ratchet.** `tsconfig.strict.json` hält bereits gehärtete Module auf voller Strenge (`strictNullChecks` u.a.): aktuell `types`, `store`, `content`, `sim`, `game`. Der Kreis wird Schritt für Schritt erweitert – **nächster Schritt `noImplicitAny`** (echte Param-/Feld-Typen statt `any`, eigene Interfaces für Pod/Deployment/Service …), danach `scenes`/`ui`, bis die Basis-`tsconfig.json` selbst auf `strict` steht. Neue/geänderte Module nach Möglichkeit gleich strict-tauglich halten.
+- **TS-Strenge als Ratchet.** `tsconfig.strict.json` hält die gehärteten Module auf voller Strenge – `types`, `store`, `content`, `sim`, `game` laufen jetzt komplett `strict` **inklusive `noImplicitAny`** (echte Param-/Feld-Typen statt `any`; die Cluster-Interfaces Pod/Deployment/Service … leben in `src/sim.ts`). **Nächster Schritt:** `scenes`/`ui` nachziehen, bis die Basis-`tsconfig.json` selbst auf `strict` steht. Neue/geänderte Module nach Möglichkeit gleich strict-tauglich halten.
 - **PixelLab-Grafik doppelt ablegen:** Quell-PNG nach `assets/pixellab/` **und** Base64 in `src/assets-data.ts` (damit der Single-File-Build self-contained bleibt). Asset-Liste + IDs: `assets/pixellab/README.md`.
+- **PixelLab-Zugriff** läuft über den **PixelLab-MCP-Server** (Subscription „Pixel Apprentice"). Der API-Key rotiert: bei „kein Zugriff" trägt fluffels den neuen Key selbst in die MCP-Config ein, danach funktional mit `get_balance` verifizieren (Key nie im Chat anfordern/ausgeben). Grafik-/Asset-Aufgaben werden — wie der ganze Backlog — als **GitHub-Issues** geführt, nicht im Vault/Notiz-System.
 - **Grafik-Stil:** Stardew-angelehnt, 16px, frontale Ansicht (`view: side` für Gebäude, nicht die schräge 2.5D-Sicht). Große Objekte (Häuser, Bäume) in hoher Auflösung generieren und möglichst ganzzahlig skalieren, damit der `pixelArt`-Renderer scharf bleibt.
 - **Spielstände** laufen über die SaveStore-Schicht (`store.ts`), localStorage + Auto-Save alle 5 s + JSON-Export/Import. Formatänderungen brauchen perspektivisch ein `version`-Feld + Migration.
 
@@ -58,6 +59,8 @@ Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `conten
 
 Der Backlog wird als **GitHub Issues** geführt, gruppiert in einem **GitHub Project-Board** (Kanban). Prioritäten als Labels: `prio:hoch` 🔴 / `prio:mittel` 🟠 / `prio:niedrig` 🟡.
 
-Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `npm test` grün halten + im Browser verifizieren, dann das Issue schließen (fluffels selbst, beim Commit per `Closes #<n>`).
+Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `npm test` grün halten + im Browser verifizieren, dann das Issue schließen.
+
+**Projekt-Ausnahme (nur kubequest):** Hier darf der Agent **GitHub-Issues selbst verwalten und schließen** (`gh issue close`, kommentieren, Labels) ohne Rückfrage. Das ist die einzige nach außen wirkende Aktion, die hier freigegeben ist — **committen/pushen/deployen bleibt auch in kubequest tabu** (siehe harte Regeln oben, macht fluffels selbst). Beim Commit kann sie zusätzlich per `Closes #<n>` schließen.
 
 Issues ansehen: `gh issue list`. Board: `gh project list --owner fluffels`.
