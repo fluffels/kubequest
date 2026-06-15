@@ -12,6 +12,7 @@ import { KQContent } from "../src/content";
 
 let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
+let SaveStore: typeof import("../src/store").SaveStore;
 
 beforeAll(async () => {
   const map = new Map<string, string>();
@@ -24,6 +25,7 @@ beforeAll(async () => {
   });
   ({ Game } = await import("../src/game"));
   ({ Sim } = await import("../src/sim"));
+  ({ SaveStore } = await import("../src/store"));
 });
 
 beforeEach(() => {
@@ -176,4 +178,89 @@ test("registerQuestCards: hängt die EXTRA_CARDS des Kapitels in die Wiederholun
   // aus EXTRA_CARDS q10 (inkl. der in #5 ergänzten Tool-Karten)
   expect(Game.state.review["q-tools-stack"]).toBeTruthy();
   expect(Game.state.review["q-tools-monitoring"]).toBeTruthy();
+});
+
+/* ---------- Defensive Validierung beim Laden (#61) ----------
+ * Ein manipulierter Import oder ein über viele Versionen gewanderter Stand kann
+ * kaputte/fremde Feldwerte tragen. load() muss daraus IMMER einen konsistenten
+ * State machen (kein Crash, keine NaN-Münzen), statt den Müll zu übernehmen.
+ * lastSeen wird in den Tests auf 0 gesetzt, damit keine Offline-Einnahmen die
+ * geprüften Münzen verändern.
+ *
+ * Red-Green: mit dem früheren Object.assign(makeDefaultState(), data) blieben
+ * String-Münzen, Fremd-Einträge und kaputte Review-Einträge stehen – diese
+ * Tests wären rot. */
+
+test("load: kaputte Zahlenfelder (String-Münzen, negative XP) fallen auf Defaults zurück", () => {
+  SaveStore.writeState({
+    coins: "viel",   // falscher Typ -> KEINE String/NaN-Münzen
+    xp: -50,         // negativ = unplausibel
+    questIdx: -3,    // negativer Index
+    taskIdx: 2.7,    // krumm -> abgerundet
+    lastSeen: 0,     // keine Offline-Einnahmen
+  } as Parameters<typeof SaveStore.writeState>[0]);
+  Game.load();
+
+  expect(Game.state.coins).toBe(40);              // Default, sauber
+  expect(Number.isFinite(Game.state.coins)).toBe(true);
+  expect(Game.state.xp).toBe(0);
+  expect(Game.state.questIdx).toBe(0);
+  expect(Game.state.taskIdx).toBe(2);             // 2.7 -> 2 (ganzzahliger Index)
+});
+
+test("load: kaputte Sammlungen/Typen werden gefiltert oder verworfen", () => {
+  SaveStore.writeState({
+    completedQuests: "q1,q2",                       // String statt Array
+    owned: ["pet-1", 42, null, "flag"],             // fremde Einträge
+    inventory: { potion: 3, ghost: -1, bad: "x" },  // negativ/Nicht-Zahl raus
+    character: "Hans",                              // soll number|null sein
+    activePet: 7,                                   // soll string|null sein
+    review: { good: { box: 2, due: 5 }, bad: "kaputt", over: { box: 99, due: 1 } },
+    lastSeen: 0,
+  } as Parameters<typeof SaveStore.writeState>[0]);
+  Game.load();
+
+  expect(Game.state.completedQuests).toEqual([]);          // String war kein Array
+  expect(Game.state.owned).toEqual(["pet-1", "flag"]);     // nur Strings bleiben
+  expect(Game.state.inventory).toEqual({ potion: 3 });     // negativ/Nicht-Zahl entfernt
+  expect(Game.state.character).toBe(null);                 // falscher Typ -> null
+  expect(Game.state.activePet).toBe(null);                 // falscher Typ -> null
+  expect(Game.state.review.good).toEqual({ box: 2, due: 5 });
+  expect(Game.state.review.bad).toBeUndefined();           // kaputter Eintrag verworfen
+  expect(Game.state.review.over.box).toBe(5);              // box auf 1..5 geklemmt
+});
+
+test("load: völlig kaputter Stand (kein Objekt) startet sauber mit Defaults, kein Crash", () => {
+  SaveStore.write(JSON.stringify({ v: 1, data: 12345 })); // data ist eine Zahl, kein State
+  Game.load();
+  expect(Game.state.coins).toBe(40);
+  expect(Game.state.xp).toBe(0);
+  expect(Array.isArray(Game.state.owned)).toBe(true);
+});
+
+test("load: ein VOLLSTÄNDIG valider Stand überlebt unverändert (kein Over-Sanitizing)", () => {
+  SaveStore.writeState({
+    xp: 320, coins: 99, character: 2, player: { x: 100, y: 200 },
+    questIdx: 4, questStep: 1, taskIdx: 0,
+    completedQuests: ["q1", "q2"], inventory: { potion: 2 }, owned: ["pet-cat"],
+    activePet: "pet-cat", activeFlag: null,
+    review: { "q-ch1-1": { box: 3, due: 10 } },
+    streak: { count: 5, lastDay: 999999 }, streakHintShown: true,
+    stats: { commands: 10, reviews: 4, quizRight: 7, quizWrong: 2, piratesBeaten: 1, krakenBeaten: 0, stackBest: 30, stormsFixed: 3 },
+    lastSeen: 0, clusterSnapshot: null,
+  } as Parameters<typeof SaveStore.writeState>[0]);
+  Game.load();
+
+  expect(Game.state.xp).toBe(320);
+  expect(Game.state.coins).toBe(99);
+  expect(Game.state.character).toBe(2);
+  expect(Game.state.player).toEqual({ x: 100, y: 200 });
+  expect(Game.state.questIdx).toBe(4);
+  expect(Game.state.completedQuests).toEqual(["q1", "q2"]);
+  expect(Game.state.owned).toEqual(["pet-cat"]);
+  expect(Game.state.inventory).toEqual({ potion: 2 });
+  expect(Game.state.review["q-ch1-1"]).toEqual({ box: 3, due: 10 });
+  expect(Game.state.streakHintShown).toBe(true);
+  expect(Game.state.stats.stackBest).toBe(30);
+  expect(Game.state.stats.stormsFixed).toBe(3);            // dynamische Zusatz-Stat bleibt
 });
