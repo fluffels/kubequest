@@ -496,7 +496,7 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
     /** Tag-Nacht-Zyklus: sanft animierter Lichtschleier über der Welt + Laternen-Glühen,
      *  das bei Dämmerung/Nacht aufleuchtet. Ein voller Tag dauert CYCLE ms. (#4) */
     updateDayNight(time: number) {
-      const CYCLE = 240000;                          // 4 Minuten realer Zeit = ein voller Tag
+      const CYCLE = 1440000;                         // 24 Minuten realer Zeit = ein voller Tag (Stardew-Tempo) – Tempo hier justieren
       const phase = (time % CYCLE) / CYCLE;          // 0 = Mittag … 0.5 = Mitternacht … 1 = Mittag
       // Keyframes [phase, r, g, b, alpha] – dazwischen wird linear interpoliert
       const keys: number[][] = [
