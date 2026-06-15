@@ -7,6 +7,7 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
+import { SFX } from "./sfx";
 import { worldScene } from "./runtime";
 import type { GameState, QuestStep, FunkStep } from "./types";
 
@@ -51,6 +52,7 @@ import type { GameState, QuestStep, FunkStep } from "./types";
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
+      audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 },
     };
   }
 
@@ -84,6 +86,21 @@ import type { GameState, QuestStep, FunkStep } from "./types";
   /** Array, gefiltert auf reine Strings (verwirft fremde Einträge). */
   function safeStrArray(v: unknown): string[] {
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  }
+  /** Lautstärke: endliche Zahl auf [0,1] geklemmt – sonst Default. */
+  function safeVol(v: unknown, def: number): number {
+    return typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : def;
+  }
+  /** Audio-Einstellungen gegen die Defaults absichern (Booleans + geklemmte Lautstärken). */
+  function safeAudio(v: unknown): GameState["audio"] {
+    const d = makeDefaultState().audio;
+    const a = isPlainObject(v) ? v : {};
+    return {
+      music: typeof a.music === "boolean" ? a.music : d.music,
+      sfx: typeof a.sfx === "boolean" ? a.sfx : d.sfx,
+      musicVol: safeVol(a.musicVol, d.musicVol),
+      sfxVol: safeVol(a.sfxVol, d.sfxVol),
+    };
   }
 
   function sanitizeState(raw: unknown): GameState {
@@ -140,6 +157,7 @@ import type { GameState, QuestStep, FunkStep } from "./types";
       lastSeen: safeCount(raw.lastSeen, def.lastSeen),
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
       clusterSnapshot: isPlainObject(raw.clusterSnapshot) ? raw.clusterSnapshot : null,
+      audio: safeAudio(raw.audio),
     };
   }
 
@@ -161,6 +179,8 @@ import type { GameState, QuestStep, FunkStep } from "./types";
       } catch (e) {
         this.state = makeDefaultState();
       }
+      // Audio-Einstellungen aus dem Spielstand an die zentrale SFX-Schicht geben.
+      SFX.applyConfig(this.state.audio);
       this.sim = new KQSim(this.state.clusterSnapshot || {});
       // Szenarien bereits erreichter Funk-Schritte wieder einmischen
       for (let qi = 0; qi <= Math.min(this.state.questIdx, KQContent.QUESTS.length - 1); qi++) {

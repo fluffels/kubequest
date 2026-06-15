@@ -92,6 +92,14 @@ import { worldScene, interiorOpen } from "./runtime";
           case "answerReviewQuiz": this.answerReviewQuiz(Number(el.dataset.oi)); break;
         }
       });
+      // Audio-Regler/-Schalter im Menü: Checkboxen feuern "change", Slider "input".
+      // Beide delegiert am document abgefangen (Block wird dynamisch erzeugt).
+      const onAudio = (ev: Event) => {
+        const el = (ev.target as HTMLElement).closest("[data-audio]") as HTMLInputElement | null;
+        if (el) this.onAudioControl(el);
+      };
+      document.addEventListener("change", onAudio);
+      document.addEventListener("input", onAudio);
       // Spielstand-Datei laden (früher inline onchange am <input>)
       ($("save-import") as HTMLInputElement).addEventListener("change", ev => this.importSave(ev));
       // Quiz-Befehlseingabe: Enter wertet aus. Das Eingabefeld wird dynamisch in
@@ -157,7 +165,37 @@ import { worldScene, interiorOpen } from "./runtime";
     /* ========== Menü / Pause ========== */
     openMenu() {
       this.closeOverlays();
+      this.renderAudioSettings();
       $("overlay-menu").classList.remove("hidden");
+    },
+
+    /** Audio-Block im Menü neu aufbauen (spiegelt Game.state.audio). */
+    renderAudioSettings() {
+      const a = Game.state.audio;
+      const pct = (v: number) => Math.round(v * 100);
+      $("menu-audio").innerHTML =
+        '<h3 class="menu-audio-title">🔊 Audio</h3>' +
+        '<div class="audio-row">' +
+        '<label><input type="checkbox" data-audio="music"' + (a.music ? " checked" : "") + '> 🎵 Musik</label>' +
+        '<input type="range" min="0" max="100" value="' + pct(a.musicVol) + '" data-audio="musicVol" aria-label="Musik-Lautstärke">' +
+        '</div>' +
+        '<div class="audio-row">' +
+        '<label><input type="checkbox" data-audio="sfx"' + (a.sfx ? " checked" : "") + '> 🔔 Soundeffekte</label>' +
+        '<input type="range" min="0" max="100" value="' + pct(a.sfxVol) + '" data-audio="sfxVol" aria-label="Sound-Lautstärke">' +
+        '</div>';
+    },
+
+    /** Reaktion auf einen Audio-Regler/-Schalter im Menü. */
+    onAudioControl(el: HTMLInputElement) {
+      const a = Game.state.audio;
+      switch (el.dataset.audio) {
+        case "music": a.music = el.checked; SFX.setMusicEnabled(a.music); break;
+        case "sfx": a.sfx = el.checked; SFX.setSfxEnabled(a.sfx); if (a.sfx) SFX.coin(); break;
+        case "musicVol": a.musicVol = Number(el.value) / 100; SFX.setMusicVol(a.musicVol); break;
+        case "sfxVol": a.sfxVol = Number(el.value) / 100; SFX.setSfxVol(a.sfxVol); if (a.sfx) SFX.coin(); break;
+        default: return;
+      }
+      Game.save();
     },
 
     /* ========== HUD, Toasts, Alarm ========== */
