@@ -34,6 +34,45 @@ test("docker: pull, run, ps, stop, ps -a", () => {
   assert.match(sim.exec("docker ps -a").output!, /Exited/);
 });
 
+test("docker build: baut aus dem Dockerfile ein eigenes, getaggtes Image (#66)", () => {
+  sim.files["Dockerfile"] = "FROM nginx:1.27\nCOPY site/ /usr/share/nginx/html\nEXPOSE 80";
+  const r = sim.exec("docker build -t hafenwache:1.0 .");
+  assert.ok(!r.error, "build mit Dockerfile muss durchgehen");
+  assert.match(r.output!, /Successfully tagged hafenwache:1\.0/);
+  assert.match(r.output!, /FROM nginx:1\.27/, "die Basis-Schicht aus dem Dockerfile taucht im Build-Log auf");
+  assert.ok(sim.docker.pulled.includes("hafenwache:1.0"), "das gebaute Image liegt jetzt lokal bereit");
+  // ohne :tag wird :latest angenommen, das Image ist startbar
+  assert.ok(!sim.exec("docker run -d --name wache hafenwache:1.0").error, "aus dem selbst gebauten Image lässt sich ein Container starten");
+});
+
+test("docker build: ohne Dockerfile UND ohne -t klare Fehler – kein Phantom-Image (#66)", () => {
+  // kein Dockerfile vorhanden
+  const ohneFile = sim.exec("docker build -t app:1.0 .");
+  assert.ok(ohneFile.error, "ohne Dockerfile muss build scheitern");
+  assert.match(ohneFile.output!, /no such file|Dockerfile/i);
+  assert.equal(sim.docker.pulled.length, 0, "kein Image darf ohne Bauplan entstehen");
+  // Dockerfile da, aber -t vergessen
+  sim.files["Dockerfile"] = "FROM nginx:1.27";
+  const ohneTag = sim.exec("docker build .");
+  assert.ok(ohneTag.error, "ohne -t (Name) muss build scheitern");
+  assert.equal(sim.docker.pulled.length, 0, "auch hier darf kein Image entstehen");
+});
+
+test("docker tag: zweiter Name fürs Image; unbekannte Quelle scheitert (#66)", () => {
+  sim.files["Dockerfile"] = "FROM nginx:1.27";
+  sim.exec("docker build -t hafenwache:1.0 .");
+  // Negativfall zuerst: taggen, was es nicht gibt
+  const fehlt = sim.exec("docker tag gibtsnicht:9.9 hafenwache:latest");
+  assert.ok(fehlt.error, "Quell-Image existiert nicht -> Fehler");
+  assert.match(fehlt.output!, /No such image/);
+  assert.ok(!sim.docker.pulled.includes("hafenwache:latest"), "kein Ziel-Tag aus kaputtem tag");
+  // jetzt korrekt taggen
+  const ok = sim.exec("docker tag hafenwache:1.0 hafenwache:latest");
+  assert.ok(!ok.error, "vorhandenes Image bekommt zweiten Namen");
+  assert.ok(sim.docker.pulled.includes("hafenwache:latest"), "das zweite Etikett ist jetzt da");
+  assert.ok(sim.docker.pulled.includes("hafenwache:1.0"), "das Original-Etikett bleibt erhalten");
+});
+
 test("docker run: Flags nach dem Image gelten nicht (echte Reihenfolge: Optionen VOR dem Image)", () => {
   // Häufiger Anfängerfehler: --name/-d hinter das Image gesetzt
   const r = sim.exec("docker run nginx --name webserver -d");

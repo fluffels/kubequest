@@ -4,10 +4,17 @@
  */
 import type { Sim, Deployment, NetworkPolicyRes } from "../sim";
 import { pick, rnd } from "./util";
-import { NETPOL_YAML } from "./manifests";
+import { NETPOL_YAML, DOCKERFILE } from "./manifests";
 
 const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
 const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
+/** Gültige (kleingeschriebene) Image-Namen für die eigenen Bau-Übungen (#66). */
+const BUILD_NAMES = ["hafenwache", "funkdienst", "lotsenbild", "kombuese-app", "kaiapp", "ankerdienst"];
+
+/** Sorgt dafür, dass ein Dockerfile im Sim-Dateisystem liegt (für docker build/tag). */
+function ensureDockerfile(sim: Sim) {
+  if (!sim.files["Dockerfile"]) sim.files["Dockerfile"] = DOCKERFILE;
+}
 
 function ensureDeployment(sim: Sim): Deployment {
   let d = sim.deployments.find(d => !["kantine"].includes(d.name)) || sim.deployments[0];
@@ -77,6 +84,19 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     let c = sim.docker.containers.find(c => c.running);
     if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name)!; }
     return { text: "Stoppe den Container <code>" + c.name + "</code>.", accept: [new RegExp("^docker\\s+stop\\s+" + c.name + "$")], solution: "docker stop " + c.name, hint: "Muster: docker stop <name>" };
+  },
+  "docker-build": sim => {
+    ensureDockerfile(sim);
+    const name = pick(BUILD_NAMES);
+    const tag = pick(["1.0", "2.0", "0.1", "dev", "stable"]);
+    return { text: "Bau aus dem <code>Dockerfile</code> ein eigenes Image <code>" + name + ":" + tag + "</code> (Punkt am Ende!).", accept: [new RegExp("^docker\\s+build\\s+-t\\s+" + name + ":" + tag.replace(/\./g, "\\.") + "\\s+\\.$")], solution: "docker build -t " + name + ":" + tag + " .", hint: "Muster: docker build -t <name>:<tag> ." };
+  },
+  "docker-tag": sim => {
+    ensureDockerfile(sim);
+    const name = pick(BUILD_NAMES);
+    sim.exec("docker build -t " + name + ":1.0 ."); // sorgt für ein vorhandenes Quell-Image
+    const newTag = pick(["latest", "stable", "prod", "v2"]);
+    return { text: "Gib deinem Image <code>" + name + ":1.0</code> zusätzlich das Etikett <code>" + name + ":" + newTag + "</code>.", accept: [new RegExp("^docker\\s+tag\\s+" + name + ":1\\.0\\s+" + name + ":" + newTag + "$")], solution: "docker tag " + name + ":1.0 " + name + ":" + newTag, hint: "Muster: docker tag <quelle> <ziel>" };
   },
   "k-get-nodes": () => ({ text: "Zeig die Nodes des Clusters.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "kubectl get <ressourcentyp>" }),
   "k-get-pods": () => ({ text: "Zeig alle Pods.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "kubectl get <ressourcentyp>" }),
@@ -252,7 +272,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
 
 /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
 export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
-  bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
+  bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }, { drill: "docker-build", after: "q3b" }, { drill: "docker-tag", after: "q3b" }],
   ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
   ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }, { drill: "k-secret-tls", after: "q23" }, { drill: "k-get-ingress", after: "q23" }],
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
