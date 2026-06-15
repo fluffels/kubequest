@@ -49,5 +49,3 @@ export const NPCS = {
   kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
   juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
 };
-
-export const PLAYER_SPRITES = [85, 88, 98, 99, 112, 96];
