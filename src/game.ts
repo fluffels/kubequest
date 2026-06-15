@@ -8,7 +8,7 @@ import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
 import { worldScene } from "./runtime";
-import type { GameState, QuestStep } from "./types";
+import type { GameState, QuestStep, FunkStep } from "./types";
 
   const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
@@ -223,9 +223,9 @@ import type { GameState, QuestStep } from "./types";
       const q = this.currentQuest();
       return q ? q.steps[this.state.questStep] || null : null;
     },
-    /** Ist der aktuelle Schritt einer fürs Funkgerät? */
-    isFunkStep(step: QuestStep | null) {
-      return step && ["teach", "drill", "terminal"].includes(step.type);
+    /** Ist der aktuelle Schritt einer fürs Funkgerät? (Typ-Guard fürs Narrowing) */
+    isFunkStep(step: QuestStep | null): step is FunkStep {
+      return !!step && (step.type === "teach" || step.type === "drill" || step.type === "terminal");
     },
     /** Aufgabenliste eines Funk-Schritts (drills werden von der UI generiert). */
     stepTasks(step: QuestStep) {
