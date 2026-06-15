@@ -145,7 +145,7 @@ import { worldScene, interiorOpen } from "./runtime";
     /* ========== Blockierung ========== */
     blocking() {
       return !!this.dialogue ||
-        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu", "charselect"]
+        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu"]
           .some(id => !$(id).classList.contains("hidden"));
     },
 
