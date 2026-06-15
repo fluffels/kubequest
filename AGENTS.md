@@ -55,9 +55,9 @@ Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator inkl. Troubleshooting)
 
 ## Wo die TODOs leben
 
-Der Backlog wird als **GitHub Issues** geführt, gruppiert in einem **GitHub Project-Board** (Kanban). Prioritäten als Labels: `prio:hoch` 🔴 / `prio:mittel` 🟠 / `prio:niedrig` 🟡.
+Der Backlog wird als **GitHub Issues** geführt, gruppiert in einem **GitHub Project-Board** (Kanban). Prioritäten als Labels: `prio:hoch` 🔴 / `prio:mittel` 🟠 / `prio:niedrig` 🟡. **Die `prio:`-Labels dienen nur der Übersicht/dem Board – sie steuern NICHT die Auswahlreihenfolge.**
 
-Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `npm test` grün halten + im Browser verifizieren, dann das Issue schließen.
+**Auswahl des nächsten Tickets – schnell und deterministisch, NICHT lange suchen, NICHT abwägen.** Nimm immer das **offene Issue mit der NIEDRIGSTEN Nummer, das noch frei ist** (nicht assigned, kein offener PR/Branch/Worktree, kein „in progress"). Ist die niedrigste Nummer schon geclaimt, nimm die nächsthöhere freie. **Nicht nach Inhalt oder prio-Label aussuchen.** Nach jedem Ticket `npm test` + `npm run typecheck` grün halten + im Browser verifizieren, dann das Issue schließen.
 
 **Kollisionsschutz bei parallelen Agenten (mehrere Chats gleichzeitig).** Jedes Ticket wird auf einem eigenen Branch + Worktree bearbeitet (`git worktree add -b <typ>/<nr>-<slug> ../kubequest-wt-<nr> main`). Damit sich zwei Agenten nicht dasselbe Ticket greifen:
 - **Nur Issues ohne Assignee greifen.** Vor der Auswahl prüfen: `gh issue list --json number,title,assignees` (zusätzlich `git worktree list` + `git branch -a` als Gegencheck).
@@ -68,7 +68,7 @@ Beim Weitermachen: offene Issues nach Priorität abarbeiten, nach jedem Punkt `n
 - **GitHub ist die Single Source of Truth für den Stand.** Was erledigt ist, wird sofort dort geschlossen (mit kurzem Ergebnis-Kommentar) – nicht nur im Chat berichten. Den Board-Status aktuell halten.
 - **Selbst Issues verwalten** ohne Rückfrage: `gh issue close`, kommentieren, Labels setzen, **neue Tickets schreiben, wenn etwas auffällt** (Bug, Lücke, Tech-Debt, Idee). Lieber ein Ticket zu viel als verlorenes Wissen.
 - **Zu großes Ticket (Epic/Phase) → aufteilen statt umsetzen.** Ist ein geclaimtes Issue ein Epic / eine ganze Phase / „Far-Future" und nicht in EINER Session vollständig umsetz- und schließbar (z.B. „Phase 4: GitOps-Archipel"): **nicht selbst implementieren.** Stattdessen in **viele konkrete, session-große Kindertickets** zerlegen und anlegen (jeweils **ohne Assignee** — der Assignee ist der „in Arbeit"-Marker, neue Tickets sind frei; passende `area:`/`prio:`-Labels setzen), im Epic einen **Übersichts-Kommentar** mit den Kindernummern + sinnvoller Reihenfolge posten und das Epic dann **auf done schließen** (`gh issue close <nr> --reason completed`, **nicht löschen** — der Datensatz bleibt als erledigtes Aufteilungs-Ticket). Kein Worktree/Branch/Merge nötig (kein Code).
-- **Der Agent priorisiert.** Reihenfolge der Arbeit selbst festlegen (prio-Labels pflegen) und proaktiv die nächste Aufgabe vorschlagen/starten.
+- **Auswahlreihenfolge ist fix, nicht Ermessen.** Das nächste Ticket ist immer die niedrigste freie Nummer (siehe oben) – der Agent wägt nicht ab und sucht nicht nach Inhalt aus. Labels und Board pflegt der Agent weiterhin (neue Tickets schreiben, labeln, schließen), aber das steuert die Reihenfolge nicht.
 - **Git ist hier voll freigegeben** (anders als sonst): committen → nach `main` mergen → **`git push origin main`** → Branch/Worktree aufräumen → Issue schließen darf der Agent in kubequest komplett selbst fahren — **Push inklusive, ohne Extra-Nachfrage**. ⚠️ Das gilt **nur für kubequest**; in **allen anderen Projekten** bleibt committen/pushen/deployen strikt tabu. Issues erst schließen, wenn die Arbeit fertig + getestet (`npm test` grün) + im Browser verifiziert ist; falls ihr Review später was findet, einfach wieder aufmachen.
 
 Issues ansehen: `gh issue list`. Board: `gh project list --owner fluffels`.
