@@ -153,7 +153,7 @@ import { worldScene, interiorOpen } from "./runtime";
     /* ========== Blockierung ========== */
     blocking() {
       return !!this.dialogue ||
-        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu", "charselect"]
+        ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu"]
           .some(id => !$(id).classList.contains("hidden"));
     },
 
@@ -535,7 +535,7 @@ import { worldScene, interiorOpen } from "./runtime";
           return this._drillTask;
         }
         const tasks = Game.stepTasks(step);
-        return tasks[Game.state.taskIdx || 0] || null;
+        return (tasks && tasks[Game.state.taskIdx || 0]) || null;
       }
       return null;
     },
