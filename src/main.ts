@@ -1,38 +1,23 @@
 /* ===== KubeQuest 3.0 – Start =====
- * Spielstand laden, Phaser starten, Tastatur & Charakterwahl verdrahten.
+ * Spielstand laden, Phaser starten, Tastatur verdrahten.
  */
 import Phaser from "phaser";
 import { Game } from "./game";
 import { UI } from "./ui";
-import { KQContent } from "./content";
 import { KQScenes } from "./scenes";
 import { SFX } from "./sfx";
-import { keys, clearKeys, worldScene } from "./runtime";
+import { keys, clearKeys } from "./runtime";
 
   // Wie in ui.ts: die DOM-Knoten liegen fest in index.html, darum nicht-nullbar.
   const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
-  function showCharSelect() {
-    const box = $("cs-chars");
-    box.innerHTML = "";
-    for (const spriteIdx of KQContent.PLAYER_SPRITES) {
-      const cv = document.createElement("canvas");
-      cv.width = 16; cv.height = 16;
-      UI.drawPortrait(cv, spriteIdx);
-      cv.onclick = () => {
-        Game.state.character = spriteIdx;
-        Game.save();
-        const ws = worldScene();
-        if (ws && ws.playerSprite) {
-          ws.playerSprite.setTexture("dungeon", spriteIdx);
-        }
-        $("charselect").classList.add("hidden");
-        UI.toast("⚓ Willkommen in Port Kubernia! Folge dem <b>!</b> – Ole wartet vor der Hafenmeisterei.");
-      };
-      box.appendChild(cv);
-    }
-    $("charselect").classList.remove("hidden");
-  }
+  /* Fester Spielcharakter: Die Spielfigur ist immer der PixelLab-Sprite
+   * `char_player` (4 Richtungen, siehe scenes.ts). Die frühere Charakterwahl
+   * setzte nur kurz eine `dungeon`-Textur, die der Bewegungs-Loop sofort wieder
+   * mit `char_player` überschrieb – Vorschau ≠ Spielfigur (#45). Das Feld
+   * `character` bleibt nur als „schon onboarded?"-Marker (null = erster Start)
+   * und als Andockpunkt für späteres Customizing à la Stardew erhalten. */
+  const FIXED_CHARACTER = 0;
 
   function wireKeyboard() {
     window.addEventListener("keydown", e => {
@@ -46,7 +31,6 @@ import { keys, clearKeys, worldScene } from "./runtime";
       keys[k] = true;
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
 
-      if (!$("charselect").classList.contains("hidden")) return;
       if (k === "Escape") { if (UI.blocking()) UI.closeOverlays(); else UI.openMenu(); return; }
       if (UI.dialogue) {
         if (UI.hasChoices()) {
@@ -99,8 +83,10 @@ import { keys, clearKeys, worldScene } from "./runtime";
 
     UI.refreshHud();
     if (Game.state.character === null) {
-      // kleinen Moment warten, bis die Spritesheet-Images für die Porträts da sind
-      setTimeout(showCharSelect, 150);
+      // Erster Start: fester Charakter, kein Auswahl-Dialog mehr (#45).
+      Game.state.character = FIXED_CHARACTER;
+      Game.save();
+      setTimeout(() => UI.toast("⚓ Willkommen in Port Kubernia! Folge dem <b>!</b> – Ole wartet vor der Hafenmeisterei."), 600);
     }
     if (Game.offlineEarnings > 0) {
       setTimeout(() => UI.toast("🌙 Während du weg warst, hat dein Hafen <b>+" + Game.offlineEarnings + " 🪙</b> verdient!"), 1200);
