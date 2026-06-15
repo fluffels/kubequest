@@ -113,6 +113,13 @@ button.primary { background: var(--accent); color: #1a1304; font-weight: bold; b
 button.danger { border-color: var(--bad); color: var(--bad); }
 button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 
+.menu-audio { margin-top: 18px; max-width: 360px; border-top: 1px solid var(--border); padding-top: 14px; }
+.menu-audio-title { margin: 0 0 10px; font-size: 1.0em; }
+.audio-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.audio-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.audio-row input[type="range"] { flex: 1; max-width: 150px; cursor: pointer; accent-color: var(--accent); }
+.audio-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
 /* ===== Alarm (Piraten / Krake) ===== */
 #alarm {
   position: fixed;
