@@ -9,6 +9,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
+import { NPC_SPAWNS, npcSolidIndices } from "./world";
 
   const T = 16;
   const COLS = 12;
@@ -526,12 +527,13 @@ import { SFX } from "./sfx";
     }
 
     spawnNpcs() {
-      const defs = [
-        { id: "ole", x: 26, y: 14.6 }, { id: "bo", x: 8, y: 25 }, { id: "ada", x: 40, y: 13.6 },
-        { id: "runa", x: 13, y: 13 }, { id: "theo", x: 44, y: 20.6 }, { id: "pelle", x: 31, y: 17.2 },
-        { id: "kralle", x: this.ship.x + 7, y: this.ship.y + 1 },
-        { id: "juno", x: 45.8, y: 24.2 },
-      ];
+      // Feste Standplätze aus dem puren world-Modul; Kralle wird relativ zum
+      // Schiff eingefügt (an Originalposition: vor Juno).
+      const defs = [...NPC_SPAWNS];
+      defs.splice(6, 0, { id: "kralle", x: this.ship.x + 7, y: this.ship.y + 1 });
+      // #31: NPCs solide machen – man läuft nicht mehr durch sie hindurch.
+      // Reden (E) bleibt möglich, weil nearestNpc von der Nachbarkachel aus greift.
+      for (const idx of npcSolidIndices(defs, this.W, this.H)) this.solidGrid[idx] = 1;
       this.npcs = defs.map(d => {
         const meta = KQContent.NPCS[d.id as keyof typeof KQContent.NPCS];
         this.addShadow(d.x * T + 8, d.y * T + 15);
