@@ -56,6 +56,29 @@ test("Übungs-Pools: verweisen auf existierende Drills und Quests", () => {
   }
 });
 
+test("Teach-Schritte mit Pflicht-Flag zeigen es im Panel (intro+text), nicht nur im hint (#29)", () => {
+  // Befehle, deren Pflicht-Flag man nicht erraten kann, müssen es dauerhaft sichtbar
+  // im Aufgaben-Panel führen (intro oder text) – der hint ist erst auf Anforderung sichtbar.
+  const muss: Record<string, string> = {
+    "t-create": "--image",   // kubectl create deployment <name> --image=<image>
+    "t-scale": "--replicas", // kubectl scale deployment <name> --replicas=<zahl>
+  };
+  const gefunden = new Set<string>();
+  for (const quest of KQContent.QUESTS) {
+    for (const step of quest.steps) {
+      if (step.type !== "teach") continue;
+      const flag = muss[step.cmd.id];
+      if (!flag) continue;
+      gefunden.add(step.cmd.id);
+      const panel = step.cmd.intro + " " + step.cmd.text;
+      assert.ok(panel.includes(flag), step.cmd.id + ": " + flag + " fehlt im Panel (intro+text)");
+    }
+  }
+  for (const id of Object.keys(muss)) {
+    assert.ok(gefunden.has(id), "Teach-Schritt nicht gefunden: " + id);
+  }
+});
+
 test("Stapel-Spiel hat mindestens 2 Runden mit je 3+ Schichten", () => {
   assert.ok(KQContent.STACK_ROUNDS.length >= 2);
   for (const r of KQContent.STACK_ROUNDS) assert.ok(r.layers.length >= 3, r.name);
