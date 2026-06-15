@@ -55,6 +55,74 @@ test("load: kaputte/fremde audio-Werte fallen auf Defaults zurück bzw. werden g
   expect(Game.state.audio).toEqual({ music: false, sfx: true, musicVol: 1, sfxVol: 0 });
 });
 
+/* ---------- Spiel-Feel: Cozy-Modus (#71) ---------- */
+
+test("defaultState: Spiel-Feel steht standardmäßig auf 'normal'", () => {
+  expect(Game.state.settings).toEqual({ events: "normal" });
+});
+
+test("load: alter Spielstand OHNE settings-Feld bekommt 'normal'", () => {
+  // Stand wie vor #71 gespeichert: keine settings-Eigenschaft.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 5, coins: 99 } }));
+  Game.load();
+  expect(Game.state.coins).toBe(99);                 // Altdaten erhalten
+  expect(Game.state.settings).toEqual({ events: "normal" });
+});
+
+test("load: unbekannte/kaputte Spiel-Feel-Stufe fällt auf 'normal' zurück", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { settings: { events: "ultrahart" } } }));
+  Game.load();
+  expect(Game.state.settings.events).toBe("normal");
+  // auch ganz falscher Typ:
+  Game.importData(JSON.stringify({ v: 1, data: { settings: 42 } }));
+  Game.load();
+  expect(Game.state.settings.events).toBe("normal");
+});
+
+test("setEventMode: setzt gültige Stufe + persistiert, ignoriert Unsinn", () => {
+  Game.setEventMode("cozy");
+  expect(Game.state.settings.events).toBe("cozy");
+  Game.load(); // aus dem Speicher neu laden -> beweist Persistenz
+  expect(Game.state.settings.events).toBe("cozy");
+
+  Game.setEventMode("quatsch" as never);
+  expect(Game.state.settings.events).toBe("cozy"); // unveränderter Wert
+});
+
+test("eventProfile: normal/cozy/off liefern die richtigen Stellschrauben", () => {
+  Game.setEventMode("normal");
+  expect(Game.eventProfile()).toMatchObject({ enabled: true, malusFactor: 0, spawnScale: 1 });
+  Game.setEventMode("cozy");
+  expect(Game.eventProfile()).toMatchObject({ enabled: true, malusFactor: 0.5 });
+  expect(Game.eventProfile().spawnScale).toBeGreaterThan(1); // seltener
+  Game.setEventMode("off");
+  expect(Game.eventProfile()).toMatchObject({ enabled: false, malusFactor: 1 });
+  expect(Game.eventProfile().spawnScale).toBe(Infinity); // nie
+});
+
+test("incomeRate: Cozy mildert den Verdienst-Malus, Aus hebt ihn auf", () => {
+  const cluster = {
+    deployments: [
+      { name: "gesund", image: "nginx", replicas: 2 },                          // 2 * 0.5 = 1.0
+      { name: "kaputt", image: "x", replicas: 4, broken: { type: "imagepull" } }, // 4 Replicas
+    ],
+  };
+  // normal: kaputte Replicas tragen 0 bei -> nur die 2 gesunden zählen.
+  Game.setEventMode("normal");
+  Game.sim = new Sim(cluster);
+  expect(Game.incomeRate()).toBe(1.0);
+
+  // cozy: kaputte zahlen halb -> (2 + 4*0.5) * 0.5 = (2 + 2) * 0.5 = 2.0
+  Game.setEventMode("cozy");
+  Game.sim = new Sim(cluster);
+  expect(Game.incomeRate()).toBe(2.0);
+
+  // off: kein Malus -> alle 6 Replicas zählen voll -> 6 * 0.5 = 3.0
+  Game.setEventMode("off");
+  Game.sim = new Sim(cluster);
+  expect(Game.incomeRate()).toBe(3.0);
+});
+
 /* ---------- XP & Rang ---------- */
 
 test("rankIndex: Schwellen greifen genau, nicht zu früh", () => {

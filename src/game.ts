@@ -9,7 +9,29 @@ import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
 import { SFX } from "./sfx";
 import { worldScene } from "./runtime";
-import type { GameState, QuestStep, FunkStep } from "./types";
+import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
+
+  /** Konkrete Stellschrauben pro Spiel-Feel-Stufe (#71). Bewusst eine reine
+   *  Daten-Tabelle, damit Wirtschaft (game.ts) und Events (scenes.ts) dieselbe
+   *  Quelle nutzen und sie testbar bleibt. */
+  interface EventProfile {
+    /** Faktor auf die Wartezeit bis zum nächsten Event (größer = seltener; Infinity = nie). */
+    spawnScale: number;
+    /** Faktor auf die Reparatur-Deadline (größer = mehr Zeit = sanfter). */
+    deadlineScale: number;
+    /** Anteil der Einnahmen, den ein kaputter Dienst trotzdem abwirft (0 = voller Malus, 1 = kein Malus). */
+    malusFactor: number;
+    /** Schaltet Zufalls-Events ganz an/aus. */
+    enabled: boolean;
+  }
+  const EVENT_PROFILES: Record<EventMode, EventProfile> = {
+    normal: { spawnScale: 1, deadlineScale: 1, malusFactor: 0, enabled: true },
+    cozy: { spawnScale: 2, deadlineScale: 1.5, malusFactor: 0.5, enabled: true },
+    off: { spawnScale: Infinity, deadlineScale: 1, malusFactor: 1, enabled: false },
+  };
+  function isEventMode(v: unknown): v is EventMode {
+    return v === "normal" || v === "cozy" || v === "off";
+  }
 
   const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
@@ -53,6 +75,7 @@ import type { GameState, QuestStep, FunkStep } from "./types";
       lastSeen: 0,
       clusterSnapshot: null,
       audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 },
+      settings: { events: "normal" },
     };
   }
 
@@ -90,6 +113,12 @@ import type { GameState, QuestStep, FunkStep } from "./types";
   /** Lautstärke: endliche Zahl auf [0,1] geklemmt – sonst Default. */
   function safeVol(v: unknown, def: number): number {
     return typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : def;
+  }
+  /** Spiel-Feel-Einstellungen absichern: nur eine bekannte EventMode übernehmen, sonst Default. */
+  function safeSettings(v: unknown): GameState["settings"] {
+    const d = makeDefaultState().settings;
+    const s = isPlainObject(v) ? v : {};
+    return { events: isEventMode(s.events) ? s.events : d.events };
   }
   /** Audio-Einstellungen gegen die Defaults absichern (Booleans + geklemmte Lautstärken). */
   function safeAudio(v: unknown): GameState["audio"] {
@@ -158,6 +187,7 @@ import type { GameState, QuestStep, FunkStep } from "./types";
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
       clusterSnapshot: isPlainObject(raw.clusterSnapshot) ? raw.clusterSnapshot : null,
       audio: safeAudio(raw.audio),
+      settings: safeSettings(raw.settings),
     };
   }
 
@@ -232,9 +262,24 @@ import type { GameState, QuestStep, FunkStep } from "./types";
 
     /* ---------- Hafen-Wirtschaft ---------- */
     /** Dublonen pro Minute: jede GESUNDE Pod-Kopie 0.5, jeder Service 1. Kaputte Deployments verdienen nichts! */
+    /** Aktives Spiel-Feel-Profil (Frequenz/Härte der Events + Verdienst-Malus, #71). */
+    eventProfile(): EventProfile {
+      return EVENT_PROFILES[this.state.settings.events] || EVENT_PROFILES.normal;
+    },
+
+    /** Spiel-Feel-Stufe setzen und persistieren (vom Menü aufgerufen). */
+    setEventMode(mode: EventMode) {
+      if (!isEventMode(mode)) return;
+      this.state.settings.events = mode;
+      this.save();
+    },
+
     incomeRate() {
       if (!this.sim) return 0;
-      const pods = this.sim.deployments.reduce((sum, d) => sum + (d.broken ? 0 : d.replicas), 0);
+      // Kaputte Dienste verdienen normal nichts (malusFactor 0). Im Cozy-Modus
+      // ist der Malus gemildert (0.5), im Aus-Modus aufgehoben (1) – Anti-Frust (#71).
+      const malus = this.eventProfile().malusFactor;
+      const pods = this.sim.deployments.reduce((sum, d) => sum + (d.broken ? d.replicas * malus : d.replicas), 0);
       return pods * 0.5 + this.sim.services.length * 1;
     },
 

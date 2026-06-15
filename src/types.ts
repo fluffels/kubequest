@@ -41,7 +41,15 @@ export interface GameState {
   clusterSnapshot: Scenario | null;
   /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke). */
   audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number };
+  /** Spiel-Feel: Frequenz/Härte der Zufalls-Events (Anti-Frust, #71). */
+  settings: { events: EventMode };
 }
+
+/** Spiel-Feel-Stufe: regelt Häufigkeit & Härte der Zufalls-Events (Stürme,
+ *  Piraten, Krake) und den Verdienst-Malus kaputter Dienste.
+ *  `normal` = volle Härte, `cozy` = seltener/sanfter + gemilderter Malus,
+ *  `off` = keine Zufalls-Events und kein Malus. */
+export type EventMode = "normal" | "cozy" | "off";
 
 /** Ergebnis einer simulierten Befehlszeile (Sim.exec). */
 export interface ExecResult {

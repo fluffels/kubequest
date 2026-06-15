@@ -97,6 +97,8 @@ import { worldScene, interiorOpen } from "./runtime";
       const onAudio = (ev: Event) => {
         const el = (ev.target as HTMLElement).closest("[data-audio]") as HTMLInputElement | null;
         if (el) this.onAudioControl(el);
+        const setting = (ev.target as HTMLElement).closest("[data-setting]") as HTMLInputElement | null;
+        if (setting) this.onSettingControl(setting);
       };
       document.addEventListener("change", onAudio);
       document.addEventListener("input", onAudio);
@@ -166,7 +168,27 @@ import { worldScene, interiorOpen } from "./runtime";
     openMenu() {
       this.closeOverlays();
       this.renderAudioSettings();
+      this.renderEventSettings();
       $("overlay-menu").classList.remove("hidden");
+    },
+
+    /** Spiel-Feel-Block im Menü (#71): Frequenz/Härte der Zufalls-Events regelbar
+     *  bis hin zu "Cozy"/"Aus". Spiegelt Game.state.settings.events. */
+    renderEventSettings() {
+      const cur = Game.state.settings.events;
+      const opts: { mode: import("./types").EventMode; label: string }[] = [
+        { mode: "normal", label: "🌊 Normal" },
+        { mode: "cozy", label: "🍵 Cozy" },
+        { mode: "off", label: "🌴 Aus" },
+      ];
+      const radios = opts.map(o =>
+        '<label><input type="radio" name="kq-events" data-setting="events" value="' + o.mode + '"' +
+        (cur === o.mode ? " checked" : "") + "> " + o.label + "</label>"
+      ).join("");
+      $("menu-events").innerHTML =
+        '<h3 class="menu-audio-title">⛈️ Stürme &amp; Piraten</h3>' +
+        '<div class="audio-row">' + radios + "</div>" +
+        '<div class="dim">Cozy macht Zufalls-Events seltener &amp; sanfter und mildert den Verdienst-Ausfall kaputter Dienste. „Aus" schaltet sie ganz ab – entspanntes Lernen ohne Zeitdruck.</div>';
     },
 
     /** Audio-Block im Menü neu aufbauen (spiegelt Game.state.audio). */
@@ -196,6 +218,16 @@ import { worldScene, interiorOpen } from "./runtime";
         default: return;
       }
       Game.save();
+    },
+
+    /** Reaktion auf einen Spiel-Feel-Schalter im Menü (#71). */
+    onSettingControl(el: HTMLInputElement) {
+      if (el.dataset.setting !== "events" || !el.checked) return;
+      const mode = el.value;
+      if (mode === "normal" || mode === "cozy" || mode === "off") {
+        Game.setEventMode(mode);
+        if (Game.state.audio.sfx) SFX.coin();
+      }
     },
 
     /* ========== HUD, Toasts, Alarm ========== */
