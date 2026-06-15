@@ -517,6 +517,7 @@ import type { Sim, Deployment } from "./sim";
         { type: "dialog", npc: "ole", lines: [
           "DAS ist Kubernetes! Soll: 3. Ist: 2. → Differenz sofort behoben. Ein letztes Puzzlestück fehlt: Neue Pods bekommen neue Namen und Adressen. Wie sollen Kund:innen die Kasse finden?",
           "Mit einem <b>Service</b> – einer festen Adresse vor den wechselnden Pods. Wie ein Empfangstresen: Die Person dahinter wechselt, der Tresen bleibt.",
+          "Der Tresen steht aber <b>im</b> Hafen. Und wenn jemand vom <b>offenen Meer</b> – dem Internet – zur Kasse will? Dafür kommt später das <b>Hafentor</b>: ein <b>Ingress</b>. Er lauscht auf eine Adresse wie <code>hafen.de/kasse</code> und lotst Besucher an den richtigen Service. Im Job ist das ein <b>Ingress-Controller</b> (oft auf nginx- oder Gateway-Basis) – merk dir den Namen schon mal.",
         ]},
         { type: "teach", brief: "Feste Adresse", cmd: {
           id: "t-expose", intro: "🆕 Neuer Befehl: <code>kubectl expose</code> – stellt einen Service vor ein Deployment.",
@@ -587,6 +588,7 @@ import type { Sim, Deployment } from "./sim";
           "Ahoi! Runa, Werftchefin. Lass mich raten – bei <b>Helm</b> dachtest du an das Ding für den Kopf? HA! Helm ist Englisch für <b>Steuerrad</b> – und der <b>Paketmanager für Kubernetes</b>.",
           "Bei Ada: 2 Karten für eine Mini-App. Eine ECHTE App: 30 Manifeste, mal drei Umgebungen. 90 Dateien?! NIEMALS. Helm bündelt alles in ein <b>Chart</b> – ein Paket mit Drehknöpfen.",
           "Charts liegen in <b>Repos</b> (wie Docker Hub für Images). Schritt eins: ein Repo hinzufügen.",
+          "Was da alles drinliegt? Fast die ganze Werft: <b>nginx</b> (Webserver), <b>postgresql</b> (Datenbank), <b>redis</b> (schneller Zwischenspeicher), <b>keycloak</b> (Login & Rechte) und <b>prometheus</b> + <b>grafana</b> fürs Überwachen. Echte Tools – die siehst du im Job alle wieder.",
         ]},
         { type: "teach", brief: "Chart-Quelle anzapfen", cmd: {
           id: "t-repoadd", intro: "🆕 Neuer Befehl: <code>helm repo add</code> – eine Chart-Quelle hinzufügen.",
@@ -755,6 +757,7 @@ import type { Sim, Deployment } from "./sim";
         ]},
         { type: "dialog", npc: "ole", lines: [
           "<code>datenbank_passwort: fisch123</code> – Krakenfutter! Die Regel lautet: <b>Vertrauliches gehört NIE in YAML-Dateien oder ConfigMaps.</b> Dafür gibt es <b>Secrets</b> – Kubernetes' Schatztruhen.",
+          "Und Logins für deine App? Die baut man heute nicht mehr selbst. Man stellt einen fertigen <b>Auth-Server</b> davor: <b>Keycloak</b>. Der macht Anmeldung, Single Sign-On und wer-darf-was – ein <b>Identity Provider</b> (kurz IDP). Deine App fragt nur noch: „Keycloak, ist die Person echt?“",
         ]},
         { type: "teach", brief: "Die Schatztruhe", cmd: {
           id: "t-secret", intro: "🆕 Neuer Befehl: <code>kubectl create secret generic</code> – Vertrauliches sicher ablegen.",
@@ -1164,6 +1167,10 @@ import type { Sim, Deployment } from "./sim";
     { id: "q-ci-1", q: "Was löst in GitLab eine Pipeline aus?", options: ["Ein git push in ein Repo, das eine .gitlab-ci.yml enthält.", "Man muss sie jeden Morgen von Hand starten.", "Ein kubectl apply.", "Das Anlegen eines neuen Branches."], correct: 0, explain: "CI heißt Continuous Integration: Bei jedem Push prüft der Runner die .gitlab-ci.yml und arbeitet die Stages automatisch ab – kein Mensch klickt etwas." },
     { id: "q-ci-2", q: "Die typische Stage-Reihenfolge einer CI/CD-Pipeline?", options: ["build → test → deploy", "deploy → test → build", "test → deploy → build", "Die Reihenfolge ist egal."], correct: 0, explain: "Erst bauen (Image erzeugen), dann testen (prüfen, BEVOR etwas live geht), dann deployen (in den Cluster ausrollen). Fällt eine frühe Stage durch, laufen die späteren gar nicht erst." },
     { id: "q-ci-3", q: "Wofür stehen CI und CD?", options: ["Continuous Integration und Continuous Delivery/Deployment.", "Code Inspection und Code Deployment.", "Container Init und Container Deploy.", "Central Integration und Central Delivery."], correct: 0, explain: "CI = Änderungen laufend automatisch bauen & testen. CD = sie automatisch ausliefern/ausrollen. Zusammen: vom Commit bis in den Cluster ohne Handarbeit." },
+    { id: "q-tools-ingress", q: "Ein Service ist nur im Cluster erreichbar. Wie kommen Besucher aus dem Internet rein?", options: ["Über einen Ingress – das Hafentor, das z.B. hafen.de/kasse an den richtigen Service weiterleitet.", "Gar nicht, ein Service ist immer öffentlich.", "Über einen zweiten Pod.", "Mit kubectl logs."], correct: 0, explain: "Service = Empfangstresen IM Hafen. Ingress = das Tor nach draußen: eine Adresse + HTTPS-Route von außen auf die passenden Services. Im Job erledigt das ein Ingress-Controller (oft nginx- oder Gateway-basiert)." },
+    { id: "q-tools-keycloak", q: "Deine App braucht Login. Was nimmst du, statt selbst eine Benutzerverwaltung zu bauen?", options: ["Keycloak – einen fertigen Auth-/IDP-Server für Anmeldung, Tokens und Rechte.", "Eine Textdatei mit allen Passwörtern.", "Ein zweites Deployment namens login.", "git commit."], correct: 0, explain: "Keycloak ist ein Identity Provider (IDP): zentrale Anmeldung, Single Sign-On, Rollen/Rechte. Man stellt ihn vor die Apps, statt jede App ihren eigenen Login bauen zu lassen." },
+    { id: "q-tools-monitoring", q: "Wofür stehen Prometheus und Grafana im Cluster?", options: ["Prometheus sammelt Messwerte (Metriken), Grafana macht daraus Dashboards.", "Beides sind Datenbanken.", "Prometheus ist ein Webserver, Grafana ein Cache.", "Beides sind Paketmanager."], correct: 0, explain: "Monitoring-Duo: Prometheus zapft laufend Metriken an (CPU, Requests, Fehler), Grafana zeigt sie als Diagramme und schlägt Alarm. So siehst du, ob der Hafen gesund ist." },
+    { id: "q-tools-stack", q: "PostgreSQL und Redis – welches Tool ist wofür?", options: ["PostgreSQL = Datenbank (Daten dauerhaft), Redis = schneller Zwischenspeicher (Cache).", "PostgreSQL = Cache, Redis = Webserver.", "Beides sind Webserver.", "PostgreSQL = Monitoring, Redis = Login."], correct: 0, explain: "Typischer App-Stack: PostgreSQL hält die Daten dauerhaft, Redis legt Häufiges blitzschnell in den Arbeitsspeicher. nginx davor als Webserver, Keycloak für den Login." },
   ];
 
   const CMD_CARDS = [
