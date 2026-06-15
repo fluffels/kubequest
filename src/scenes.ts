@@ -44,7 +44,7 @@ import { gameClock } from "./clock";
 
   // Sheets werden nach dem Laden in 16er-Frames geschnitten; plains bleiben ganze Bilder.
   const BOOT_SHEETS: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "mushroom", "seashell", "driftwood", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
+  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "mushroom", "seashell", "driftwood", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "ship", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
 
   class BootScene extends Phaser.Scene {
     [key: string]: any;
@@ -598,36 +598,21 @@ import { gameClock } from "./clock";
           this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
         }
       }
-      // === Ein richtiges Schiff: Rumpf mit Bug & Heck, Mast, Rah, Segel, Takelage ===
+      // === Dein Schiff: hübsches PixelLab-Holzschiff (#41) statt prozeduraler Primitive ===
+      // Bug zeigt nach Osten, Heck rund nach Westen – passt zur alten Ausrichtung.
+      // Das begehbare Deck bleibt unverändert (Kollisionsraster wird in buildMap gesetzt);
+      // hier wird nur die Optik gerendert, Tiefe 2 wie zuvor, damit die Figur aufs Deck läuft.
       const s = this.ship, px = s.x * T, py = s.y * T, pw = s.w * T, ph = s.h * T;
       const midY = py + ph / 2;
-      const gfx = this.add.graphics().setDepth(2);
-      // Bug (spitz nach Osten) – Rumpf + hellere Deckfläche
-      gfx.fillStyle(0x4a3426);
-      gfx.fillPoints([{ x: px + pw - 1, y: py - 4 }, { x: px + pw + 30, y: midY }, { x: px + pw - 1, y: py + ph + 4 }], true);
-      gfx.fillStyle(0xc89858);
-      gfx.fillPoints([{ x: px + pw - 1, y: py + 4 }, { x: px + pw + 19, y: midY }, { x: px + pw - 1, y: py + ph - 4 }], true);
-      // Heck (rund, Westen)
-      gfx.fillStyle(0x4a3426); gfx.fillRoundedRect(px - 13, py - 4, 16, ph + 8, { tl: 9, bl: 9, tr: 0, br: 0 });
-      gfx.fillStyle(0xc89858); gfx.fillRoundedRect(px - 8, py + 3, 10, ph - 6, { tl: 5, bl: 5, tr: 0, br: 0 });
-      // Bordwände (Reling) mit Holz-Posten
-      gfx.fillStyle(0x4a3426); gfx.fillRect(px - 4, py - 4, pw + 4, 4); gfx.fillRect(px - 4, py + ph, pw + 4, 4);
-      gfx.fillStyle(0x6b4f35);
-      for (let rx = px; rx < px + pw; rx += 12) { gfx.fillRect(rx, py - 5, 3, 5); gfx.fillRect(rx, py + ph, 3, 5); }
-      // Mast mit Rah und gerefftem Segel
-      const mx = px + pw * 0.45;
-      gfx.fillStyle(0x3a2e22); gfx.fillRect(mx - 1.5, midY - 38, 3, 40);
-      gfx.fillRect(mx - 14, midY - 34, 28, 2);                     // Rah (Querbalken)
-      gfx.fillStyle(0xf2ecd9); gfx.fillRoundedRect(mx - 13, midY - 31, 26, 6, 3); // gerefftes Segel
-      gfx.fillStyle(0xddd5bd); gfx.fillRect(mx - 13, midY - 27, 26, 1.5);
-      // Takelage
-      gfx.lineStyle(1, 0x3a2e22, 0.7);
-      gfx.lineBetween(mx, midY - 38, px + pw + 27, midY);
-      gfx.lineBetween(mx, midY - 38, px - 10, midY - 2);
-      // Ausguck + Flagge am Masttop
-      gfx.fillStyle(0x4a3426); gfx.fillRect(mx - 4, midY - 41, 8, 3);
-      this.shipFlag = this.add.image(mx + 7, midY - 44, "px").setScale(6, 4).setDepth(3);
-      this.tweens.add({ targets: this.shipFlag, y: midY - 46, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const shipImg = this.add.image(px + pw / 2, midY - 6, "ship").setDepth(2);
+      const shipScale = (pw + 46) / shipImg.width;   // Rumpf etwas breiter als das Deck – Bug/Heck ragen über
+      shipImg.setScale(shipScale);
+      // Dynamische Fortschritts-Flagge am Masttop (Tint wird beim Sync gesetzt, s. shipFlag.setTint).
+      // Mast sitzt im Asset knapp links der Bildmitte; Offsets relativ zur Bildmitte, mitskaliert.
+      const mastTopX = shipImg.x + (-14) * shipScale + 7;
+      const mastTopY = shipImg.y + (-76) * shipScale;
+      this.shipFlag = this.add.image(mastTopX, mastTopY, "px").setScale(6, 4).setDepth(3);
+      this.tweens.add({ targets: this.shipFlag, y: mastTopY - 2, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
       // === Leuchtturm (Sturmwache) – PixelLab-Turm + rotierender Lichtkegel ===
       const lh = this.lighthouse, lx = lh.x * T + 8, lyB = (lh.y + 1) * T;
