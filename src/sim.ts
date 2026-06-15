@@ -485,7 +485,7 @@ export interface Scenario {
     _help() {
       return [
         "Verfügbare Befehle im Simulator:",
-        "  docker     pull | run | ps [-a] | images | stop | rm",
+        "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
         "  kubectl    get pods|deployments|services|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | scale | expose | delete | apply -f <datei>",
         "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
@@ -517,6 +517,48 @@ export interface Scenario {
           "Status: Downloaded newer image for " + full,
           "docker.io/library/" + full,
         ].join("\n");
+      }
+
+      if (sub === "build") {
+        // docker build -t <name[:tag]> <kontext>  – baut aus dem Dockerfile ein eigenes Image.
+        const tagSpec = this._flagValue(t, "-t") || this._flagValue(t, "--tag");
+        if (!tagSpec) return this._err("docker build: Ohne -t bekommt dein Image keinen Namen.", "Muster: docker build -t <name>:<tag> .");
+        if (!this.files["Dockerfile"]) {
+          return this._err("ERROR: failed to read dockerfile: open Dockerfile: no such file or directory",
+            "docker build liest den Bauplan aus einer Datei namens 'Dockerfile' im aktuellen Ordner. Schau mit 'ls', ob sie da ist.");
+        }
+        const full = tagSpec.includes(":") ? tagSpec : tagSpec + ":latest";
+        const base = (this.files["Dockerfile"].match(/^\s*FROM\s+(\S+)/m) || [])[1] || "scratch";
+        const copyLines = (this.files["Dockerfile"].match(/^\s*(COPY|ADD|RUN)\b/gim) || []).length;
+        const total = 3 + copyLines; // load definition + FROM + (COPY/ADD/RUN…) + export
+        if (!this.docker.pulled.includes(full)) this.docker.pulled.push(full);
+        return [
+          "[+] Building 2.4s (" + total + "/" + total + ") FINISHED",
+          " => [internal] load build definition from Dockerfile",
+          " => [internal] load metadata for " + base,
+          " => [1/" + Math.max(1, copyLines + 1) + "] FROM " + base,
+          copyLines ? " => [2/" + (copyLines + 1) + "] COPY/RUN-Schritte aus dem Dockerfile" : " => (keine weiteren Schichten)",
+          " => exporting to image",
+          " => => naming to docker.io/library/" + full,
+          "Successfully built " + randSuffix(12),
+          "Successfully tagged " + full,
+        ].join("\n");
+      }
+
+      if (sub === "tag") {
+        // docker tag <quelle> <ziel>  – hängt einem vorhandenen Image einen zweiten Namen an.
+        const src = t[2], dst = t[3];
+        if (!src || !dst || src.startsWith("-") || dst.startsWith("-")) {
+          return this._err("docker tag: Quelle und Ziel fehlen.", "Muster: docker tag <quelle>[:tag] <ziel>[:tag]");
+        }
+        const srcFull = src.includes(":") ? src : src + ":latest";
+        if (!this.docker.pulled.includes(srcFull) && !this.docker.pulled.includes(src)) {
+          return this._err("Error response from daemon: No such image: " + src,
+            "Das Quell-Image gibt es (noch) nicht. Mit 'docker images' siehst du, was da ist – oder erst 'docker build -t " + src + " .'.");
+        }
+        const dstFull = dst.includes(":") ? dst : dst + ":latest";
+        if (!this.docker.pulled.includes(dstFull)) this.docker.pulled.push(dstFull);
+        return ""; // echtes 'docker tag' ist still (kein Output)
       }
 
       if (sub === "images") {
