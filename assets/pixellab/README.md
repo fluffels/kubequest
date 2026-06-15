@@ -2,8 +2,9 @@
 
 Diese Grafiken wurden mit **PixelLab AI** (https://api.pixellab.ai/mcp) im Stardew-angelehnten
 Stil erzeugt und ersetzen nach und nach die ursprünglichen Kenney-Tiny-Platzhalter.
-Jede Datei liegt hier als PNG **und** als Base64 in `src/assets-data.ts` (damit der
-Single-File-Offline-Build self-contained bleibt). Die `.json` sind die Tileset-Metadaten.
+Jede Datei liegt hier als PNG und wird in `src/assets-data.ts` per `import` eingebunden;
+der Single-File-Offline-Build inlinet sie automatisch als Base64-Data-URI, bleibt also
+self-contained. Die `.json` sind die Tileset-Metadaten.
 
 ## Einheitlicher Stil (immer mitgeben)
 - **Tiles:** 16×16, `selective outline`, `detailed shading`, `highly detailed`, `high top-down`
@@ -47,7 +48,7 @@ Gemeinsame Basis-Tile-IDs (zum Weiter-Verketten neuer Sets):
 > `char_kralle` ist als aufrechtes Krabben-Maskottchen gekommen (humanoides Skelett).
 
 > ⚠️ **Map-Objekte & Figuren werden serverseitig nach 8 h gelöscht.** Die IDs sind nur historisch —
-> die dauerhafte Quelle sind die PNGs hier + das Base64 in `src/assets-data.ts`. Tilesets bleiben abrufbar.
+> die dauerhafte Quelle sind die PNGs hier (per `import` in `src/assets-data.ts` eingebunden). Tilesets bleiben abrufbar.
 
 > 💳 **Account-Stand (2026-06-15):** PixelLab läuft jetzt auf einem **Abo (Tier 1)** mit großem Generierungs-Kontingent (~2000) — die alte „4/40 Free-Trial"-Knappheit ist vorbei. Tier 1 erlaubt zudem **größere Bilder (mehr Pixel pro Bild)** → gut für große Objekte wie **Häuser, Bäume, Gebäude** (höher auflösen statt klein generieren + hochskalieren). Generieren ist unkritisch.
 
@@ -57,11 +58,11 @@ Gemeinsame Basis-Tile-IDs (zum Weiter-Verketten neuer Sets):
   `WANG = [6,7,10,9,2,11,4,15,5,14,1,8,3,0,13,12]` — **bei allen Sets identisch** (aus den Metadaten verifiziert).
 - **Terrain-Höhen je Bodenzelle:** Wasser(`-2`)=0 < Sand(`-3`)=1 < Gras/Land(sonst)=2 < Weg(`25`)=3.
 - **Pro Zelle:** berührt sie Wasser → Wasser-Rand-Set nach Nachbar-**Material** (Holz `-10/-11` > Stein `96/97/98` > Sand); sonst Weg-Zelle → `path`; sonst → `meadow`. Stein-Kai/Stege innen = volles Tile.
-- **Objekte/Figuren** liegen in `BootScene`-`plains` (ohne Slicing, ganzes Bild = ein Sprite),
+- **Objekte/Figuren** liegen in `BootScene`-`BOOT_PLAINS` (ohne Slicing, ganzes Bild = ein Sprite),
   werden unten verankert gerendert (Origin ~0.81 = Fußhöhe; Füße sitzen auf dem Schatten).
 
 ## Ein neues Asset hinzufügen
 1. `create_topdown_tileset` (Terrain, ggf. `lower_base_tile_id` aus obiger Liste) **oder** `create_map_object` / `create_character`.
-2. PNG nach `assets/pixellab/` laden, als Base64 in `src/assets-data.ts` (Eintrag `name: "data:image/png;base64,…"`).
-3. In `BootScene`: Tileset → `sheets`-Array (4 Spalten); Objekt/Figur → `plains`-Array.
-4. Verwenden — **erst referenzieren, wenn eingebettet UND geladen** (sonst grün-schwarzer Phaser-Platzhalter).
+2. PNG nach `assets/pixellab/` laden, in `src/assets-data.ts` per `import name from "../assets/pixellab/datei.png"` einbinden und ins `KQAssets`-Objekt aufnehmen.
+3. In `BootScene`: Tileset → `BOOT_SHEETS`-Array (4 Spalten); Objekt/Figur → `BOOT_PLAINS`-Array.
+4. Verwenden — **erst referenzieren, wenn geladen** (sonst grün-schwarzer Phaser-Platzhalter).
