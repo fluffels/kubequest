@@ -123,7 +123,54 @@ export const QUESTS: Quest[] = [
             reply: "NEIN. Nicht schneller – ÜBERALL GLEICH. Das ist der Schatz." },
         ]},
       { type: "dialog", npc: "bo", lines: [
-        "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Ole will dich sprechen – es geht um den GROSSEN Umbau. Und vergiss nicht: Üben bei Bo bringt Dublonen!",
+        "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Aber eins fehlt noch: Bisher hast du nur <b>fertige</b> Baupläne aus der Registry geholt. Ein echter Profi baut auch seinen <b>eigenen</b>. Bleib noch einen Moment bei Bo!",
+      ]},
+    ]},
+
+  { id: "q3b", title: "Dein eigener Bauplan", giver: "bo", rewardXp: 40, rewardCoins: 30,
+    steps: [
+      { type: "dialog", npc: "bo",
+        scenario: { files: { "Dockerfile": DOCKERFILE } },
+        lines: [
+          "Erinnerst du dich ans <b>Stapel-Spiel</b>? Ein Image ist ein Stapel aus <b>Schichten</b>. Diesen Stapel beschreibst du in einer Datei: dem <b>Dockerfile</b>. Das ist DEIN Bauplan.",
+          "Bo hat dir einen hingelegt. Schau ihn dir an: <code>cat Dockerfile</code>. Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App.",
+        ] },
+      { type: "terminal", brief: "Bauplan lesen", tasks: [
+        { id: "t-cat-dockerfile", text: "Lies den Bauplan: <code>cat Dockerfile</code>. Siehst du das <code>FROM</code> ganz oben?",
+          accept: [/^cat\s+Dockerfile$/], solution: "cat Dockerfile", hint: "cat <datei>" },
+      ]},
+      { type: "dialog", npc: "bo", lines: [
+        "Jetzt machst du aus dem Bauplan ein echtes Image: <code>docker build</code>. Das <code>-t</code> (wie „tag“) gibt deinem Image einen <b>Namen</b> – sonst findest du es später nicht wieder. Der <b>Punkt</b> am Ende sagt: „Der Bauplan liegt HIER im aktuellen Ordner.“",
+      ]},
+      { type: "teach", brief: "Eigenes Image bauen", cmd: {
+        id: "t-build", intro: "🆕 Neuer Befehl: <code>docker build -t &lt;name&gt;:&lt;tag&gt; .</code> – baut aus dem Dockerfile ein eigenes Image.",
+        text: "Bau aus dem Dockerfile ein Image mit dem Namen <code>hafenwache:1.0</code>. (Punkt am Ende nicht vergessen!)",
+        accept: [/^docker\s+build\s+-t\s+hafenwache:1\.0\s+\.$/], solution: "docker build -t hafenwache:1.0 .",
+        hint: "Muster: docker build -t <name>:<tag> . – der Punkt ist der Baukontext (aktueller Ordner)." } },
+      { type: "teach", brief: "Image-Liste", cmd: {
+        id: "t-images", intro: "🆕 Neuer Befehl: <code>docker images</code> – zeigt alle Images, die lokal bereitliegen (gebaut oder gezogen).",
+        text: "Zeig deine Images an. <code>hafenwache</code> mit Tag <code>1.0</code> müsste jetzt dabei sein!",
+        accept: [/^docker\s+images$/], solution: "docker images", hint: "docker + Mehrzahl von „image“." } },
+      { type: "dialog", npc: "bo", lines: [
+        "Ein Image kann <b>mehrere Namen</b> tragen – wie Etiketten auf derselben Kiste. <code>docker tag</code> hängt ein zweites Etikett an. Üblich: derselbe Build bekommt zusätzlich <code>:latest</code> („die neueste Version“), damit andere ihn ohne Versionsnummer ziehen können.",
+      ]},
+      { type: "teach", brief: "Zweites Etikett", cmd: {
+        id: "t-tag", intro: "🆕 Neuer Befehl: <code>docker tag &lt;quelle&gt; &lt;ziel&gt;</code> – gibt einem vorhandenen Image einen weiteren Namen.",
+        text: "Gib deinem <code>hafenwache:1.0</code> zusätzlich das Etikett <code>hafenwache:latest</code>.",
+        accept: [/^docker\s+tag\s+hafenwache:1\.0\s+hafenwache:latest$/], solution: "docker tag hafenwache:1.0 hafenwache:latest",
+        hint: "Muster: docker tag <quelle> <ziel> – erst das vorhandene Image, dann der neue Name." } },
+      { type: "drill", brief: "Bos Bau-Übung", pool: ["docker-build", "docker-tag"], count: 3,
+        intro: "Bauen und Etikettieren mit anderen Namen – drei Runden:" },
+      { type: "choice", npc: "bo", reviewId: "q-ch1-6",
+        q: "Was ist der Unterschied zwischen <code>docker pull</code> und <code>docker build</code>?",
+        options: [
+          { t: "pull lädt ein FERTIGES Image aus der Registry, build baut aus einem Dockerfile ein EIGENES.", ok: true,
+            reply: "GENAU. Konsumieren vs. selbst herstellen. Mit build bist du nicht mehr auf fremde Baupläne angewiesen. <i>*anerkennendes Knirschen*</i>" },
+          { t: "Kein Unterschied – beide laden ein Image herunter.", ok: false,
+            reply: "NEIN. pull HOLT ein fertiges Image. build STELLT eines HER – aus deinem Dockerfile. Das ist der ganze Punkt!" },
+        ]},
+      { type: "dialog", npc: "bo", lines: [
+        "Jetzt bist du <b>echter</b> Kisten-Profi: holen, bauen, etikettieren. <i>*Golem-Applaus*</i> Später baut eine <b>Pipeline</b> deine Images ganz von allein – aber das zeigt dir Ada. Erst will Ole dich sprechen: der GROSSE Umbau wartet! Und Üben bei Bo bringt weiter Dublonen.",
       ]},
     ]},
 
