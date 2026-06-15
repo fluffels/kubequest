@@ -84,6 +84,21 @@ import type { Quest } from "./types";
     "resource \"hafen_server\" \"worker\" {", "  count   = 2", "  name    = \"worker-${count.index + 3}\"", "  groesse = \"mittel\"", "}",
   ].join("\n");
 
+  const GITLAB_CI_YML = [
+    "stages:", "  - build", "  - test", "  - deploy", "",
+    "build-image:        # baut aus dem Dockerfile ein Docker-Image",
+    "  stage: build", "  script:", "    - docker build -t funkdienst:$CI_COMMIT_SHORT_SHA .", "",
+    "unit-test:          # prueft den Code, BEVOR etwas live geht",
+    "  stage: test", "  script:", "    - npm test", "",
+    "deploy-cluster:     # rollt automatisch in den Cluster aus",
+    "  stage: deploy", "  script:", "    - kubectl apply -f deployment.yaml",
+    "  only:", "    - main          # nur vom main-Branch wird wirklich deployt",
+  ].join("\n");
+
+  const DOCKERFILE = [
+    "FROM nginx:1.27", "COPY site/ /usr/share/nginx/html", "EXPOSE 80",
+  ].join("\n");
+
   /* =================================================================
    * DRILLS – Zufalls-Übungsaufgaben. Jede Funktion bekommt den Simulator
    * und liefert eine frische Aufgabe (ggf. mit Vorbereitung der Welt).
@@ -239,13 +254,26 @@ import type { Quest } from "./types";
       while (sim.git.branches.includes(name)) name = "feature-" + rnd(100, 9999);
       return { text: "Lege den Branch <code>" + name + "</code> an UND wechsle direkt hinein.", accept: [new RegExp("^git\\s+checkout\\s+-b\\s+" + name + "$")], solution: "git checkout -b " + name, hint: "Muster: git checkout -b <name>" };
     },
+    "git-add-all": sim => {
+      ensureGit(sim);
+      const fn = "aenderung-" + sim.clock + "-" + rnd(100, 9999) + ".md";
+      sim.files[fn] = "# Notiz";
+      return { text: "Merke <b>alle</b> Änderungen auf einmal zum Commit vor (mit dem Punkt-Kürzel).", accept: [/^git\s+add\s+\.$/], solution: "git add .", hint: "git add + ein einzelner Punkt = alles." };
+    },
+    "ci-status": sim => {
+      ensureGit(sim);
+      if (!sim.files[".gitlab-ci.yml"]) sim.files[".gitlab-ci.yml"] = "stages: [build, test, deploy]";
+      const fn = "auslieferung-" + sim.clock + "-" + rnd(100, 9999) + ".txt";
+      sim.files[fn] = "x"; sim.exec("git add " + fn); sim.exec('git commit -m "Auslieferung"'); sim.exec("git push");
+      return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> – der Befehl fürs Nachschauen." };
+    },
   };
 
   /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
   const PRACTICE = {
     bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
     ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
-    ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }],
+    ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
     runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }],
     theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
     juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }],
@@ -1012,6 +1040,74 @@ import type { Quest } from "./types";
           "Du beherrschst jetzt den vollen Git-Kreis: <b>branch → commit → merge → push</b>. Genau dieser Ablauf treibt später auch die <b>Pipelines</b> an (ein push löst automatische Builds & Deployments aus – aber das ist eine andere Insel). Sauber gemacht, Kartograph:in! 🗺️",
         ] },
       ]},
+
+    { id: "q20", title: "Die Pipeline-Passage", giver: "ada", rewardXp: 60, rewardCoins: 45,
+      steps: [
+        { type: "dialog", npc: "ada",
+          scenario: { files: { ".gitlab-ci.yml": GITLAB_CI_YML, "Dockerfile": DOCKERFILE }, ciDeploy: { name: "funkdienst", image: "nginx", replicas: 2 } },
+          lines: [
+            "Du erinnerst dich: Ich sagte, ein <code>git push</code> treibt später <b>Pipelines</b> an. Willkommen in der <b>Pipeline-Passage</b> – hier wird aus „von Hand deployen“ endlich Automatik.",
+            "Auf dem Server (z.B. GitLab) sitzt ein <b>Runner</b> und wartet. Liegt im Repo eine Datei <code>.gitlab-ci.yml</code>, arbeitet er bei <b>jedem Push</b> automatisch eine <b>Pipeline</b> ab – eine Kette von Schritten, klassisch <b>build → test → deploy</b>.",
+            "Das ist <b>CI/CD</b>: <b>CI</b> (Continuous Integration) baut & testet jede Änderung sofort, <b>CD</b> (Continuous Delivery/Deployment) liefert sie automatisch aus. Ich hab dir eine <code>.gitlab-ci.yml</code> und ein <code>Dockerfile</code> hingelegt. Sieh dir die Pipeline-Definition an: <code>cat .gitlab-ci.yml</code>.",
+          ] },
+        { type: "teach", brief: "Pipeline lesen", cmd: {
+          id: "t-ci-cat", intro: "🆕 Die <code>.gitlab-ci.yml</code> beschreibt die Pipeline: welche <b>stages</b> es gibt und welche <b>Jobs</b> mit welchen <code>script</code>-Befehlen darin laufen.",
+          text: "Lies die Pipeline-Definition <code>.gitlab-ci.yml</code>.",
+          accept: [/^cat\s+\.gitlab-ci\.yml$/], solution: "cat .gitlab-ci.yml", hint: "cat <datei> – wie bei meiner Seekarte." } },
+        { type: "dialog", npc: "ada", lines: [
+          "Siehst du die drei <b>stages</b>? <b>build</b> baut aus dem <code>Dockerfile</code> ein Docker-Image. <b>test</b> prüft den Code – <i>bevor</i> irgendwas live geht. <b>deploy</b> macht ein <code>kubectl apply</code> in den Cluster – also genau das, was du bei mir und Theo von Hand getippt hast, nur <b>automatisch</b>.",
+          "Und schau aufs <code>only: main</code> beim deploy: wirklich ausgerollt wird nur, was auf dem <b>main</b>-Branch landet. Feature-Branches werden gebaut & getestet, aber nicht deployt – ein Sicherheitsnetz.",
+          "Jetzt der Beweis. Nimm die neuen Dateien ins Repo auf – diesmal alle auf einmal mit <code>git add .</code> (der Punkt = „alles“).",
+        ] },
+        { type: "teach", brief: "Alles vormerken", cmd: {
+          id: "t-ci-addall", intro: "🆕 <code>git add .</code> – der Punkt merkt <b>alle</b> neuen/geänderten Dateien auf einmal vor, statt jede einzeln.",
+          text: "Merke alle Änderungen auf einmal vor.",
+          accept: [/^git\s+add\s+\.$/], solution: "git add .", hint: "git add + ein einzelner Punkt." } },
+        { type: "teach", brief: "Festhalten", cmd: {
+          id: "t-ci-commit", intro: "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält die vorgemerkten Änderungen fest.",
+          text: "Committe die Pipeline-Einrichtung, z.B. mit <code>CI-Pipeline eingerichtet</code>.",
+          accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "CI-Pipeline eingerichtet"', hint: 'Muster: git commit -m "Nachricht"' } },
+        { type: "teach", brief: "Push löst Pipeline aus", cmd: {
+          id: "t-ci-push", intro: "🆕 Der entscheidende Moment: <code>git push</code> lädt nicht nur hoch – weil jetzt eine <code>.gitlab-ci.yml</code> im Repo liegt, <b>startet der Runner automatisch die Pipeline</b>.",
+          text: "Schiebe deine Arbeit zum Server – und lass die erste Pipeline laufen.",
+          accept: [/^git\s+push$/], solution: "git push", hint: "Wirklich nur: git push" } },
+        { type: "dialog", npc: "ada", lines: [
+          "Spürst du das? Du hast nichts deployt – du hast nur <b>gepusht</b>. Den Rest macht die Pipeline. Schau ihr beim Arbeiten zu: <code>glab</code> ist das Kommandozeilen-Werkzeug für GitLab.",
+        ] },
+        { type: "teach", brief: "Pipeline-Status", cmd: {
+          id: "t-ci-status", intro: "🆕 Neuer Befehl: <code>glab ci status</code> – zeigt die Pipeline des aktuellen Branches und ob ihre Stages durchgelaufen sind.",
+          text: "Sieh nach, wie weit die Pipeline ist.",
+          accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> fürs Nachschauen." } },
+        { type: "dialog", npc: "ada", lines: [
+          "Alles grün ✅ – build, test, <b>deploy</b>. Und jetzt das Beste: der deploy-Stage hat den Dienst <b>funkdienst</b> ganz von allein in den Cluster gerollt. Kein <code>kubectl apply</code> von Hand. Überzeug dich: <code>kubectl get pods</code>.",
+        ] },
+        { type: "teach", brief: "Beweis im Cluster", cmd: {
+          id: "t-ci-getpods", intro: "↩︎ Beweis: die Pipeline hat <code>funkdienst</code> für dich deployt – ohne dass du den Cluster angefasst hast.",
+          text: "Zeig die Pods – <code>funkdienst</code> müsste jetzt laufen.",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "kubectl get pods" } },
+        { type: "choice", npc: "ada", reviewId: "q-ci-1",
+          q: "Ada prüft: Was löst die Pipeline aus?",
+          options: [
+            { t: "Ein git push in ein Repo, das eine .gitlab-ci.yml enthält.", ok: true,
+              reply: "Genau. Push → der Runner sieht die .gitlab-ci.yml → Pipeline läuft. Vollautomatisch." },
+            { t: "Man muss sie jeden Morgen von Hand starten.", ok: false,
+              reply: "Nein – das wäre ja keine Automatik. Der Push ist der Auslöser." },
+          ] },
+        { type: "choice", npc: "ada", reviewId: "q-ci-2",
+          q: "Und in welcher Reihenfolge laufen die Stages?",
+          options: [
+            { t: "build → test → deploy", ok: true,
+              reply: "Richtig. Erst bauen, dann testen (bevor etwas live geht!), dann ausrollen. Fällt test durch, wird gar nicht erst deployt." },
+            { t: "deploy → test → build", ok: false,
+              reply: "Andersherum – du würdest Ungetestetes ausrollen und erst danach bauen. Genau das verhindert die Reihenfolge." },
+          ] },
+        { type: "drill", brief: "Adas Pipeline-Übung", pool: ["git-add-all", "ci-status"], count: 2,
+          intro: "Der CI/CD-Reflex: alles vormerken, pushen, Status checken." },
+        { type: "dialog", npc: "ada", lines: [
+          "Du hast die Pipeline-Passage gemeistert: <b>push → build → test → deploy</b>, vollautomatisch. So liefert ein Team hundertmal am Tag aus, ohne Angst – die Pipeline ist Bauanleitung, Prüfer und Auslieferer in einem.",
+          "Und es schließt den Kreis: deine Befehle von Bo (Docker-Build), von mir (Git) und von Ole (kubectl apply) – die Pipeline tippt sie jetzt für dich. Das ist das Herz von modernem DevOps. 🚢",
+        ] },
+      ]},
   ];
 
   /* ---------- Standard-Dialoge ---------- */
@@ -1061,6 +1157,9 @@ import type { Quest } from "./types";
     { id: "q-git-1", q: "Was macht git commit?", options: ["Hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht in der Historie fest.", "Lädt die Dateien auf den Server hoch.", "Löscht alle ungespeicherten Änderungen.", "Wechselt auf einen anderen Branch."], correct: 0, explain: "Ein Commit ist ein lokaler Speicherpunkt mit Nachricht. Hochladen zum Server macht erst git push." },
     { id: "q-git-2", q: "Wozu legt man in Git einen eigenen Branch (Zweig) an?", options: ["Um Änderungen abseits von main auszuprobieren und erst nach Review zusammenzuführen.", "Damit Git schneller läuft.", "Um Speicherplatz zu sparen.", "Um Dateien endgültig zu löschen."], correct: 0, explain: "Branches erlauben sicheres, paralleles Arbeiten: main bleibt stabil, das Experiment lebt im Zweig – am Ende wird gemergt." },
     { id: "q-git-3", q: "Unterschied zwischen git add und git commit?", options: ["add merkt Änderungen vor (Staging), commit hält die vorgemerkten dauerhaft in der Historie fest.", "Kein Unterschied, beides speichert dasselbe.", "add committet, commit pusht zum Server.", "add ist für neue Dateien, commit für alte."], correct: 0, explain: "Zwei bewusste Schritte: erst auswählen, was in den Schnappschuss soll (add/Staging), dann festhalten (commit)." },
+    { id: "q-ci-1", q: "Was löst in GitLab eine Pipeline aus?", options: ["Ein git push in ein Repo, das eine .gitlab-ci.yml enthält.", "Man muss sie jeden Morgen von Hand starten.", "Ein kubectl apply.", "Das Anlegen eines neuen Branches."], correct: 0, explain: "CI heißt Continuous Integration: Bei jedem Push prüft der Runner die .gitlab-ci.yml und arbeitet die Stages automatisch ab – kein Mensch klickt etwas." },
+    { id: "q-ci-2", q: "Die typische Stage-Reihenfolge einer CI/CD-Pipeline?", options: ["build → test → deploy", "deploy → test → build", "test → deploy → build", "Die Reihenfolge ist egal."], correct: 0, explain: "Erst bauen (Image erzeugen), dann testen (prüfen, BEVOR etwas live geht), dann deployen (in den Cluster ausrollen). Fällt eine frühe Stage durch, laufen die späteren gar nicht erst." },
+    { id: "q-ci-3", q: "Wofür stehen CI und CD?", options: ["Continuous Integration und Continuous Delivery/Deployment.", "Code Inspection und Code Deployment.", "Container Init und Container Deploy.", "Central Integration und Central Delivery."], correct: 0, explain: "CI = Änderungen laufend automatisch bauen & testen. CD = sie automatisch ausliefern/ausrollen. Zusammen: vom Commit bis in den Cluster ohne Handarbeit." },
   ];
 
   const CMD_CARDS = [
@@ -1089,6 +1188,8 @@ import type { Quest } from "./types";
     { id: "c-git-3", chapter: "q18", q: "Halte die vorgemerkten Änderungen fest (Nachricht: <code>Erste Seekarte</code>).", accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"' },
     { id: "c-git-4", chapter: "q19", q: "Lege den Branch <code>experiment-route</code> an und wechsle hinein.", accept: [/^git\s+checkout\s+-b\s+experiment-route$/], solution: "git checkout -b experiment-route" },
     { id: "c-git-5", chapter: "q19", q: "Führe <code>experiment-route</code> in deinen aktuellen Branch zusammen.", accept: [/^git\s+merge\s+experiment-route$/], solution: "git merge experiment-route" },
+    { id: "c-ci-1", chapter: "q20", q: "Schau dir den Status der letzten GitLab-Pipeline an.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status" },
+    { id: "c-ci-2", chapter: "q20", q: "Merke ALLE Änderungen auf einmal für den nächsten Commit vor.", accept: [/^git\s+add\s+\.$/], solution: "git add ." },
   ];
 
   /* ---------- Stapel-Spiel: Docker-Image-Schichten ---------- */

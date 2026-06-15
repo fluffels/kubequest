@@ -58,6 +58,7 @@
     releases!: any[];
     tf!: { initialized: boolean; applied: boolean; resources: any[] };
     git!: { initialized: boolean; branch: string; branches: string[]; staged: string[]; committed: string[]; commits: any[]; pushed: boolean };
+    ci!: { pipelines: any[]; deploy: any };
     lastDeletedPod: any;
     lastError!: boolean;
 
@@ -107,6 +108,14 @@
         committed: (sc.gitCommitted || []).slice(),
         commits: (sc.gitCommits || []).map(c => Object.assign({}, c)),
         pushed: !!sc.gitPushed,
+      };
+
+      this.ci = {
+        pipelines: (sc.ciPipelines || []).map(p => ({
+          id: p.id, ref: p.ref, status: p.status, created: p.created,
+          stages: (p.stages || []).map(s => Object.assign({}, s)),
+        })),
+        deploy: sc.ciDeploy ? Object.assign({}, sc.ciDeploy) : null, // {name, image, replicas}, den die deploy-Stage ausrollt
       };
 
       this.lastDeletedPod = null;
@@ -173,6 +182,7 @@
       for (const repo of sc.helmRepos || []) {
         if (!this.helmRepos.includes(repo)) this.helmRepos.push(repo);
       }
+      if (sc.ciDeploy) this.ci.deploy = Object.assign({}, sc.ciDeploy);
     }
 
     /** Zustand als speicherbares Szenario ausgeben (für localStorage). */
@@ -201,6 +211,11 @@
         gitCommitted: this.git.committed.slice(),
         gitCommits: this.git.commits.map(c => Object.assign({}, c)),
         gitPushed: this.git.pushed,
+        ciPipelines: this.ci.pipelines.map(p => ({
+          id: p.id, ref: p.ref, status: p.status, created: p.created,
+          stages: p.stages.map(s => Object.assign({}, s)),
+        })),
+        ciDeploy: this.ci.deploy ? Object.assign({}, this.ci.deploy) : null,
       };
     }
 
@@ -222,12 +237,13 @@
           case "helm": out = this._helm(tokens, raw); break;
           case "terraform": out = this._terraform(tokens, raw); break;
           case "git": out = this._git(tokens, raw); break;
+          case "glab": out = this._glab(tokens); break;
           case "ls": out = this._ls(); break;
           case "cat": out = this._cat(tokens); break;
           case "clear": return { output: null, error: false, clear: true };
           case "help": out = this._help(); break;
           default: {
-            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "git", "ls", "cat", "clear", "help"]);
+            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "git", "glab", "ls", "cat", "clear", "help"]);
             out = this._err("⚠️ Den Befehl '" + cmd + "' gibt es hier nicht.",
               guess ? "Meintest du '" + guess + "'? (Tippe 'help' für alle Befehle.)"
                     : "Tippe 'help' für eine Liste der Befehle, die hier funktionieren.");
@@ -299,6 +315,7 @@
         "  helm       repo add|update | search repo | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push",
+        "  glab       ci status | ci list  (Pipeline-Status in GitLab)",
         "  ls, cat <datei>, clear, help",
       ].join("\n");
     }
@@ -1037,7 +1054,65 @@
       const g = this.git;
       if (!g.commits.length) return this._err("git push: Noch nichts zu pushen.", "Erst committen, dann pushen.");
       g.pushed = true;
-      return "Schiebe nach origin/" + g.branch + " … ✅ Deine Commits liegen jetzt auf dem Server (z.B. GitLab) – sichtbar fürs Team.";
+      let msg = "Schiebe nach origin/" + g.branch + " … ✅ Deine Commits liegen jetzt auf dem Server (z.B. GitLab) – sichtbar fürs Team.";
+      // Liegt eine .gitlab-ci.yml im Repo, startet der Runner bei jedem Push automatisch eine Pipeline.
+      if (this.files[".gitlab-ci.yml"]) {
+        const p = this._runPipeline();
+        msg += "\n🏃 Eine .gitlab-ci.yml liegt im Repo – der Runner startet Pipeline #" + p.id +
+          " (build → test → deploy). Status checken mit 'glab ci status'.";
+      }
+      return msg;
+    }
+
+    /** Baut eine Pipeline für den aktuellen Branch und lässt ihre Stages laufen. */
+    _runPipeline() {
+      const g = this.git;
+      const onMain = g.branch === "main";
+      const stages = [
+        { name: "build", status: "passed" },
+        { name: "test", status: "passed" },
+        { name: "deploy", status: onMain ? "passed" : "skipped" }, // 'only: main' – Feature-Branches werden nicht ausgerollt
+      ];
+      const p = { id: 1001 + this.ci.pipelines.length, ref: g.branch, status: "passed", stages, created: this.clock };
+      this.ci.pipelines.push(p);
+      // Die deploy-Stage rollt den Dienst automatisch in den Cluster (nur auf main).
+      if (this.ci.deploy && onMain) {
+        const d = this.ci.deploy;
+        if (!this.deployments.some(x => x.name === d.name)) {
+          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas));
+        }
+      }
+      return p;
+    }
+
+    /* ===================== glab (GitLab CLI) ===================== */
+    _glab(t) {
+      if (t[1] !== "ci") return this._err("Der Simulator kann nur 'glab ci ...'.", "z.B. 'glab ci status' oder 'glab ci list'.");
+      const action = t[2];
+
+      if (action === "status" || action === "view") {
+        const p = this.ci.pipelines[this.ci.pipelines.length - 1];
+        if (!p) return this._err("Keine Pipeline gefunden.", "Eine Pipeline entsteht beim 'git push' – wenn eine .gitlab-ci.yml im Repo liegt.");
+        const icon = s => (s === "passed" ? "✓" : s === "skipped" ? "–" : "•");
+        const lines = [
+          "Pipeline #" + p.id + "  (Branch " + p.ref + ")   Status: " + (p.status === "passed" ? "passed ✅" : p.status),
+        ];
+        for (const s of p.stages) lines.push("  " + icon(s.status) + " " + pad(s.name, 8) + s.status);
+        if (p.stages.some(s => s.name === "deploy" && s.status === "passed")) {
+          lines.push("🚀 Die deploy-Stage hat den Dienst automatisch ausgerollt – schau mit 'kubectl get pods'.");
+        } else if (p.ref !== "main") {
+          lines.push("ℹ️  deploy übersprungen ('only: main') – auf diesem Branch wird gebaut & getestet, aber nicht deployt.");
+        }
+        return lines.join("\n");
+      }
+
+      if (action === "list") {
+        if (!this.ci.pipelines.length) return "Keine Pipelines. (Entstehen beim 'git push' mit .gitlab-ci.yml im Repo.)";
+        return table(["ID", "BRANCH", "STATUS"],
+          this.ci.pipelines.slice().reverse().map(p => ["#" + p.id, p.ref, p.status]));
+      }
+
+      return this._err("glab ci: unbekannte Aktion '" + (action || "") + "'", "z.B. 'glab ci status' oder 'glab ci list'.");
     }
 
     _ls() {
