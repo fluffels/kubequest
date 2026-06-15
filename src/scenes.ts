@@ -355,17 +355,21 @@ import { NPC_SPAWNS, npcSolidIndices } from "./world";
     }
 
     /** Festes Orts-Schild: eingravierte Schrift auf einem PixelLab-Holzbrett,
-     *  per 9-Slice auf jede Textlänge gedehnt (Rahmen bleibt fix, Mitte streckt). */
+     *  per 9-Slice auf jede Textlänge gedehnt (Rahmen bleibt fix, Mitte streckt).
+     *  Am 16px-Maßstab orientiert (knappes Padding + leicht runterskaliert) und per
+     *  y-Tiefe in die Welt einsortiert, damit es Fässer/Pod-Kisten/Tech-Tags nicht verdeckt. */
     makeSign(x: number, y: number, text: string) {
       const txt = this.add.text(0, 0, text, {
         fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px",
         color: "#3a2410", resolution: 10,
       }).setOrigin(0.5).setShadow(0, 0.5, "rgba(255,243,214,0.45)", 0);
-      const w = Math.max(22, Math.ceil(txt.width) + 18);
-      const h = Math.max(15, Math.ceil(txt.height) + 12);
+      const w = Math.max(18, Math.ceil(txt.width) + 10);
+      const h = Math.max(13, Math.ceil(txt.height) + 7);
       const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
       board.y = -h / 2; txt.y = -h / 2;   // unten am Bezugspunkt verankert (wie altes origin 0.5,1)
-      return this.add.container(x, y, [board, txt]).setDepth(10000);
+      // Tiefe = Welt-y (wie Bäume/Fässer/Krabben): Objekte derselben/näheren Reihe liegen davor
+      // statt darunter; Tech-Tags (Tiefe 9600) bleiben ohnehin oben → nichts wird mehr verdeckt.
+      return this.add.container(x, y, [board, txt]).setScale(0.8).setDepth(y);
     }
 
     /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
