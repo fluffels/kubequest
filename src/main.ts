@@ -7,13 +7,10 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQScenes } from "./scenes";
 import { SFX } from "./sfx";
+import { keys, clearKeys, worldScene } from "./runtime";
 
   // Wie in ui.ts: die DOM-Knoten liegen fest in index.html, darum nicht-nullbar.
   const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
-
-  // Tasten-Zustand für die Szene (window-Listener statt Phaser-Keyboard,
-  // damit Eingabefelder in Overlays normal funktionieren)
-  window.KQKeys = {};
 
   function showCharSelect() {
     const box = $("cs-chars");
@@ -25,8 +22,9 @@ import { SFX } from "./sfx";
       cv.onclick = () => {
         Game.state.character = spriteIdx;
         Game.save();
-        if (window.WorldScene && window.WorldScene.playerSprite) {
-          window.WorldScene.playerSprite.setTexture("dungeon", spriteIdx);
+        const ws = worldScene();
+        if (ws && ws.playerSprite) {
+          ws.playerSprite.setTexture("dungeon", spriteIdx);
         }
         $("charselect").classList.add("hidden");
         UI.toast("⚓ Willkommen in Port Kubernia! Folge dem <b>!</b> – Ole wartet vor der Hafenmeisterei.");
@@ -38,14 +36,14 @@ import { SFX } from "./sfx";
 
   function wireKeyboard() {
     window.addEventListener("keydown", e => {
-      if (window.SFX) SFX.ensure();
+      SFX.ensure();
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") {
         if (e.key === "Escape") { UI.closeOverlays(); (e.target as HTMLElement).blur(); }
         return;
       }
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      window.KQKeys[k] = true;
+      keys[k] = true;
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
 
       if (!$("charselect").classList.contains("hidden")) return;
@@ -73,9 +71,9 @@ import { SFX } from "./sfx";
     });
     window.addEventListener("keyup", e => {
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      window.KQKeys[k] = false;
+      keys[k] = false;
     });
-    window.addEventListener("blur", () => { window.KQKeys = {}; });
+    window.addEventListener("blur", () => clearKeys());
 
     $("term-input").addEventListener("keydown", e => {
       if (e.key === "Enter") {
@@ -88,6 +86,7 @@ import { SFX } from "./sfx";
   function boot() {
     Game.load();
     wireKeyboard();
+    UI.bindEvents();
 
     new Phaser.Game({
       type: Phaser.AUTO,
@@ -109,6 +108,9 @@ import { SFX } from "./sfx";
 
     // Spielstand regelmäßig sichern
     setInterval(() => Game.save(), 5000);
+
+    // Boot-Markierung fürs Sicherheitsnetz in index.html (früher: window.Game)
+    document.body.dataset.kqBooted = "1";
   }
 
   document.addEventListener("DOMContentLoaded", boot);
