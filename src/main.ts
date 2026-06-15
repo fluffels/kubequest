@@ -94,7 +94,7 @@ import { keys, clearKeys, worldScene } from "./runtime";
       backgroundColor: "#356dab",
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-      scene: [KQScenes.BootScene, KQScenes.WorldScene],
+      scene: [KQScenes.BootScene, KQScenes.WorldScene, KQScenes.InteriorScene],
     });
 
     UI.refreshHud();

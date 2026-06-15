@@ -41,3 +41,18 @@ export function setWorldScene(scene: WorldSceneRef | null): void {
 export function worldScene(): WorldSceneRef | null {
   return _scene;
 }
+
+/* ---------- Innenraum aktiv (#6) ----------
+ * Solange ein Hausinnenraum offen ist, läuft die WorldScene pausiert. Die E-/
+ * Prompt-Logik in ui.ts greift aber weiterhin auf worldScene() zu – dieses Flag
+ * lässt sie aussetzen, damit man nicht durch die Wand mit Außen-NPCs redet. Die
+ * InteriorScene verarbeitet ihre Tasten selbst. */
+let _interiorOpen = false;
+
+export function setInteriorOpen(v: boolean): void {
+  _interiorOpen = v;
+}
+
+export function interiorOpen(): boolean {
+  return _interiorOpen;
+}

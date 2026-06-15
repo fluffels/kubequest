@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, DOORS, doorAt } from "../src/world";
 
 const W = 52, H = 40; // wie WorldScene.create()
 
@@ -58,4 +58,44 @@ test("trotz Blockade bleibt jeder NPC ansprechbar (freie Nachbarkachel in Reichw
 test("out-of-bounds-NPC erzeugt keine Solid-Kachel", () => {
   expect(npcSolidIndices([{ id: "x", x: -5, y: 3 }], W, H)).toEqual([]);
   expect(npcSolidIndices([{ id: "x", x: 3, y: 999 }], W, H)).toEqual([]);
+});
+
+/* ===== Türen / betretbare Häuser (#6) ===== */
+
+test("doorAt trifft die Tür-Kachel ab dem Mittelpunkt der Kachel", () => {
+  for (const d of DOORS) {
+    // Mittelpunkt der Tür-Kachel -> genau diese Tür
+    expect(doorAt(d.tx * TILE + 8, d.ty * TILE + 8)).toEqual(d);
+    // beliebiger Punkt innerhalb derselben Kachel zählt ebenfalls
+    expect(doorAt(d.tx * TILE + 1, d.ty * TILE + 15)?.id).toBe(d.id);
+  }
+});
+
+test("doorAt liefert null neben der Tür (Negativfall, kein versehentliches Betreten)", () => {
+  for (const d of DOORS) {
+    expect(doorAt((d.tx - 1) * TILE + 8, d.ty * TILE + 8)).toBeNull(); // eine Kachel links
+    expect(doorAt(d.tx * TILE + 8, (d.ty + 1) * TILE + 8)).toBeNull(); // eine Kachel darunter (Anlaufpunkt)
+  }
+  expect(doorAt(0, 0)).toBeNull();
+});
+
+test("jede Tür-Kachel liegt im Grid und Türen sind eindeutig", () => {
+  expect(DOORS).toHaveLength(3);
+  for (const d of DOORS) {
+    expect(d.tx >= 0 && d.tx < W && d.ty >= 0 && d.ty < H).toBe(true);
+  }
+  const keysOf = DOORS.map((d) => d.ty * W + d.tx);
+  expect(new Set(keysOf).size).toBe(DOORS.length); // keine zwei Türen auf derselben Kachel
+});
+
+test("keine Tür-Kachel kollidiert mit einer NPC-Solid-Kachel (Tür muss begehbar bleiben)", () => {
+  const blocked = new Set(npcSolidIndices(NPC_SPAWNS, W, H));
+  for (const d of DOORS) {
+    expect(blocked.has(d.ty * W + d.tx), `Tür ${d.id} darf nicht auf einer NPC-Kachel liegen`).toBe(false);
+  }
+});
+
+test("jede Tür verweist auf einen existierenden NPC-Standort", () => {
+  const ids = new Set(NPC_SPAWNS.map((s) => s.id));
+  for (const d of DOORS) expect(ids.has(d.npc), `Tür ${d.id} -> NPC ${d.npc}`).toBe(true);
 });

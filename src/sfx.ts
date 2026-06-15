@@ -35,4 +35,5 @@ export const SFX = {
   fanfare() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.16, "square", 0.04, i * 0.12)); },
   wrong() { this.tone(196, 0.18, "sawtooth", 0.03); },
   thunder() { this.tone(58, 0.7, "sawtooth", 0.06); this.tone(46, 0.9, "sawtooth", 0.05, 0.12); },
+  door() { this.tone(160, 0.12, "sine", 0.05); this.tone(110, 0.16, "sine", 0.04, 0.05); },
 };
