@@ -39,9 +39,13 @@
 |---|---|---|
 | [`src/main.ts`](src/main.ts) | Einstieg | Start & Tastatursteuerung |
 | [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl, helm, terraform, secrets, git) |
-| [`src/content.ts`](src/content.ts) | pure Domäne | Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel |
+| [`src/content.ts`](src/content.ts) | pure Domäne | Fassade: bündelt `src/content/*` (Quests, Drills, Quiz, NPCs, Progression, Minispiel) zum `KQContent`-Objekt |
+| [`src/world.ts`](src/world.ts) | pure Domäne | Welt-Geometrie (Kachelraster, NPC-Standplätze, Solid-Kacheln) – Phaser-frei, von `scenes.ts` genutzt |
+| [`src/decor.ts`](src/decor.ts) | pure Domäne | Deterministische Deko-Platzierung (Büsche, Steine, Laternen, Blumen) – Phaser-frei |
+| [`src/clock.ts`](src/clock.ts) | pure Domäne | Zeit-/Datums-Ableitung für die HUD-Uhr (synchron zum Tag-Nacht-Schleier) |
 | [`src/types.ts`](src/types.ts) | Typen | Zentrale Typen (GameState, Quest, …) |
 | [`src/game.ts`](src/game.ts) | Anwendung | Spielstand, XP, Wirtschaft, Spaced Repetition |
+| [`src/runtime.ts`](src/runtime.ts) | Anwendung | Laufzeit-Singletons (ersetzt den früheren `window`-Shim; bricht Import-Zyklen) |
 | [`src/store.ts`](src/store.ts) | Persistenz | SaveStore (kapselt localStorage; Andockpunkt fürs spätere Backend) |
 | [`src/scenes.ts`](src/scenes.ts) | Präsentation | Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake |
 | [`src/ui.ts`](src/ui.ts) | Präsentation | Dialoge, Funkgerät, Shop, Quiz, Minispiel |

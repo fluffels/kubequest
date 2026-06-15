@@ -13,6 +13,7 @@
 - **Im Browser verifizieren**, nicht nur „sollte gehen". Sicht- oder spielbare Änderungen mit `npm run dev` (oder dem Single-File-Build) tatsächlich anschauen.
 - **Deutsch mit echten Umlauten** (ä/ö/ü/ß) in Code-Kommentaren, Dialogen und Texten. Ausnahme: Dateinamen bleiben ASCII (ae/oe/ue/ss).
 - **Backlog/TODOs leben in GitHub** (Issues + Project-Board), **nicht** im Code und **nicht** in einem externen Notiz-System. Siehe unten.
+- **Doku aktuell halten ist Teil von „fertig".** Die **README** ist die spielerseitige Quelle (Story, Spielsysteme, Steuerung, Lernpfad, **Quest-Zahl**); **CLAUDE.md** trägt die **eine** Datei-für-Datei-Repo-Landkarte. Wer Spielinhalte/Quests/Steuerung ändert, zieht die README im selben PR mit; wer ein `src/`-Modul hinzufügt/umbenennt/verschiebt, aktualisiert die Landkarte in CLAUDE.md. **Die Datei-Landkarte gibt es nur einmal (CLAUDE.md)** – README und AGENTS.md **verweisen** darauf, kopieren sie nicht (genau diese Doppelung hat die README veralten lassen). Die Quest-Zahl in der README wird zusätzlich von [`test/readme.test.ts`](test/readme.test.ts) automatisch gegen den Code geprüft – ändert sich die Quest-Anzahl, schlägt der Test fehl, bis die README stimmt.
 
 ## Befehle
 
@@ -32,23 +33,17 @@ Einmalig vorher: `npm install`.
 
 Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bündelt den Rest. Phaser 3 als npm-Paket. `npm run build` erzeugt via `vite-plugin-singlefile` eine self-contained `dist/index.html` (offline-tauglich).
 
-**Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt:
+**Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt. Leitidee: Die Spiellogik bleibt **Phaser-frei und damit im Node-Test prüfbar**; nur `scenes.ts`/`ui.ts` fassen Phaser bzw. das DOM an. Deshalb liegen z.B. Welt-Geometrie (`world.ts`), Deko-Platzierung (`decor.ts`) und HUD-Uhr (`clock.ts`) bewusst **außerhalb** von `scenes.ts`.
 
-| Modul (`src/`) | Rolle |
-|---|---|
-| `sim.ts` | Cluster-Simulator (docker, kubectl, helm, terraform, secrets, git) – pure Domäne |
-| `content.ts` | Quests, Dialoge, Drills, NPCs, Karteikarten, Minispiel – pure Domäne |
-| `types.ts` | Zentrale Typen (GameState, Quest, …) |
-| `game.ts` | Spielstand, XP, Wirtschaft, Spaced Repetition – Anwendung |
-| `store.ts` | SaveStore-Persistenz (kapselt localStorage; Andockpunkt fürs spätere Backend) |
-| `scenes.ts` | Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake – Präsentation |
-| `ui.ts` | Dialoge, Funkgerät, Shop, Quiz, Minispiel – Präsentation |
-| `sfx.ts` | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
-| `main.ts` | Start & Tastatur (Einstiegspunkt) |
-| `assets-data.ts` | Spritesheets als `import`s aus `assets/` (Single-File-Build inlinet sie als Data-URI → Offline-Build self-contained) |
-| `vite-env.d.ts` | Typ-Deklarationen (u.a. window-Shim für Inline-Handler) |
+- **pure Domäne** (kein Phaser, voll unit-testbar): `sim.ts` (Cluster-Simulator), `content.ts` (Fassade über `src/content/*`: Quests/Drills/Quiz/NPCs/Progression/Minispiel), `world.ts`, `decor.ts`, `clock.ts`.
+- **Anwendung:** `game.ts` (Spielstand, XP, Wirtschaft, Spaced Repetition), `runtime.ts` (Laufzeit-Singletons statt globalem `window`-Shim, bricht Import-Zyklen).
+- **Persistenz:** `store.ts` (SaveStore über localStorage; Andockpunkt fürs spätere Backend).
+- **Präsentation** (Phaser/DOM): `scenes.ts`, `ui.ts`, `sfx.ts`.
+- **Einstieg/Assets:** `main.ts` (Start & Tastatur), `assets-data.ts` (Spritesheet-`import`s, im Single-File-Build als Data-URI inlinet).
 
-Tests in `test/`: `sim.test.ts` (Simulator-Units inkl. Troubleshooting), `content.test.ts` (Konsistenz aller Inhalte), `quests.test.ts` (spielt die ganze Story + alle Drills durch).
+> Welches Modul genau was macht (mit Links), steht **einmal** in der [CLAUDE.md › Repo-Landkarte](CLAUDE.md) – hier steht nur das *Warum* der Schichtung, nicht die Dateiliste.
+
+Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator inkl. Troubleshooting), `content.test.ts` (Konsistenz aller Inhalte), `quests.test.ts` (spielt die ganze Story + alle Drills durch), `readme.test.ts` (Doku-Sync: Quest-Zahl der README gegen den Code).
 
 ## Konventionen
 
