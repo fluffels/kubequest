@@ -983,4 +983,63 @@ export const QUESTS: Quest[] = [
         "Merke: <b>Zertifikat als TLS-Secret ablegen, im Ingress unter spec.tls referenzieren – fertig ist HTTPS am Tor.</b> Die Verschlüsselung endet am Hafentor, dahinter bleibt's einfach. Und DNS sorgt dafür, dass der Name überhaupt bei uns ankommt. Hervorragende Arbeit, Lotse! 🔒⚓",
       ]},
     ]},
+
+  { id: "q24", title: "Läuft – bedient aber niemanden", giver: "juno", rewardXp: 60, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "juno", lines: [
+        "Sturmwache Juno – kniffliger Fall heute. Die <b>Kombüse</b> (Deployment <code>kombuese</code>) soll die Crew verköstigen, aber die Gäste am Service bekommen … <b>nichts</b>. Dabei ist KEIN Pod abgestürzt!",
+        "Genau das ist die fiese Sorte Fehler: Der Pod <b>läuft</b> – und liefert trotzdem nicht aus. Heute lernst du die zwei Wächter jedes Pods kennen: <b>liveness</b> (lebt er noch?) und <b>readiness</b> (kann er schon bedienen?). Schau erst mal nach den Pods.",
+      ]},
+      { type: "terminal", brief: "Das seltsame Bild",
+        scenario: { deployments: [{ name: "kombuese", image: "nginx", replicas: 1, broken: { type: "notready", needsSecret: "kombuese-menue" } }] },
+        tasks: [
+        { id: "t-j24-1", text: "Mantra-Schritt 1: <code>get pods</code>. Lies STATUS <b>und</b> READY genau – fällt dir was auf?",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Der Übersichts-Befehl. STATUS = Running, aber die READY-Spalte …?" },
+        { id: "t-j24-2", text: "<code>Running</code>, aber <code>0/1</code> READY – er läuft, ist aber nicht <b>bereit</b>. Schritt 2: <code>describe</code> den kombuese-Pod und lies die Events unten.",
+          accept: [/^kubectl\s+describe\s+pods?\s+kombuese-\S+$/], solution: "kubectl describe pod <kombuese-pod>", hint: "kubectl describe pod <name> – Name aus get pods." },
+      ]},
+      { type: "choice", npc: "juno", reviewId: "q-ts-6",
+        q: "Die Events sagen: <code>Readiness probe failed</code>, aber der Container ist gestartet. Was bedeutet READY 0/1 bei Status Running?",
+        options: [
+          { t: "Die Readiness-Probe ist rot – der Pod läuft, wird aber aus dem Service genommen, bis er bereit ist.", ok: true,
+            reply: "Genau! Liveness = „lebt er?“ (sonst Neustart), Readiness = „kann er schon bedienen?“. Readiness rot heißt: kein Traffic, aber KEIN Neustart. Der Pod fehlt dann im Service – das sehen wir uns gleich an." },
+          { t: "Der Pod ist abgestürzt und startet ständig neu (CrashLoopBackOff).", ok: false,
+            reply: "Nein – dann stünden Restarts in der Liste und der Status wäre CrashLoopBackOff. Hier ist es Running, 0 Restarts: Er LÄUFT, meldet sich nur nicht bereit. Das ist die Readiness-Probe." },
+          { t: "Das Image ließ sich nicht laden (ImagePullBackOff).", ok: false,
+            reply: "Nein, das wäre ein ganz anderes Bild. Der Container ist gestartet (steht in den Events) – er sagt nur „noch nicht bereit“. Reine Readiness-Sache." },
+        ]},
+      { type: "terminal", brief: "Service davorstellen", tasks: [
+        { id: "t-j24-3", text: "Stell der Kombüse einen <b>Service</b> voran (Port 80) – der verteilt den Verkehr auf die bereiten Pods.",
+          accept: [/^kubectl\s+expose\s+deployment\s+kombuese\s+--port[=\s]80$/], check: (sim: Sim) => sim.services.some(s => s.name === "kombuese"),
+          solution: "kubectl expose deployment kombuese --port=80", hint: "Muster: kubectl expose deployment <name> --port=<zahl>" },
+      ]},
+      { type: "teach", brief: "Wer bedient wirklich?", cmd: {
+        id: "t-endpoints", intro: "🆕 Neuer Befehl: <code>kubectl get endpoints</code> (kurz <code>ep</code>) – zeigt, welche Pods ein Service <b>tatsächlich</b> bedient. Nur <b>bereite</b> Pods stehen hier.",
+        text: "Schau, welche Endpoints der Service <code>kombuese</code> hat. (Spoiler: <code>&lt;none&gt;</code> – der nicht-bereite Pod fehlt!)",
+        accept: [/^kubectl\s+get\s+(endpoints|endpoint|ep)\s+kombuese$/],
+        solution: "kubectl get endpoints kombuese",
+        hint: "Muster: kubectl get endpoints <service>" } },
+      { type: "dialog", npc: "juno", lines: [
+        "Da hast du den Beweis: Service vorhanden, Pod läuft – aber <code>ENDPOINTS &lt;none&gt;</code>. Die rote Readiness-Probe hält den Pod aus dem Service raus, damit kein Gast vor einer halb gestarteten Küche steht. Genau dafür ist Readiness da.",
+        "Und der Grund? Der Probe-Pfad <code>/ready</code> antwortet erst grün, wenn die Kombüse ihre <b>Speisekarte</b> hat – ein Secret namens <code>kombuese-menue</code>. Leg es an. Achte danach drauf: Du wirst <b>nicht</b> neu starten müssen!",
+      ]},
+      { type: "terminal", brief: "Ursache beheben & beobachten", tasks: [
+        { id: "t-j24-4", text: "Leg das fehlende Secret <code>kombuese-menue</code> an (Wert frei wählbar).",
+          accept: [/^kubectl\s+create\s+secret\s+generic\s+kombuese-menue\s+--from-literal[=\s][\w.-]+=\S+$/],
+          solution: "kubectl create secret generic kombuese-menue --from-literal=menue=fischeintopf",
+          hint: "kubectl create secret generic <name> --from-literal=k=v" },
+        { id: "t-j24-5", text: "Kein <code>rollout restart</code>! Frag einfach nochmal die Endpoints ab – die Probe prüft von selbst weiter.",
+          accept: [/^kubectl\s+get\s+(endpoints|endpoint|ep)\s+kombuese$/],
+          check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "kombuese"); return !!d && !d.broken && sim.services.some(s => s.name === "kombuese"); },
+          solution: "kubectl get endpoints kombuese", hint: "Gleicher Befehl wie eben – jetzt steht eine Pod-IP drin statt <none>." },
+        { id: "t-j24-6", text: "Gegenprobe mit <code>get pods</code>: READY müsste jetzt <code>1/1</code> sein.",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/],
+          check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "kombuese"); return !!d && !d.broken; },
+          solution: "kubectl get pods", hint: "READY 1/1, Status Running – ganz ohne Neustart." },
+      ]},
+      { type: "dialog", npc: "juno", lines: [
+        "Merk dir den Unterschied fürs Leben: <b>Liveness</b> schlägt fehl → Pod wird neu gestartet. <b>Readiness</b> schlägt fehl → Pod läuft weiter, fliegt aber aus dem Service, bis er bereit ist. Beim Rollout schützt das deine Nutzer: Traffic geht erst auf neue Pods, wenn sie wirklich bereit sind.",
+        "Und du hast's gesehen: Ursache behoben → Readiness wird von selbst grün, kein Neustart nötig. Das ist der feine Unterschied zum Crash. Sturmwache-würdig, Lotse! ⚓",
+      ]},
+    ]},
 ];
