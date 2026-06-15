@@ -1,0 +1,53 @@
+/* ===== Inhalte: Fortschritt, Shop & Figuren =====
+ * Ränge (XP-Schwellen), Shop-Angebot, NPC-Stammdaten und Spieler-Sprites.
+ * Reine Daten, ohne Logik.
+ */
+
+/* ---------- Ränge (geschlechtsneutral) ---------- */
+export const RANKS = [
+  { xp: 0,    name: "Landratte",  icon: "🦔" },
+  { xp: 110,  name: "Moses",      icon: "🧽" },
+  { xp: 280,  name: "Deckshand",  icon: "🧹" },
+  { xp: 520,  name: "Matrose",    icon: "⚓" },
+  { xp: 820,  name: "Maat",       icon: "🪢" },
+  { xp: 1200, name: "Steuermaat", icon: "☸️" },
+  { xp: 1700, name: "Navigator",  icon: "🧭" },
+  { xp: 2300, name: "Käpt'n",     icon: "🫡" },
+  { xp: 3000, name: "Admiral",    icon: "🏅" },
+];
+
+/* ---------- Shop ---------- */
+export const SHOP = [
+  { id: "fernrohr", icon: "🔭", name: "Hinweis-Fernrohr", price: 25, type: "consumable",
+    desc: "Zeigt dir beim Funken einen Hinweis zur aktuellen Aufgabe. Einmal benutzbar." },
+  { id: "kompass", icon: "🧭", name: "Lösungs-Kompass", price: 50, type: "consumable",
+    desc: "Verrät dir beim Funken die komplette Lösung der aktuellen Aufgabe. Einmal benutzbar." },
+  { id: "pet-ratte", icon: "🐀", sprite: 124, tex: "pet_ratte", name: "Hafenratte Taki", price: 150, type: "pet",
+    desc: "Folgt dir überallhin. Hat schon mehr Häfen gesehen als jeder Admiral." },
+  { id: "pet-fledermaus", icon: "🦇", sprite: 120, tex: "pet_fledermaus", name: "Fledermaus Echo", price: 250, type: "pet",
+    desc: "Flattert hinter dir her. Findet jeden Weg – auch im Dunkeln." },
+  { id: "pet-geist", icon: "👻", sprite: 121, tex: "pet_geist", name: "Archiv-Geist Plotter", price: 400, type: "pet",
+    desc: "Spukt seit Jahren im Kartenhaus. Kennt YAML auswendig. Gruselig." },
+  { id: "flagge-lila", icon: "🟪", color: 0x9b6bdf, name: "Lila Schiffsflagge", price: 80, type: "flag",
+    desc: "Dein Schiff am Pier zeigt Flagge – in Edel-Lila." },
+  { id: "flagge-gruen", icon: "🟩", color: 0x6fdc8c, name: "Grüne Schiffsflagge", price: 80, type: "flag",
+    desc: "Grün wie ein frisch deploytes Release." },
+  { id: "flagge-pirat", icon: "🏴‍☠️", color: 0x202028, name: "Piratenflagge", price: 150, type: "flag",
+    desc: "Arrr! Streng genommen nicht erlaubt. Ole drückt ein Auge zu." },
+  { id: "kanone", icon: "💣", name: "Hafen-Kanone", price: 300, type: "upgrade",
+    desc: "Steht danach am Dock. Piraten-Überfälle bringen dir +50% Kopfgeld." },
+];
+
+/* ---------- NPCs ---------- */
+export const NPCS = {
+  ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100, tex: "char_ole" },
+  bo:     { name: "Bo",            title: "Dock-Golem",      sprite: 109, tex: "char_bo" },
+  ada:    { name: "Ada",           title: "Kartenhaus",      sprite: 84,  tex: "char_ada" },
+  runa:   { name: "Runa",          title: "Werftchefin",     sprite: 87, tex: "char_runa" },
+  theo:   { name: "Theo",          title: "Landvermessung",  sprite: 111, tex: "char_theo" },
+  pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
+  kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
+  juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
+};
+
+export const PLAYER_SPRITES = [85, 88, 98, 99, 112, 96];
