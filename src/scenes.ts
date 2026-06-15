@@ -10,8 +10,8 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove } from "./world";
-import { keys, setWorldScene } from "./runtime";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, type Door } from "./world";
+import { keys, setWorldScene, setInteriorOpen } from "./runtime";
 import { pickPlacements, strSeed, hash01 } from "./decor";
 
   const T = 16;
@@ -41,7 +41,7 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
 
   // Sheets werden nach dem Laden in 16er-Frames geschnitten; plains bleiben ganze Bilder.
   const BOOT_SHEETS: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
+  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "mushroom", "seashell", "driftwood", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
 
   class BootScene extends Phaser.Scene {
     [key: string]: any;
@@ -102,6 +102,9 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
       this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
       this.scatter("rock", 14, 0.45, [0, 1, 2, -3], true); // Steine: solide, auch am Strand
       this.scatter("lamppost", 4, 0.55, [0, 1, 2], true);  // ein paar Hafenlaternen
+      this.scatter("mushroom", 10, 0.28, [0, 1, 2]);       // Pilze: kleine Wald-/Wiesendeko, begehbar (#7)
+      this.scatter("seashell", 8, 0.22, [-3]);             // Muscheln: nur am Sandstrand (#7)
+      this.scatter("driftwood", 5, 0.3, [-3]);             // Treibholz: nur am Sandstrand (#7)
 
       this.splash = this.add.particles(0, 0, "px", {
         speed: { min: 25, max: 80 }, angle: { min: 200, max: 340 }, gravityY: 140,
@@ -288,6 +291,29 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
       const spots = [[5, 5], [7, 3], [15, 4], [20, 6], [33, 5], [36, 4], [44, 5], [47, 8], [47, 13], [36, 15], [20, 12], [5, 17], [3, 21], [8, 20], [18, 16], [34, 9], [30, 7], [45, 15], [37, 22], [6, 22], [21, 21]];
       spots.forEach(([x, y]) => this.tree(x, y));
       this.deco(16, 21, "town", 29, false);   // Pilze (Kenney) – noch kein PixelLab-Ersatz, bleibt vorerst
+
+      this.carveDoors();   // #6: Häuser betretbar machen
+    }
+
+    /** #6: In jede Gebäude-Front eine begehbare Tür schneiden (Solid-Kachel der
+     *  unteren Mittel-Kachel wieder freigeben) und sichtbar markieren. Das
+     *  Betreten erkennt update() über doorAt() der reinen world-Geometrie. */
+    carveDoors() {
+      for (const d of DOORS) {
+        this.solidGrid[d.ty * this.W + d.tx] = 0;
+        this.makeDoor(d.tx, d.ty);
+      }
+    }
+
+    /** Eine sichtbare Holztür auf der vorderen Gebäudekante (Fußlinie der Kachel),
+     *  Tiefe knapp vor der Hauswand, damit sie auf der Front sitzt. */
+    makeDoor(tx: number, ty: number) {
+      const cx = tx * T + 8, baseY = (ty + 1) * T;
+      const frame = this.add.rectangle(0, 0, 12, 15, 0x33210f).setOrigin(0.5, 1);   // dunkler Rahmen
+      const leaf = this.add.rectangle(0, -1, 9, 12, 0x6b4a2a).setOrigin(0.5, 1);     // Türblatt
+      const seam = this.add.rectangle(0, -1, 1, 12, 0x4a3219).setOrigin(0.5, 1);     // Mittelfuge
+      const knob = this.add.circle(2.5, -6, 1, 0xffd97a);                            // Türknauf
+      this.add.container(cx, baseY, [frame, leaf, seam, knob]).setDepth(baseY + 0.5);
     }
 
     renderGround() {
@@ -675,6 +701,21 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
       return best;
     }
 
+    /** #6: Haus betreten – WorldScene schlafen legen (friert + blendet sie aus)
+     *  und die InteriorScene als eigene Szene starten. Der Spieler wird vorher
+     *  vor die Tür gesetzt, damit ein Speichern/Neuladen draußen landet (sonst
+     *  würde man beim Laden direkt wieder in der Tür stehen). */
+    enterInterior(door: Door) {
+      const pl = this.playerPos;
+      pl.x = door.tx * T + 8;
+      pl.y = (door.ty + 1) * T + 4;   // eine Kachel unter der Tür, draußen
+      pl.face = "south"; pl.moving = false;
+      SFX.door();
+      setInteriorOpen(true);
+      this.scene.launch("Interior", { door });
+      this.scene.sleep();
+    }
+
     /* ============ Effekte (von der UI aufrufbar) ============ */
     burstAt(x: number, y: number, kind: string) {
       const e = kind === "splash" ? this.splash : kind === "dust" ? this.dust : this.sparkle;
@@ -1006,6 +1047,13 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
         this.stepAcc += dt;
         if (this.stepAcc > 0.3) { this.stepAcc = 0; this.dust.explode(2, pl.x, pl.y + 6); }
       }
+
+      // #6: Auf einer Tür-Kachel? -> Haus betreten (Rest dieses Frames überspringen).
+      if (!blocked) {
+        const door = doorAt(pl.x, pl.y);
+        if (door) { this.enterInterior(door); return; }
+      }
+
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
       // Echte 4-Richtungs-Sprites aus PixelLab (south = Basis-Textur char_player)
       const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
@@ -1083,4 +1131,141 @@ import { pickPlacements, strSeed, hash01 } from "./decor";
     }
   }
 
-  export const KQScenes = { BootScene, WorldScene };
+  /* ===== InteriorScene (#6) – betretbarer Hausinnenraum =====
+   * Wird von WorldScene.enterInterior() als eigene Szene gestartet, während die
+   * WorldScene schläft (eingefroren + ausgeblendet). Ein kleiner gekachelter
+   * Raum aus vorhandenen dungeon-Tiles, themengerechte Möbel, die NPC-Figur des
+   * Hauses und eine Tür-Schwelle unten zum Hinausgehen (E oder runterlaufen). */
+  const INTERIORS: Record<string, { frame: number; tx: number; ty: number }[]> = {
+    office: [{ frame: TABLE, tx: 3, ty: 2 }, { frame: DEVICE, tx: 7, ty: 2 }, { frame: BOOK, tx: 8, ty: 2 }, { frame: CRATE, tx: 2, ty: 5 }, { frame: BARREL, tx: 8, ty: 5 }],
+    forge:  [{ frame: ANVIL, tx: 3, ty: 2 }, { frame: TABLE, tx: 7, ty: 2 }, { frame: DEVICE, tx: 8, ty: 2 }, { frame: BARREL, tx: 2, ty: 5 }, { frame: CRATE, tx: 8, ty: 5 }],
+    chart:  [{ frame: TABLE, tx: 3, ty: 2 }, { frame: BOOK, tx: 7, ty: 2 }, { frame: BOOK, tx: 8, ty: 2 }, { frame: CRATE, tx: 2, ty: 5 }, { frame: BARREL, tx: 8, ty: 5 }],
+  };
+
+  class InteriorScene extends Phaser.Scene {
+    [key: string]: any;
+    constructor() { super("Interior"); }
+
+    create(data: { door: Door }) {
+      const door = data.door;
+      this.door = door;
+      const RW = 11, RH = 8;
+      this.RW = RW; this.RH = RH;
+      this.solid = new Uint8Array(RW * RH);
+      this.exitTx = Math.floor(RW / 2);   // 5
+      this.exitTy = RH - 1;               // 7 (Tür-Schwelle unten Mitte)
+
+      // Boden (Holz) + Wände (Stein); Schwelle unten Mitte bleibt frei.
+      const rt = this.add.renderTexture(0, 0, RW * T, RH * T).setOrigin(0).setDepth(0);
+      for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+        const wall = y === 0 || x === 0 || x === RW - 1 || (y === RH - 1 && x !== this.exitTx);
+        if (wall) { rt.drawFrame("dungeon", STONE[(x + y) % STONE.length], x * T, y * T); this.solid[y * RW + x] = 1; }
+        else rt.drawFrame("dungeon", WOOD[(x * 3 + y) % WOOD.length], x * T, y * T);
+      }
+      // Tür-Schwelle (Ausgangs-Matte) optisch markieren
+      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 12, 14, 0x6b4a2a).setOrigin(0.5, 1).setDepth(1);
+      this.add.rectangle(this.exitTx * T + 8, this.exitTy * T + T, 9, 3, 0x2a1c0d).setOrigin(0.5, 1).setDepth(1.1);
+
+      // Themengerechte Möbel (solide, damit man sie nicht durchläuft)
+      for (const f of (INTERIORS[door.theme] || [])) {
+        this.add.image(f.tx * T + 8, f.ty * T + 12, "dungeon", f.frame).setOrigin(0.5, 0.7).setDepth(f.ty * T + T);
+        this.solid[f.ty * RW + f.tx] = 1;
+      }
+
+      // NPC-Figur des Hauses (Deko – reden weiterhin draußen) + Namensschild
+      const meta = (KQContent.NPCS as any)[door.npc];
+      const ntx = this.exitTx, nty = 2;
+      this.solid[nty * RW + ntx] = 1;
+      const nbaseY = nty * T + 15;
+      this.add.ellipse(ntx * T + 8, nty * T + 15, 10, 4, 0x000000, 0.26).setDepth(1.6);
+      const npc = meta && meta.tex
+        ? this.add.image(ntx * T + 8, nbaseY, meta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(nty * T + T)
+        : this.add.image(ntx * T + 8, nty * T + 8, "dungeon", meta ? meta.sprite : 0).setDepth(nty * T + T);
+      this.tweens.add({ targets: npc, y: npc.y - 1, duration: 1000, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
+      // Spieler vor der Schwelle
+      this.pl = { x: this.exitTx * T + 8, y: (this.exitTy - 1) * T + 8, face: "north", moving: false };
+      this.bobT = 0;
+      this.pShadow = this.add.ellipse(this.pl.x, this.pl.y + 6, 10, 4, 0x000000, 0.26).setDepth(1.6);
+      this.pSprite = this.add.image(this.pl.x, this.pl.y + 6, "char_player").setOrigin(0.5, 0.81).setScale(0.6).setDepth(this.pl.y + 8);
+
+      // Kamera: Raum füllend, mit dunklem Innenraum-Hintergrund
+      const cam = this.cameras.main;
+      cam.setBounds(0, 0, RW * T, RH * T);
+      cam.setBackgroundColor(0x140f0a);
+      cam.centerOn(RW * T / 2, RH * T / 2);
+      const fit = Math.min(window.innerWidth / (RW * T), window.innerHeight / (RH * T)) * 0.85;
+      cam.setZoom(Phaser.Math.Clamp(fit, 2.4, 6));
+
+      // Fixierte Beschriftung (oben Titel, unten Hinweis)
+      const cw = cam.width, ch = cam.height;
+      const npcName = meta ? meta.name + " · " + meta.title : "";
+      this.add.text(cw / 2, 12, "🚪 " + door.title, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
+        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      if (npcName) this.add.text(cw / 2, 32, npcName, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "11px", color: "#cdd9e8", resolution: 2 })
+        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      this.add.text(cw / 2, ch - 22, "E – Hinausgehen   ·   ↓ durch die Tür", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "12px", color: "#ffd97a", resolution: 2 })
+        .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+
+      // E war beim Betreten evtl. noch gedrückt – erst nach Loslassen reagieren.
+      this.ePrev = true;
+    }
+
+    isSolid(px: number, py: number) {
+      const tx = Math.floor(px / T), ty = Math.floor(py / T);
+      if (tx < 0 || ty < 0 || tx >= this.RW || ty >= this.RH) return true;
+      return !!this.solid[ty * this.RW + tx];
+    }
+
+    tryMove(dx: number, dy: number) {
+      const pl = this.pl;
+      const probe = (nx: number, ny: number) =>
+        this.isSolid(nx - 4, ny - 2) || this.isSolid(nx + 4, ny - 2) ||
+        this.isSolid(nx - 4, ny + 5) || this.isSolid(nx + 4, ny + 5);
+      if (!probe(pl.x + dx, pl.y)) pl.x += dx;
+      if (!probe(pl.x, pl.y + dy)) pl.y += dy;
+    }
+
+    exitInterior() {
+      SFX.door();
+      setInteriorOpen(false);
+      this.scene.wake("World");
+      this.scene.stop();
+    }
+
+    update(_time: number, delta: number) {
+      const dt = Math.min(0.05, delta / 1000);
+      const pl = this.pl;
+      const blocked = UI.blocking();
+
+      let dx = 0, dy = 0;
+      if (!blocked) {
+        if (keys["w"] || keys["ArrowUp"]) dy -= 1;
+        if (keys["s"] || keys["ArrowDown"]) dy += 1;
+        if (keys["a"] || keys["ArrowLeft"]) dx -= 1;
+        if (keys["d"] || keys["ArrowRight"]) dx += 1;
+      }
+      pl.moving = dx !== 0 || dy !== 0;
+      if (pl.moving) {
+        const len = Math.hypot(dx, dy);
+        if (dx < 0) pl.face = "west";
+        else if (dx > 0) pl.face = "east";
+        else if (dy < 0) pl.face = "north";
+        else if (dy > 0) pl.face = "south";
+        this.tryMove(dx / len * 70 * dt, dy / len * 70 * dt);
+        this.bobT += dt * 12;
+      }
+      const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
+      const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
+      this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
+      this.pShadow.setPosition(pl.x, pl.y + 6);
+
+      // Hinausgehen: E (Flanke) oder auf der Tür-Schwelle stehen.
+      const e = !blocked && (!!keys["e"] || !!keys["Enter"] || !!keys[" "]);
+      const onExit = Math.floor(pl.x / T) === this.exitTx && Math.floor(pl.y / T) === this.exitTy;
+      if (!blocked && ((e && !this.ePrev) || onExit)) { this.exitInterior(); return; }
+      this.ePrev = e;
+    }
+  }
+
+  export const KQScenes = { BootScene, WorldScene, InteriorScene };
