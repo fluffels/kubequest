@@ -171,6 +171,12 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     return { text: "Lege ein Secret <code>" + name + "</code> mit <code>--from-literal=passwort=geheim" + rnd(10, 99) + "x</code> an. (Wert frei wählbar!)", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+generic\\s+" + name + "\\s+--from-literal[=\\s][\\w.-]+=\\S+$")], solution: "kubectl create secret generic " + name + " --from-literal=passwort=geheim123", hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert" };
   },
   "k-get-secrets": () => ({ text: "Zeig alle Secrets an.", accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …" }),
+  "k-secret-tls": sim => {
+    let name = pick(["hafen-tls", "kasse-tls", "lager-tls"]);
+    while (sim.secrets.some(s => s.name === name)) name = "tor-tls-" + rnd(100, 9999);
+    return { text: "Lege ein TLS-Secret <code>" + name + "</code> aus <code>tls.crt</code> und <code>tls.key</code> an.", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+tls\\s+" + name + "\\s+(?=.*--cert[=\\s]\\S+)(?=.*--key[=\\s]\\S+).*$")], solution: "kubectl create secret tls " + name + " --cert=tls.crt --key=tls.key", hint: "Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key" };
+  },
+  "k-get-ingress": () => ({ text: "Zeig alle Hafentore (Ingresses) an.", accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch." }),
   "k-logs": sim => {
     const d = ensureDeployment(sim);
     const pod = d.pods[0].name;
@@ -248,7 +254,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
 export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   bo:   [{ drill: "docker-pull", after: "q1" }, { drill: "docker-run", after: "q1" }, { drill: "docker-ps", after: "q2" }, { drill: "docker-stop", after: "q2" }, { drill: "docker-ps-a", after: "q2" }, { drill: "docker-run-named", after: "q3" }],
   ole:  [{ drill: "k-get-nodes", after: "q4" }, { drill: "k-get-pods", after: "q4" }, { drill: "k-describe", after: "q5" }, { drill: "k-create", after: "q6" }, { drill: "k-scale", after: "q6" }, { drill: "k-delete-pod", after: "q7" }, { drill: "k-expose", after: "q7" }, { drill: "k-get-svc", after: "q7" }, { drill: "k-secret", after: "q14" }, { drill: "k-get-secrets", after: "q14" }],
-  ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }],
+  ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }, { drill: "k-secret-tls", after: "q23" }, { drill: "k-get-ingress", after: "q23" }],
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
   juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }],
