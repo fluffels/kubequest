@@ -20,6 +20,8 @@ export interface GameState {
   activeFlag: string | null;
   review: Record<string, { box: number; due: number }>;
   streak: { count: number; lastDay: number };
+  /** Wurde der einmalige Erklär-Toast zum 🔥 Streak bereits gezeigt? */
+  streakHintShown: boolean;
   stats: {
     commands: number;
     reviews: number;
