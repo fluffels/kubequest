@@ -567,3 +567,82 @@ test("networkpolicy: Szenario-Seeding + snapshot/restore erhalten die Mauer", ()
   assert.match(restored.exec("kubectl get netpol").output!, /wall-1/);
   assert.match(restored.exec("kubectl get netpol").output!, /wall-2/);
 });
+
+/* ===================== Health-Checks: Readiness/Liveness – Issue #67 ===================== */
+
+// Kleiner Helfer: ein Deployment, das läuft, aber wegen fehlender Readiness
+// (es fehlt ihm sein Secret) nicht bereit ist – plus Service davor.
+function legeNotreadyDeployment(s: KQSim, name = "kombuese", secret = "kombuese-menue") {
+  s.mergeScenario({ deployments: [{ name, image: "nginx", replicas: 1, broken: { type: "notready", needsSecret: secret } }] });
+  s.exec("kubectl expose deployment " + name + " --port=80");
+}
+
+test("readiness: notready-Pod läuft (Running), ist aber READY 0/1 ohne Restarts", () => {
+  legeNotreadyDeployment(sim);
+  const pods = sim.exec("kubectl get pods");
+  assert.ok(!pods.error);
+  // Genau das Lehrbild: STATUS Running, aber READY 0/1 – kein Crash, keine Restarts.
+  assert.match(pods.output!, /kombuese-\S+\s+0\/1\s+Running\s+0\b/);
+  assert.doesNotMatch(pods.output!, /CrashLoopBackOff/);
+});
+
+test("readiness: get endpoints zeigt <none>, solange der Pod nicht bereit ist", () => {
+  legeNotreadyDeployment(sim);
+  const ep = sim.exec("kubectl get endpoints kombuese");
+  assert.ok(!ep.error, "leere Endpoints sind kein Fehler");
+  assert.match(ep.output!, /kombuese\s+<none>/, "nicht-bereiter Pod fehlt im Service");
+  // Kurzform 'ep' liefert dasselbe.
+  assert.match(sim.exec("kubectl get ep kombuese").output!, /<none>/);
+});
+
+test("readiness: describe pod nennt die fehlgeschlagene Readiness-Probe + Ready: 0/1", () => {
+  legeNotreadyDeployment(sim);
+  const podName = sim.deployments.find(d => d.name === "kombuese")!.pods[0].name;
+  const d = sim.exec("kubectl describe pod " + podName);
+  assert.ok(!d.error);
+  assert.match(d.output!, /Readiness probe failed/);
+  assert.match(d.output!, /Ready:\s+0\/1/);
+  // Es LÄUFT trotzdem – Status bleibt Running (liveness ok).
+  assert.match(d.output!, /Status:\s+Running/);
+});
+
+test("readiness: Secret anlegen macht den Pod von SELBST bereit – ohne rollout restart", () => {
+  legeNotreadyDeployment(sim);
+  // Ursache beheben: das Secret, an dem die Readiness-Probe hängt.
+  assert.match(sim.exec("kubectl create secret generic kombuese-menue --from-literal=menue=fisch").output!, /created/);
+  // KEIN Neustart! Allein das nächste Abfragen lässt die Probe durchgehen.
+  const ep = sim.exec("kubectl get endpoints kombuese");
+  assert.match(ep.output!, /kombuese\s+10\.244\.1\.20:80/, "bereiter Pod taucht als Endpoint auf");
+  assert.match(sim.exec("kubectl get pods").output!, /kombuese-\S+\s+1\/1\s+Running/);
+  assert.equal(sim.deployments.find(d => d.name === "kombuese")!.broken, null, "notready ist geheilt");
+});
+
+test("readiness: das FALSCHE Secret heilt NICHT (kein False Positive)", () => {
+  legeNotreadyDeployment(sim);
+  sim.exec("kubectl create secret generic irgendwas-anderes --from-literal=k=v");
+  // Solange das benötigte Secret fehlt, bleibt der Pod draußen.
+  assert.match(sim.exec("kubectl get endpoints kombuese").output!, /<none>/);
+  assert.match(sim.exec("kubectl get pods").output!, /kombuese-\S+\s+0\/1\s+Running/);
+  assert.ok(sim.deployments.find(d => d.name === "kombuese")!.broken, "notready besteht weiter");
+});
+
+test("readiness: ein GESUNDES Deployment liefert echte Endpoints (Gegenprobe)", () => {
+  sim.exec("kubectl create deployment kantine --image=nginx");
+  sim.exec("kubectl expose deployment kantine --port=80");
+  const ep = sim.exec("kubectl get endpoints kantine");
+  assert.match(ep.output!, /kantine\s+10\.244\.1\.20:80/, "gesunder Pod ist sofort Endpoint");
+  assert.doesNotMatch(ep.output!, /<none>/);
+});
+
+test("endpoints: unbekannter Service meldet NotFound", () => {
+  const miss = sim.exec("kubectl get endpoints gibtsnicht");
+  assert.ok(miss.error);
+  assert.match(miss.output!, /NotFound/);
+});
+
+test("deployments-Liste spiegelt Readiness: notready zeigt 0/1, geheilt 1/1", () => {
+  legeNotreadyDeployment(sim);
+  assert.match(sim.exec("kubectl get deployments").output!, /kombuese\s+0\/1/);
+  sim.exec("kubectl create secret generic kombuese-menue --from-literal=menue=fisch");
+  assert.match(sim.exec("kubectl get deployments").output!, /kombuese\s+1\/1/);
+});
