@@ -489,7 +489,7 @@ import { worldScene, interiorOpen } from "./runtime";
           return this._drillTask;
         }
         const tasks = Game.stepTasks(step);
-        return tasks[Game.state.taskIdx || 0] || null;
+        return (tasks && tasks[Game.state.taskIdx || 0]) || null;
       }
       return null;
     },
