@@ -34,6 +34,19 @@ test("docker: pull, run, ps, stop, ps -a", () => {
   assert.match(sim.exec("docker ps -a").output!, /Exited/);
 });
 
+test("docker run: Flags nach dem Image gelten nicht (echte Reihenfolge: Optionen VOR dem Image)", () => {
+  // Häufiger Anfängerfehler: --name/-d hinter das Image gesetzt
+  const r = sim.exec("docker run nginx --name webserver -d");
+  assert.ok(r.error, "Flags nach dem Image müssen abgelehnt werden");
+  assert.ok(!sim.docker.containers.some(c => c.name === "webserver"), "es darf KEIN Container 'webserver' angelegt werden");
+  // korrekte Reihenfolge legt den Hintergrund-Container an
+  assert.ok(!sim.exec("docker run -d --name webserver nginx").error, "korrekte Reihenfolge geht durch");
+  const c = sim.docker.containers.find(c => c.name === "webserver");
+  assert.ok(c && c.running, "webserver läuft im Hintergrund");
+  // ein echter Container-Befehl nach dem Image ist erlaubt (kein Flag)
+  assert.ok(!sim.exec("docker run --name echo-test nginx echo hallo").error, "Befehl nach dem Image ist ok");
+});
+
 test("kubectl: create, scale, self-healing nach delete", () => {
   sim.exec("kubectl create deployment kasse --image=nginx");
   sim.exec("kubectl scale deployment kasse --replicas=3");

@@ -480,15 +480,23 @@ export interface Scenario {
       }
 
       if (sub === "run") {
-        // docker run [-d] [--name X] [-p a:b] IMAGE
-        let name: string | null = null, image: string | null = null;
+        // docker run [-d] [--name X] [-p a:b] IMAGE [BEFEHL ...]
+        // Reihenfolge wie echtes Docker: Optionen stehen VOR dem Image. Sobald das
+        // Image gelesen ist, gehört alles Weitere zum Container-Befehl – Flags danach
+        // wirken NICHT (sonst lernt man die falsche Reihenfolge, siehe Issue #17).
+        let name: string | null = null, image: string | null = null, flagAfterImage = false;
         for (let i = 2; i < t.length; i++) {
+          if (image) {                                   // alles nach dem Image = Container-Befehl
+            if (t[i].startsWith("-")) flagAfterImage = true;
+            continue;
+          }
           if (t[i] === "--name") { name = t[i + 1]; i++; }
           else if (t[i] === "-d" || t[i] === "--detach") { /* ok */ }
           else if (t[i] === "-p" || t[i] === "--publish") { i++; }
           else if (!t[i].startsWith("-")) image = t[i];
         }
         if (!image) return this._err("docker run: Es fehlt das Image.", "z.B. 'docker run -d --name webserver nginx'");
+        if (flagAfterImage) return this._err("docker run: Optionen wie -d/--name müssen VOR das Image.", "Alles nach dem Image ist der Container-Befehl. Muster: docker run [-d] [--name <name>] <image>");
         const typo = this._checkImageTypo(image);
         if (typo) return typo;
         if (!name) name = image.split(":")[0] + "-" + randSuffix(4);

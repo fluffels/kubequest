@@ -540,10 +540,18 @@ import { SFX } from "./sfx";
         this.taskSolved();
       } else {
         this.failCount++;
-        if (this.failCount >= 3) {
+        const fb = $("tt-feedback");
+        if (fb && this.failCount >= 3) {
+          // nach mehreren Versuchen: zum Hinweis-Knopf lotsen
           this.failCount = 0;
-          const fb = $("tt-feedback");
-          if (fb) fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft – das ist keine Schande!</div>';
+          fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft – das ist keine Schande!</div>';
+        } else if (fb && !result.error) {
+          // Befehl lief fehlerfrei, erfüllt die Aufgabe aber (noch) nicht → SOFORT sanft rückmelden
+          // (sonst bleibt das Spiel stumm, obwohl im Terminal eine Erfolgs-ID steht – siehe Issue #17)
+          const tip = /^docker\s+run\b/.test(norm)
+            ? "Bei <code>docker run</code>: hinter <code>--name</code> steht dein Wunschname, das Image kommt ganz zuletzt – Muster <code>docker run -d --name &lt;name&gt; &lt;image&gt;</code>."
+            : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.";
+          fb.innerHTML = '<div class="tt-feedback">❌ Fast – der Befehl lief durch, erfüllt die Aufgabe aber noch nicht. ' + tip + '</div>';
         }
       }
     },
