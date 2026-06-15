@@ -37,7 +37,7 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
-**26 Quests:** Einstieg (1) → Docker (4) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (2)** → **CI/CD: Pipeline-Passage (1)** → **Werft-Ausbau: eigenes Helm-Chart (1)** → **Hafenmauer: NetworkPolicy (1)** → **Hafentor: Ingress/TLS (1)** → **Service-Endpoints-Debugging (1)**.
+**27 Quests:** Einstieg (1) → Docker (4) → Kubernetes-Grundlagen (4) → YAML (1) → Helm (3) → Terraform (2) → Security/Secrets (1) → **Sturm-Saison: Troubleshooting (3)** → **Git (3)** → **CI/CD: Pipeline-Passage (1)** → **Werft-Ausbau: eigenes Helm-Chart (1)** → **Hafenmauer: NetworkPolicy (1)** → **Hafentor: Ingress/TLS (1)** → **Service-Endpoints-Debugging (1)**.
 
 Die **Hafenmauer** (bei Sturmwache Juno) führt **NetworkPolicies** ein: Kubernetes ist von Haus aus offen – jeder Pod erreicht jeden. Eine NetworkPolicy schaltet die per Label gewählten Pods auf **default-deny** und lässt nur erlaubte Quellen durch (`kubectl get/describe/apply/delete networkpolicy`). Genau so sichert man im Job z.B. Datenbanken ab.
 
@@ -100,7 +100,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 | Phase | Thema | Status |
 |---|---|---|
 | 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (17 Quests, inkl. eigenes Docker-Image bauen & eigenes Helm-Chart „Werft-Ausbau“) |
-| 2 | Git & Branching-Workflows + CI/CD-Pipelines | ✅ im Spiel (Git: 2 Quests bei Ada; CI/CD: „Pipeline-Passage“) |
+| 2 | Git & Branching-Workflows + CI/CD-Pipelines | ✅ im Spiel (Git: 3 Quests bei Ada; CI/CD: „Pipeline-Passage“) |
 | 3 | Ingress, DNS, TLS, NetworkPolicies | 🟡 teilweise im Spiel: Ingress + TLS („verschlüsseltes Hafentor“ bei Ada) + NetworkPolicies („Hafenmauer“ bei Juno); DNS noch offen |
 | 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🔜 geplant: „GitOps-Archipel“ |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
