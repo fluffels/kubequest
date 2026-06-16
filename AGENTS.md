@@ -36,6 +36,8 @@ Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bünde
 
 **Warum Phaser 3 (und nicht Godot/Unity/MonoGame)?** Bewusst festgehalten als ADR: [`docs/adr/0001-engine-phaser.md`](docs/adr/0001-engine-phaser.md). Kurz: Phaser bedient den Kern-Wert (offline, eine Datei, verschenkbar, Lern-Tool); ein Engine-Wechsel wäre ein kompletter Rewrite für marginalen Gewinn. Native Distribution kommt über einen Wrapper (#83 Tauri), nicht über einen Engine-Wechsel. Re-Evaluierungs-Trigger stehen im ADR. **Vor erneuter „Engine wechseln?"-Diskussion bitte dorthin verweisen.**
 
+**Warum kein Multiplayer/Co-op?** Bewusst festgehalten als ADR: [`docs/adr/0003-multiplayer-coop-out-of-scope.md`](docs/adr/0003-multiplayer-coop-out-of-scope.md). Kurz: KubeQuest bleibt Single-Player – Co-op erzwingt den Backend-Stack (Server/Netcode/DB), den wir bewusst nicht bauen (#85), und bricht den Offline-eine-Datei-Wert; der Lern-Kern ist solo. Architektur nicht dafür verbauen, aber auch nichts proaktiv dafür bauen. **Vor erneuter „Sollten wir Co-op machen?"-Diskussion bitte dorthin verweisen.**
+
 **Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt. Leitidee: Die Spiellogik bleibt **Phaser-frei und damit im Node-Test prüfbar**; nur `scenes.ts`/`ui.ts` fassen Phaser bzw. das DOM an. Deshalb liegen z.B. Welt-Geometrie (`world.ts`), Deko-Platzierung (`decor.ts`) und HUD-Uhr (`clock.ts`) bewusst **außerhalb** von `scenes.ts`.
 
 - **pure Domäne** (kein Phaser, voll unit-testbar): `sim.ts` (Cluster-Simulator), `content.ts` (Fassade über `src/content/*`: Quests/Drills/Quiz/NPCs/Progression/Minispiel), `world.ts`, `decor.ts`, `clock.ts`.
