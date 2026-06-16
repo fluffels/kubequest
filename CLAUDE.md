@@ -50,7 +50,7 @@
 | [`src/scenes.ts`](src/scenes.ts) | Präsentation | Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake |
 | [`src/ui.ts`](src/ui.ts) | Präsentation | Dialoge, Funkgerät, Shop, Quiz, Minispiel |
 | [`src/sfx.ts`](src/sfx.ts) | Präsentation | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
-| [`src/assets-data.ts`](src/assets-data.ts) | Assets | Spritesheets als `import`s (Single-File-Build inlinet sie als Data-URI) |
+| [`src/assets-data.ts`](src/assets-data.ts) | Assets | `ASSET_MANIFEST` – die eine Quelle pro Grafik (Key/Pfad/Typ/Spalten); BootScene leitet Laden+Slicing daraus ab, Single-File-Build inlinet sie als Data-URI |
 
 > Tiefe Architektur-Begründung (Schichtung Domäne ↔ Anwendung ↔ Präsentation): [AGENTS.md › Architektur](AGENTS.md#architektur).
 
