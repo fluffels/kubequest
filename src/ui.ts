@@ -5,7 +5,7 @@
 import { Game } from "./game";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
-import { SFX } from "./sfx";
+import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
@@ -195,11 +195,18 @@ import { worldScene, interiorOpen } from "./runtime";
     renderAudioSettings() {
       const a = Game.state.audio;
       const pct = (v: number) => Math.round(v * 100);
+      const trackOpts = MUSIC_THEMES.map(t =>
+        '<option value="' + t.id + '"' + (a.track === t.id ? " selected" : "") + ">" + t.label + "</option>"
+      ).join("");
       $("menu-audio").innerHTML =
         '<h3 class="menu-audio-title">🔊 Audio</h3>' +
         '<div class="audio-row">' +
         '<label><input type="checkbox" data-audio="music"' + (a.music ? " checked" : "") + '> 🎵 Musik</label>' +
         '<input type="range" min="0" max="100" value="' + pct(a.musicVol) + '" data-audio="musicVol" aria-label="Musik-Lautstärke">' +
+        '</div>' +
+        '<div class="audio-row">' +
+        '<label>🎼 Musikstück</label>' +
+        '<select data-audio="track" aria-label="Musikstück">' + trackOpts + '</select>' +
         '</div>' +
         '<div class="audio-row">' +
         '<label><input type="checkbox" data-audio="sfx"' + (a.sfx ? " checked" : "") + '> 🔔 Soundeffekte</label>' +
@@ -214,6 +221,7 @@ import { worldScene, interiorOpen } from "./runtime";
         case "music": a.music = el.checked; SFX.setMusicEnabled(a.music); break;
         case "sfx": a.sfx = el.checked; SFX.setSfxEnabled(a.sfx); if (a.sfx) SFX.coin(); break;
         case "musicVol": a.musicVol = Number(el.value) / 100; SFX.setMusicVol(a.musicVol); break;
+        case "track": a.track = el.value; SFX.setTrack(a.track); if (a.sfx) SFX.coin(); break;
         case "sfxVol": a.sfxVol = Number(el.value) / 100; SFX.setSfxVol(a.sfxVol); if (a.sfx) SFX.coin(); break;
         default: return;
       }

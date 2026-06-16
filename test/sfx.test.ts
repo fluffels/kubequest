@@ -7,6 +7,7 @@ import { test, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { vi } from "vitest";
 
 let SFX: typeof import("../src/sfx").SFX;
+let MUSIC_THEMES: typeof import("../src/sfx").MUSIC_THEMES;
 
 // ---- Minimaler Fake-WebAudio-Graph ----
 class FakeParam {
@@ -38,14 +39,14 @@ class FakeCtx {
 
 beforeAll(async () => {
   vi.stubGlobal("window", { AudioContext: FakeCtx });
-  ({ SFX } = await import("../src/sfx"));
+  ({ SFX, MUSIC_THEMES } = await import("../src/sfx"));
 });
 
 beforeEach(() => {
   // Frischer Context + Default-Einstellungen vor jedem Test.
   SFX.stopMusic();
   SFX.ctx = null;
-  SFX.cfg = { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 };
+  SFX.cfg = { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" };
 });
 
 afterEach(() => {
@@ -109,6 +110,45 @@ test("applyConfig: übernimmt Spielstand-Werte und stoppt Musik bei music=false"
   expect(SFX.cfg.musicVol).toBe(0.3);
   expect(SFX.cfg.sfxVol).toBe(0.2);
   expect(SFX.music.playing).toBe(false); // wurde gestoppt
+});
+
+test("Themes: mindestens 3 auswählbare Stücke mit eindeutigen IDs, Default 'hafen'", () => {
+  expect(MUSIC_THEMES.length).toBeGreaterThanOrEqual(3); // Akzeptanzkriterium: ≥3
+  const ids = MUSIC_THEMES.map(t => t.id);
+  expect(new Set(ids).size).toBe(ids.length); // keine Doppel-ID
+  expect(ids).toContain("hafen");
+  expect(SFX.cfg.track).toBe("hafen"); // Default
+  // _theme() liefert genau das gewählte Theme.
+  SFX.cfg.track = "nacht";
+  expect(SFX._theme().id).toBe("nacht");
+});
+
+test("setTrack: wechselt den Track, startet bei Takt 0 und ignoriert unbekannte IDs", () => {
+  SFX.setMusicEnabled(true);
+  SFX.music.step = 7;
+  SFX.setTrack("nacht");
+  expect(SFX.cfg.track).toBe("nacht");
+  expect(SFX.music.step).toBe(0); // sauberer Neustart des Loops
+
+  // Negativfall: unbekannte ID lässt Track UND Schrittzähler unverändert.
+  SFX.music.step = 3;
+  SFX.setTrack("gibtsnicht");
+  expect(SFX.cfg.track).toBe("nacht");
+  expect(SFX.music.step).toBe(3);
+});
+
+test("setTrack: unbekannte ID bei laufender Musik fällt _theme() trotzdem nicht durch", () => {
+  // Selbst wenn cfg.track manuell auf Müll stünde, darf nie undefined kommen.
+  SFX.cfg.track = "kaputt";
+  expect(SFX._theme()).toBe(MUSIC_THEMES[0]); // Fallback auf Default
+});
+
+test("applyConfig: übernimmt bekannten Track, ignoriert unbekannten (kein Durchschlagen)", () => {
+  SFX.applyConfig({ track: "insel" });
+  expect(SFX.cfg.track).toBe("insel");
+  // Negativfall: unbekannte ID darf den gültigen Track NICHT überschreiben.
+  SFX.applyConfig({ track: "quatsch" });
+  expect(SFX.cfg.track).toBe("insel");
 });
 
 test("ensure: startet Musik nach erster Interaktion, aber nicht doppelt", () => {
