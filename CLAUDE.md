@@ -54,7 +54,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Datei | Schicht | Inhalt |
 |---|---|---|
 | [`src/main.ts`](src/main.ts) | Einstieg | Start & Tastatursteuerung |
-| [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl, helm, terraform, secrets, git) |
+| [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl, helm, terraform, git, argocd/GitOps) |
 | [`src/content.ts`](src/content.ts) | pure Domäne | Fassade: bündelt `src/content/*` (Quests, Drills, Quiz, NPCs, Progression, Minispiel) zum `KQContent`-Objekt |
 | [`src/world.ts`](src/world.ts) | pure Domäne | Welt-Geometrie (Kachelraster, NPC-Standplätze, Solid-Kacheln) – Phaser-frei, von `scenes.ts` genutzt |
 | [`src/decor.ts`](src/decor.ts) | pure Domäne | Deterministische Deko-Platzierung (Büsche, Steine, Laternen, Blumen) – Phaser-frei |
