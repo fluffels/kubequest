@@ -206,6 +206,12 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const d = ensureDeployment(sim);
     return { text: "Starte alle Pods von <code>" + d.name + "</code> sauber neu (Rolling Restart).", accept: [new RegExp("^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]" + d.name + "$")], solution: "kubectl rollout restart deployment " + d.name, hint: "Muster: kubectl rollout restart deployment <name>" };
   },
+  "k-set-resources": sim => {
+    const d = ensureDeployment(sim);
+    const lim = pick([128, 256, 512]);
+    const req = lim / 2;
+    return { text: "Setz dem Deployment <code>" + d.name + "</code> ein memory-Limit von <b>" + lim + "Mi</b> und einen Request von <b>" + req + "Mi</b>.", accept: [new RegExp("^kubectl\\s+set\\s+resources\\s+deployment[\\/\\s]" + d.name + "\\s+(?=.*--limits[=\\s][^\\s]*memory=" + lim + "Mi)(?=.*--requests[=\\s][^\\s]*memory=" + req + "Mi).*$")], solution: "kubectl set resources deployment/" + d.name + " --limits=memory=" + lim + "Mi --requests=memory=" + req + "Mi", hint: "Muster: kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi" };
+  },
   "git-status": sim => {
     ensureGit(sim);
     return { text: "Zeig den aktuellen Stand deines Repos (Branch + Änderungen).", accept: [/^git\s+status$/], solution: "git status", hint: "git + ein Wort für „Stand“." };
@@ -299,5 +305,5 @@ export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   ada:  [{ drill: "k-apply", after: "q8" }, { drill: "git-status", after: "q18" }, { drill: "git-add", after: "q18" }, { drill: "git-commit", after: "q18" }, { drill: "git-branch", after: "q19" }, { drill: "git-checkout", after: "q19" }, { drill: "git-add-all", after: "q20" }, { drill: "ci-status", after: "q20" }, { drill: "git-pull", after: "q25" }, { drill: "git-resolve", after: "q25" }, { drill: "k-secret-tls", after: "q23" }, { drill: "k-get-ingress", after: "q23" }],
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
-  juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }],
+  juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }, { drill: "k-set-resources", after: "q26" }],
 };

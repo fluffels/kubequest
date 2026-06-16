@@ -11,13 +11,19 @@ import type { ExecResult } from "./types";
 
 /** Art einer absichtlich kaputten Workload (für die Troubleshooting-Quests). */
 export interface Broken {
-  type: string; // "imagepull" | "crashloop" | "pending" | "notready"
+  type: string; // "imagepull" | "crashloop" | "pending" | "notready" | "oomkilled"
   badImage?: string;
   // Fehlendes Secret, das die App braucht. Bei "crashloop" stirbt sie ohne es,
   // bei "notready" läuft sie zwar (liveness ok), meldet sich aber erst als
   // bereit, sobald das Secret da ist (readiness). Sobald es existiert, heilt
   // crashloop per `rollout restart`, notready ganz von selbst (Probe prüft weiter).
   needsSecret?: string;
+  // Bei "oomkilled": So viel Speicher (in Mi) braucht die App wirklich. Solange
+  // das memory-Limit darunter liegt, killt der Kernel den Container immer wieder
+  // (OOMKilled). Wird das Limit per `kubectl set resources` auf >= memNeeded
+  // angehoben, heilt der Dienst. Diagnose nur über `describe` (Last State /
+  // Reason: OOMKilled) – die App-Logs verraten den OOM-Kill NICHT.
+  memNeeded?: number;
 }
 /** Eine einzelne Pod-Instanz eines Deployments. */
 export interface PodInstance {
@@ -32,6 +38,9 @@ export interface Deployment {
   created: number;
   pods: PodInstance[];
   broken: Broken | null;
+  /** Aktuelles memory-Limit in Mi (per `kubectl set resources` gesetzt). Laufzeit-Feld,
+   *  nicht serialisiert – relevant nur für die OOMKilled-Diagnose innerhalb einer Sitzung. */
+  memLimit?: number;
 }
 export interface ServiceRes {
   name: string;
@@ -319,6 +328,8 @@ export interface Scenario {
 
     _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null): Deployment {
       const d: Deployment = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
+      // OOMKilled startet mit einem zu knappen Limit – das ist ja die Ursache.
+      if (d.broken && d.broken.type === "oomkilled") d.memLimit = 64;
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
@@ -331,6 +342,9 @@ export interface Scenario {
       if (d.broken.type === "imagepull") return { status: "ImagePullBackOff", ready: "0/1", restarts: 0 };
       if (d.broken.type === "crashloop") return { status: "CrashLoopBackOff", ready: "0/1", restarts: 5 };
       if (d.broken.type === "pending") return { status: "Pending", ready: "0/1", restarts: 0 };
+      // oomkilled: Der Container sprengt sein memory-Limit, der Kernel killt ihn,
+      // Kubernetes startet neu, er sprengt es wieder … RESTARTS klettern, READY 0/1.
+      if (d.broken.type === "oomkilled") return { status: "OOMKilled", ready: "0/1", restarts: 4 };
       // notready: Container läuft (liveness ok) – aber die Readiness-Probe meldet
       // "noch nicht bereit", also Running mit READY 0/1 und kein Restart.
       if (d.broken.type === "notready") return { status: "Running", ready: "0/1", restarts: 0 };
@@ -565,7 +579,7 @@ export interface Scenario {
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
         "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | scale | expose | delete | apply -f <datei>",
-        "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
+        "             logs <pod> | set image deployment/<n> <c>=<img> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push | fetch | pull",
@@ -724,7 +738,10 @@ export interface Scenario {
       if (sub === "delete") return this._kubectlDelete(t);
       if (sub === "apply") return this._kubectlApply(t);
       if (sub === "logs") return this._kubectlLogs(t);
-      if (sub === "set") return this._kubectlSetImage(t);
+      if (sub === "set") {
+        if (t[2] === "resources") return this._kubectlSetResources(t, raw);
+        return this._kubectlSetImage(t);
+      }
       if (sub === "rollout") return this._kubectlRollout(t);
 
       return this._err("kubectl: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
@@ -887,7 +904,27 @@ export interface Scenario {
         events.push("  Normal   Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
         events.push("  Normal   Started    " + this._age(pod.created) + "   Started container " + dep.name);
         events.push("  Warning  Unhealthy  " + this._age(pod.created) + "   Readiness probe failed: HTTP probe returned statuscode 503 (Liveness probe ok – der Pod LÄUFT, ist aber nicht bereit)");
+      } else if (dep.broken.type === "oomkilled") {
+        events.push("  Normal   Scheduled  " + this._age(pod.created) + "   Successfully assigned default/" + pod.name);
+        events.push("  Normal   Pulled     " + this._age(pod.created) + "   Container image \"" + dep.image + "\" already present");
+        events.push("  Warning  BackOff    " + this._age(pod.created) + "   Back-off restarting failed container (zuletzt OOMKilled – Limit zu knapp)");
       }
+      // OOMKilled zeigt sich NICHT im State (der ist gerade wieder Waiting), sondern im
+      // Last State + Reason und am memory-Limit – genau das ist die Lern-Pointe.
+      const oom = !!dep.broken && dep.broken.type === "oomkilled";
+      const containerBlock = [
+        "  " + dep.name + ":",
+        "    Image:        " + dep.image,
+        "    State:        " + (oom ? "Waiting (CrashLoopBackOff)" : st.status),
+        ...(oom ? [
+          "    Last State:   Terminated",
+          "      Reason:     OOMKilled",
+          "      Exit Code:  137",
+          "    Limits:",
+          "      memory:     " + (dep.memLimit || 64) + "Mi",
+        ] : []),
+        "    Restart Count: " + (st.restarts || pod.restarts),
+      ];
       return [
         "Name:         " + pod.name,
         "Namespace:    default",
@@ -897,10 +934,7 @@ export interface Scenario {
         "IP:           " + (dep.broken && dep.broken.type === "pending" ? "<none>" : "10.244.1." + (10 + Math.floor(Math.random() * 200))),
         "Controlled By: ReplicaSet/" + dep.name,
         "Containers:",
-        "  " + dep.name + ":",
-        "    Image:        " + dep.image,
-        "    State:        " + st.status,
-        "    Restart Count: " + (st.restarts || pod.restarts),
+        ...containerBlock,
         "Events:",
       ].concat(events).join("\n");
     }
@@ -1145,6 +1179,17 @@ export interface Scenario {
       if (dep.broken && dep.broken.type === "pending") {
         return this._err('Error from server (BadRequest): pod "' + name + '" is not scheduled yet', "Der Pod wartet auf einen freien Node. Schau in die Events: kubectl describe pod " + name);
       }
+      if (dep.broken && dep.broken.type === "oomkilled") {
+        // Tückisch: Die App-Logs sehen normal aus und brechen einfach ab – den OOM-Kill
+        // macht der Kernel von außen, die App schreibt dazu nichts. Die Wahrheit steht
+        // in 'kubectl describe pod' (Last State: Terminated, Reason: OOMKilled).
+        return [
+          "[start] Dienst " + dep.name + " startet …",
+          "[info]  Lade Datensätze in den Arbeitsspeicher …",
+          "[info]  Baue Index auf …",
+          "(Log endet hier abrupt – kein Fehler, kein Stacktrace.)",
+        ].join("\n");
+      }
       return [
         "10.244.1.1 - - [12/Jun/2026:09:14:02 +0000] \"GET / HTTP/1.1\" 200 615",
         "10.244.1.1 - - [12/Jun/2026:09:14:05 +0000] \"GET /gesundheit HTTP/1.1\" 200 2",
@@ -1170,6 +1215,42 @@ export interface Scenario {
         dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
       }
       return "deployment.apps/" + depName + " image updated" + (oldBad && newImage === oldBad ? "\n💡 Hmm – das ist exakt dasselbe (kaputte) Image. Schau nochmal genau auf den Namen!" : "");
+    }
+
+    /** Speicherangabe wie "256Mi", "1Gi", "512M" in Mi umrechnen (null bei Unsinn). */
+    _parseMem(spec: string): number | null {
+      const m = spec.match(/^(\d+)(Mi|Gi|M|G)?$/);
+      if (!m) return null;
+      const n = parseInt(m[1], 10);
+      const unit = m[2] || "Mi";
+      if (unit === "Gi" || unit === "G") return n * 1024;
+      return n; // Mi / M ~ als Mi behandeln (didaktisch genau genug)
+    }
+
+    /** kubectl set resources deployment/<name> --limits=memory=256Mi [--requests=memory=128Mi]
+     *  Setzt das memory-Limit. Ist der Dienst wegen OOMKilled kaputt und das neue Limit
+     *  reicht (>= memNeeded), heilt er – der Container hat endlich genug Platz. */
+    _kubectlSetResources(t: string[], raw: string) {
+      let depName: string | null = null;
+      if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
+      else if (t[3] === "deployment") depName = t[4];
+      const limitSpec = (raw.match(/--limits[=\s][^\s]*memory=([0-9]+(?:Mi|Gi|M|G)?)/) || [])[1];
+      const requestSpec = (raw.match(/--requests[=\s][^\s]*memory=([0-9]+(?:Mi|Gi|M|G)?)/) || [])[1];
+      if (!depName) return this._err("kubectl set resources: Welches Deployment?", "Muster: kubectl set resources deployment/<name> --limits=memory=256Mi --requests=memory=128Mi");
+      if (!limitSpec && !requestSpec) return this._err("kubectl set resources: Kein Limit/Request angegeben.", "Häng z.B. '--limits=memory=256Mi --requests=memory=128Mi' an.");
+      const dep = this.deployments.find(d => d.name === depName);
+      if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found', "Welche Deployments es gibt: 'kubectl get deployments'");
+      const newLimit = limitSpec ? this._parseMem(limitSpec) : null;
+      if (limitSpec && newLimit === null) return this._err('error: invalid resource quantity "' + limitSpec + '"', "Schreib das Limit z.B. als '256Mi' oder '1Gi'.");
+      if (newLimit !== null) dep.memLimit = newLimit;
+      let healed = false;
+      if (dep.broken && dep.broken.type === "oomkilled" && newLimit !== null && newLimit >= (dep.broken.memNeeded || 0)) {
+        dep.broken = null;
+        dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
+        healed = true;
+      }
+      return "deployment.apps/" + depName + " resource requirements updated" +
+        (healed ? "\n💡 Genug Speicher! Die Pods starten neu und bleiben diesmal stehen – kein OOMKilled mehr." : "");
     }
 
     /** kubectl rollout restart deployment <name> */

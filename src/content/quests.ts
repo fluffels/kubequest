@@ -9,7 +9,7 @@ import type { Quest } from "../types";
 import type { Sim } from "../sim";
 import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
-  MAIN_TF, GITLAB_CI_YML, DOCKERFILE,
+  RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1171,5 +1171,71 @@ export const QUESTS: Quest[] = [
         "Merk dir den Unterschied fürs Leben: <b>Liveness</b> schlägt fehl → Pod wird neu gestartet. <b>Readiness</b> schlägt fehl → Pod läuft weiter, fliegt aber aus dem Service, bis er bereit ist. Beim Rollout schützt das deine Nutzer: Traffic geht erst auf neue Pods, wenn sie wirklich bereit sind.",
         "Und du hast's gesehen: Ursache behoben → Readiness wird von selbst grün, kein Neustart nötig. Das ist der feine Unterschied zum Crash. Sturmwache-würdig, Lotse! ⚓",
       ]},
+    ]},
+
+  { id: "q26", title: "Der hungrige Kartograf", giver: "juno", rewardXp: 65, rewardCoins: 50,
+    steps: [
+      { type: "dialog", npc: "juno", lines: [
+        "Neuer Sturm, neue Sorte Ärger. Der <b>kartograf</b> – unser Dienst, der die Seekarten neu berechnet – will einfach nicht stehenbleiben. Kein Image-Fehler, kein fehlendes Secret. Er startet, läuft kurz, ist weg. Wieder und wieder.",
+        "Das riecht nach <b>Speicher</b>. Jeder Container bekommt zwei Zahlen mit auf den Weg: <b>requests</b> (so viel reserviert ihm der Cluster fest) und <b>limits</b> (die Obergrenze). Sprengt er beim Speicher das Limit, macht der Kernel kurzen Prozess: <b>OOMKilled</b>. Mantra wie immer – erst gucken!",
+      ]},
+      { type: "terminal", brief: "Diagnose",
+        scenario: { deployments: [{ name: "kartograf", image: "nginx", replicas: 1, broken: { type: "oomkilled", memNeeded: 256 } }] },
+        tasks: [
+        { id: "t-j26-1", text: "Mantra-Schritt 1: <code>get pods</code>. Lies STATUS und RESTARTS – der kartograf-Pod sieht übel aus.",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Der Übersichts-Befehl. STATUS zeigt OOMKilled, RESTARTS klettern." },
+        { id: "t-j26-2", text: "Schritt 2: <code>describe</code> den kartograf-Pod. Achte auf <b>Last State</b>, <b>Reason</b> und das <b>memory-Limit</b> unten!",
+          accept: [/^kubectl\s+describe\s+pods?\s+kartograf-\S+$/], solution: "kubectl describe pod <kartograf-pod>", hint: "kubectl describe pod <name> – Name aus get pods." },
+      ]},
+      { type: "choice", npc: "juno", reviewId: "q-ts-7",
+        q: "<code>Last State: Terminated, Reason: OOMKilled</code> bei einem Limit von 64Mi. Und in den Logs? Nichts Auffälliges. Diagnose?",
+        options: [
+          { t: "Der Container sprengt sein memory-Limit – der Kernel killt ihn (Out Of Memory). Das Limit ist zu knapp.", ok: true,
+            reply: "Genau! OOMKilled = Out Of Memory Killed. Der Beweis steht NIE in den App-Logs, sondern in describe unter Last State / Reason. Fix: das Limit realistisch anheben." },
+          { t: "Die App hat einen Bug und stürzt ab (CrashLoopBackOff).", ok: false,
+            reply: "Naheliegend, aber nein: Bei einem App-Crash stünde die Ursache in den Logs. Hier sagen die Logs nichts – und describe nennt klar OOMKilled. Das ist der Speicher, nicht der Code." },
+          { t: "Das Image ließ sich nicht laden (ImagePullBackOff).", ok: false,
+            reply: "Nein – das Image ist da, der Container startet ja (steht in den Events). Er wird nur wegen Speicher-Überschreitung gekillt: OOMKilled." },
+        ]},
+      { type: "terminal", brief: "Die saubere Lösung lesen",
+        scenario: { files: { "resources.yaml": RESOURCES_YAML } },
+        tasks: [
+        { id: "t-j26-3", text: "So sieht es richtig aus: <code>cat resources.yaml</code>. Findest du den <code>resources</code>-Block mit <code>requests</code> und <code>limits</code>?",
+          accept: [/^cat\s+resources\.yaml$/], solution: "cat resources.yaml", hint: "cat <datei>" },
+      ]},
+      { type: "dialog", npc: "juno", lines: [
+        "Siehst du's? <b>requests.memory</b> ist der reservierte Platz (danach sucht der Scheduler einen passenden Node), <b>limits.memory</b> die harte Obergrenze. Unser kartograf braucht real ~256Mi, hatte aber nur 64Mi Limit. Kein Wunder, dass er zerplatzt.",
+        "Wir heben das Limit an. Der Befehl dafür: <code>kubectl set resources</code> – setzt requests/limits an einem laufenden Deployment, ohne dass du das ganze Manifest neu schreibst.",
+      ]},
+      { type: "teach", brief: "Mehr Speicher geben", cmd: {
+        id: "t-setresources", intro: "🆕 Neuer Befehl: <code>kubectl set resources deployment/&lt;name&gt; --limits=memory=&lt;X&gt; --requests=memory=&lt;Y&gt;</code> – setzt die Ressourcen-Grenzen.",
+        text: "Gib dem <code>kartograf</code> ein <code>--limits=memory=256Mi</code> und ein <code>--requests=memory=128Mi</code>. Schau danach zum Dock!",
+        accept: [/^kubectl\s+set\s+resources\s+deployment\/kartograf\s+(?=.*--limits[=\s][^\s]*memory=256Mi)(?=.*--requests[=\s][^\s]*memory=128Mi).*$/],
+        solution: "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi",
+        hint: "Muster: kubectl set resources deployment/<name> --limits=memory=256Mi --requests=memory=128Mi" } },
+      { type: "terminal", brief: "Verifizieren", tasks: [
+        { id: "t-j26-4", text: "Dritte Regel: verifizieren! Steht der kartograf jetzt stabil?",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "kartograf"); return d && !d.broken; },
+          solution: "kubectl get pods", hint: "STATUS muss Running sein, keine neuen Restarts." },
+      ]},
+      { type: "choice", npc: "juno", reviewId: "q-res-cost",
+        q: "Geschafft! Warum nicht einfach allen Diensten <code>--limits=memory=4Gi</code> „sicherheitshalber\" geben?",
+        options: [
+          { t: "Weil requests echten Node-Platz reservieren – zu üppig = teurer, verschwendeter Platz. Man dimensioniert nach echtem Bedarf.", ok: true,
+            reply: "Genau das ist Right-Sizing! Zu knapp → OOMKilled, zu üppig → du zahlst Dublonen für reservierte Luft. Die Kunst ist die Mitte: am echten Verbrauch messen, dann passend setzen." },
+          { t: "Weil große Limits den Pod automatisch langsamer machen.", ok: false,
+            reply: "Nein, langsamer macht das nichts. Das Problem ist die Reservierung: große requests blockieren Node-Kapazität, die keiner nutzt – und Kapazität kostet." },
+        ]},
+      { type: "dialog", npc: "juno", lines: [
+        "Letzter Profi-Tipp, bevor du weiterziehst: Last schwankt – tagsüber Hochbetrieb, nachts Ebbe. Statt von Hand zu skalieren, setzt man einen <b>HorizontalPodAutoscaler (HPA)</b> davor. Der zählt die Auslastung (gemessen an den requests!) und dreht die Replica-Zahl automatisch hoch und runter.",
+      ]},
+      { type: "choice", npc: "juno", reviewId: "q-res-hpa",
+        q: "Was macht ein HorizontalPodAutoscaler?",
+        options: [
+          { t: "Er passt die Anzahl der Pods automatisch an die Last an (mehr Pods bei hoher Auslastung).", ok: true,
+            reply: "Richtig – die Automatik hinter dem manuellen 'kubectl scale'. Genau deshalb sind saubere requests so wichtig: Ohne sie weiß der HPA gar nicht, was „ausgelastet\" heißt. Du hast die Speicher-Stürme im Griff, Lotse! ⚓" },
+          { t: "Er vergrößert automatisch das memory-Limit eines einzelnen Pods.", ok: false,
+            reply: "Fast – das wäre VERTIKAL (das macht der VPA). Der HPA skaliert HORIZONTAL: er ändert die Pod-ANZAHL, nicht die Größe eines einzelnen Pods." },
+        ]},
     ]},
 ];

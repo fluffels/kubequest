@@ -389,6 +389,42 @@ test("troubleshooting: CrashLoop heilt nur mit Secret + rollout restart", () => 
   assert.equal(sim.deployments[0].broken, null);
 });
 
+test("troubleshooting: OOMKilled heilt erst, wenn das memory-Limit reicht (set resources)", () => {
+  sim.mergeScenario({ deployments: [{ name: "kartograf", image: "nginx", replicas: 1, broken: { type: "oomkilled", memNeeded: 256 } }] });
+  // get pods zeigt das Fehlerbild
+  assert.match(sim.exec("kubectl get pods").output!, /OOMKilled/);
+  const pod = sim.deployments[0].pods[0].name;
+  // describe ist die EINZIGE Diagnosequelle: Last State / Reason / Limit
+  const desc = sim.exec("kubectl describe pod " + pod).output!;
+  assert.match(desc, /Reason:\s+OOMKilled/);
+  assert.match(desc, /memory:\s+64Mi/, "zu knappes Limit steht im describe");
+  // Logs verraten den OOM-Kill bewusst NICHT
+  assert.doesNotMatch(sim.exec("kubectl logs " + pod).output!, /OOM/i);
+  // Negativfall: ein zu knappes neues Limit heilt NICHT
+  sim.exec("kubectl set resources deployment/kartograf --limits=memory=128Mi --requests=memory=64Mi");
+  assert.ok(sim.deployments[0].broken, "128Mi < 256Mi benötigt -> weiter OOMKilled");
+  assert.match(sim.exec("kubectl get pods").output!, /OOMKilled/);
+  // Ausreichendes Limit heilt
+  sim.exec("kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi");
+  assert.equal(sim.deployments[0].broken, null, "256Mi >= 256Mi benötigt -> geheilt");
+  assert.match(sim.exec("kubectl get pods").output!, /Running/);
+});
+
+test("set resources: Gi wird zu Mi umgerechnet, Unsinn wird abgelehnt (Negativfall)", () => {
+  sim.exec("kubectl create deployment app --image=nginx");
+  // 1Gi = 1024Mi -> als Limit gesetzt
+  const ok = sim.exec("kubectl set resources deployment/app --limits=memory=1Gi");
+  assert.ok(!ok.error);
+  assert.equal(sim.deployments.find(d => d.name === "app")!.memLimit, 1024);
+  // krummer Wert -> klarer Fehler, kein stilles Durchwinken
+  const bad = sim.exec("kubectl set resources deployment/app --limits=memory=foo");
+  assert.ok(bad.error, "ungültige Speicherangabe ist ein Fehler");
+  // gar kein Limit/Request -> Fehler
+  assert.ok(sim.exec("kubectl set resources deployment/app").error);
+  // unbekanntes Deployment -> NotFound
+  assert.match(sim.exec("kubectl set resources deployment/gibtsnicht --limits=memory=128Mi").output!, /NotFound/);
+});
+
 test("troubleshooting: Pending heilt durch neue Nodes (Terraform)", () => {
   sim.mergeScenario({
     deployments: [{ name: "app", image: "nginx", replicas: 1, broken: { type: "pending" } }],
