@@ -1006,6 +1006,55 @@ test("argocd: doppeltes apply ist idempotent (unchanged, keine zweite App)", () 
   assert.equal(sim.argoApps.length, 1);
 });
 
+test("argocd: apply mit neuen selfHeal/autoSync-Einstellungen gibt 'configured' zurück (#96)", () => {
+  // Erst ohne selfHeal anlegen
+  legeArgoApp(sim, { autoSync: false, selfHeal: false });
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("argocd app sync kasse");
+  assert.equal(sim.argoApps[0].selfHeal, false, "selfHeal ist initial aus");
+
+  // Update-YAML: selfHeal und autoSync einschalten
+  sim.files["kasse-selfheal.yaml"] = "kind: Application (selfHeal)";
+  sim.applyEffects["kasse-selfheal.yaml"] = {
+    application: {
+      name: "kasse", repo: "https://git.hafen.de/apps.git", path: "kasse/",
+      autoSync: true, selfHeal: true,
+      deployment: { name: "kasse", image: "nginx", replicas: 3 },
+    },
+  };
+  const r = sim.exec("kubectl apply -f kasse-selfheal.yaml");
+  assert.match(r.output!, /configured/, "apply mit geänderter Policy gibt 'configured' zurück");
+  assert.equal(sim.argoApps.length, 1, "keine zweite App angelegt");
+  assert.equal(sim.argoApps[0].selfHeal, true, "selfHeal ist jetzt aktiv");
+  assert.equal(sim.argoApps[0].autoSync, true, "autoSync ist jetzt aktiv");
+});
+
+test("argocd: nach selfHeal-Aktivierung per apply dreht Self-Heal Drift zurück (#96)", () => {
+  // Anlegen ohne selfHeal, synced
+  legeArgoApp(sim, { autoSync: false, selfHeal: false });
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("argocd app sync kasse");
+
+  // selfHeal via zweites apply aktivieren
+  sim.files["kasse-selfheal.yaml"] = "kind: Application (selfHeal)";
+  sim.applyEffects["kasse-selfheal.yaml"] = {
+    application: {
+      name: "kasse", repo: "https://git.hafen.de/apps.git", path: "kasse/",
+      autoSync: true, selfHeal: true,
+      deployment: { name: "kasse", image: "nginx", replicas: 3 },
+    },
+  };
+  sim.exec("kubectl apply -f kasse-selfheal.yaml");
+
+  // manueller Drift
+  sim.exec("kubectl scale deployment kasse --replicas=0");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 0, "Drift erzeugt");
+
+  // nächster Befehl → reconcileAutoSync dreht zurück
+  sim.exec("kubectl get deployments");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 3, "selfHeal stellt Git-Soll wieder her");
+});
+
 test("argocd: 'argcd' bekommt einen Meintest-du-Vorschlag", () => {
   const r = sim.exec("argcd app list");
   assert.ok(r.error);

@@ -1231,7 +1231,21 @@ export interface Scenario {
       if (effApp) {
         const existing = this.argoApps.find(a => a.name === effApp.name);
         if (existing) {
-          out.push("application.argoproj.io/" + effApp.name + " unchanged");
+          // kubectl apply ist idempotent: ändert sich autoSync/selfHeal, ist das ein "configure"-Vorgang
+          // (genau wie bei echtem kubectl, das "configured" statt "unchanged" zurückgibt, wenn sich etwas ändert).
+          const newAutoSync = !!effApp.autoSync;
+          const newSelfHeal = !!effApp.selfHeal;
+          if (existing.autoSync !== newAutoSync || existing.selfHeal !== newSelfHeal) {
+            existing.autoSync = newAutoSync;
+            existing.selfHeal = newSelfHeal;
+            out.push("application.argoproj.io/" + effApp.name + " configured");
+            if (existing.autoSync) {
+              this._argoReconcile(existing);
+              out.push("💡 Sync-Policy 'Automated'" + (existing.selfHeal ? " + Self-Heal" : "") + " aktiv – Argo gleicht den Cluster laufend mit dem Git-Soll ab.");
+            }
+          } else {
+            out.push("application.argoproj.io/" + effApp.name + " unchanged");
+          }
         } else {
           const app: ArgoApp = {
             name: effApp.name,
