@@ -9,7 +9,7 @@ import type { Quest } from "../types";
 import type { Sim } from "../sim";
 import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
-  RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE,
+  RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1328,6 +1328,76 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "argo", lines: [
         "Drei Sätze zum Mitnehmen: <b>1.</b> Das Repo ist die einzige Quelle der Wahrheit. <b>2.</b> Der Soll-Zustand steht deklarativ darin. <b>3.</b> Der Cluster <b>zieht</b> ihn sich selbst – statt dass jemand pusht.",
         "Das ist <b>GitOps</b>. Mehr Theorie brauchst du nicht – ab jetzt wird es praktisch. Komm wieder her, dann richten wir gemeinsam <b>Argo CD</b> ein und lassen es seine erste Application aus dem Logbuch ziehen. 🧭",
+      ]},
+    ]},
+
+  { id: "q29", title: "Die selbstsegelnde Seekarte", giver: "argo", rewardXp: 55, rewardCoins: 40,
+    steps: [
+      { type: "dialog", npc: "argo",
+        scenario: {
+          files: { "application.yaml": ARGO_APPLICATION_MANUAL_YAML },
+          applyEffects: {
+            "application.yaml": { application: {
+              name: "hafen-lager", repo: "https://github.com/port-kubernia/seekarten.git", path: "lager",
+              autoSync: false, selfHeal: false,
+              deployment: { name: "hafen-lager", image: "nginx:1.27", replicas: 2 },
+            } },
+          },
+        },
+        lines: [
+          "Willkommen auf dem <b>GitOps-Archipel</b>, Lotse. Hier oben gilt eine eiserne Regel: <b>Git ist die Quelle der Wahrheit.</b> Was im Repo steht, IST der Soll-Zustand – kein Mensch tippt mehr <code>kubectl</code>-Befehle von Hand in den Cluster.",
+          "Mein Werkzeug heißt <b>Argo CD</b>. Du gibst ihm eine <b>Application</b> – einen Auftrag, der sagt: „Diese Seekarte (dieser Git-Pfad) gehört in jenen Hafen (Namespace).“ Argo vergleicht dann laufend <b>Soll</b> (Git) mit <b>Ist</b> (Cluster).",
+          "Ich habe dir den Auftrag schon hingelegt: <code>application.yaml</code>. Schau ihn dir an, bevor wir ihn ausrollen!",
+        ] },
+      { type: "terminal", brief: "Die Seekarte lesen", tasks: [
+        { id: "t-argo-ls", text: "Was liegt hier? <code>ls</code>.", accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-argo-cat", text: "Lies den Auftrag: <code>cat application.yaml</code>. Findest du <code>kind: Application</code> und den <code>source</code>-Block (das Git-Repo + der Pfad)?",
+          accept: [/^cat\s+application\.yaml$/], solution: "cat application.yaml", hint: "cat <datei>" },
+      ]},
+      { type: "teach", brief: "Auftrag ausrollen", cmd: {
+        id: "t-argo-apply", intro: "🆕 Die <b>Application</b> selbst ist ein ganz normales Manifest – du wendest sie mit dem längst bekannten <code>kubectl apply -f</code> an. Damit kennt Argo ab jetzt deinen Auftrag.",
+        text: "Lege die Application im Cluster an: wende <code>application.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+-f\s+application\.yaml$/], solution: "kubectl apply -f application.yaml",
+        hint: "Der vertraute Befehl aus dem Kartenhaus: kubectl apply -f <datei>." } },
+      { type: "dialog", npc: "argo", lines: [
+        "Angelegt! Aber Achtung: Diese Seekarte hat <b>keine</b> automatische Sync-Politik. Argo <i>kennt</i> jetzt den Soll-Zustand, hat ihn aber noch <b>nicht</b> in den Cluster gesegelt. Lass uns nachschauen, was Argo über den Auftrag weiß.",
+      ]},
+      { type: "terminal", brief: "Was sagt Argo?", tasks: [
+        { id: "t-argo-list", text: "Verschaff dir den Überblick: <code>argocd app list</code>. In der Spalte SYNC STATUS steht <code>OutOfSync</code> – Ist und Soll klaffen noch auseinander.",
+          accept: [/^argocd\s+app\s+(list|ls)$/], solution: "argocd app list", hint: "argocd app list (oder ls)." },
+      ]},
+      { type: "teach", brief: "In die Akte schauen", cmd: {
+        id: "t-argo-get", intro: "🆕 Neuer Befehl: <code>argocd app get &lt;name&gt;</code> – die volle Akte einer Application: <b>Sync Status</b> (Synced/OutOfSync) und <b>Health</b> (läuft die Workload gesund?).",
+        text: "Öffne die Akte von <code>hafen-lager</code>. Lies Sync Status (noch <b>OutOfSync</b>) und Health.",
+        accept: [/^argocd\s+app\s+get\s+hafen-lager$/], check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-lager"),
+        solution: "argocd app get hafen-lager", hint: "argocd app get <name> – den Namen zeigt 'argocd app list'." },
+      },
+      { type: "dialog", npc: "argo", lines: [
+        "<b>OutOfSync</b> heißt: Im Git steht etwas, das der Cluster noch nicht hat (hier: das Deployment <code>hafen-lager</code> fehlt). Weil diese Application keinen Auto-Sync hat, segelst <b>du</b> den Soll-Zustand jetzt von Hand in den Cluster.",
+        "Das ist das <b>Pull-Prinzip</b>: Argo <i>zieht</i> sich den im Git deklarierten Stand – niemand <i>pusht</i> von außen in den Cluster.",
+      ]},
+      { type: "teach", brief: "Soll in den Cluster ziehen", cmd: {
+        id: "t-argo-sync", intro: "🆕 Neuer Befehl: <code>argocd app sync &lt;name&gt;</code> – Argo zieht den im Git deklarierten Soll-Zustand in den Cluster (Pull) und legt die fehlenden Ressourcen an.",
+        text: "Synchronisiere <code>hafen-lager</code> – und schau danach, wie das Deployment entsteht!",
+        accept: [/^argocd\s+app\s+sync\s+hafen-lager$/],
+        check: (sim: Sim) => sim.deployments.some(d => d.name === "hafen-lager"),
+        solution: "argocd app sync hafen-lager", hint: "argocd app sync <name>." } },
+      { type: "terminal", brief: "Verifizieren", tasks: [
+        { id: "t-argo-verify", text: "Beweis: <code>kubectl get deployments</code> – <code>hafen-lager</code> läuft jetzt, genau wie die Seekarte es deklariert.",
+          accept: [/^kubectl\s+get\s+(deployments|deployment|deploy)$/],
+          check: (sim: Sim) => sim.deployments.some(d => d.name === "hafen-lager"),
+          solution: "kubectl get deployments", hint: "kubectl get deployments (oder deploy)." },
+      ]},
+      { type: "choice", npc: "argo",
+        q: "Frische <code>argocd app get hafen-lager</code> nochmal ab: Was bedeutet jetzt <b>Synced</b> statt OutOfSync?",
+        options: [
+          { t: "Cluster-Ist und Git-Soll stimmen überein – Argo hat den deklarierten Zustand hergestellt.", ok: true,
+            reply: "Genau! Synced = Ist deckt sich mit dem Git-Soll. OutOfSync hieß: es gab eine Differenz. Argo gleicht beides per Pull ab – das Repo bleibt die Quelle der Wahrheit. ⚓" },
+          { t: "Die Application-Datei wurde erfolgreich auf die Festplatte gespeichert.", ok: false,
+            reply: "Nein – Synced sagt nichts über Dateien, sondern über den Abgleich: Cluster-Ist == Git-Soll. Vorher (OutOfSync) fehlte das Deployment im Cluster." },
+        ]},
+      { type: "dialog", npc: "argo", lines: [
+        "Du hast deine erste Application von Hand synchronisiert. Beim nächsten Mal zeige ich dir, wie Argo das <b>ganz allein</b> macht – und sogar heimliche Änderungen am Cluster zurückdreht. <i>Self-Heal</i> nennt sich das.",
       ]},
     ]},
 ];
