@@ -21,6 +21,21 @@
 
 ⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick öffnen → leere Seite. Zum Offline-Spielen `npm run build:offline`, dann `dist-offline/index.html` doppelklicken.
 
+## 🟢 Aus IntelliJ starten (Ein-Klick)
+
+Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/runConfigurations/) – sie tauchen in IntelliJ/WebStorm automatisch oben rechts im Run-Auswahlmenü auf:
+
+| Run-Config | macht | entspricht |
+|---|---|---|
+| **dev** | startet den Vite-Dev-Server; Browser über die angezeigte Adresse öffnen | `npm run dev` |
+| **build** | Host-/Prod-Build nach `dist/` | `npm run build` |
+| **test** | Vitest einmalig | `npm test` |
+| **typecheck** | TypeScript voll strict prüfen | `npm run typecheck` |
+
+**Zum Entwickeln musst du nichts extra installieren** – nur einmalig `npm install`, dann Run-Config **dev** wählen und auf ▶ klicken; der Browser zeigt das Spiel über die im Run-Fenster angezeigte Adresse.
+
+> Eine doppelklickbare Desktop-`.exe` (wie bei Stardew) ist ein **separates** Thema (#83 Tauri) und fürs Entwickeln **nicht** nötig.
+
 ## 🛠️ Befehle
 
 | Zweck | Befehl |
