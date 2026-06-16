@@ -89,3 +89,44 @@ export const GITLAB_CI_YML = [
 export const DOCKERFILE = [
   "FROM nginx:1.27", "COPY site/ /usr/share/nginx/html", "EXPOSE 80",
 ].join("\n");
+
+// ===== GitOps-Archipel (Phase 4) =====
+// Argo CD liest den Soll-Zustand aus einem Git-Repo (im Spiel: die „Seekarte") und
+// segelt den Cluster selbsttätig dorthin – Pull statt Push. Eine `Application` ist
+// der Auftrag „halte diesen Hafen so, wie ihn die Seekarte zeigt".
+export const ARGO_APPLICATION_YAML = [
+  "apiVersion: argoproj.io/v1alpha1", "kind: Application", "metadata:",
+  "  name: hafen-lager", "  namespace: argocd", "spec:",
+  "  project: default",
+  "  source:                       # die Seekarte: Soll-Zustand im Git-Repo",
+  "    repoURL: https://github.com/port-kubernia/seekarten.git",
+  "    path: lager",
+  "    targetRevision: main",
+  "  destination:                  # wohin Argo den Soll-Zustand segelt",
+  "    server: https://kubernetes.default.svc",
+  "    namespace: hafen",
+  "  syncPolicy:",
+  "    automated:                  # Pull-Prinzip: Argo gleicht selbst ab",
+  "      prune: true               # entfernt, was aus der Seekarte verschwand",
+  "      selfHeal: true            # Drift am Cluster wird zurückgesetzt",
+].join("\n");
+
+// App-of-Apps: eine `Application`, die selbst keine Dienste ausrollt, sondern nur auf
+// einen Ordner voller weiterer `Application`s zeigt – eine „Flotte", die mit einem
+// einzigen Auftrag den ganzen Archipel verwaltet. So skaliert GitOps über viele Häfen.
+export const APP_OF_APPS_YAML = [
+  "apiVersion: argoproj.io/v1alpha1", "kind: Application", "metadata:",
+  "  name: hafen-flotte", "  namespace: argocd", "spec:",
+  "  project: default",
+  "  source:                       # zeigt nur auf einen Ordner voller weiterer Applications",
+  "    repoURL: https://github.com/port-kubernia/seekarten.git",
+  "    path: flotte",
+  "    targetRevision: main",
+  "  destination:",
+  "    server: https://kubernetes.default.svc",
+  "    namespace: argocd",
+  "  syncPolicy:",
+  "    automated:",
+  "      prune: true",
+  "      selfHeal: true",
+].join("\n");
