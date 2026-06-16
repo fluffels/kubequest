@@ -39,7 +39,12 @@ export const SHOP = [
 ];
 
 /* ---------- NPCs ---------- */
-export const NPCS = {
+/** NPC-Stammdaten. `tex` (eigener PixelLab-Sprite) ist optional: Figuren ohne
+ *  eigene Textur rendern über den Kenney-Fallback aus `sprite` (siehe
+ *  drawNpcPortrait in ui.ts und den tex-Guard in scenes.ts). */
+export interface NpcMeta { name: string; title: string; sprite: number; tex?: string }
+
+export const NPCS: Record<string, NpcMeta> = {
   ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100, tex: "char_ole" },
   bo:     { name: "Bo",            title: "Dock-Golem",      sprite: 109, tex: "char_bo" },
   ada:    { name: "Ada",           title: "Kartenhaus",      sprite: 84,  tex: "char_ada" },
@@ -48,4 +53,9 @@ export const NPCS = {
   pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
   kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
   juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
+  // GitOps-Archipel-NPC. #93 setzt den finalen PixelLab-Sprite + Smalltalk; hier
+  // minimal angelegt, damit die Einstiegs-Quest (#94) einen gültigen Geber hat.
+  // Platzhalter-Sprite ohne tex → das Porträt nutzt den Kenney-Fallback, bis das
+  // echte Asset aus #93 vorliegt.
+  argo:   { name: "Argo",          title: "GitOps-Lotsin",   sprite: 90 },
 };

@@ -1286,4 +1286,48 @@ export const QUESTS: Quest[] = [
             reply: "Fast – das wäre VERTIKAL (das macht der VPA). Der HPA skaliert HORIZONTAL: er ändert die Pod-ANZAHL, nicht die Größe eines einzelnen Pods." },
         ]},
     ]},
+
+  // ===== Phase 4: GitOps-Archipel (#103) – Einstiegs-Quest beim neuen NPC Argo =====
+  // Reine Konzept-Quest (#94): vermittelt das GitOps-Prinzip (Git als einzige
+  // Quelle der Wahrheit, deklarativer Soll-Zustand, Pull statt Push) noch OHNE
+  // tiefe Argo-CD-Mechanik – die kommt ab #95. Bewusst nur dialog/choice,
+  // entspannt & belohnend (#52). Knüpft an Adas Manifeste (q8) und die
+  // Pipeline-Passage (q20, „die Pipeline schiebt den Stand rein") an.
+  { id: "q28", title: "Das Logbuch der Insel", giver: "argo", rewardXp: 40, rewardCoins: 30,
+    steps: [
+      { type: "dialog", npc: "argo", lines: [
+        "Willkommen auf dem <b>GitOps-Archipel</b>! Ich bin <b>Argo</b>, die Lotsin hier draußen. Schön ruhig, was? Das hat einen Grund.",
+        "Drüben im Hafen rennst du ans Funkgerät und rufst dem Cluster jeden Befehl einzeln zu – <code>apply</code> hier, <code>scale</code> da. Sogar deine Pipeline <b>schiebt</b> den neuen Stand von außen hinein. Funktioniert. Aber: Wer weiß morgen noch, was wirklich laufen SOLL?",
+        "Auf meiner Insel machen wir es andersherum. Hier gibt es <b>ein</b> Logbuch – und das Logbuch hat immer recht.",
+      ]},
+      { type: "dialog", npc: "argo", lines: [
+        "Das Logbuch ist dein <b>Git-Repo</b>. Dort hinein schreibst du den <b>Soll-Zustand</b> – deklarativ als Manifeste, genau wie Ada es dir beigebracht hat: welche Dienste, welche Version, wie viele Kopien.",
+        "Git ist damit die <b>einzige Quelle der Wahrheit</b> (engl. <i>single source of truth</i>). Nicht der Cluster, nicht dein Gedächtnis, nicht ein mühsam zusammengeklicktes Etwas – sondern <b>das Repo</b>. Willst du wissen, was laufen soll? Lies das Logbuch.",
+      ]},
+      { type: "choice", npc: "argo",
+        q: "Was ist bei GitOps die <b>einzige Quelle der Wahrheit</b> für den Soll-Zustand?",
+        options: [
+          { t: "Das Git-Repo – dort steht deklarativ, was laufen soll.", ok: true,
+            reply: "Genau! Ein Blick ins Logbuch und du weißt, was sein soll – kein „ich glaube, da lief noch irgendwas…“." },
+          { t: "Der aktuelle Zustand im Cluster – was läuft, ist die Wahrheit.", ok: false,
+            reply: "Vorsicht: Das ist der <b>Ist</b>-Zustand, und der driftet. Jemand ändert von Hand etwas, ein Pod stirbt … Die Wahrheit über das SOLL steht im Repo, nicht im Cluster." },
+        ]},
+      { type: "dialog", npc: "argo", lines: [
+        "Und jetzt der Clou – das <b>Pull-Prinzip</b>. Drüben <b>pusht</b> jemand von außen in den Cluster: du am Funkgerät, oder die Pipeline. Der Cluster ist passiv, er lässt mit sich machen.",
+        "Hier wohnt ein Crewmitglied <b>im</b> Cluster: <b>Argo CD</b>, mein Namensvetter. Es schaut unermüdlich ins Logbuch und <b>zieht</b> sich den Soll-Zustand selbst heran (<i>pull</i>). Niemand drückt von außen etwas rein – der Cluster holt sich seine Wahrheit ab.",
+        "Push heißt also: von außen reingeschoben. Pull heißt: der Cluster zieht es sich selbst. Klingt nach einer Kleinigkeit – ist aber der ganze Unterschied.",
+      ]},
+      { type: "choice", npc: "argo",
+        q: "<b>Push</b>- gegen <b>Pull</b>-Deployment – was trifft zu?",
+        options: [
+          { t: "Pull: ein Agent IM Cluster zieht den Soll-Zustand aus Git. Push: jemand von außen drückt ihn hinein (kubectl/Pipeline).", ok: true,
+            reply: "Sitzt! Beim Pull lebt der Abgleich im Cluster und läuft von allein weiter – auch wenn niemand am Funkgerät sitzt." },
+          { t: "Push und Pull sind nur zwei Wörter für dasselbe – am Ende läuft derselbe Befehl.", ok: false,
+            reply: "Nein – die Richtung ist der Punkt: von außen hineindrücken (push) oder vom Cluster selbst abholen lassen (pull). Das verändert, wer die Kontrolle hat." },
+        ]},
+      { type: "dialog", npc: "argo", lines: [
+        "Drei Sätze zum Mitnehmen: <b>1.</b> Das Repo ist die einzige Quelle der Wahrheit. <b>2.</b> Der Soll-Zustand steht deklarativ darin. <b>3.</b> Der Cluster <b>zieht</b> ihn sich selbst – statt dass jemand pusht.",
+        "Das ist <b>GitOps</b>. Mehr Theorie brauchst du nicht – ab jetzt wird es praktisch. Komm wieder her, dann richten wir gemeinsam <b>Argo CD</b> ein und lassen es seine erste Application aus dem Logbuch ziehen. 🧭",
+      ]},
+    ]},
 ];
