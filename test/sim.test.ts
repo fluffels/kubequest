@@ -365,6 +365,66 @@ test("secrets: create, get (ohne Inhalt!), delete", () => {
   assert.match(sim.exec("kubectl get secrets").output!, /No resources/);
 });
 
+test("configmaps: create, get, delete – und Duplikat/leer werden abgelehnt (Negativfälle)", () => {
+  const created = sim.exec("kubectl create configmap app-config --from-literal=db_host=hafen-db");
+  assert.ok(!created.error);
+  assert.match(created.output!, /configmap\/app-config created/);
+  assert.match(sim.exec("kubectl get configmaps").output!, /app-config.*1/);
+  // Negativ: ohne --from-literal legt nichts an
+  const leer = sim.exec("kubectl create configmap leer");
+  assert.ok(leer.error, "ConfigMap ohne Daten wird abgelehnt");
+  assert.equal(sim.configMaps.length, 1, "fehlgeschlagenes create legt nichts an");
+  // Negativ: Duplikat
+  const doppelt = sim.exec("kubectl create configmap app-config --from-literal=x=y");
+  assert.ok(doppelt.error, "doppelte ConfigMap wird abgelehnt");
+  assert.equal(sim.configMaps.filter(c => c.name === "app-config").length, 1);
+  sim.exec("kubectl delete configmap app-config");
+  assert.match(sim.exec("kubectl get configmaps").output!, /No resources/);
+});
+
+test("set env: bindet ConfigMap UND Secret in ein Deployment ein", () => {
+  sim.mergeScenario({ deployments: [{ name: "passagierliste", image: "nginx", replicas: 1 }] });
+  sim.exec("kubectl create configmap pc --from-literal=db_host=hafen-db");
+  sim.exec("kubectl create secret generic pg --from-literal=db_passwort=tiefsee42");
+  assert.ok(!sim.exec("kubectl set env deployment/passagierliste --from=configmap/pc").error);
+  assert.ok(!sim.exec("kubectl set env deployment/passagierliste --from=secret/pg").error);
+  const dep = sim.deployments.find(d => d.name === "passagierliste")!;
+  assert.deepEqual(dep.envFrom.configMaps, ["pc"]);
+  assert.deepEqual(dep.envFrom.secrets, ["pg"]);
+  // idempotent: zweimal dieselbe Quelle bindet nicht doppelt
+  sim.exec("kubectl set env deployment/passagierliste --from=configmap/pc");
+  assert.deepEqual(dep.envFrom.configMaps, ["pc"], "doppelte Bindung bleibt einmalig");
+});
+
+test("set env: Negativfälle – fehlendes Deployment, fehlende Quelle, keine Bindung bei Fehler", () => {
+  sim.mergeScenario({ deployments: [{ name: "passagierliste", image: "nginx", replicas: 1 }] });
+  // unbekanntes Deployment
+  const keinDep = sim.exec("kubectl set env deployment/gibtsnicht --from=configmap/pc");
+  assert.ok(keinDep.error);
+  assert.match(keinDep.output!, /not found/);
+  // ConfigMap existiert noch nicht -> Fehler, nichts gebunden
+  const keineCm = sim.exec("kubectl set env deployment/passagierliste --from=configmap/pc");
+  assert.ok(keineCm.error, "nicht existierende ConfigMap wird abgelehnt");
+  const dep = sim.deployments.find(d => d.name === "passagierliste")!;
+  assert.deepEqual(dep.envFrom.configMaps, [], "fehlgeschlagene Bindung verändert nichts");
+  // Secret existiert noch nicht -> Fehler
+  assert.ok(sim.exec("kubectl set env deployment/passagierliste --from=secret/pg").error);
+  assert.deepEqual(dep.envFrom.secrets, []);
+});
+
+test("envFrom übersteht snapshot/restore", () => {
+  sim.mergeScenario({ deployments: [{ name: "passagierliste", image: "nginx", replicas: 1 }] });
+  sim.exec("kubectl create configmap pc --from-literal=db_host=hafen-db");
+  sim.exec("kubectl create secret generic pg --from-literal=db_passwort=x");
+  sim.exec("kubectl set env deployment/passagierliste --from=configmap/pc");
+  sim.exec("kubectl set env deployment/passagierliste --from=secret/pg");
+  const restored = new KQSim(sim.snapshot());
+  const dep = restored.deployments.find(d => d.name === "passagierliste")!;
+  assert.deepEqual(dep.envFrom.configMaps, ["pc"]);
+  assert.deepEqual(dep.envFrom.secrets, ["pg"]);
+  assert.match(restored.exec("kubectl get configmaps").output!, /pc/);
+});
+
 test("troubleshooting: ImagePullBackOff via set image heilen", () => {
   sim.mergeScenario({ deployments: [{ name: "app", image: "ngnix", replicas: 1, broken: { type: "imagepull", badImage: "ngnix" } }] });
   assert.match(sim.exec("kubectl get pods").output!, /ImagePullBackOff/);

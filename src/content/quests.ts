@@ -555,6 +555,54 @@ export const QUESTS: Quest[] = [
             reply: "NEIN! ConfigMaps sind Klartext – Krakenfutter! Vertrauliches gehört in Secrets." },
         ]},
       { type: "dialog", npc: "ole", lines: [
+        "Eine Schatztruhe anlegen kannst du jetzt – aber eine verschlossene Truhe nützt der App noch gar nichts. Wie kommt das Geheimnis eigentlich IN den Dienst hinein? Und: nicht alles, was eine App braucht, ist überhaupt geheim!",
+        "Komm, das zeig ich dir noch – dann ist deine Grundausbildung wirklich rund. Funk mich gleich an. 📻",
+      ]},
+    ]},
+
+  { id: "q26", title: "Truhe trifft Kombüse", giver: "ole", rewardXp: 55, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "ole", lines: [
+        "Schau, die <b>passagierliste</b> ist frisch ausgerollt – aber sie braucht zwei Dinge: die Adresse unserer Datenbank (<code>hafen-db</code>) und das <b>DB-Passwort</b>.",
+        "Merk dir die Trennlinie: Der DB-Host ist <b>kein Geheimnis</b> – sowas (Hostnamen, Ports, Log-Level) kommt in eine <b>ConfigMap</b>. Eine ConfigMap ist absichtlich Klartext, aber eben nur für <b>Harmloses</b>.",
+        "Das Passwort dagegen ist Krakenfutter, wenn's offen rumliegt – das gehört ins <b>Secret</b>. Zwei Behälter, ein Prinzip: erst anlegen, dann der App geben.",
+      ]},
+      { type: "teach", brief: "Die Klartext-Kiste", scenario: { deployments: [{ name: "passagierliste", image: "nginx", replicas: 1 }] }, cmd: {
+        id: "t-configmap", intro: "🆕 Neuer Befehl: <code>kubectl create configmap</code> – harmlose Einstellungen sammeln.",
+        text: "Lege eine ConfigMap <code>passagier-config</code> an, mit <code>--from-literal=db_host=hafen-db</code>.",
+        accept: [/^kubectl\s+create\s+configmap\s+passagier-config\s+--from-literal[=\s][\w.-]+=\S+$/],
+        solution: "kubectl create configmap passagier-config --from-literal=db_host=hafen-db",
+        hint: "Muster: kubectl create configmap <name> --from-literal=schluessel=wert" } },
+      { type: "terminal", brief: "Das Geheimnis", tasks: [
+        { id: "t-q26-secret", text: "Jetzt das Vertrauliche: Lege ein Secret <code>passagier-geheim</code> an (z.B. <code>--from-literal=db_passwort=tiefsee42</code>).",
+          accept: [/^kubectl\s+create\s+secret\s+generic\s+passagier-geheim\s+--from-literal[=\s][\w.-]+=\S+$/],
+          solution: "kubectl create secret generic passagier-geheim --from-literal=db_passwort=tiefsee42",
+          hint: "Wie bei der Krake: kubectl create secret generic <name> --from-literal=k=v" },
+      ]},
+      { type: "teach", brief: "Config einbinden", cmd: {
+        id: "t-setenv-config", intro: "🆕 Neuer Befehl: <code>kubectl set env … --from=configmap/<name></code> – bindet die Einstellungen als Umgebungsvariablen in die App.",
+        text: "Gib der <code>passagierliste</code> ihre Config: <code>kubectl set env deployment/passagierliste --from=configmap/passagier-config</code>.",
+        accept: [/^kubectl\s+set\s+env\s+deployment\/passagierliste\s+--from[=\s]configmap\/passagier-config$/],
+        solution: "kubectl set env deployment/passagierliste --from=configmap/passagier-config",
+        hint: "Muster: kubectl set env deployment/<name> --from=configmap/<configmap-name>" } },
+      { type: "terminal", brief: "Geheimnis einbinden", tasks: [
+        { id: "t-q26-bind-secret", text: "Und jetzt dasselbe fürs Secret – genau gleich, nur <code>--from=secret/passagier-geheim</code>. Erst dann kennt die App ihr Passwort.",
+          accept: [/^kubectl\s+set\s+env\s+deployment\/passagierliste\s+--from[=\s]secret\/passagier-geheim$/],
+          solution: "kubectl set env deployment/passagierliste --from=secret/passagier-geheim",
+          check: (sim: Sim) => { const d = sim.deployments.find(d => d.name === "passagierliste"); return d && d.envFrom.configMaps.includes("passagier-config") && d.envFrom.secrets.includes("passagier-geheim"); },
+          hint: "kubectl set env deployment/passagierliste --from=secret/<secret-name>" },
+      ]},
+      { type: "choice", npc: "ole", reviewId: "q-sec-3",
+        q: "Die App braucht DB-Host <code>hafen-db</code> und das DB-Passwort. Was gehört wohin?",
+        options: [
+          { t: "DB-Host in die ConfigMap (harmlos), Passwort ins Secret (vertraulich).", ok: true,
+            reply: "Genau das! Harmloses → ConfigMap, Geheimes → Secret. Beide bindet man gleich ein – aber nur eins davon darf die Krake sehen." },
+          { t: "Beides in die ConfigMap – dann ist alles an einem Ort.", ok: false,
+            reply: "Nein! Das Passwort in der ConfigMap ist Klartext – Krakenfutter. Vertrauliches gehört IMMER ins Secret." },
+          { t: "Beides ins Secret – sicher ist sicher.", ok: false,
+            reply: "Übervorsichtig: Der DB-Host ist kein Geheimnis. Solche Einstellungen gehören in die ConfigMap – Secrets bleiben fürs wirklich Vertrauliche." },
+        ]},
+      { type: "dialog", npc: "ole", lines: [
         "Damit erkläre ich deine <b>Grundausbildung für abgeschlossen</b>! 🎉 Docker, Kubernetes, YAML, Helm, Terraform, Security – du hast den ganzen Werkzeugkasten.",
         "Aber Port Kubernia schläft nie: <b>Piraten</b> überfallen die Stege, die <b>Krake</b> schnüffelt nach Klartext, und deine Dienste verdienen rund um die Uhr. Halte den Hafen am Laufen!",
         "Und … hörst du das Donnergrollen? Die <b>Sturm-Saison</b> beginnt. <b>Juno</b>, unsere Sturmwache am Leuchtturm im Osten, braucht dringend jemanden, der kaputte Dienste reparieren kann. Geh zu ihr – jetzt wird es ernst! ⛈️",
