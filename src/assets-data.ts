@@ -61,6 +61,7 @@ import char_ada from "../assets/pixellab/char_ada.png";
 import char_theo from "../assets/pixellab/char_theo.png";
 import char_kralle from "../assets/pixellab/char_kralle.png";
 import char_juno from "../assets/pixellab/char_juno.png";
+import char_argos from "../assets/pixellab/char_argos.png";
 
 // PixelLab-Shop-Haustiere
 import pet_ratte from "../assets/pixellab/pet_ratte.png";
@@ -122,6 +123,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { key: "char_theo", src: char_theo, kind: "plain" },
   { key: "char_kralle", src: char_kralle, kind: "plain" },
   { key: "char_juno", src: char_juno, kind: "plain" },
+  { key: "char_argos", src: char_argos, kind: "plain" },
 
   // PixelLab-Shop-Haustiere
   { key: "pet_ratte", src: pet_ratte, kind: "plain" },

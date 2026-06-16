@@ -5,6 +5,20 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { KQContent } from "../src/content";
 import { validateContent, type ContentBundle } from "../src/content/validate";
+import { KQAssets } from "../src/assets-data";
+import { ARCHIPEL_NPC } from "../src/archipel";
+
+/** Findet NPCs ohne Sprite-Asset (tex fehlt im Manifest) – das macht einen NPC
+ *  „tot": Phaser fiele auf den grün-schwarzen Platzhalter zurück. Smalltalk ist
+ *  bewusst NICHT universell Pflicht (z.B. Kralle führt direkt ins Quiz, ohne
+ *  Smalltalk-Pfad). Als Helfer, um denselben Check Red-Green abzusichern. */
+function npcSpriteProblems(npcs: Record<string, { tex?: string }>, assets: Record<string, string>): string[] {
+  const out: string[] = [];
+  for (const [id, npc] of Object.entries(npcs)) {
+    if (!npc.tex || !assets[npc.tex]) out.push(`${id}: Sprite-Asset fehlt (tex=${npc.tex})`);
+  }
+  return out;
+}
 
 test("Quiz-Karten: IDs eindeutig, correct-Index gültig, Erklärung vorhanden", () => {
   const seen = new Set();
@@ -83,6 +97,29 @@ test("Teach-Schritte mit Pflicht-Flag zeigen es im Panel (intro+text), nicht nur
 test("Stapel-Spiel hat mindestens 2 Runden mit je 3+ Schichten", () => {
   assert.ok(KQContent.STACK_ROUNDS.length >= 2);
   for (const r of KQContent.STACK_ROUNDS) assert.ok(r.layers.length >= 3, r.name);
+});
+
+test("jeder NPC hat ein Sprite-Asset (tex im Manifest)", () => {
+  const problems = npcSpriteProblems(KQContent.NPCS, KQAssets);
+  assert.deepEqual(problems, [], "NPCs ohne Sprite-Asset:\n" + problems.join("\n"));
+});
+
+test("der GitOps-Insel-NPC (#93) ist in der Registry verdrahtet, mit Sprite + Smalltalk", () => {
+  // archipel.ts reserviert den Standplatz mit fester id – die MUSS einem NPC der
+  // Registry entsprechen, sonst rendert die Insel eine Figur ohne Daten.
+  const npc = (KQContent.NPCS as Record<string, { tex?: string }>)[ARCHIPEL_NPC.id];
+  assert.ok(npc, "Insel-NPC-Id '" + ARCHIPEL_NPC.id + "' fehlt in NPCS");
+  assert.ok(npc.tex && KQAssets[npc.tex], "Insel-NPC ohne Sprite-Asset");
+  // Bis #94 die erste Quest einhängt, ist Smalltalk das, was Argo zu sagen hat.
+  const lines = (KQContent.SMALLTALK as Record<string, string[]>)[ARCHIPEL_NPC.id];
+  assert.ok(Array.isArray(lines) && lines.length > 0, "Insel-NPC ohne Smalltalk");
+});
+
+test("Red-Green: ein NPC mit fehlendem Sprite-Asset wird gemeldet", () => {
+  // Ein Check, der auch bei fehlendem Sprite grün bliebe, wäre wertlos.
+  const npcs = { ...KQContent.NPCS, geist: { name: "Geist", title: "?", sprite: 0, tex: "char_gibtsnicht" } };
+  const problems = npcSpriteProblems(npcs as Record<string, { tex?: string }>, KQAssets);
+  assert.ok(problems.some(p => p.includes("geist") && p.includes("Sprite-Asset")), "fehlendes Sprite-Asset nicht gemeldet:\n" + problems.join("\n"));
 });
 
 test("Ränge: aufsteigende XP-Schwellen", () => {

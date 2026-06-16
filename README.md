@@ -105,7 +105,7 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 | 1 | Container, Kubernetes-Basics, YAML, Helm, Terraform, Secrets | ✅ im Spiel (17 Quests, inkl. eigenes Docker-Image bauen & eigenes Helm-Chart „Werft-Ausbau“) |
 | 2 | Git & Branching-Workflows + CI/CD-Pipelines | ✅ im Spiel (Git: 3 Quests bei Ada; CI/CD: „Pipeline-Passage“) |
 | 3 | Ingress, DNS, TLS, NetworkPolicies | 🟡 teilweise im Spiel: Ingress + TLS („verschlüsseltes Hafentor“ bei Ada) + NetworkPolicies („Hafenmauer“ bei Juno); DNS noch offen |
-| 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🟡 angefangen: Insel „GitOps-Archipel“ ist begehbar (Anleger/Warp per Steg); Sim, NPC & Quests folgen |
+| 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | 🟡 angefangen: Insel „GitOps-Archipel“ ist begehbar (Anleger/Warp per Steg), Argo-CD-Sim & Insel-NPC (GitOps-Lotsin Argo) sind da; die Lern-Quests folgen |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | 🔜 geplant: „Monitoring-Leuchtturm“ |
 | 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |
 | 7 | StatefulSets, Volumes, Backups, Datenbanken im Cluster | 🔜 geplant: „Lagerhallen-Viertel“ |

@@ -17,7 +17,7 @@ import {
   WORLD_JETTY, WORLD_TO_ARCHIPEL, WORLD_RETURN,
   ARCHIPEL_TO_WORLD, ARCHIPEL_ARRIVAL, ARCHIPEL_NPC, ARCHIPEL_QUEST_TRIGGER,
 } from "./archipel";
-import { keys, setWorldScene, setInteriorOpen } from "./runtime";
+import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
@@ -1493,11 +1493,20 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       this.objStatue(ARCHIPEL_QUEST_TRIGGER.x, ARCHIPEL_QUEST_TRIGGER.y);
       this.makeSign(ARCHIPEL_QUEST_TRIGGER.x * T + 8, (ARCHIPEL_QUEST_TRIGGER.y - 1) * T, "GitOps");
 
-      // Reservierter NPC-Standplatz (#93 setzt hier den Sprite) – dezent markiert.
-      const npx = ARCHIPEL_NPC.x * T + 8, npy = ARCHIPEL_NPC.y * T + 8;
-      this.add.ellipse(npx, npy + 7, 12, 5, 0x000000, 0.22).setDepth(npy);
-      const post = this.add.image(npx, npy + 8, "signpost").setOrigin(0.5, 1).setScale(0.5).setDepth(npy + 1);
-      this.tweens.add({ targets: post, y: post.y - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      // GitOps-NPC „Argo" (#93): die GitOps-Lotsin des Archipels, die ab #94 die
+      // Phase-4-Quests vergibt. Gleiches Render-Schema wie die NPCs der WorldScene
+      // (tex-Figur an den Schatten verankert, Origin 0.81 = Fußlinie, „!"-Marker).
+      // Reden läuft über E → UI.interact() → nearestNpc(); bis #94 zeigt sie Smalltalk.
+      const argoMeta = KQContent.NPCS.argo;
+      const npx = ARCHIPEL_NPC.x * T + 8, npBaseY = ARCHIPEL_NPC.y * T + 15;
+      this.solid[ARCHIPEL_NPC.y * this.W + ARCHIPEL_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.add.ellipse(npx, npBaseY, 12, 5, 0x000000, 0.26).setDepth(npBaseY - 1);
+      const argoSpr = this.add.image(npx, npBaseY, argoMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(ARCHIPEL_NPC.y * T + T);
+      this.tweens.add({ targets: argoSpr, y: npBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const argoMarker = this.add.text(npx, ARCHIPEL_NPC.y * T - 6, "!", { fontFamily: "Consolas", fontSize: "8px", color: "#ffc857", fontStyle: "bold", resolution: 8 })
+        .setOrigin(0.5, 1).setDepth(10000).setShadow(0.5, 0.5, "#000", 1).setVisible(false);
+      this.tweens.add({ targets: argoMarker, y: ARCHIPEL_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.npcs = [{ id: ARCHIPEL_NPC.id, x: ARCHIPEL_NPC.x, y: ARCHIPEL_NPC.y, sprite: argoSpr, marker: argoMarker }];
 
       // Spieler am Ankunfts-Steg (eine Kachel landwärts vom Rück-Warp).
       this.pl = { x: ARCHIPEL_ARRIVAL.tx * T + 8, y: ARCHIPEL_ARRIVAL.ty * T + 8, face: "north", moving: false };
@@ -1523,6 +1532,14 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       // Ein paar Möwen für die Hafen-Atmosphäre (wie auf der Hauptkarte).
       this.time.addEvent({ delay: 6500, loop: true, callback: () => { if (Math.random() < 0.6) this.spawnGull(); } });
       this.spawnGull();
+
+      // Ab jetzt ist die Insel die aktive „WorldScene": E/Prompt der ui.ts (reden,
+      // später Quests) greifen über nearestNpc() auf Argo. enterArchipel() hatte
+      // interiorOpen(true) gesetzt, um den Übergang abzuschirmen – hier wieder frei,
+      // damit man auf der Insel tatsächlich reden kann. exitToWorld() stellt beides
+      // auf die Hauptkarte zurück.
+      setWorldScene(this);
+      setInteriorOpen(false);
 
       this.ePrev = true;
       // #92: Rück-Warp erst scharf, wenn die (vom Hinweg evtl. noch gehaltene)
@@ -1638,8 +1655,35 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       return !!this.solid[ty * this.W + tx];
     }
 
+    /** Nächster ansprechbarer NPC (E-Reichweite), gleiche Logik wie WorldScene –
+     *  ui.ts ruft das über worldScene() auf, um Reden/Quests anzubieten. */
+    nearestNpc() {
+      const pl = this.pl;
+      let best = null, bestD = 1.7 * T;
+      for (const n of this.npcs) {
+        const d = Math.hypot(n.x * T + 8 - pl.x, n.y * T + 8 - pl.y);
+        if (d < bestD) { bestD = d; best = n; }
+      }
+      return best;
+    }
+
+    /** Partikel-Effekt am Spieler – die Insel hat (noch) keine eigenen Emitter,
+     *  daher ein kurzer Funken-Text. ui.ts ruft das bei Quest-Belohnungen auf. */
+    burstAtPlayer(_kind: string) {
+      this.floatText(this.pl.x, this.pl.y - 8, "✨", "#ffe9b0");
+    }
+
+    floatText(x: number, y: number, str: string, color?: string) {
+      const t = this.add.text(x, y, str, { fontFamily: "Consolas", fontSize: "6px", color: color || "#ffd97a", resolution: 8 })
+        .setOrigin(0.5).setDepth(10001).setShadow(0.5, 0.5, "#000", 1);
+      this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: 1400, ease: "Sine.out", onComplete: () => t.destroy() });
+    }
+
     exitToWorld() {
       SFX.door();
+      // Aktive WorldScene zurück auf die Hauptkarte zeigen lassen (sie wurde nur
+      // schlafen gelegt, ihr create() läuft beim Aufwachen nicht erneut).
+      setWorldScene(this.scene.get("World") as unknown as WorldSceneRef);
       setInteriorOpen(false);
       this.scene.wake("World");
       this.scene.stop();
@@ -1672,6 +1716,14 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
       this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
       this.pShadow.setPosition(pl.x, pl.y + 6);
+
+      // Quest-Marker über Argo (zeigt „!", sobald ab #94 ein Quest-Dialogschritt ansteht).
+      for (const n of this.npcs) n.marker.setVisible(!blocked && UI.questMarkerFor(n.id));
+
+      // „E – reden"-Hinweis selbst pflegen: die WorldScene (die das sonst tut)
+      // schläft, solange die Insel läuft – ohne diesen Aufruf bliebe Argo ohne
+      // sichtbaren Reden-Hinweis.
+      UI.updatePrompt();
 
       // Rück-Anleger betreten? -> zurück nach Port Kubernia. Wie beim Hinweg gilt:
       // erst „scharf", wenn die Lauftaste seit der Ankunft losgelassen wurde und man
