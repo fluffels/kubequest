@@ -1,5 +1,5 @@
 /* ===== KubeQuest 3.0 – Phaser-Szenen =====
- * BootScene: lädt die Spritesheets per Phaser-Loader (KQAssets aus assets-data.ts;
+ * BootScene: lädt alle Grafiken per Phaser-Loader (ASSET_MANIFEST aus assets-data.ts;
  *            Single-File-Build inlinet sie als Data-URI → funktioniert auch per Doppelklick!).
  * WorldScene: Port Kubernia – Karte, Spieler:in, NPCs, Cluster→Welt-Sync,
  *             Piraten-Überfälle, Hacker-Krake, Hafen-Wirtschaft, Sound.
@@ -8,7 +8,7 @@ import Phaser from "phaser";
 import { Game } from "./game";
 import { UI } from "./ui";
 import { KQContent } from "./content";
-import { KQAssets } from "./assets-data";
+import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
 import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, type Door } from "./world";
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
@@ -16,8 +16,6 @@ import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 
   const T = 16;
-  const COLS = 12;
-  const CREATURE_COLS = 10; // Tiny Creatures (Clint Bellanger, CC0) ist 10 Spalten breit, nicht 12
 
   /* SFX (Mini-Synthesizer) liegt jetzt in sfx.ts und wird oben importiert. */
 
@@ -42,26 +40,26 @@ import { gameClock } from "./clock";
   function hueColor(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.7, 0.55).color; }
   function hueColorLight(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
 
-  // Sheets werden nach dem Laden in 16er-Frames geschnitten; plains bleiben ganze Bilder.
-  const BOOT_SHEETS: [string, number][] = [["town", COLS], ["dungeon", COLS], ["creatures", CREATURE_COLS], ["coast", 4], ["meadow", 4], ["path", 4], ["kai", 4], ["dock", 4]];
-  const BOOT_PLAINS = ["flowers", "tree", "pine", "bush", "rock", "barrel", "char_player", "char_player_east", "char_player_north", "char_player_west", "char_ole", "char_runa", "char_pelle", "char_bo", "char_ada", "char_theo", "char_kralle", "char_juno", "crate", "well", "stall", "lamppost", "mushroom", "seashell", "driftwood", "signpost", "sign", "lighthouse", "house_office", "house_forge", "house_chart", "ship", "pet_ratte", "pet_fledermaus", "pet_geist"]; // Einzelobjekte ohne Slicing
-
   class BootScene extends Phaser.Scene {
     [key: string]: any;
     constructor() { super("Boot"); }
     preload() {
-      // KQAssets[key] ist im Dev-Server eine URL, im Single-File-Build eine Base64-Data-URI.
+      // a.src ist im Dev-Server eine URL, im Single-File-Build eine Base64-Data-URI.
       // Der Phaser-Loader kommt mit beidem klar (Data-URIs laden ohne XHR – Doppelklick-tauglich).
-      for (const [key] of BOOT_SHEETS) this.load.image(key, (KQAssets as any)[key]);
-      for (const key of BOOT_PLAINS) this.load.image(key, (KQAssets as any)[key]);
+      // Laden ist für plain wie sheet identisch; das Frame-Slicing folgt erst in create().
+      for (const a of ASSET_MANIFEST) this.load.image(a.key, a.src);
     }
     create() {
-      for (const [key, cols] of BOOT_SHEETS) {
-        const tex = this.textures.get(key);
+      // Nur Sheets in Frames schneiden; plains bleiben ganze Bilder. Spaltenzahl und
+      // Frame-Größe kommen aus dem Manifest (Default 16), nicht mehr aus Listen hier.
+      for (const a of ASSET_MANIFEST) {
+        if (a.kind !== "sheet") continue;
+        const frame = a.frame ?? T;
+        const tex = this.textures.get(a.key);
         const img = tex.getSourceImage();
-        const rows = Math.floor(img.height / T);
-        for (let i = 0; i < cols * rows; i++) {
-          tex.add(i, 0, (i % cols) * T, Math.floor(i / cols) * T, T, T);
+        const rows = Math.floor(img.height / frame);
+        for (let i = 0; i < a.cols * rows; i++) {
+          tex.add(i, 0, (i % a.cols) * frame, Math.floor(i / a.cols) * frame, frame, frame);
         }
       }
       this.scene.start("World");
