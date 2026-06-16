@@ -155,12 +155,33 @@ export interface CiDeploy {
   image: string;
   replicas: number;
 }
+/** Soll-Zustand einer Argo-Application: was die Manifeste im „Git"-Repo deklarieren. */
+export interface ArgoDesired {
+  deployment: { name: string; image: string; replicas: number };
+  service?: { name: string; type?: string; port: string | number };
+}
+/** Eine von Argo CD verwaltete Application – das Herzstück von GitOps.
+ *  Argo vergleicht den im Git deklarierten Soll-Zustand (`desired`) laufend mit dem
+ *  Cluster und gleicht ihn per **Pull** an: manuell (`argocd app sync`) oder automatisch
+ *  (`autoSync`). `selfHeal` dreht manuellen Drift (z.B. `kubectl scale`) von selbst zurück
+ *  – so wird das Pull-Prinzip spürbar: Git ist die Quelle der Wahrheit, nicht der Cluster. */
+export interface ArgoApp {
+  name: string;
+  repo: string;        // Quell-Repo, in dem die Manifeste liegen
+  path: string;        // Pfad im Repo
+  autoSync: boolean;   // synchronisiert von selbst (kein manuelles `argocd app sync` nötig)
+  selfHeal: boolean;   // korrigiert manuellen Drift automatisch auf den Git-Soll zurück
+  desired: ArgoDesired;
+  created: number;
+}
 /** Wirkung eines `kubectl apply -f <datei>` (was die Datei im Cluster erzeugt). */
 export interface ApplyEffect {
   deployment?: { name: string; image: string; replicas: number };
   service?: { name: string; type?: string; port: string | number };
   ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string; tls?: { secretName: string } };
   networkPolicy?: { name: string; podSelector?: string; allowFrom?: string };
+  // Eine Argo-Application-CRD: legt beim `kubectl apply -f` eine Argo-App im Sim-State an.
+  application?: { name: string; repo?: string; path?: string; autoSync?: boolean; selfHeal?: boolean; deployment: { name: string; image: string; replicas: number }; service?: { name: string; type?: string; port: string | number } };
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
@@ -182,6 +203,7 @@ export interface Scenario {
   configMaps?: ConfigMap[];
   files?: Record<string, string>;
   applyEffects?: Record<string, ApplyEffect>;
+  argoApps?: ArgoApp[];
   helmRepos?: string[];
   releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
   charts?: Array<{ name: string; version?: string; packaged?: boolean }>;
@@ -260,6 +282,7 @@ export interface Scenario {
     configMaps!: ConfigMap[];
     files!: Record<string, string>;
     applyEffects!: Record<string, ApplyEffect>;
+    argoApps!: ArgoApp[];
     helmRepos!: string[];
     releases!: Release[];
     charts!: Chart[];
@@ -297,6 +320,7 @@ export interface Scenario {
       this.configMaps = (sc.configMaps || []).map(c => Object.assign({}, c));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
+      this.argoApps = (sc.argoApps || []).map(a => this._cloneArgoApp(a));
 
       this.helmRepos = (sc.helmRepos || []).slice();
       this.releases = (sc.releases || []).map(r => ({
@@ -414,6 +438,9 @@ export interface Scenario {
       if (!sc) return;
       Object.assign(this.files, sc.files || {});
       Object.assign(this.applyEffects, sc.applyEffects || {});
+      for (const a of sc.argoApps || []) {
+        if (!this.argoApps.some(x => x.name === a.name)) this.argoApps.push(this._cloneArgoApp(a));
+      }
       if (sc.tfResources) { this.tf.resources = sc.tfResources.slice(); this.tf.initialized = false; this.tf.applied = false; }
       for (const img of sc.dockerImages || []) {
         if (!this.docker.pulled.includes(img)) this.docker.pulled.push(img);
@@ -477,6 +504,7 @@ export interface Scenario {
         configMaps: this.configMaps.map(c => ({ name: c.name, keys: c.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
+        argoApps: this.argoApps.map(a => this._cloneArgoApp(a)),
         helmRepos: this.helmRepos.slice(),
         releases: this.releases.map(r => ({
           name: r.name, chart: r.chart, revision: r.revision, depName: r.depName,
@@ -510,6 +538,9 @@ export interface Scenario {
     /** Führt eine Befehlszeile aus. Rückgabe: { output, error } */
     exec(line: string): ExecResult {
       this.clock++;
+      // Argo CD reconciliert vor jeder Eingabe: Self-Heal-Apps drehen zwischenzeitlichen
+      // Drift (z.B. ein `kubectl scale` aus dem letzten Befehl) von selbst auf den Git-Soll zurück.
+      this._reconcileAutoSync();
       this.lastError = false;
       const raw = line.trim();
       if (!raw) return { output: "", error: false };
@@ -525,13 +556,14 @@ export interface Scenario {
           case "helm": out = this._helm(tokens, raw); break;
           case "terraform": out = this._terraform(tokens, raw); break;
           case "git": out = this._git(tokens, raw); break;
+          case "argocd": out = this._argocd(tokens); break;
           case "glab": out = this._glab(tokens); break;
           case "ls": out = this._ls(); break;
           case "cat": out = this._cat(tokens); break;
           case "clear": return { output: null, error: false, clear: true };
           case "help": out = this._help(); break;
           default: {
-            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "git", "glab", "ls", "cat", "clear", "help"]);
+            const guess = this._suggest(cmd, ["docker", "kubectl", "helm", "terraform", "git", "argocd", "glab", "ls", "cat", "clear", "help"]);
             out = this._err("⚠️ Den Befehl '" + cmd + "' gibt es hier nicht.",
               guess ? "Meintest du '" + guess + "'? (Tippe 'help' für alle Befehle.)"
                     : "Tippe 'help' für eine Liste der Befehle, die hier funktionieren.");
@@ -603,6 +635,7 @@ export interface Scenario {
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push | fetch | pull",
+        "  argocd     app list | app get <name> | app sync <name>  (Argo CD / GitOps – den Git-Soll in den Cluster ziehen)",
         "  glab       ci status | ci list  (Pipeline-Status in GitLab)",
         "  ls, cat <datei>, clear, help",
       ].join("\n");
@@ -1192,6 +1225,35 @@ export interface Scenario {
             allowFrom: effNp.allowFrom || "", created: this.clock,
           });
           out.push("networkpolicy.networking.k8s.io/" + effNp.name + " created");
+        }
+      }
+      const effApp = eff.application;
+      if (effApp) {
+        const existing = this.argoApps.find(a => a.name === effApp.name);
+        if (existing) {
+          out.push("application.argoproj.io/" + effApp.name + " unchanged");
+        } else {
+          const app: ArgoApp = {
+            name: effApp.name,
+            repo: effApp.repo || "https://git.hafen.de/apps.git",
+            path: effApp.path || effApp.name + "/",
+            autoSync: !!effApp.autoSync,
+            selfHeal: !!effApp.selfHeal,
+            desired: {
+              deployment: Object.assign({}, effApp.deployment),
+              ...(effApp.service ? { service: Object.assign({}, effApp.service) } : {}),
+            },
+            created: this.clock,
+          };
+          this.argoApps.push(app);
+          out.push("application.argoproj.io/" + effApp.name + " created");
+          // Mit auto-sync zieht Argo den Git-Soll sofort in den Cluster (Pull ohne manuelles 'argocd app sync').
+          if (app.autoSync) {
+            this._argoReconcile(app);
+            out.push("💡 Sync-Policy 'Automated' – Argo rollt den deklarierten Stand sofort aus. Schau mit 'argocd app get " + app.name + "'.");
+          } else {
+            out.push("💡 Die App ist angelegt, aber noch OutOfSync. Zieh den Git-Soll mit 'argocd app sync " + app.name + "' in den Cluster.");
+          }
         }
       }
       return out.join("\n");
@@ -1824,6 +1886,129 @@ export interface Scenario {
         }
       }
       return p;
+    }
+
+    /* ===================== argocd (GitOps / Argo CD) ===================== */
+    /** Tiefe Kopie einer Argo-App (für reset/snapshot/mergeScenario). */
+    _cloneArgoApp(a: ArgoApp): ArgoApp {
+      return {
+        name: a.name, repo: a.repo, path: a.path,
+        autoSync: !!a.autoSync, selfHeal: !!a.selfHeal,
+        desired: {
+          deployment: Object.assign({}, a.desired.deployment),
+          ...(a.desired.service ? { service: Object.assign({}, a.desired.service) } : {}),
+        },
+        created: a.created || 0,
+      };
+    }
+
+    /** Sync-Status: stimmt der Cluster mit dem im Git deklarierten Soll überein?
+     *  Wird IMMER live aus dem Cluster-Zustand berechnet – ein manuelles `kubectl scale`
+     *  (Drift) oder ein gelöschtes Deployment macht die App damit sofort OutOfSync. */
+    _argoSyncStatus(app: ArgoApp): "Synced" | "OutOfSync" {
+      const d = app.desired.deployment;
+      const dep = this.deployments.find(x => x.name === d.name);
+      if (!dep) return "OutOfSync";                 // Soll-Ressource fehlt im Cluster
+      if (dep.image !== d.image || dep.replicas !== d.replicas) return "OutOfSync"; // Drift
+      if (app.desired.service && !this.services.some(s => s.name === app.desired.service!.name)) return "OutOfSync";
+      return "Synced";
+    }
+
+    /** Health-Status: läuft die ausgerollte Workload gesund? */
+    _argoHealth(app: ArgoApp): "Healthy" | "Progressing" | "Degraded" | "Missing" {
+      const dep = this.deployments.find(x => x.name === app.desired.deployment.name);
+      if (!dep) return "Missing";
+      if (dep.broken) return "Degraded";
+      return this._podReady(dep) ? "Healthy" : "Progressing";
+    }
+
+    /** Pull: zieht den im Git deklarierten Soll-Zustand in den Cluster – legt fehlende
+     *  Ressourcen an und dreht Drift (falsches Image/abweichende Replikas) zurück. */
+    _argoReconcile(app: ArgoApp) {
+      const d = app.desired.deployment;
+      let dep = this.deployments.find(x => x.name === d.name);
+      if (!dep) {
+        this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas));
+      } else {
+        dep.image = d.image;
+        while (dep.pods.length < d.replicas) dep.pods.push({ name: makePodName(dep.name), created: this.clock, restarts: 0 });
+        while (dep.pods.length > d.replicas) dep.pods.pop();
+        dep.replicas = d.replicas;
+        dep.broken = null; // ein gesundes Git-Manifest heilt auch eine kaputte Workload
+      }
+      const s = app.desired.service;
+      if (s && !this.services.some(x => x.name === s.name)) {
+        this.services.push({
+          name: s.name, type: s.type || "ClusterIP",
+          clusterIP: "10.96." + Math.floor(Math.random() * 250) + "." + Math.floor(Math.random() * 250),
+          port: s.port, created: this.clock,
+        });
+      }
+    }
+
+    /** Self-Heal-Schleife: läuft vor jeder Eingabe und korrigiert bei auto-sync-Apps mit
+     *  self-heal jeden manuellen Drift automatisch zurück (das spürbare Pull-Prinzip). */
+    _reconcileAutoSync() {
+      if (!this.argoApps) return; // exec() kann theoretisch vor reset() laufen
+      for (const app of this.argoApps) {
+        if (app.autoSync && app.selfHeal && this._argoSyncStatus(app) === "OutOfSync") {
+          this._argoReconcile(app);
+        }
+      }
+    }
+
+    _argocd(t: string[]) {
+      if (t[1] !== "app") return this._err("Der Simulator kann nur 'argocd app ...'.", "z.B. 'argocd app list', 'argocd app get <name>' oder 'argocd app sync <name>'.");
+      const action = t[2];
+
+      if (action === "list" || action === "ls") {
+        if (this.argoApps.length === 0) return "Keine Argo-Applications. (Lege eine an: 'kubectl apply -f <application>.yaml'.)";
+        return table(["NAME", "SYNC STATUS", "HEALTH STATUS", "REPO", "PATH"],
+          this.argoApps.map(a => [a.name, this._argoSyncStatus(a), this._argoHealth(a), a.repo, a.path]));
+      }
+
+      if (action === "get") {
+        const name = t[3];
+        if (!name || name.startsWith("-")) return this._err("argocd app get: Welche Application?", "Die Namen siehst du mit 'argocd app list'.");
+        const app = this.argoApps.find(a => a.name === name);
+        if (!app) return this._err('Error: rpc error: code = NotFound desc = applications.argoproj.io "' + name + '" not found', "Die Namen siehst du mit 'argocd app list'.");
+        const sync = this._argoSyncStatus(app);
+        const lines = [
+          "Name:               " + app.name,
+          "Project:            default",
+          "Source Repo:        " + app.repo,
+          "Source Path:        " + app.path,
+          "Sync Policy:        " + (app.autoSync ? "Automated" + (app.selfHeal ? " (self-heal)" : "") : "<none> (manuell)"),
+          "Sync Status:        " + sync + (sync === "Synced" ? " ✅" : " ⚠️  (der Cluster weicht vom Git-Soll ab)"),
+          "Health Status:      " + this._argoHealth(app),
+        ];
+        if (sync === "OutOfSync") {
+          lines.push(app.autoSync && app.selfHeal
+            ? "▸ Self-Heal ist an – Argo dreht den Drift beim nächsten Abgleich von selbst auf den Git-Stand zurück."
+            : "▸ Bring den Cluster auf den Git-Soll: 'argocd app sync " + app.name + "'. (Git ist die Quelle der Wahrheit, nicht der Cluster.)");
+        }
+        return lines.join("\n");
+      }
+
+      if (action === "sync") {
+        const name = t[3];
+        if (!name || name.startsWith("-")) return this._err("argocd app sync: Welche Application?", "Die Namen siehst du mit 'argocd app list'.");
+        const app = this.argoApps.find(a => a.name === name);
+        if (!app) return this._err('Error: rpc error: code = NotFound desc = applications.argoproj.io "' + name + '" not found', "Die Namen siehst du mit 'argocd app list'.");
+        const before = this._argoSyncStatus(app);
+        this._argoReconcile(app);
+        if (before === "Synced") {
+          return "Application '" + app.name + "' ist bereits Synced ✅ – Cluster und Git-Soll stimmen überein, nichts zu tun. 🧘";
+        }
+        return [
+          "Synchronisiere Application '" + app.name + "' …",
+          "Argo zieht den im Git deklarierten Soll-Zustand in den Cluster (Pull-Prinzip).",
+          "Sync Status: Synced ✅   Health: " + this._argoHealth(app),
+          "▸ Schau mit 'kubectl get deployments' – der Cluster entspricht jetzt wieder dem Git-Stand.",
+        ].join("\n");
+      }
+
+      return this._err("argocd app: unbekannte Aktion '" + (action || "") + "'", "z.B. 'argocd app list', 'argocd app get <name>' oder 'argocd app sync <name>'.");
     }
 
     /* ===================== glab (GitLab CLI) ===================== */

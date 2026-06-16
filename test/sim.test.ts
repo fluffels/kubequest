@@ -862,3 +862,152 @@ test("deployments-Liste spiegelt Readiness: notready zeigt 0/1, geheilt 1/1", ()
   sim.exec("kubectl create secret generic kombuese-menue --from-literal=menue=fisch");
   assert.match(sim.exec("kubectl get deployments").output!, /kombuese\s+1\/1/);
 });
+
+/* ===================== argocd / GitOps (Issue #90) ===================== */
+
+// Legt eine Argo-Application-CRD als apply-Effekt an (manuelle Sync-Policy, falls nicht anders gesagt).
+function legeArgoApp(s: KQSim, opts: { autoSync?: boolean; selfHeal?: boolean } = {}) {
+  s.files["kasse-app.yaml"] = "kind: Application …";
+  s.applyEffects["kasse-app.yaml"] = {
+    application: {
+      name: "kasse", repo: "https://git.hafen.de/apps.git", path: "kasse/",
+      autoSync: opts.autoSync, selfHeal: opts.selfHeal,
+      deployment: { name: "kasse", image: "nginx", replicas: 3 },
+      service: { name: "kasse", port: "80" },
+    },
+  };
+}
+
+test("argocd: apply einer Application-CRD legt eine Argo-App an – erst OutOfSync/Missing", () => {
+  legeArgoApp(sim);
+  const r = sim.exec("kubectl apply -f kasse-app.yaml");
+  assert.match(r.output!, /application\.argoproj\.io\/kasse created/);
+  assert.equal(sim.argoApps.length, 1, "App liegt im Sim-State");
+  // Noch nichts ausgerollt: Deployment fehlt -> OutOfSync, Health Missing
+  assert.equal(sim.deployments.length, 0, "ohne sync wird nichts materialisiert");
+  const get = sim.exec("argocd app get kasse");
+  assert.match(get.output!, /Sync Status:\s+OutOfSync/);
+  assert.match(get.output!, /Health Status:\s+Missing/);
+});
+
+test("argocd: app sync zieht den Git-Soll in den Cluster (Pull) -> Synced/Healthy", () => {
+  legeArgoApp(sim);
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  const sync = sim.exec("argocd app sync kasse");
+  assert.ok(!sync.error);
+  assert.match(sync.output!, /Synced/);
+  const dep = sim.deployments.find(d => d.name === "kasse");
+  assert.ok(dep, "Deployment wurde materialisiert");
+  assert.equal(dep!.replicas, 3, "Replikas wie im Git deklariert");
+  assert.equal(dep!.image, "nginx");
+  assert.ok(sim.services.some(s => s.name === "kasse"), "Service wurde mit angelegt");
+  assert.match(sim.exec("argocd app get kasse").output!, /Sync Status:\s+Synced/);
+  assert.match(sim.exec("argocd app get kasse").output!, /Health Status:\s+Healthy/);
+});
+
+test("argocd: list zeigt Sync- und Health-Status", () => {
+  legeArgoApp(sim);
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  assert.match(sim.exec("argocd app list").output!, /kasse\s+OutOfSync\s+Missing/);
+  sim.exec("argocd app sync kasse");
+  assert.match(sim.exec("argocd app list").output!, /kasse\s+Synced\s+Healthy/);
+});
+
+test("argocd: Drift durch kubectl scale macht OutOfSync, erneutes sync dreht ihn zurück", () => {
+  legeArgoApp(sim); // manuelle Policy, kein self-heal
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("argocd app sync kasse");
+  // manueller Eingriff am Cluster -> weicht vom Git-Soll ab
+  sim.exec("kubectl scale deployment kasse --replicas=7");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 7, "Drift bleibt zunächst stehen (kein self-heal)");
+  assert.match(sim.exec("argocd app get kasse").output!, /Sync Status:\s+OutOfSync/);
+  // Pull bringt den Cluster wieder auf den deklarierten Stand
+  sim.exec("argocd app sync kasse");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 3, "Sync stellt den Git-Soll wieder her");
+  assert.match(sim.exec("argocd app get kasse").output!, /Sync Status:\s+Synced/);
+});
+
+test("argocd: Drift durch set image macht OutOfSync, sync setzt das Image zurück", () => {
+  legeArgoApp(sim);
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("argocd app sync kasse");
+  sim.exec("kubectl set image deployment/kasse kasse=redis");
+  assert.match(sim.exec("argocd app get kasse").output!, /OutOfSync/);
+  sim.exec("argocd app sync kasse");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.image, "nginx", "Git-Image gewinnt");
+});
+
+test("argocd: gelöschtes Deployment macht OutOfSync/Missing, sync legt es neu an", () => {
+  legeArgoApp(sim);
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("argocd app sync kasse");
+  sim.exec("kubectl delete deployment kasse");
+  const get = sim.exec("argocd app get kasse");
+  assert.match(get.output!, /OutOfSync/);
+  assert.match(get.output!, /Missing/);
+  sim.exec("argocd app sync kasse");
+  assert.ok(sim.deployments.some(d => d.name === "kasse"), "sync materialisiert die fehlende Ressource neu");
+});
+
+test("argocd: auto-sync rollt den Soll beim apply sofort aus (kein manuelles sync nötig)", () => {
+  legeArgoApp(sim, { autoSync: true, selfHeal: true });
+  const r = sim.exec("kubectl apply -f kasse-app.yaml");
+  assert.match(r.output!, /Automated/);
+  assert.ok(sim.deployments.some(d => d.name === "kasse"), "auto-sync materialisiert sofort");
+  assert.match(sim.exec("argocd app get kasse").output!, /Sync Status:\s+Synced/);
+});
+
+test("argocd: self-heal dreht manuellen Drift beim nächsten Tick automatisch zurück (Pull spürbar)", () => {
+  legeArgoApp(sim, { autoSync: true, selfHeal: true });
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("kubectl scale deployment kasse --replicas=9");
+  // direkt nach dem Scale steht der Drift noch (reconcile läuft VOR dem nächsten Befehl)
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 9);
+  // der nächste Befehl tickt die Self-Heal-Schleife -> Drift weg
+  const get = sim.exec("argocd app get kasse");
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 3, "self-heal hat zurückgedreht");
+  assert.match(get.output!, /Sync Status:\s+Synced/);
+});
+
+test("argocd: ohne self-heal bleibt der Drift bei auto-sync stehen (Gegenprobe)", () => {
+  legeArgoApp(sim, { autoSync: true, selfHeal: false });
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  sim.exec("kubectl scale deployment kasse --replicas=9");
+  sim.exec("argocd app get kasse"); // Tick – darf NICHT heilen
+  assert.equal(sim.deployments.find(d => d.name === "kasse")!.replicas, 9, "ohne self-heal kein Auto-Zurückdrehen");
+  assert.match(sim.exec("argocd app get kasse").output!, /OutOfSync/);
+});
+
+test("argocd: Snapshot/Reset bewahrt Argo-Apps inkl. Sync-Status", () => {
+  legeArgoApp(sim, { autoSync: true, selfHeal: true });
+  sim.exec("kubectl apply -f kasse-app.yaml");
+  const snap = sim.snapshot();
+  const wieder = new KQSim(snap);
+  assert.equal(wieder.argoApps.length, 1, "App überlebt das Speichern");
+  assert.equal(wieder.argoApps[0].name, "kasse");
+  assert.equal(wieder.argoApps[0].autoSync, true);
+  assert.match(wieder.exec("argocd app get kasse").output!, /Synced/);
+});
+
+test("argocd: Fehlerfälle – unbekannter Unterbefehl, fehlende/unbekannte App", () => {
+  assert.ok(sim.exec("argocd cluster list").error, "nur 'argocd app ...' wird unterstützt");
+  assert.ok(sim.exec("argocd app get").error, "Name fehlt");
+  const miss = sim.exec("argocd app get gibtsnicht");
+  assert.ok(miss.error);
+  assert.match(miss.output!, /NotFound/);
+  assert.ok(sim.exec("argocd app sync gibtsnicht").error, "sync auf unbekannte App ist Fehler");
+  assert.ok(sim.exec("argocd app huh kasse").error, "unbekannte Aktion");
+});
+
+test("argocd: doppeltes apply ist idempotent (unchanged, keine zweite App)", () => {
+  legeArgoApp(sim);
+  assert.match(sim.exec("kubectl apply -f kasse-app.yaml").output!, /created/);
+  assert.match(sim.exec("kubectl apply -f kasse-app.yaml").output!, /unchanged/);
+  assert.equal(sim.argoApps.length, 1);
+});
+
+test("argocd: 'argcd' bekommt einen Meintest-du-Vorschlag", () => {
+  const r = sim.exec("argcd app list");
+  assert.ok(r.error);
+  assert.match(r.output!, /argocd/);
+});
