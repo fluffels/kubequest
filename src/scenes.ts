@@ -14,6 +14,7 @@ import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOO
 import { keys, setWorldScene, setInteriorOpen } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
+import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 
   const T = 16;
 
@@ -87,6 +88,20 @@ import { gameClock } from "./clock";
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
       this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
 
+      // Performance-Budget (#82): Off-screen-Culling + Messung.
+      // cullables = statische Deko (Blumen, Gras, Büsche, Steine, Bäume …), die
+      // außerhalb des Sichtfelds ausgeblendet wird. Nur Optik – Kollision (solidGrid)
+      // bleibt unberührt. Debug-Schalter über die URL:
+      //   ?perf        → FPS/Sprite-HUD einblenden (Messbeleg vor/nach)
+      //   ?stress=N    → Deko-Dichte ×N (künstlich „vergrößerte" Karte zum Messen)
+      this.cullables = [];               // { obj, x, y }
+      this.visibleCullables = 0;
+      this.lastCullX = NaN; this.lastCullY = NaN;
+      this.fpsSampler = new FrameSampler();
+      const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+      this.debugPerf = params.has("perf");
+      this.stress = Math.max(1, Math.min(20, Math.floor(Number(params.get("stress")) || 1)));
+
       // Pixel-Textur für Partikel
       const g = this.make.graphics({ add: false } as any);
       g.fillStyle(0xffffff); g.fillRect(0, 0, 2, 2);
@@ -140,6 +155,16 @@ import { gameClock } from "./clock";
       cam.startFollow(this.playerSprite, true, 0.15, 0.15);
 
       this.scale.on("resize", () => cam.setZoom(window.innerWidth < 900 ? 2.4 : 3));
+
+      // Performance-HUD (#82, nur mit ?perf in der URL): FPS + Sprite-Zahl als
+      // Messbeleg, dass das Culling wirkt (sichtbar/gesamt fällt beim Scrollen).
+      if (this.debugPerf) {
+        this.perfHud = this.add.text(4, 4, "", {
+          fontFamily: "Consolas, monospace", fontSize: "9px", color: "#9effa0",
+          backgroundColor: "rgba(0,0,0,0.6)", padding: { left: 5, right: 5, top: 3, bottom: 3 }, resolution: 3,
+        }).setScrollFactor(0).setDepth(30000);
+      }
+
       this.scheduleEvents(60); // erste Events frühestens nach 1 Minute
 
       // Möwen für die Hafen-Atmosphäre
@@ -182,6 +207,14 @@ import { gameClock } from "./clock";
       // ein PixelLab-Objekt als Deko (unten verankert, Tiefe nach y), optional solide
       this.decoList.push({ x, y, sheet: tex, obj: true, scale });
       if (solid) this.solidGrid[Math.round(y) * this.W + Math.round(x)] = 1;
+    }
+
+    /** Statisches Render-Objekt fürs Off-screen-Culling registrieren (#82).
+     *  (px,py) = Welt-Pixel-Anker (für die Sichtfeld-Prüfung). Gibt das Objekt
+     *  durch, damit Aufrufer es weiter verketten können. */
+    registerCullable<T extends Phaser.GameObjects.Components.Visible>(obj: T, px: number, py: number): T {
+      this.cullables.push({ obj, x: px, y: py } as Cullable);
+      return obj;
     }
     path(x0: number, y0: number, x1: number, y1: number) {
       let x = x0, y = y0;
@@ -482,13 +515,14 @@ import { gameClock } from "./clock";
         return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
       };
       for (const p of pickPlacements({
-        W: this.W, H: this.H, count: 30, seed: strSeed("flowers"), accept,
+        W: this.W, H: this.H, count: 30 * this.stress, seed: strSeed("flowers"), accept,
         jitter: { x: [2, 14], y: [8, 15] },
       })) {
         // Origin am Boden; leichte feste Neigung (-3..+3°) bricht den Gleichtakt – ohne Bewegung (#30)
         const angle = Math.round(hash01(strSeed("flower-angle"), p.x, p.y) * 6) - 3;
-        this.add.image(p.x * T + p.jx, p.y * T + p.jy, "flowers")
+        const img = this.add.image(p.x * T + p.jx, p.y * T + p.jy, "flowers")
           .setOrigin(0.5, 1).setScale(0.35).setDepth(p.y * T + 6).setAngle(angle);
+        this.registerCullable(img, p.x * T + p.jx, p.y * T + p.jy);
       }
     }
 
@@ -505,7 +539,7 @@ import { gameClock } from "./clock";
       };
       // Deutlich mehr Büschel als Blumen → die Wiese wirkt flächig bewachsen statt kahl.
       for (const p of pickPlacements({
-        W: this.W, H: this.H, count: 140, seed: strSeed("grass-detail"), accept,
+        W: this.W, H: this.H, count: 140 * this.stress, seed: strSeed("grass-detail"), accept,
         jitter: { x: [1, 15], y: [6, 15] },
       })) {
         const s = grassTuftStyle(strSeed("grass-style"), p.x, p.y, VARIANTS);
@@ -515,12 +549,13 @@ import { gameClock } from "./clock";
           0.45 + s.shade * 0.08,              // Sättigung
           0.34 + s.shade * 0.07,              // Helligkeit
         ).color;
-        this.add.image(p.x * T + p.jx, p.y * T + p.jy, "grasstuft" + s.variant)
+        const img = this.add.image(p.x * T + p.jx, p.y * T + p.jy, "grasstuft" + s.variant)
           .setOrigin(0.5, 1)
           .setScale((s.flip ? -1 : 1) * s.scale, s.scale)
           .setAngle(s.angle)
           .setTint(tint)
           .setDepth(p.y * T + 4);             // y-sortiert, knapp unter Blumen/Objekten
+        this.registerCullable(img, p.x * T + p.jx, p.y * T + p.jy);
       }
     }
 
@@ -543,11 +578,13 @@ import { gameClock } from "./clock";
       })) {
         const ox = p.x * T + p.jx, oy = p.y * T + p.jy;
         const img = this.add.image(ox, oy, tex).setOrigin(0.5, 0.7).setScale(scale).setDepth(p.y * T + 7);
+        this.registerCullable(img, ox, oy);   // #82: gestreute Deko cullen
         if (tex === "lamppost") {
           // Warmes Glühen am Laternenkopf – leuchtet bei Dämmerung/Nacht auf (#4)
           const glow = this.add.image(ox, img.getTopCenter().y + 7, "glowSoft").setDisplaySize(26, 26)
             .setTint(0xffd591).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(p.y * T + 6);
           this.lampGlows.push(glow);
+          this.registerCullable(glow, ox, oy);   // Glühen mit der Laterne mit-cullen (kein Floating-Glow)
         }
         if (solid) this.solidGrid[p.y * this.W + p.x] = 1;
       }
@@ -588,13 +625,13 @@ import { gameClock } from "./clock";
     }
 
     renderStatics() {
-      // Deko (Bäume, Häuser, Möbel) – Tiefe nach y
+      // Deko (Bäume, Häuser, Möbel) – Tiefe nach y. Jedes Bild fürs Culling
+      // registrieren (#82): außerhalb des Sichtfelds wird es ausgeblendet.
       for (const d of this.decoList) {
-        if (d.obj) {
-          this.add.image(d.x * T + 8, d.y * T + 10, d.sheet).setOrigin(0.5, 0.7).setScale(d.scale || 1).setDepth(d.y * T + T);
-        } else {
-          this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
-        }
+        const img = d.obj
+          ? this.add.image(d.x * T + 8, d.y * T + 10, d.sheet).setOrigin(0.5, 0.7).setScale(d.scale || 1).setDepth(d.y * T + T)
+          : this.add.image(d.x * T + 8, d.y * T + 8, d.sheet, d.idx).setDepth(d.y * T + T);
+        this.registerCullable(img, d.x * T + 8, d.y * T + 8);
       }
       // === Dein Schiff: hübsches PixelLab-Holzschiff (#41) statt prozeduraler Primitive ===
       // Bug zeigt nach Osten, Heck rund nach Westen – passt zur alten Ausrichtung.
@@ -916,6 +953,33 @@ import { gameClock } from "./clock";
       }
     }
 
+    /** Off-screen-Culling der statischen Deko (#82). Gedrosselt: die (potentiell
+     *  tausende) Sprites werden nur neu geprüft, wenn die Kamera nennenswert
+     *  gescrollt ist – in ruhigen Frames kostet das Culling so gut wie nichts.
+     *  Der großzügige Rand (MARGIN) verhindert Pop-in: hohe Objekte (Bäume) ragen
+     *  weit über ihren Fuß-Anker, müssen also schon „aktiv" werden, bevor der
+     *  Anker ins Bild scrollt. Reine Optik – das solidGrid bleibt unangetastet. */
+    cullDecor(delta: number) {
+      this.fpsSampler.push(delta);
+      const cam = this.cameras.main, wv = cam.worldView;
+      // worldView ist erst nach dem ersten Render gefüllt; vorher (Breite 0) warten.
+      if (wv.width > 0 &&
+          (isNaN(this.lastCullX) || Math.abs(cam.scrollX - this.lastCullX) > 8 || Math.abs(cam.scrollY - this.lastCullY) > 8)) {
+        this.lastCullX = cam.scrollX; this.lastCullY = cam.scrollY;
+        const MARGIN = 4 * T;
+        const bounds = expandRect({ x: wv.x, y: wv.y, width: wv.width, height: wv.height }, MARGIN);
+        this.visibleCullables = cull(this.cullables, bounds);
+      }
+      if (this.debugPerf && this.perfHud) {
+        const total = this.cullables.length, vis = this.visibleCullables;
+        this.perfHud.setText(
+          "FPS " + this.fpsSampler.fps + "\n" +
+          "Sprites sichtbar " + vis + "/" + total + "\n" +
+          "gecullt " + (total - vis) + "  ·  stress ×" + this.stress,
+        );
+      }
+    }
+
     /* ============ Events: Piraten & Krake ============ */
     scheduleEvents(delaySec?: number) {
       const now = this.time.now / 1000;
@@ -1147,6 +1211,7 @@ import { gameClock } from "./clock";
       this.syncCluster();
       this.revealNearbyLabels();
       this.updateDayNight(time);
+      this.cullDecor(delta);
 
       // Wirtschaft
       const payout = Game.economyTick(dt);
