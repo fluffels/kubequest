@@ -63,7 +63,7 @@ Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator inkl. Troubleshooting)
   - **Keine simpel-prozeduralen Platzhalter dort, wo ein Asset hingehört:** code-gezeichnete Primitive (Dreieck-Grashalme, mit `graphics` gemalte Gegner/Boote) sind nur Übergangslösung und bekommen ein Asset-Ticket. *Dynamische Effekte* (rotierender Leuchtturm-Lichtkegel, Schatten/Glow, Tag-Nacht-Schleier) sind **kein** Platzhalter und bleiben bewusst Code.
   - **Hoch auflösen, dann ganzzahlig verkleinern:** große Objekte (Häuser, Bäume, Schiff) in hoher Auflösung generieren (PixelLab-Abo Tier 1 erlaubt große Bilder) statt klein erzeugen + hochskalieren, damit der Renderer scharf bleibt.
 
-  **Voraussetzung für neue Optik-Tickets:** erst die echte Stardew-Referenz aus #106 sammeln, statt zu raten. Lebende Abweichungsliste (Audit gegen diese Messlatte, je Bereich): [`docs/art-direction-audit.md`](docs/art-direction-audit.md). PixelLab-Workflow (Ablegen/Einbinden) siehe oben + `assets/pixellab/README.md`.
+  **Voraussetzung für neue Optik-Tickets:** Vor jedem Optik-Ticket die **echte Stardew-Referenz** lesen, statt zu raten — [`docs/stardew-referenz.md`](docs/stardew-referenz.md) (Raster, Palette, Outlines, Gras/Boden, PixelLab-Prompt-Bausteine, „Ist es Stardew-Niveau?"-Checkliste; #106). Lebende Abweichungsliste (Audit gegen diese Messlatte, je Bereich): [`docs/art-direction-audit.md`](docs/art-direction-audit.md). PixelLab-Workflow (Ablegen/Einbinden) siehe oben + `assets/pixellab/README.md`.
 - **Spielstände** laufen über die SaveStore-Schicht (`store.ts`), localStorage + Auto-Save alle 5 s + JSON-Export/Import. Formatänderungen brauchen perspektivisch ein `version`-Feld + Migration.
 
 ## Wo die TODOs leben
