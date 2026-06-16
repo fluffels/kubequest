@@ -18,8 +18,9 @@ Handvoll klar benennbarer Stilbrüche – fast alle bereits in eigenen Tickets:
 4. **Schiff liegt auf einer Holz-Plattform** statt im Wasser zu schwimmen → **#108** (Platzierung, kein Stil).
 5. **Offene Stil-Entscheidung:** Gebäude in schräger 2.5D-Sicht vs. die frontale `view: side`-Messlatte → neues Entscheidungs-Ticket (siehe unten).
 
-**Voraussetzung** für die eigentliche Umsetzung der Optik-Tickets: erst die echte
-Referenz aus **#106** sammeln, damit gegen ein Vorbild gearbeitet wird statt zu raten.
+**Voraussetzung** für die eigentliche Umsetzung der Optik-Tickets: die echte
+Referenz lesen, damit gegen ein Vorbild gearbeitet wird statt zu raten →
+[`stardew-referenz.md`](stardew-referenz.md) (#106, erledigt).
 
 ---
 
@@ -54,7 +55,7 @@ Fast alle Abweichungen sind bereits geführt – das Audit ordnet sie der Messla
 
 | # | Bereich | Status |
 |---|---|---|
-| [#106](https://github.com/fluffels/kubequest/issues/106) | **Voraussetzung:** echte Stardew-Referenz sammeln | offen (zuerst) |
+| [#106](https://github.com/fluffels/kubequest/issues/106) | **Voraussetzung:** echte Stardew-Referenz sammeln → [`stardew-referenz.md`](stardew-referenz.md) | ✅ erledigt |
 | [#107](https://github.com/fluffels/kubequest/issues/107) | Gras als echtes Pixelart (Re-Do von #40) | offen |
 | [#53](https://github.com/fluffels/kubequest/issues/53) | Inventar aller Nicht-Pixelart-Grafiken (Gegner, HUD, Emojis) + Per-Element-Tickets | offen |
 | [#108](https://github.com/fluffels/kubequest/issues/108) | Schiff schwimmt im Wasser statt auf Holz-Plattform (Platzierung) | offen |
