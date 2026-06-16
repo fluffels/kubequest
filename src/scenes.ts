@@ -93,6 +93,7 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       this.slotUsed = new Array(36).fill(false);
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
       this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
+      this.archipelArmed = false;   // #92: Archipel-Warp erst nach Tasten-Loslassen scharf (kein Pingpong)
 
       // Performance-Budget (#82): Off-screen-Culling + Messung.
       // cullables = statische Deko (Blumen, Gras, Büsche, Steine, Bäume …), die
@@ -830,14 +831,16 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
     }
 
     /** #92: Zum GitOps-Archipel übersetzen – analog zu enterInterior. Der Spieler
-     *  wird vorher auf den Kai am Steg-Kopf zurückgesetzt, damit ein Speichern/
-     *  Neuladen draußen (und nicht im Warp) landet und der Warp nicht sofort
-     *  erneut triggert, sobald man von der Insel zurückkommt. */
+     *  wird vorher auf den Steg vor dem Anker zurückgesetzt (WORLD_RETURN), damit
+     *  man symmetrisch dort ankommt, wo man abgelegt hat, ein Speichern/Neuladen
+     *  draußen landet – und der Warp NICHT sofort erneut triggert: das Gate wird
+     *  disarmt, bis die Lauftaste nach der Rückkehr einmal losgelassen wurde. */
     enterArchipel() {
       const pl = this.playerPos;
       pl.x = WORLD_RETURN.tx * T + 8;
       pl.y = WORLD_RETURN.ty * T + 8;
       pl.face = "north"; pl.moving = false;
+      this.archipelArmed = false;
       SFX.door();
       setInteriorOpen(true);
       this.scene.launch("Archipel");
@@ -1206,12 +1209,21 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
         if (this.stepAcc > 0.3) { this.stepAcc = 0; this.dust.explode(2, pl.x, pl.y + 6); }
       }
 
+      // #92: Archipel-Anleger „scharf machen". Der Warp darf erst auslösen, wenn
+      // der Spieler die Lauftaste seit der Ankunft losgelassen hat UND nicht schon
+      // auf der Anker-Kachel steht – sonst pingpongt man mit gehaltener Taste sofort
+      // wieder zurück (Review-Feedback). Bei der Rückkehr landet man eine Kachel vor
+      // dem Anker, also disarmt enterArchipel() das Gate bewusst.
+      const onArchWarp = warpAt(pl.x, pl.y, WORLD_TO_ARCHIPEL);
+      const moveKeyDown = !!(keys["w"] || keys["s"] || keys["a"] || keys["d"] ||
+        keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
+      if (!moveKeyDown && !onArchWarp) this.archipelArmed = true;
+
       // #6: Auf einer Tür-Kachel? -> Haus betreten (Rest dieses Frames überspringen).
       if (!blocked) {
         const door = doorAt(pl.x, pl.y);
         if (door) { this.enterInterior(door); return; }
-        // #92: Auf dem Archipel-Anleger? -> zur Insel überwarpen.
-        if (warpAt(pl.x, pl.y, WORLD_TO_ARCHIPEL)) { this.enterArchipel(); return; }
+        if (this.archipelArmed && onArchWarp) { this.enterArchipel(); return; }
       }
 
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
@@ -1513,6 +1525,9 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       this.spawnGull();
 
       this.ePrev = true;
+      // #92: Rück-Warp erst scharf, wenn die (vom Hinweg evtl. noch gehaltene)
+      // Lauftaste einmal losgelassen wurde – sonst sofortiges Pingpong.
+      this.returnArmed = false;
     }
 
     /** Wang-Boden wie WorldScene.renderGround, hier ohne Stein-Kai: Wasser → Sand
@@ -1658,8 +1673,15 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
       this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
       this.pShadow.setPosition(pl.x, pl.y + 6);
 
-      // Rück-Anleger betreten? -> zurück nach Port Kubernia.
-      if (!blocked && warpAt(pl.x, pl.y, ARCHIPEL_TO_WORLD)) { this.exitToWorld(); return; }
+      // Rück-Anleger betreten? -> zurück nach Port Kubernia. Wie beim Hinweg gilt:
+      // erst „scharf", wenn die Lauftaste seit der Ankunft losgelassen wurde und man
+      // nicht schon auf dem Anker steht – sonst pingpongt man mit gehaltener Taste
+      // sofort zurück, weil die Ankunft direkt über dem Rück-Anleger liegt.
+      const onRet = warpAt(pl.x, pl.y, ARCHIPEL_TO_WORLD);
+      const moveKeyDown = !!(keys["w"] || keys["s"] || keys["a"] || keys["d"] ||
+        keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
+      if (!moveKeyDown && !onRet) this.returnArmed = true;
+      if (!blocked && this.returnArmed && onRet) { this.exitToWorld(); return; }
       // Notausgang per E/Enter, falls man am Steg feststeht.
       const e = !blocked && (!!keys["e"] || !!keys["Enter"]);
       const onDock = this.ground[Math.floor(pl.y / T) * this.W + Math.floor(pl.x / T)] === A_DOCK;

@@ -42,9 +42,11 @@ export const WORLD_JETTY = { x: 20, w: 2, y0: 27, y1: 31 } as const;
 export const WORLD_TO_ARCHIPEL: Warp = { id: "archipel-anleger", tx: 21, ty: 31, title: "GitOps-Archipel" };
 
 /** Wohin der Spieler nach der Rückkehr auf der Hauptkarte gesetzt wird: auf den
- *  Kai am Steg-Kopf (eine Kachel landwärts vom Steg), damit er nicht sofort
- *  wieder zurückwarpt. */
-export const WORLD_RETURN = { tx: 21, ty: 26 } as const;
+ *  Steg direkt vor dem Anker (eine Kachel landwärts vom Warp-Ende), damit man
+ *  symmetrisch dort ankommt, wo man abgelegt hat – und nicht auf der Warp-Kachel
+ *  selbst (sonst sofortiger Re-Warp). Das „Scharf"-Gate in scenes.ts verhindert
+ *  zusätzlich das Pingpong bei gehaltener Lauftaste. */
+export const WORLD_RETURN = { tx: 21, ty: WORLD_JETTY.y1 - 1 } as const;
 
 /** Rück-Anleger auf der Insel → Hauptkarte (Steg-Ende im Süden, eine Reihe vor
  *  dem Kartenrand, damit offenes Wasser die Insel umschließt). */

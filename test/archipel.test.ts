@@ -118,7 +118,7 @@ test("warpAt trifft die Warp-Kachel und nur diese (Negativfall: Nachbarkachel z�
 test("kein Re-Trigger-Loop: die Ankunfts-/Rückkehrkacheln sind NICHT selbst die Warp-Kachel", () => {
   // Insel: man landet eine Kachel landwärts vom Rück-Anleger
   expect(warpAt(ARCHIPEL_ARRIVAL.tx * TILE + 8, ARCHIPEL_ARRIVAL.ty * TILE + 8, ARCHIPEL_TO_WORLD)).toBe(false);
-  // Hauptkarte: man landet auf dem Kai, nicht auf dem Steg-Ende
+  // Hauptkarte: man landet eine Kachel vor dem Anker, nicht auf dem Steg-Ende
   expect(warpAt(WORLD_RETURN.tx * TILE + 8, WORLD_RETURN.ty * TILE + 8, WORLD_TO_ARCHIPEL)).toBe(false);
 });
 
@@ -126,6 +126,13 @@ test("der Hauptkarten-Steg endet genau auf der Warp-Kachel (Steg-Geometrie ↔ T
   // Warp liegt am seewärtigen Ende des Stegs und innerhalb seiner Spalten
   expect(WORLD_TO_ARCHIPEL.ty).toBe(WORLD_JETTY.y1);
   expect(WORLD_TO_ARCHIPEL.tx >= WORLD_JETTY.x && WORLD_TO_ARCHIPEL.tx < WORLD_JETTY.x + WORLD_JETTY.w).toBe(true);
-  // Rückkehrpunkt liegt landwärts (kleinere y) vom Steg-Kopf
-  expect(WORLD_RETURN.ty).toBeLessThan(WORLD_JETTY.y0);
+});
+
+test("Rückkehr landet symmetrisch auf dem Steg direkt vor dem Anker (nicht am Kai/Schild)", () => {
+  // auf einer Steg-Kachel (innerhalb Spalten + y-Bereich) …
+  expect(WORLD_RETURN.tx >= WORLD_JETTY.x && WORLD_RETURN.tx < WORLD_JETTY.x + WORLD_JETTY.w).toBe(true);
+  expect(WORLD_RETURN.ty >= WORLD_JETTY.y0 && WORLD_RETURN.ty <= WORLD_JETTY.y1).toBe(true);
+  // … und zwar direkt neben dem Anker (eine Kachel landwärts), aber nicht darauf
+  expect(WORLD_RETURN.tx).toBe(WORLD_TO_ARCHIPEL.tx);
+  expect(WORLD_RETURN.ty).toBe(WORLD_TO_ARCHIPEL.ty - 1);
 });
