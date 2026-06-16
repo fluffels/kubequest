@@ -32,6 +32,9 @@ export interface Deployment {
   created: number;
   pods: PodInstance[];
   broken: Broken | null;
+  /** Eingebundene Config/Geheimnisse (via `kubectl set env --from=…`).
+   *  configMaps = harmlose Einstellungen, secrets = Vertrauliches. */
+  envFrom: { configMaps: string[]; secrets: string[] };
 }
 export interface ServiceRes {
   name: string;
@@ -62,6 +65,13 @@ export interface Secret {
   name: string;
   keys: string[];
   type?: string;         // z.B. "kubernetes.io/tls" für TLS-Secrets; sonst "Opaque"
+  created?: number;
+}
+/** ConfigMap: harmlose Einstellungen im Klartext (DB-Host, Log-Level …).
+ *  Gegenstück zum Secret – ConfigMaps gehören NIE Vertrauliches. */
+export interface ConfigMap {
+  name: string;
+  keys: string[];
   created?: number;
 }
 export interface ClusterNode {
@@ -155,11 +165,12 @@ export interface Scenario {
   dockerImages?: string[];
   dockerContainers?: Container[];
   nodes?: ClusterNode[];
-  deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null }>;
+  deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null; envFrom?: { configMaps: string[]; secrets: string[] } }>;
   services?: ServiceRes[];
   ingresses?: IngressRes[];
   networkPolicies?: NetworkPolicyRes[];
   secrets?: Secret[];
+  configMaps?: ConfigMap[];
   files?: Record<string, string>;
   applyEffects?: Record<string, ApplyEffect>;
   helmRepos?: string[];
@@ -237,6 +248,7 @@ export interface Scenario {
     ingresses!: IngressRes[];
     networkPolicies!: NetworkPolicyRes[];
     secrets!: Secret[];
+    configMaps!: ConfigMap[];
     files!: Record<string, string>;
     applyEffects!: Record<string, ApplyEffect>;
     helmRepos!: string[];
@@ -268,11 +280,12 @@ export interface Scenario {
         { name: "ahoi-worker-2", status: "Ready", roles: "<none>", version: "v1.30.2" },
       ]).map(n => Object.assign({}, n));
 
-      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken));
+      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
       this.ingresses = (sc.ingresses || []).map(i => Object.assign({}, i));
       this.networkPolicies = (sc.networkPolicies || []).map(n => Object.assign({}, n));
       this.secrets = (sc.secrets || []).map(s => Object.assign({}, s));
+      this.configMaps = (sc.configMaps || []).map(c => Object.assign({}, c));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
 
@@ -317,8 +330,11 @@ export interface Scenario {
       this.lastError = false;
     }
 
-    _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null): Deployment {
-      const d: Deployment = { name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null };
+    _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null, envFrom?: { configMaps: string[]; secrets: string[] }): Deployment {
+      const d: Deployment = {
+        name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null,
+        envFrom: { configMaps: (envFrom?.configMaps || []).slice(), secrets: (envFrom?.secrets || []).slice() },
+      };
       for (let i = 0; i < replicas; i++) {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
@@ -390,8 +406,11 @@ export interface Scenario {
       }
       for (const d of sc.deployments || []) {
         if (!this.deployments.some(x => x.name === d.name)) {
-          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas, d.broken));
+          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom));
         }
+      }
+      for (const cm of sc.configMaps || []) {
+        if (!this.configMaps.some(x => x.name === cm.name)) this.configMaps.push(Object.assign({}, cm));
       }
       for (const repo of sc.helmRepos || []) {
         if (!this.helmRepos.includes(repo)) this.helmRepos.push(repo);
@@ -436,11 +455,12 @@ export interface Scenario {
         dockerImages: this.docker.pulled.slice(),
         dockerContainers: this.docker.containers.map(c => Object.assign({}, c)),
         nodes: this.nodes.map(n => Object.assign({}, n)),
-        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null })),
+        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null, envFrom: { configMaps: d.envFrom.configMaps.slice(), secrets: d.envFrom.secrets.slice() } })),
         services: this.services.map(s => Object.assign({}, s)),
         ingresses: this.ingresses.map(i => Object.assign({}, i)),
         networkPolicies: this.networkPolicies.map(n => Object.assign({}, n)),
         secrets: this.secrets.map(s => ({ name: s.name, keys: s.keys.slice() })),
+        configMaps: this.configMaps.map(c => ({ name: c.name, keys: c.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
         helmRepos: this.helmRepos.slice(),
@@ -563,9 +583,9 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets | describe pod|ingress|networkpolicy <name>",
-        "             create deployment | create secret generic|tls | scale | expose | delete | apply -f <datei>",
-        "             logs <pod> | set image deployment/<n> <c>=<img> | rollout restart deployment <n>",
+        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
+        "             create deployment | create secret generic|tls | create configmap | scale | expose | delete | apply -f <datei>",
+        "             logs <pod> | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push | fetch | pull",
@@ -724,7 +744,7 @@ export interface Scenario {
       if (sub === "delete") return this._kubectlDelete(t);
       if (sub === "apply") return this._kubectlApply(t);
       if (sub === "logs") return this._kubectlLogs(t);
-      if (sub === "set") return this._kubectlSetImage(t);
+      if (sub === "set") return this._kubectlSet(t, raw);
       if (sub === "rollout") return this._kubectlRollout(t);
 
       return this._err("kubectl: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
@@ -804,6 +824,12 @@ export interface Scenario {
           this.secrets.map(s => [s.name, s.type || "Opaque", String(s.keys.length), this._age(s.created || 0)]));
       }
 
+      if (["configmaps", "configmap", "cm"].includes(what)) {
+        if (this.configMaps.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "DATA", "AGE"],
+          this.configMaps.map(c => [c.name, String(c.keys.length), this._age(c.created || 0)]));
+      }
+
       if (["ingress", "ingresses", "ing"].includes(what)) {
         if (this.ingresses.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "CLASS", "HOSTS", "ADDRESS", "PORTS", "AGE"],
@@ -817,7 +843,7 @@ export interface Scenario {
       }
 
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, secrets, configmaps oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -928,7 +954,17 @@ export interface Scenario {
         this.secrets.push({ name, keys: literals, created: this.clock });
         return "secret/" + name + " created";
       }
-      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment ...' und 'kubectl create secret generic ...'.");
+      if (t[2] === "configmap" || t[2] === "cm") {
+        // kubectl create configmap <name> --from-literal=schluessel=wert
+        const name = t[3];
+        if (!name || name.startsWith("--")) return this._err("kubectl create configmap: Der Name fehlt.", "Muster: kubectl create configmap <name> --from-literal=schluessel=wert");
+        const literals = [...raw.matchAll(/--from-literal[=\s]([\w.-]+)=(\S+)/g)].map(m => m[1]);
+        if (literals.length === 0) return this._err("error: at least one --from-literal is required", "Häng '--from-literal=log_level=info' an.");
+        if (this.configMaps.some(c => c.name === name)) return this._err('error: configmaps "' + name + '" already exists');
+        this.configMaps.push({ name, keys: literals, created: this.clock });
+        return "configmap/" + name + " created";
+      }
+      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment …', 'kubectl create secret generic …' und 'kubectl create configmap …'.");
       const name = t[3];
       const imgMatch = raw.match(/--image[=\s]+(\S+)/);
       if (!name || name.startsWith("--")) return this._err("kubectl create deployment: Der Name fehlt.", "z.B. 'kubectl create deployment kasse --image=nginx'");
@@ -1027,6 +1063,13 @@ export interface Scenario {
         if (idx === -1) return this._err('Error from server (NotFound): services "' + name + '" not found');
         this.services.splice(idx, 1);
         return 'service "' + name + '" deleted';
+      }
+
+      if (["configmap", "configmaps", "cm"].includes(what)) {
+        const idx = this.configMaps.findIndex(c => c.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): configmaps "' + name + '" not found');
+        this.configMaps.splice(idx, 1);
+        return 'configmap "' + name + '" deleted';
       }
 
       if (["secret", "secrets"].includes(what)) {
@@ -1150,6 +1193,37 @@ export interface Scenario {
         "10.244.1.1 - - [12/Jun/2026:09:14:05 +0000] \"GET /gesundheit HTTP/1.1\" 200 2",
         "10.244.2.7 - - [12/Jun/2026:09:14:11 +0000] \"GET /favicon.ico HTTP/1.1\" 404 153",
       ].join("\n");
+    }
+
+    /** Verteiler für `kubectl set …` (image | env). */
+    _kubectlSet(t: string[], raw: string) {
+      if (t[2] === "image") return this._kubectlSetImage(t);
+      if (t[2] === "env") return this._kubectlSetEnv(t, raw);
+      return this._err("Der Simulator kann 'kubectl set image …' und 'kubectl set env …'.", "z.B. 'kubectl set env deployment/<name> --from=configmap/<name>'");
+    }
+
+    /** kubectl set env deployment/<name> --from=configmap/<name> | --from=secret/<name>
+     *  Bindet eine ConfigMap (harmlose Config) oder ein Secret (Vertrauliches) als
+     *  Umgebungsvariablen in ein Deployment ein. */
+    _kubectlSetEnv(t: string[], raw: string) {
+      let depName: string | null = null;
+      if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
+      else if (t[3] === "deployment") depName = t[4];
+      if (!depName) return this._err("kubectl set env: Welches Deployment?", "Muster: kubectl set env deployment/<name> --from=configmap/<name>");
+      const dep = this.deployments.find(d => d.name === depName);
+      if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found', "Welche Deployments es gibt: 'kubectl get deployments'");
+      const m = raw.match(/--from[=\s](configmap|secret)\/(\S+)/);
+      if (!m) return this._err("kubectl set env: Womit einbinden?", "Muster: kubectl set env deployment/<name> --from=configmap/<name> (oder --from=secret/<name>)");
+      const kind = m[1];
+      const refName = m[2];
+      if (kind === "configmap") {
+        if (!this.configMaps.some(c => c.name === refName)) return this._err('error: configmaps "' + refName + '" not found', "Erst anlegen: kubectl create configmap " + refName + " --from-literal=k=v");
+        if (!dep.envFrom.configMaps.includes(refName)) dep.envFrom.configMaps.push(refName);
+      } else {
+        if (!this.secrets.some(s => s.name === refName)) return this._err('error: secrets "' + refName + '" not found', "Erst anlegen: kubectl create secret generic " + refName + " --from-literal=k=v");
+        if (!dep.envFrom.secrets.includes(refName)) dep.envFrom.secrets.push(refName);
+      }
+      return "deployment.apps/" + depName + " env updated";
     }
 
     /** kubectl set image deployment/<name> <container>=<image> */
