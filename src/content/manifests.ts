@@ -111,6 +111,25 @@ export const ARGO_APPLICATION_YAML = [
   "      selfHeal: true            # Drift am Cluster wird zurückgesetzt",
 ].join("\n");
 
+// Dieselbe `Application`, aber OHNE `syncPolicy.automated`: Argo legt sie an und
+// merkt den Drift, rollt den Git-Soll aber NICHT von selbst aus. Du ziehst ihn von
+// Hand mit `argocd app sync` in den Cluster – das macht das Pull-Prinzip beim ersten
+// Mal greifbar (die automatische Variante kommt danach, siehe ARGO_APPLICATION_YAML).
+export const ARGO_APPLICATION_MANUAL_YAML = [
+  "apiVersion: argoproj.io/v1alpha1", "kind: Application", "metadata:",
+  "  name: hafen-lager", "  namespace: argocd", "spec:",
+  "  project: default",
+  "  source:                       # die Seekarte: Soll-Zustand im Git-Repo",
+  "    repoURL: https://github.com/port-kubernia/seekarten.git",
+  "    path: lager",
+  "    targetRevision: main",
+  "  destination:                  # wohin Argo den Soll-Zustand segelt",
+  "    server: https://kubernetes.default.svc",
+  "    namespace: hafen",
+  "  # (noch) keine syncPolicy.automated → du synchronisierst von Hand:",
+  "  #   argocd app sync hafen-lager",
+].join("\n");
+
 // App-of-Apps: eine `Application`, die selbst keine Dienste ausrollt, sondern nur auf
 // einen Ordner voller weiterer `Application`s zeigt – eine „Flotte", die mit einem
 // einzigen Auftrag den ganzen Archipel verwaltet. So skaliert GitOps über viele Häfen.

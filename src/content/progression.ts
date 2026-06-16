@@ -48,4 +48,7 @@ export const NPCS = {
   pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
   kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
   juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
+  // GitOps-Archipel-Lotsin (Standplatz: archipel.ts ARCHIPEL_NPC, id "argo").
+  // Vorläufiger Sprite/Tex – #93 setzt den eigenen Insel-Sprite + Smalltalk.
+  argo:   { name: "Argo",          title: "GitOps-Lotsin",   sprite: 84,  tex: "char_ada" },
 };
