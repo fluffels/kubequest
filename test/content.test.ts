@@ -4,6 +4,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { KQContent } from "../src/content";
+import { validateContent, type ContentBundle } from "../src/content/validate";
 
 test("Quiz-Karten: IDs eindeutig, correct-Index gültig, Erklärung vorhanden", () => {
   const seen = new Set();
@@ -88,4 +89,51 @@ test("Ränge: aufsteigende XP-Schwellen", () => {
   for (let i = 1; i < KQContent.RANKS.length; i++) {
     assert.ok(KQContent.RANKS[i].xp > KQContent.RANKS[i - 1].xp);
   }
+});
+
+/* ===== Zentrale Schema-Validierung (#81) =====
+ * Der Validator (src/content/validate.ts) prüft das ganze Inhalts-Bündel auf
+ * strukturelle & referenzielle Konsistenz. Hier wird er einmal gegen die echten
+ * Inhalte gefahren (muss sauber sein) und mit absichtlich kaputten Referenzen
+ * Red-Green abgesichert: ein Validator, der auch bei kaputtem Inhalt grün bleibt,
+ * wäre wertlos. */
+
+test("Schema-Validierung: die echten Inhalte sind konsistent (keine Fehler)", () => {
+  const errors = validateContent(KQContent);
+  assert.deepEqual(errors, [], "validateContent meldet Probleme:\n" + errors.join("\n"));
+});
+
+test("Red-Green: kaputte Quest-Referenz (unbekannter Questgeber) macht den Check rot", () => {
+  // Akzeptanzkriterium #81: eine absichtlich kaputte Quest-Referenz MUSS gemeldet werden.
+  const kaputt: ContentBundle = {
+    ...KQContent,
+    QUESTS: [
+      ...KQContent.QUESTS,
+      { id: "q-bad", title: "Geister-Quest", giver: "niemand", rewardXp: 1, rewardCoins: 1, steps: [] },
+    ],
+  };
+  const errors = validateContent(kaputt);
+  assert.ok(errors.some(e => e.includes("q-bad") && e.includes("niemand")), "kaputter Questgeber wurde NICHT gemeldet – Validator ohne Zähne:\n" + errors.join("\n"));
+});
+
+test("Red-Green: unbekannter Drill in einem Übungs-Pool macht den Check rot", () => {
+  const kaputt: ContentBundle = {
+    ...KQContent,
+    PRACTICE: { ...KQContent.PRACTICE, ole: [{ drill: "gibt-es-nicht", after: "q4" }] },
+  };
+  const errors = validateContent(kaputt);
+  assert.ok(errors.some(e => e.includes("gibt-es-nicht")), "unbekannter Drill wurde NICHT gemeldet:\n" + errors.join("\n"));
+});
+
+test("Red-Green: CMD-Karte mit unbekanntem chapter und nicht matchender Lösung wird gemeldet", () => {
+  const kaputt: ContentBundle = {
+    ...KQContent,
+    CMD_CARDS: [
+      ...KQContent.CMD_CARDS,
+      { id: "c-bad", chapter: "q-existiert-nicht", q: "?", accept: [/^kubectl get pods$/], solution: "ganz was anderes" },
+    ],
+  };
+  const errors = validateContent(kaputt);
+  assert.ok(errors.some(e => e.includes("c-bad") && e.includes("q-existiert-nicht")), "unbekanntes chapter nicht gemeldet:\n" + errors.join("\n"));
+  assert.ok(errors.some(e => e.includes("c-bad") && e.includes("accept")), "nicht matchende Musterlösung nicht gemeldet:\n" + errors.join("\n"));
 });

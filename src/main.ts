@@ -68,6 +68,16 @@ import { keys, clearKeys } from "./runtime";
   }
 
   function boot() {
+    // Dev-Sicherheitsnetz: Inhalts-Schema beim Start prüfen und Querverweis-Fehler
+    // (unbekannte NPCs/Drills/Quests/reviewIds …) sofort in der Konsole melden.
+    // Nur im Dev-Server aktiv – `import.meta.env.DEV` ist im Prod-Build `false`,
+    // der ganze Block fällt beim Bauen weg (kein Gameplay-Einfluss, #81).
+    if (import.meta.env.DEV) {
+      Promise.all([import("./content/validate"), import("./content")]).then(([{ validateContent }, { KQContent }]) => {
+        const probleme = validateContent(KQContent);
+        if (probleme.length) console.error("⚠️ KubeQuest-Inhalte inkonsistent (#81):\n" + probleme.join("\n"));
+      });
+    }
     Game.load();
     wireKeyboard();
     UI.bindEvents();

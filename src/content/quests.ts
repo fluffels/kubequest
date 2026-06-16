@@ -1221,7 +1221,7 @@ export const QUESTS: Quest[] = [
       ]},
     ]},
 
-  { id: "q26", title: "Der hungrige Kartograf", giver: "juno", rewardXp: 65, rewardCoins: 50,
+  { id: "q27", title: "Der hungrige Kartograf", giver: "juno", rewardXp: 65, rewardCoins: 50,
     steps: [
       { type: "dialog", npc: "juno", lines: [
         "Neuer Sturm, neue Sorte Ärger. Der <b>kartograf</b> – unser Dienst, der die Seekarten neu berechnet – will einfach nicht stehenbleiben. Kein Image-Fehler, kein fehlendes Secret. Er startet, läuft kurz, ist weg. Wieder und wieder.",
