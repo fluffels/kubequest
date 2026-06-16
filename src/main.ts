@@ -82,14 +82,19 @@ import { keys, clearKeys } from "./runtime";
     wireKeyboard();
     UI.bindEvents();
 
-    new Phaser.Game({
+    const game = new Phaser.Game({
       type: Phaser.AUTO,
       parent: "game-container",
       backgroundColor: "#356dab",
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-      scene: [KQScenes.BootScene, KQScenes.WorldScene, KQScenes.InteriorScene],
+      scene: [KQScenes.BootScene, KQScenes.WorldScene, KQScenes.InteriorScene, KQScenes.ArchipelScene],
     });
+
+    // Dev-Affordance: die laufende Phaser-Instanz fürs manuelle Verifizieren im
+    // Browser greifbar machen (Szenen-Wechsel/Teleport testen). Im Prod-Build fällt
+    // der ganze Block weg (import.meta.env.DEV === false), kein Gameplay-Einfluss.
+    if (import.meta.env.DEV) (window as unknown as { kqGame: Phaser.Game }).kqGame = game;
 
     UI.refreshHud();
     if (Game.state.character === null) {
