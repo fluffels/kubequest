@@ -10,6 +10,7 @@ import type { Sim } from "../sim";
 import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
+  ARGO_APPLICATION_SELFHEAL_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1399,5 +1400,76 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "argo", lines: [
         "Du hast deine erste Application von Hand synchronisiert. Beim nächsten Mal zeige ich dir, wie Argo das <b>ganz allein</b> macht – und sogar heimliche Änderungen am Cluster zurückdreht. <i>Self-Heal</i> nennt sich das.",
       ]},
+    ]},
+
+  // ===== Phase 4: GitOps-Archipel – Quest 3: Self-Heal & Drift (#96) =====
+  // Die „Aha"-Quest: zeigt, dass Argo CD den deklarierten Soll-Zustand aktiv durchsetzt.
+  // Spieler:in skaliert hafen-lager manuell auf 0 → Argo dreht den Drift sofort zurück.
+  // Lerneffekt: Hand-Änderungen am Cluster sind vergänglich – Git gewinnt immer.
+  { id: "q30", title: "Der stille Wächter", giver: "argo", rewardXp: 60, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "argo", lines: [
+        "Du hast hafen-lager erfolgreich von Hand synchronisiert – super. Aber jetzt kommt die eigentliche Frage: Was passiert, wenn jemand am Cluster <b>herumschraubt</b>? Im echten Betrieb gibt es immer jemanden, der 'eben schnell' etwas skaliert oder einen Pod löscht. Manchmal auch du selbst, im Stress.",
+        "GitOps hat eine Antwort darauf: <b>Self-Heal</b>. Argo beobachtet den Cluster laufend. Sobald der Ist-Zustand vom Git-Soll abweicht – also <b>Drift</b> entsteht –, dreht Argo die Änderung automatisch zurück. Der Cluster kann gar nicht dauerhaft von der Seekarte abweichen.",
+        "Ich habe dir eine aktualisierte Seekarte vorbereitet. Die schaltet Auto-Sync und Self-Heal für hafen-lager ein. Schau sie dir an.",
+      ] },
+      { type: "terminal", brief: "Seekarte lesen",
+        scenario: {
+          files: { "application-selfheal.yaml": ARGO_APPLICATION_SELFHEAL_YAML },
+          applyEffects: {
+            "application-selfheal.yaml": { application: {
+              name: "hafen-lager",
+              repo: "https://github.com/port-kubernia/seekarten.git", path: "lager",
+              autoSync: true, selfHeal: true,
+              deployment: { name: "hafen-lager", image: "nginx:1.27", replicas: 2 },
+            } },
+          },
+        },
+        tasks: [
+          { id: "t-sh-ls", text: "Was liegt hier? <code>ls</code>.",
+            accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+          { id: "t-sh-cat", text: "Lies die neue Seekarte: <code>cat application-selfheal.yaml</code>. Findest du <code>syncPolicy.automated</code> und <code>selfHeal: true</code>?",
+            accept: [/^cat\s+application-selfheal\.yaml$/], solution: "cat application-selfheal.yaml", hint: "cat application-selfheal.yaml" },
+        ]},
+      { type: "teach", brief: "Self-Heal aktivieren", cmd: {
+        id: "t-sh-apply",
+        intro: "🆕 <code>kubectl apply -f</code> ist idempotent: ändert sich die Konfiguration, gibt Kubernetes <b>configured</b> zurück (statt <i>unchanged</i>). So schaltest du Self-Heal für eine bestehende Application ein, ohne sie neu anlegen zu müssen.",
+        text: "Aktiviere Self-Heal: wende <code>application-selfheal.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+-f\s+application-selfheal\.yaml$/],
+        check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-lager" && a.selfHeal),
+        solution: "kubectl apply -f application-selfheal.yaml",
+        hint: "kubectl apply -f <datei> – der vertraute Befehl." } },
+      { type: "dialog", npc: "argo", lines: [
+        "Self-Heal ist jetzt aktiv. Prüf die Sync-Policy – und dann stell den stillen Wächter auf die Probe.",
+      ]},
+      { type: "terminal", brief: "Drift erzeugen & beobachten", tasks: [
+        { id: "t-sh-get-before", text: "Prüf den Status: <code>argocd app get hafen-lager</code>. In der Sync-Policy steht jetzt <b>Automated (self-heal)</b>.",
+          accept: [/^argocd\s+app\s+get\s+hafen-lager$/],
+          check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-lager" && a.selfHeal),
+          solution: "argocd app get hafen-lager", hint: "argocd app get hafen-lager" },
+        { id: "t-sh-scale", text: "Erzeuge Drift: <code>kubectl scale deployment hafen-lager --replicas=0</code>. Das ist eine absichtlich <i>falsche</i> Hand-Änderung.",
+          accept: [/^kubectl\s+scale\s+(deployment\/hafen-lager|deployment\s+hafen-lager)\s+--replicas[=\s]+0$/],
+          check: (sim: Sim) => { const d = sim.deployments.find(x => x.name === "hafen-lager"); return !!d && d.replicas === 0; },
+          solution: "kubectl scale deployment hafen-lager --replicas=0",
+          hint: "kubectl scale deployment hafen-lager --replicas=0" },
+        { id: "t-sh-get-after", text: "Und jetzt schau, was wirklich läuft: <code>kubectl get deployments</code>. Erwartest du 0 – aber was zeigt der Cluster?",
+          accept: [/^kubectl\s+get\s+(deployments|deployment|deploy)$/],
+          check: (sim: Sim) => { const d = sim.deployments.find(x => x.name === "hafen-lager"); return !!d && d.replicas === 2; },
+          solution: "kubectl get deployments", hint: "kubectl get deployments" },
+      ]},
+      { type: "dialog", npc: "argo", lines: [
+        "<b>2 Replikas</b> – genau wie die Seekarte deklariert. Du hast auf null skaliert, aber Argo hat den Drift in demselben Atemzug erkannt und rückgängig gemacht. Bevor du nachschauen konntest, war der Git-Soll bereits wiederhergestellt.",
+        "Das ist das Pull-Prinzip in seiner schärfsten Form: <b>manuelle Änderungen am Cluster sind vergänglich</b>. Egal was du tippst – solange die Seekarte etwas anderes sagt, ist die Hand-Änderung nur ein kurzes Zucken. <i>Git gewinnt immer.</i> 🧭",
+      ]},
+      { type: "choice", npc: "argo",
+        q: "Was tut Argo CD, wenn <b>Self-Heal</b> aktiv ist und jemand ein Deployment manuell skaliert?",
+        options: [
+          { t: "Es erkennt den Drift und stellt den im Git deklarierten Soll-Zustand automatisch wieder her.", ok: true,
+            reply: "Genau! Self-Heal = Drift automatisch zurückdrehen. Git ist die Quelle der Wahrheit, kein manueller Eingriff kann das dauerhaft ändern. ⚓" },
+          { t: "Es sendet eine Warnung, damit ein Admin manuell eingreifen kann.", ok: false,
+            reply: "Nein – das wäre nur passives Monitoring. Self-Heal ist <i>aktiv</i>: Argo dreht den Drift von selbst zurück, ohne auf einen Menschen zu warten." },
+          { t: "Es aktualisiert das Git-Repo, damit es dem neuen Cluster-Stand entspricht.", ok: false,
+            reply: "Genau umgekehrt! Argo schreibt nie in Git. Git ist die Quelle der Wahrheit – Argo liest nur daraus und gleicht den Cluster daran an, nicht andersherum." },
+        ]},
     ]},
 ];
