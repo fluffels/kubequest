@@ -19,7 +19,7 @@
 10. nach main mergen → Worktree/Branch aufräumen → Issue schließen   # Details siehe AGENTS.md
 ```
 
-⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick öffnen → leere Seite. Zum Offline-Spielen `npm run build`, dann `dist/index.html` doppelklicken.
+⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick öffnen → leere Seite. Zum Offline-Spielen `npm run build:offline`, dann `dist-offline/index.html` doppelklicken.
 
 ## 🛠️ Befehle
 
@@ -27,7 +27,8 @@
 |---|---|
 | Erstinstallation | `npm install` |
 | Dev-Server (Hot-Reload) | `npm run dev` |
-| Offline-Build (self-contained `dist/index.html`) | `npm run build` |
+| Host-/Prod-Build (Multi-File nach `dist/`) | `npm run build` |
+| Offline-Build (self-contained `dist-offline/index.html`) | `npm run build:offline` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (voll strict) | `npm run typecheck` |
 
@@ -50,7 +51,7 @@
 | [`src/scenes.ts`](src/scenes.ts) | Präsentation | Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake |
 | [`src/ui.ts`](src/ui.ts) | Präsentation | Dialoge, Funkgerät, Shop, Quiz, Minispiel |
 | [`src/sfx.ts`](src/sfx.ts) | Präsentation | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
-| [`src/assets-data.ts`](src/assets-data.ts) | Assets | Spritesheets als `import`s (Single-File-Build inlinet sie als Data-URI) |
+| [`src/assets-data.ts`](src/assets-data.ts) | Assets | Spritesheets als `import`s (Host-Build: eigene Dateien; Offline-Build inlinet sie als Data-URI) |
 
 > Tiefe Architektur-Begründung (Schichtung Domäne ↔ Anwendung ↔ Präsentation): [AGENTS.md › Architektur](AGENTS.md#architektur).
 

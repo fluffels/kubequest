@@ -1,7 +1,9 @@
 /* Spritesheets/Grafiken als ES-Modul-Imports statt handgepflegtem Base64.
- * Vite gibt im Dev-Server eine URL zurück, im Single-File-Build (vite-plugin-singlefile,
- * assetsInlineLimit = unendlich) eine inline Base64-Data-URI – so bleibt der
- * Doppelklick-Offline-Build self-contained, ohne dass Base64 von Hand gepflegt wird.
+ * Dieselbe Quelle versorgt beide Build-Wege (Ticket #58): Im Dev-Server und im
+ * Host-Build (`npm run build`) gibt Vite eine URL zurück (Asset bleibt eine eigene,
+ * cachebare Datei); im Offline-Build (`npm run build:offline`, vite-plugin-singlefile)
+ * eine inline Base64-Data-URI – so bleibt der Doppelklick-Offline-Build self-contained,
+ * ohne dass Base64 von Hand gepflegt wird.
  * Die PNGs in assets/ sind damit die einzige Quelle. Schlüssel = wie in scenes.ts/ui.ts
  * referenziert; Mapping der Tileset-Schlüssel auf Dateinamen siehe assets/pixellab/README.md. */
 

@@ -13,7 +13,9 @@ Ein **2D-Lernspiel** (gebaut mit **Phaser 3**) für Docker, Kubernetes, Helm, Te
 
 **Entwickeln:** einmalig `npm install`, dann `npm run dev` – startet einen lokalen Server mit Auto-Reload (Vite). Im Browser unter der angezeigten Adresse öffnen.
 
-**Offline spielen / weitergeben:** `npm run build` erzeugt **eine einzige, in sich geschlossene Datei** `dist/index.html` (Code, Grafiken und Engine sind eingebettet). Die kann man **doppelklicken** – läuft komplett offline, ohne Server.
+**Offline spielen / weitergeben:** `npm run build:offline` erzeugt **eine einzige, in sich geschlossene Datei** `dist-offline/index.html` (Code, Grafiken und Engine sind eingebettet). Die kann man **doppelklicken** – läuft komplett offline, ohne Server.
+
+**Hosten / auf einen Webserver legen:** `npm run build` erzeugt das normale Bündel nach `dist/` (Grafiken als eigene, einzeln cachebare Dateien). Das ist der Standard-Build zum Ausliefern über einen Server; lokal ansehen mit `npm run preview`.
 
 Spielstand speichert automatisch im Browser.
 
@@ -57,7 +59,7 @@ Die **Sturm-Saison** (bei Sturmwache Juno am Leuchtturm) lehrt das Debugging-Han
 
 ## Projektstruktur
 
-Gebaut mit **Vite** + **TypeScript** (ES-Module) und **Phaser 3** (als npm-Paket, nicht mehr als Datei im Repo). `index.html` lädt nur `src/main.ts`; Vite bündelt den Rest und erzeugt beim Offline-Build die self-contained `dist/index.html`. Der Code ist in Schichten geordnet (pure Domäne → Anwendung → Präsentation), damit die Spiellogik ohne Phaser testbar bleibt.
+Gebaut mit **Vite** + **TypeScript** (ES-Module) und **Phaser 3** (als npm-Paket, nicht mehr als Datei im Repo). `index.html` lädt nur `src/main.ts`; Vite bündelt den Rest. Es gibt zwei Build-Wege aus derselben Quelle: den Standard-Build (`npm run build` → `dist/`, gehostet, Assets als eigene Dateien) und den Offline-Export (`npm run build:offline` → self-contained `dist-offline/index.html` für den Doppelklick). Der Code ist in Schichten geordnet (pure Domäne → Anwendung → Präsentation), damit die Spiellogik ohne Phaser testbar bleibt.
 
 Grobe Aufteilung:
 
@@ -74,7 +76,8 @@ kubequest/
 ├── test/             Test-Suite (Vitest) – Simulator, Inhalte, kompletter Story-Durchlauf u.a.
 ├── assets/           Kenney- & PixelLab-Grafiken (CC0) + Lizenzen
 ├── docs/             Konzept- & Architektur-Analysen
-└── dist/             Build-Ausgabe von `npm run build` (nicht eingecheckt)
+├── dist/             Host-Build von `npm run build` (Multi-File, nicht eingecheckt)
+└── dist-offline/     Offline-Build von `npm run build:offline` (eine self-contained index.html, nicht eingecheckt)
 ```
 
 > **Datei-für-Datei-Landkarte** (welches Modul macht was, Schicht für Schicht) steht in **[CLAUDE.md › Repo-Landkarte](CLAUDE.md)**, die Agenten-Regeln & Konventionen in **[AGENTS.md](AGENTS.md)**. Diese Listen werden dort gepflegt – hier bewusst nicht doppelt.

@@ -20,18 +20,19 @@
 | Zweck | Befehl |
 |---|---|
 | Dev-Server (Hot-Reload) | `npm run dev` → angezeigte Adresse öffnen |
-| Offline-Build (eine self-contained `dist/index.html`) | `npm run build` |
+| Host-/Prod-Build (Multi-File nach `dist/`, zum Ausliefern) | `npm run build` |
+| Offline-Build (eine self-contained `dist-offline/index.html`) | `npm run build:offline` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (ganzes Projekt, voll strict) | `npm run typecheck` |
 | Typen prüfen (Alias, identisch zu `typecheck`) | `npm run typecheck:strict` |
 
 Einmalig vorher: `npm install`.
 
-⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick / statischem Server öffnen liefert `.ts` als falschen MIME-Typ → leere Seite. Zum Offline-Spielen `npm run build` und dann `dist/index.html` doppelklicken.
+⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick / statischem Server öffnen liefert `.ts` als falschen MIME-Typ → leere Seite. Zum Offline-Spielen `npm run build:offline` und dann `dist-offline/index.html` doppelklicken.
 
 ## Architektur
 
-Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bündelt den Rest. Phaser 3 als npm-Paket. `npm run build` erzeugt via `vite-plugin-singlefile` eine self-contained `dist/index.html` (offline-tauglich).
+Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bündelt den Rest. Phaser 3 als npm-Paket. **Zwei Build-Wege aus derselben Quelle** (Ticket #58, konfiguriert in [`vite.config.ts`](vite.config.ts) über den Vite-`mode`): `npm run build` ist der normale Multi-File-Host-Build nach `dist/` (Assets als eigene, einzeln cachebare Dateien – zum Ausliefern über einen Webserver); `npm run build:offline` (`vite build --mode offline`) erzeugt via `vite-plugin-singlefile` eine self-contained `dist-offline/index.html` (alle Assets inline als Data-URI – das Doppelklick-Offline-Feature). Das Single-File-Plugin ist bewusst **nur** im Offline-Mode aktiv, sonst wäre auch der Host-Build wieder eager-inline.
 
 **Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt. Leitidee: Die Spiellogik bleibt **Phaser-frei und damit im Node-Test prüfbar**; nur `scenes.ts`/`ui.ts` fassen Phaser bzw. das DOM an. Deshalb liegen z.B. Welt-Geometrie (`world.ts`), Deko-Platzierung (`decor.ts`) und HUD-Uhr (`clock.ts`) bewusst **außerhalb** von `scenes.ts`.
 

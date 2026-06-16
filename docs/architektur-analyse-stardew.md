@@ -127,6 +127,14 @@ data)`. Fehlende Felder werden ergänzt, **kaputte/fremde Werte aber ungeprüft
 → **Empfehlung: Build-Strategie entkoppeln (#58, prio:mittel).** Prod/Host-Build
 mit szenenweisem Lazy-Loading; Single-File-Build als *zusätzliches* Offline-Target.
 
+**Umgesetzt (#58):** Die beiden Build-Wege sind getrennt (`vite.config.ts` schaltet
+über den Vite-`mode`): `npm run build` ist der Multi-File-Host-Build nach `dist/`
+(Assets als eigene, cachebare Dateien), `npm run build:offline` der self-contained
+Single-File-Export nach `dist-offline/`. Das `vite-plugin-singlefile` ist nur noch im
+Offline-Mode aktiv. Das *szenenweise Lazy-Loading* der Assets über den Phaser-Loader
+ist damit erst vorbereitet (eigener Pfad existiert), aber noch nicht implementiert –
+das hängt am Asset-Manifest (#59) und bleibt Folgearbeit.
+
 ### 5. Frameworks/Tools allgemein: fehlt etwas?
 
 | Thema | Bewertung |
