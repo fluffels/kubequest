@@ -10,4 +10,5 @@ export const SMALLTALK = {
   theo: ["Ich vermesse gerade die Möglichkeiten. Sie sind … beachtlich.", "terraform plan lesen. IMMER. Frag nicht, woher ich das weiß."],
   pelle: ["Frische Ware, faire Preise! Na ja – Preise.", "Die Kanone da drüben? Bestseller, seit die Piraten wieder da sind."],
   juno: ["Ruhige See heute. ZU ruhig.", "get pods → describe → logs. Träum es. Lebe es.", "Der Leuchtturm hat 99,99% Uptime. Die fehlenden 0,01% verfolgen mich bis heute."],
+  argo: ["Die <b>Seekarte</b> im Git sagt, wie der Hafen aussehen soll – ich halte ihn nur auf Kurs.", "Nicht <i>pushen</i>, Lotse. Der Cluster <b>zieht</b> sich den Soll-Zustand selbst. Pull-Prinzip!", "Verstellt jemand heimlich was am Hafen? Beim nächsten Abgleich dreh ich's zurück. Git gewinnt immer."],
 };

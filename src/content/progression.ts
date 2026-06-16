@@ -48,4 +48,5 @@ export const NPCS = {
   pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
   kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
   juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
+  argo:   { name: "Argos",         title: "Steuerfrau",      sprite: 112, tex: "char_argos" },
 };
