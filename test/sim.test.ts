@@ -1060,3 +1060,91 @@ test("argocd: 'argcd' bekommt einen Meintest-du-Vorschlag", () => {
   assert.ok(r.error);
   assert.match(r.output!, /argocd/);
 });
+
+/* ----- App-of-Apps-Muster (#97) ----- */
+
+// Legt eine App-of-Apps-Wurzel als apply-Effekt an: eine Application, die selbst nichts
+// ausrollt, sondern nur auf einen Ordner voller weiterer Applications zeigt (#97).
+function legeAppOfApps(s: KQSim, opts: { autoSync?: boolean; selfHeal?: boolean } = {}) {
+  s.files["flotte.yaml"] = "kind: Application (App-of-Apps) …";
+  s.applyEffects["flotte.yaml"] = {
+    application: {
+      name: "hafen-flotte", repo: "https://git.hafen.de/seekarten.git", path: "flotte",
+      autoSync: opts.autoSync, selfHeal: opts.selfHeal,
+      childApps: [
+        { name: "flotte-lager", path: "flotte/lager", deployment: { name: "flotte-lager", image: "nginx:1.27", replicas: 2 } },
+        { name: "flotte-funk",  path: "flotte/funk",  deployment: { name: "flotte-funk",  image: "nginx:1.27", replicas: 2 } },
+        { name: "flotte-kran",  path: "flotte/kran",  deployment: { name: "flotte-kran",  image: "nginx:1.27", replicas: 1 } },
+      ],
+    },
+  };
+}
+
+test("App-of-Apps: ein apply der Wurzel legt die ganze Flotte an (eine Wurzel → n Apps)", () => {
+  legeAppOfApps(sim, { autoSync: true, selfHeal: true });
+  const r = sim.exec("kubectl apply -f flotte.yaml");
+  assert.match(r.output!, /application\.argoproj\.io\/hafen-flotte created/);
+  // Wurzel + drei Kind-Apps
+  assert.equal(sim.argoApps.length, 4, "Wurzel plus drei Kind-Apps");
+  for (const n of ["flotte-lager", "flotte-funk", "flotte-kran"]) {
+    assert.ok(sim.argoApps.some(a => a.name === n), n + " als Kind-App angelegt");
+    assert.ok(sim.deployments.some(d => d.name === n), n + " Deployment ausgerollt");
+  }
+  // Gegenprobe: die Wurzel selbst rollt KEIN eigenes Deployment aus
+  assert.ok(!sim.deployments.some(d => d.name === "hafen-flotte"), "die Wurzel verwaltet nur, sie deployt selbst nichts");
+  // Replikas wie in den Kind-Specs deklariert
+  assert.equal(sim.deployments.find(d => d.name === "flotte-lager")!.replicas, 2);
+  assert.equal(sim.deployments.find(d => d.name === "flotte-kran")!.replicas, 1);
+});
+
+test("App-of-Apps: 'argocd app get' der Wurzel listet die verwalteten Kind-Apps und ist Synced/Healthy", () => {
+  legeAppOfApps(sim, { autoSync: true, selfHeal: true });
+  sim.exec("kubectl apply -f flotte.yaml");
+  const get = sim.exec("argocd app get hafen-flotte");
+  assert.match(get.output!, /Managed Apps:\s+3/);
+  assert.match(get.output!, /flotte-lager/);
+  assert.match(get.output!, /Sync Status:\s+Synced/);
+  assert.match(get.output!, /Health Status:\s+Healthy/);
+  // list zeigt Wurzel UND Kinder
+  const list = sim.exec("argocd app list").output!;
+  assert.match(list, /hafen-flotte/);
+  assert.match(list, /flotte-funk\s+Synced\s+Healthy/);
+});
+
+test("App-of-Apps: ohne auto-sync ist die Wurzel erst OutOfSync, 'app sync' zieht dann die ganze Flotte", () => {
+  legeAppOfApps(sim, { autoSync: false, selfHeal: false });
+  sim.exec("kubectl apply -f flotte.yaml");
+  // nur die Wurzel, noch keine Kinder, nichts ausgerollt
+  assert.equal(sim.argoApps.length, 1, "nur die Wurzel angelegt");
+  assert.equal(sim.deployments.length, 0, "ohne sync wird nichts materialisiert");
+  assert.match(sim.exec("argocd app get hafen-flotte").output!, /Sync Status:\s+OutOfSync/);
+  // Pull der Wurzel legt die ganze Flotte an
+  const sync = sim.exec("argocd app sync hafen-flotte");
+  assert.match(sync.output!, /Flotte/);
+  assert.equal(sim.argoApps.length, 4, "Wurzel + drei Kinder nach dem Sync");
+  assert.ok(sim.deployments.some(d => d.name === "flotte-funk"), "Kind-Dienst ist jetzt ausgerollt");
+  assert.match(sim.exec("argocd app get hafen-flotte").output!, /Sync Status:\s+Synced/);
+});
+
+test("App-of-Apps: ausgefallener Kind-Dienst macht die Wurzel OutOfSync; vererbtes Self-Heal stellt ihn wieder her", () => {
+  legeAppOfApps(sim, { autoSync: true, selfHeal: true });
+  sim.exec("kubectl apply -f flotte.yaml");
+  // ein Dienst der Flotte fällt aus -> Wurzel weicht vom Git-Soll ab
+  sim.exec("kubectl delete deployment flotte-funk");
+  assert.ok(!sim.deployments.some(d => d.name === "flotte-funk"), "Drift: Dienst weg");
+  // der nächste Befehl tickt die Self-Heal-Schleife (Kind erbt Self-Heal von der Wurzel)
+  sim.exec("kubectl get deployments");
+  assert.ok(sim.deployments.some(d => d.name === "flotte-funk"), "Self-Heal hat den Dienst neu angelegt");
+  assert.match(sim.exec("argocd app get hafen-flotte").output!, /Sync Status:\s+Synced/);
+});
+
+test("App-of-Apps: Snapshot/Reset bewahrt die Wurzel inkl. Kind-Apps", () => {
+  legeAppOfApps(sim, { autoSync: true, selfHeal: true });
+  sim.exec("kubectl apply -f flotte.yaml");
+  const wieder = new KQSim(sim.snapshot());
+  const root = wieder.argoApps.find(a => a.name === "hafen-flotte");
+  assert.ok(root, "Wurzel überlebt das Speichern");
+  assert.equal(root!.childApps!.length, 3, "Kind-Apps bleiben im Snapshot erhalten");
+  assert.ok(wieder.argoApps.some(a => a.name === "flotte-lager"), "Kind-App überlebt das Speichern");
+  assert.match(wieder.exec("argocd app get hafen-flotte").output!, /Synced/);
+});

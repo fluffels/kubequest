@@ -10,7 +10,7 @@ import type { Sim } from "../sim";
 import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
-  ARGO_APPLICATION_SELFHEAL_YAML,
+  ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1470,6 +1470,82 @@ export const QUESTS: Quest[] = [
             reply: "Nein – das wäre nur passives Monitoring. Self-Heal ist <i>aktiv</i>: Argo dreht den Drift von selbst zurück, ohne auf einen Menschen zu warten." },
           { t: "Es aktualisiert das Git-Repo, damit es dem neuen Cluster-Stand entspricht.", ok: false,
             reply: "Genau umgekehrt! Argo schreibt nie in Git. Git ist die Quelle der Wahrheit – Argo liest nur daraus und gleicht den Cluster daran an, nicht andersherum." },
+        ]},
+    ]},
+
+  // ===== Phase 4: GitOps-Archipel – Quest 4 (Abschluss): App-of-Apps-Muster (#97) =====
+  // Aufbau-Quest: eine Wurzel-`Application`, die selbst nichts ausrollt, sondern nur auf einen
+  // Ordner voller weiterer `Application`s zeigt. Ein Sync → die ganze Flotte entsteht. Lerneffekt:
+  // App-of-Apps skaliert GitOps über viele Apps – eine Wurzel statt n einzelner Hand-Anlagen.
+  // Letzte Lern-Quest der Insel; setzt q29 (Application anlegen/syncen) und q30 (Self-Heal) voraus.
+  { id: "q31", title: "Die Flotte aus einer Hand", giver: "argo", rewardXp: 65, rewardCoins: 50,
+    steps: [
+      { type: "dialog", npc: "argo", lines: [
+        "Du beherrschst jetzt eine einzelne Application: anlegen, syncen, sogar Self-Heal. Aber schau mal raus auf den Archipel – das sind nicht eine, sondern <b>ein Dutzend Dienste</b>: Lager, Funk, Kran, Lotsen … und es werden mehr.",
+        "Jeden davon von Hand als eigene <code>Application</code> anzulegen und einzeln zu syncen? Das ist genau die Fummelei, vor der GitOps uns eigentlich bewahren soll. Du vergisst einen, ein anderer driftet weg – und keiner hat den Überblick.",
+        "Dafür gibt es das <b>App-of-Apps-Muster</b>: <b>eine einzige Wurzel-Application</b>, die selbst <i>nichts</i> ausrollt. Sie zeigt nur auf einen <b>Ordner voller weiterer Applications</b> – die <code>flotte/</code>. Synchronisierst du die Wurzel, legt Argo jede Application aus dem Ordner an, und die rollen wiederum ihre Dienste aus. Eine Hand am Steuer, die ganze Flotte fährt mit. Ich hab dir die Seekarte dafür hingelegt – schau sie dir an.",
+      ] },
+      { type: "terminal", brief: "Seekarte der Flotte lesen",
+        scenario: {
+          files: { "app-of-apps.yaml": APP_OF_APPS_YAML },
+          applyEffects: {
+            "app-of-apps.yaml": { application: {
+              name: "hafen-flotte",
+              repo: "https://github.com/port-kubernia/seekarten.git", path: "flotte",
+              autoSync: true, selfHeal: true,
+              childApps: [
+                { name: "flotte-lager", path: "flotte/lager", deployment: { name: "flotte-lager", image: "nginx:1.27", replicas: 2 } },
+                { name: "flotte-funk",  path: "flotte/funk",  deployment: { name: "flotte-funk",  image: "nginx:1.27", replicas: 2 } },
+                { name: "flotte-kran",  path: "flotte/kran",  deployment: { name: "flotte-kran",  image: "nginx:1.27", replicas: 1 } },
+              ],
+            } },
+          },
+        },
+        tasks: [
+          { id: "t-aoa-ls", text: "Was liegt hier? <code>ls</code>.",
+            accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+          { id: "t-aoa-cat", text: "Lies die Wurzel-Seekarte: <code>cat app-of-apps.yaml</code>. Sie ist selbst <code>kind: Application</code> – aber ihr <code>source.path</code> zeigt auf den Sammel-Ordner <code>flotte</code>, nicht auf einen einzelnen Dienst.",
+            accept: [/^cat\s+app-of-apps\.yaml$/], solution: "cat app-of-apps.yaml", hint: "cat app-of-apps.yaml" },
+        ]},
+      { type: "teach", brief: "Die Flotte auslaufen lassen", cmd: {
+        id: "t-aoa-apply",
+        intro: "🆕 Das App-of-Apps-Muster: du wendest <b>eine</b> Wurzel-Application an – und weil sie auf einen Ordner voller weiterer Applications zeigt (und <code>automated</code> aktiv ist), legt Argo die <b>ganze Flotte</b> in einem Rutsch an. Ein <code>apply</code> statt n einzelner.",
+        text: "Lass die Flotte auslaufen: wende <code>app-of-apps.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+-f\s+app-of-apps\.yaml$/],
+        check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-flotte" && !!a.childApps)
+          && ["flotte-lager", "flotte-funk", "flotte-kran"].every(n => sim.argoApps.some(a => a.name === n)),
+        solution: "kubectl apply -f app-of-apps.yaml",
+        hint: "kubectl apply -f app-of-apps.yaml – der vertraute Befehl, diesmal für die Wurzel." } },
+      { type: "dialog", npc: "argo", lines: [
+        "Spürst du das? <b>Ein</b> Befehl – und die Wurzel hat den ganzen <code>flotte/</code>-Ordner ausgerollt. Schau dir an, was jetzt alles fährt.",
+      ]},
+      { type: "terminal", brief: "Die ganze Flotte erscheint", tasks: [
+        { id: "t-aoa-list", text: "Verschaff dir den Überblick: <code>argocd app list</code>. Aus einer Wurzel-Application ist die ganze Flotte geworden – <code>hafen-flotte</code> plus <code>flotte-lager</code>, <code>flotte-funk</code> und <code>flotte-kran</code>.",
+          accept: [/^argocd\s+app\s+(list|ls)$/],
+          check: (sim: Sim) => ["flotte-lager", "flotte-funk", "flotte-kran"].every(n => sim.argoApps.some(a => a.name === n)),
+          solution: "argocd app list", hint: "argocd app list (oder ls)." },
+        { id: "t-aoa-get", text: "Sieh dir die Wurzel genauer an: <code>argocd app get hafen-flotte</code>. Unter <b>Managed Apps</b> stehen die Kinder, die sie verwaltet – die Wurzel selbst rollt keinen eigenen Dienst aus.",
+          accept: [/^argocd\s+app\s+get\s+hafen-flotte$/],
+          check: (sim: Sim) => { const a = sim.argoApps.find(x => x.name === "hafen-flotte"); return !!a && !!a.childApps && a.childApps.length === 3; },
+          solution: "argocd app get hafen-flotte", hint: "argocd app get hafen-flotte" },
+        { id: "t-aoa-deploys", text: "Und der Beweis im Cluster: <code>kubectl get deployments</code>. Jede Kind-Application hat ihren Dienst ausgerollt – ohne dass du sie einzeln anlegen musstest.",
+          accept: [/^kubectl\s+get\s+(deployments|deployment|deploy)$/],
+          check: (sim: Sim) => ["flotte-lager", "flotte-funk", "flotte-kran"].every(n => sim.deployments.some(d => d.name === n)),
+          solution: "kubectl get deployments", hint: "kubectl get deployments" },
+      ]},
+      { type: "dialog", npc: "argo", lines: [
+        "Das ist die Skalier-Idee in Reinform: <b>eine Wurzel statt n Einzel-Anlagen</b>. Kommt ein neuer Dienst dazu, legst du eine weitere <code>Application</code>-Datei in den <code>flotte/</code>-Ordner – und beim nächsten Abgleich zieht die Wurzel sie automatisch mit rein. Du fasst nie wieder jede App einzeln an.",
+        "Und weil alles in Git steht, gilt der Überblick für die ganze Flotte auf einen Blick: <code>argocd app list</code> zeigt dir den Sync- und Health-Status <i>jeder</i> App – verwaltet von einer einzigen Wurzel. So segelt der ganze Archipel im Gleichschritt. 🧭⚓",
+      ]},
+      { type: "choice", npc: "argo",
+        q: "Warum skaliert das <b>App-of-Apps-Muster</b> besser als jede Application einzeln von Hand anzulegen?",
+        options: [
+          { t: "Eine einzige Wurzel-Application zeigt auf einen Ordner voller weiterer Applications – ein Sync legt die ganze Flotte an, neue Dienste kommen als Datei im Ordner automatisch dazu.", ok: true,
+            reply: "Genau! Eine Wurzel statt n Hand-Anlagen. Neue App = eine Datei mehr im Ordner, die Wurzel zieht sie beim nächsten Abgleich von selbst mit. ⚓" },
+          { t: "Es macht jede Application schneller, weil Argo die Manifeste komprimiert.", ok: false,
+            reply: "Nein, mit Geschwindigkeit oder Kompression hat es nichts zu tun. Der Gewinn ist <i>organisatorisch</i>: eine Wurzel verwaltet viele Apps, statt jede einzeln anzulegen." },
+          { t: "Die Wurzel-Application rollt selbst alle Dienste aus und macht die Kind-Applications überflüssig.", ok: false,
+            reply: "Andersherum: Die Wurzel rollt <i>keinen</i> eigenen Dienst aus. Sie zeigt nur auf die Kind-Applications – die rollen ihre Dienste selbst aus. Genau diese Trennung ist der Kern des Musters." },
         ]},
     ]},
 ];
