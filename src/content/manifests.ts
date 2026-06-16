@@ -43,6 +43,24 @@ export const NETPOL_YAML = [
   "  ingress:", "    - from:", "        - podSelector:", "            matchLabels:", "              app: hafentor",
 ].join("\n");
 
+// Ein Deployment MIT Ressourcen-Angaben: requests = was der Scheduler reserviert
+// (Platzbedarf), limits = Obergrenze, ab der der Kernel den Container killt (OOMKilled).
+// Genau dieses Paar fehlte dem hungrigen Dienst – zu knapp = OOMKilled, zu üppig =
+// verschwendete Dublonen. Richtig dimensioniert spart Geld und bleibt stabil.
+export const RESOURCES_YAML = [
+  "apiVersion: apps/v1", "kind: Deployment", "metadata:", "  name: kartograf", "spec:",
+  "  replicas: 1", "  selector:", "    matchLabels:", "      app: kartograf", "  template:",
+  "    metadata:", "      labels:", "        app: kartograf", "    spec:", "      containers:",
+  "        - name: kartograf", "          image: nginx",
+  "          resources:",
+  "            requests:        # so viel reserviert der Scheduler fest",
+  "              memory: 128Mi",
+  "              cpu: 100m",
+  "            limits:          # ab hier killt der Kernel den Container (OOMKilled)",
+  "              memory: 256Mi",
+  "              cpu: 250m",
+].join("\n");
+
 export const BOESE_CONFIG_YAML = [
   "apiVersion: v1", "kind: ConfigMap", "metadata:", "  name: kasse-config", "data:",
   "  datenbank_host: db.hafen.local", "  # AUTSCH – Passwort im Klartext! Krakenfutter!",
