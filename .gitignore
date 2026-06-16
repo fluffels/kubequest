@@ -3,7 +3,8 @@ dist/
 dist-offline/
 .claude/
 .vscode/
-.idea/
+.idea/*
+!.idea/runConfigurations/
 *.iml
 Thumbs.db
 .DS_Store
