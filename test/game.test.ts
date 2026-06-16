@@ -36,7 +36,7 @@ beforeEach(() => {
 /* ---------- Audio-Einstellungen (#47) ---------- */
 
 test("defaultState: Audio ist standardmäßig an, mit gesetzten Lautstärken", () => {
-  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 });
+  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" });
 });
 
 test("load: alter Spielstand OHNE audio-Feld bekommt die Audio-Defaults", () => {
@@ -44,7 +44,7 @@ test("load: alter Spielstand OHNE audio-Feld bekommt die Audio-Defaults", () => 
   Game.importData(JSON.stringify({ v: 1, data: { xp: 5, coins: 99 } }));
   Game.load();
   expect(Game.state.coins).toBe(99);                 // Altdaten erhalten
-  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 });
+  expect(Game.state.audio).toEqual({ music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" });
 });
 
 test("load: kaputte/fremde audio-Werte fallen auf Defaults zurück bzw. werden geklemmt", () => {
@@ -52,7 +52,7 @@ test("load: kaputte/fremde audio-Werte fallen auf Defaults zurück bzw. werden g
   // musicVol über 1 -> auf 1 geklemmt, sfxVol negativ -> auf 0 geklemmt.
   Game.importData(JSON.stringify({ v: 1, data: { audio: { music: false, sfx: "ja", musicVol: 5, sfxVol: -2 } } }));
   Game.load();
-  expect(Game.state.audio).toEqual({ music: false, sfx: true, musicVol: 1, sfxVol: 0 });
+  expect(Game.state.audio).toEqual({ music: false, sfx: true, musicVol: 1, sfxVol: 0, track: "hafen" });
 });
 
 /* ---------- Spiel-Feel: Cozy-Modus (#71) ---------- */

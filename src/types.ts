@@ -39,8 +39,8 @@ export interface GameState {
   lastSeen: number;
   /** Serialisierter Cluster-Zustand (genau die Form von Sim.snapshot()). */
   clusterSnapshot: Scenario | null;
-  /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke). */
-  audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number };
+  /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke; track = gewähltes Musikstück). */
+  audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number; track: string };
   /** Spiel-Feel: Frequenz/Härte der Zufalls-Events (Anti-Frust, #71). */
   settings: { events: EventMode };
 }

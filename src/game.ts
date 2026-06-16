@@ -74,7 +74,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
-      audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 },
+      audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" },
       settings: { events: "normal" },
     };
   }
@@ -129,6 +129,9 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       sfx: typeof a.sfx === "boolean" ? a.sfx : d.sfx,
       musicVol: safeVol(a.musicVol, d.musicVol),
       sfxVol: safeVol(a.sfxVol, d.sfxVol),
+      // Track als String übernehmen; SFX.applyConfig prüft zur Laufzeit gegen die
+      // bekannten Themes und fällt sonst auf den Default zurück.
+      track: typeof a.track === "string" ? a.track : d.track,
     };
   }
 

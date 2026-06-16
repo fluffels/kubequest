@@ -15,17 +15,71 @@ export interface AudioConfig {
   musicVol: number;
   /** Lautstärke 0..1 */
   sfxVol: number;
+  /** ID des aktuell gewählten Musikstücks (siehe MUSIC_THEMES). */
+  track: string;
 }
 
-// Sanftes C-Dur-Loop (I–vi–IV–V) für entspannten Hafen-/Insel-Vibe.
-// Jede Zeile ist ein Takt: [Bass-Note, ...Akkordtöne] als MIDI-Nummern.
-const MUSIC_BPM = 68;
+/** Ein auswählbares Musikstück. Alles prozedural (kein Audio-Asset, keine Lizenz):
+ *  je Theme eine eigene Tonart/Akkordfolge, BPM und Klangfarbe, damit sich die
+ *  Stücke spürbar unterscheiden (Tag/Insel/Nacht-Stimmung). */
+export interface MusicTheme {
+  /** Stabile ID (im Spielstand persistiert). ASCII. */
+  id: string;
+  /** Anzeigename im Menü (mit Emoji, deutsche Umlaute erlaubt). */
+  label: string;
+  /** Tempo in Schlägen pro Minute. */
+  bpm: number;
+  /** Akkordfolge: je Takt [Bass-Note, ...Akkordtöne] als MIDI-Nummern. */
+  prog: number[][];
+  /** Wellenform für Bass + Akkord-Pad (Default sine). */
+  pad?: OscillatorType;
+  /** Wellenform fürs Arpeggio (Default triangle). */
+  arp?: OscillatorType;
+}
+
 const STEPS_PER_BAR = 8;                 // Achtelschritte pro Takt
-const MUSIC_PROG: number[][] = [
-  [48, 60, 64, 67], // C-Dur   (C  E  G)
-  [45, 57, 60, 64], // a-Moll  (A  C  E)
-  [41, 53, 57, 60], // F-Dur   (F  A  C)
-  [43, 55, 59, 62], // G-Dur   (G  B  D)
+
+/** Die auswählbaren Stücke. Index 0 ("hafen") ist der Default und entspricht
+ *  dem ursprünglichen, einzelnen C-Dur-Loop (I–vi–IV–V). Die weiteren Themes
+ *  bringen eigene Tonarten, Tempi und Klangfarben für mehr Atmosphäre. */
+export const MUSIC_THEMES: MusicTheme[] = [
+  {
+    id: "hafen",
+    label: "🏝️ Hafenbrise",
+    bpm: 68,
+    prog: [
+      [48, 60, 64, 67], // C-Dur   (C  E  G)
+      [45, 57, 60, 64], // a-Moll  (A  C  E)
+      [41, 53, 57, 60], // F-Dur   (F  A  C)
+      [43, 55, 59, 62], // G-Dur   (G  B  D)
+    ],
+  },
+  {
+    id: "insel",
+    label: "🌅 Inselmorgen",
+    bpm: 82,
+    pad: "triangle",
+    arp: "triangle",
+    prog: [
+      [50, 62, 66, 69], // D-Dur   (D  Fis A)
+      [43, 55, 59, 62], // G-Dur   (G  B  D)
+      [45, 57, 61, 64], // A-Dur   (A  Cis E)
+      [47, 59, 62, 66], // h-Moll  (H  D  Fis)
+    ],
+  },
+  {
+    id: "nacht",
+    label: "🌙 Sternennacht",
+    bpm: 54,
+    pad: "sine",
+    arp: "sine",
+    prog: [
+      [45, 57, 60, 64], // a-Moll  (A  C  E)
+      [41, 53, 57, 60], // F-Dur   (F  A  C)
+      [40, 52, 55, 59], // e-Moll  (E  G  H)
+      [43, 55, 59, 62], // G-Dur   (G  B  D)
+    ],
+  },
 ];
 
 /** MIDI-Note -> Frequenz (Hz). */
@@ -38,7 +92,7 @@ export const SFX = {
 
   // Audio-Einstellungen. Spiegeln GameState.audio; werden über applyConfig()
   // bzw. die set*-Methoden vom Menü/Spielstand gesetzt. Defaults = an.
-  cfg: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8 } as AudioConfig,
+  cfg: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" } as AudioConfig,
 
   // Laufende Musik. masterGain bündelt alle Musik-Stimmen, damit ein
   // Lautstärke-Regler reicht und "aus" wirklich Ruhe bedeutet (Gain auf 0
@@ -116,21 +170,36 @@ export const SFX = {
     osc.start(time); osc.stop(time + dur + 0.05);
   },
 
+  /** Das aktuell gewählte Theme; fällt bei unbekannter ID auf den Default (Index 0). */
+  _theme(): MusicTheme {
+    return MUSIC_THEMES.find(t => t.id === this.cfg.track) || MUSIC_THEMES[0];
+  },
+
   /** Plant den i-ten Achtelschritt (global) auf die Context-Zeit `time`. */
   _scheduleStep(globalStep: number, time: number) {
-    const bar = MUSIC_PROG[Math.floor(globalStep / STEPS_PER_BAR) % MUSIC_PROG.length];
+    const theme = this._theme();
+    const prog = theme.prog;
+    const bar = prog[Math.floor(globalStep / STEPS_PER_BAR) % prog.length];
     const local = globalStep % STEPS_PER_BAR;
-    const secPerStep = 60 / MUSIC_BPM / 2;
+    const secPerStep = 60 / theme.bpm / 2;
+    const pad = theme.pad || "sine";
+    const arp = theme.arp || "triangle";
     const [bass, ...chord] = bar;
     if (local === 0) {
       // Bass-Grundton + weicher Akkord-Pad über den ganzen Takt.
-      this._musicNote(bass, time, secPerStep * STEPS_PER_BAR, "sine", 0.5);
-      for (const n of chord) this._musicNote(n, time, secPerStep * STEPS_PER_BAR, "sine", 0.22);
+      this._musicNote(bass, time, secPerStep * STEPS_PER_BAR, pad, 0.5);
+      for (const n of chord) this._musicNote(n, time, secPerStep * STEPS_PER_BAR, pad, 0.22);
     }
     // Leichtes Arpeggio-Plucken auf den geraden Schritten – steigt durch den Akkord.
     if (local % 2 === 0) {
       const note = chord[(local / 2) % chord.length] + 12; // eine Oktave höher
-      this._musicNote(note, time, secPerStep * 1.6, "triangle", 0.3);
+      this._musicNote(note, time, secPerStep * 1.6, arp, 0.3);
+    }
+    // Sanfter Melodie-Anker auf den beiden Takthälften: gibt jedem Theme eine
+    // erkennbare Oberstimme, damit es voller klingt als das alte reine Loop.
+    if (local === 0 || local === 4) {
+      const top = chord[chord.length - 1] + (local === 0 ? 12 : 19); // Grundton- bzw. Quint-Oktave
+      this._musicNote(top, time, secPerStep * 3, "triangle", 0.14);
     }
   },
 
@@ -138,7 +207,7 @@ export const SFX = {
   _tickMusic() {
     const ctx = this.ctx;
     if (!ctx) return;
-    const secPerStep = 60 / MUSIC_BPM / 2;
+    const secPerStep = 60 / this._theme().bpm / 2;
     while (this.music.nextTime < ctx.currentTime + 0.2) {
       this._scheduleStep(this.music.step, this.music.nextTime);
       this.music.nextTime += secPerStep;
@@ -194,6 +263,11 @@ export const SFX = {
       if (typeof audio.sfx === "boolean") this.cfg.sfx = audio.sfx;
       if (typeof audio.musicVol === "number") this.cfg.musicVol = audio.musicVol;
       if (typeof audio.sfxVol === "number") this.cfg.sfxVol = audio.sfxVol;
+      // Nur bekannte Track-IDs übernehmen; ein kaputter/alter Wert bleibt beim
+      // bisherigen Track (Default "hafen") – _theme() hätte sonst nur den Fallback.
+      if (typeof audio.track === "string" && MUSIC_THEMES.some(t => t.id === audio.track)) {
+        this.cfg.track = audio.track;
+      }
     }
     // Musik nur stoppen, wenn ausgeschaltet. Das Anwerfen passiert erst bei der
     // ersten User-Geste über ensure() (Autoplay-Policy).
@@ -212,6 +286,16 @@ export const SFX = {
   setMusicVol(v: number) {
     this.cfg.musicVol = v;
     if (this.music.master) this.music.master.gain.value = this._musicBase * v;
+  },
+
+  /** Musikstück wechseln. Unbekannte IDs werden ignoriert. Läuft die Musik,
+   *  beginnt der neue Track sauber bei Takt 0; die schon ~0,2 s im Voraus
+   *  geplanten Stimmen klingen über den durchlaufenden Master weich aus –
+   *  kein harter Schnitt/Knacken. */
+  setTrack(id: string) {
+    if (!MUSIC_THEMES.some(t => t.id === id)) return;
+    this.cfg.track = id;
+    if (this.music.playing) this.music.step = 0;
   },
 
   setSfxVol(v: number) {
