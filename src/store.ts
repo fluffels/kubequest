@@ -8,6 +8,11 @@
  * angefasst werden – das ist der ganze Sinn dieser Schicht.
  */
   const SAVE_KEY = "kubequest-save-v3";
+  // Ein-Slot-Sicherungskopie der Roh-Spielstanddatei. Wird befüllt, BEVOR ein Stand
+  // migriert/heruntergestuft/verworfen würde (siehe readState). Damit ist garantiert,
+  // dass selbst eine fehlerhafte Migration oder eine kaputte Datei nicht den einzigen
+  // vorhandenen Stand vernichtet – er bleibt hier wiederherstellbar (readBackup).
+  const BACKUP_KEY = "kubequest-save-backup-v1";
 
   // localStorage ist nicht überall verfügbar (privater Modus, blockierte Cookies,
   // Node-Tests). Dann fallen wir auf einen flüchtigen In-Memory-Speicher zurück,
@@ -27,6 +32,27 @@
       };
     }
   })();
+
+  // Schreiben kann auch ZUR LAUFZEIT fehlschlagen, obwohl die Init-Probe oben durchlief:
+  // localStorage hat ein Kontingent (meist ~5 MB) – ist es voll, wirft setItem einen
+  // QuotaExceededError. Ein echter Nutzer mit wachsendem Stand läuft da irgendwann rein,
+  // und der Fehler würde sonst durch den 5-Sekunden-Auto-Save propagieren und das Spiel
+  // reißen. Deshalb fängt safeSet jeden Schreibfehler ab, meldet ihn EINMALIG (nicht im
+  // 5-s-Takt) und gibt zurück, ob das Schreiben geklappt hat.
+  let warnedWriteFailed = false;
+  function safeSet(key: string, value: string): boolean {
+    try {
+      backend.setItem(key, value);
+      return true;
+    } catch (e) {
+      if (!warnedWriteFailed) {
+        warnedWriteFailed = true;
+        // eslint-disable-next-line no-console
+        console.warn("SaveStore: Speichern fehlgeschlagen (localStorage voll/blockiert?) – Spiel läuft weiter, dieser Stand wurde nicht persistiert.", e);
+      }
+      return false;
+    }
+  }
 
   /* ===== Versionierung der Spielstände =====
    * Persistierte Stände tragen ab jetzt eine Hülle: { v: <Format-Version>, data: <Spielstand> }.
@@ -75,15 +101,29 @@
     );
   }
 
+  /**
+   * Sichert die Roh-Datei in den Backup-Slot, BEVOR der Hauptschlüssel durch einen
+   * migrierten/heruntergestuften/frischen Stand überschrieben wird. Best effort:
+   * schlägt das Backup-Schreiben fehl (Kontingent voll), läuft das Laden trotzdem
+   * weiter – wir wollten nur eine zusätzliche Rettungskopie, kein Muss.
+   */
+  function backup(raw: string): void {
+    safeSet(BACKUP_KEY, raw);
+  }
+
   export const SaveStore = {
     /** Roh-JSON des Spielstands lesen – oder null, wenn noch nichts gespeichert ist. */
     read() {
       return backend.getItem(SAVE_KEY);
     },
 
-    /** Roh-JSON-String des Spielstands ablegen. */
-    write(json: string) {
-      backend.setItem(SAVE_KEY, json);
+    /**
+     * Roh-JSON-String des Spielstands ablegen.
+     * Gibt zurück, ob das Schreiben geklappt hat (false z.B. bei vollem localStorage) –
+     * wirft NIE, damit ein fehlschlagendes Speichern den Aufrufer nicht reißt.
+     */
+    write(json: string): boolean {
+      return safeSet(SAVE_KEY, json);
     },
 
     /** Spielstand löschen (für „Zurücksetzen"). */
@@ -91,10 +131,22 @@
       backend.removeItem(SAVE_KEY);
     },
 
+    /** Roh-JSON der letzten Sicherungskopie lesen – oder null, wenn es keine gibt.
+     *  Quelle für eine Wiederherstellung, falls eine Migration einen Stand zerschossen hat. */
+    readBackup(): string | null {
+      return backend.getItem(BACKUP_KEY);
+    },
+
     /**
      * Spielstand lesen und auf das aktuelle Format migrieren.
      * Liefert das Spielstand-Objekt (NICHT die Versions-Hülle) oder null,
      * wenn nichts gespeichert ist bzw. die Datei kaputt ist (→ frischer Start).
+     *
+     * Schutz vor Datenverlust: Sobald die gelesene Datei NICHT schon exakt in der
+     * aktuellen Version vorliegt – also migriert (Alt-Stand), heruntergestuft
+     * (Zukunfts-Version) oder gar nicht parsebar (kaputt) wäre – wird die Original-
+     * Rohdatei zuerst in den Backup-Slot kopiert. So überschreibt das anschließende
+     * Zurückschreiben in game.ts (load → save) niemals den einzigen Stand unrettbar.
      */
     readState(): unknown | null {
       const raw = backend.getItem(SAVE_KEY);
@@ -103,15 +155,26 @@
       try {
         parsed = JSON.parse(raw);
       } catch {
-        return null; // kaputte/halbe Datei: lieber frisch anfangen als crashen
+        backup(raw); // kaputte/halbe Datei sichern, dann frisch starten statt crashen
+        return null;
       }
-      // Versionierte Hülle? Sonst Alt-Stand ohne Hülle = Format-Version 0.
-      return isEnvelope(parsed) ? migrate(parsed.v, parsed.data) : migrate(0, parsed);
+      if (isEnvelope(parsed)) {
+        // Schon exakt aktuelle Version? Dann nichts zu sichern (kein unnötiges Verdoppeln).
+        // Sonst (älter ODER neuer als wir) zuerst das Original sichern.
+        if (parsed.v !== CURRENT_SAVE_VERSION) backup(raw);
+        return migrate(parsed.v, parsed.data);
+      }
+      // Keine Hülle = Alt-Stand der Format-Version 0 → wird migriert, also vorher sichern.
+      backup(raw);
+      return migrate(0, parsed);
     },
 
-    /** Spielstand in der aktuellen Versions-Hülle ablegen. */
-    writeState(state: unknown): void {
-      backend.setItem(SAVE_KEY, JSON.stringify({ v: CURRENT_SAVE_VERSION, data: state }));
+    /**
+     * Spielstand in der aktuellen Versions-Hülle ablegen.
+     * Gibt zurück, ob das Schreiben geklappt hat (false z.B. bei vollem localStorage) –
+     * wirft NIE, damit der Auto-Save den Aufrufer nicht reißt.
+     */
+    writeState(state: unknown): boolean {
+      return safeSet(SAVE_KEY, JSON.stringify({ v: CURRENT_SAVE_VERSION, data: state }));
     },
   };
-

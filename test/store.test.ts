@@ -16,8 +16,24 @@ function makeLocalStorageStub() {
   };
 }
 
+/** localStorage-Stub, bei dem die Init-Probe durchläuft, aber jeder ECHTE Schreibvorgang
+ *  (Key != Probe) scheitert – simuliert ein zur Laufzeit volles Kontingent (QuotaExceeded). */
+function makeQuotaStub() {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
+    setItem: (k: string, v: string) => {
+      if (k === "__kq_probe__") { map.set(k, String(v)); return; } // Init-Probe darf durch
+      throw new Error("QuotaExceededError"); // echte Saves scheitern zur Laufzeit
+    },
+    removeItem: (k: string) => { map.delete(k); },
+    _map: map,
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.resetModules();
 });
 
@@ -128,4 +144,97 @@ test("readState: unbekannt neue Version crasht nicht, liefert die Nutzlast best 
   const future = { xp: 123 };
   ls._map.set(SAVE_KEY, JSON.stringify({ v: 999, data: future }));
   expect(SaveStore.readState()).toEqual(future);
+});
+
+/* ===== Schreibsicherheit: voller/blockierter Speicher darf nicht crashen ===== */
+
+test("write: voller localStorage (QuotaExceeded) crasht NICHT, gibt false zurück", async () => {
+  const ls = makeQuotaStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  let result: boolean | undefined;
+  // Darf KEINE Exception werfen (sonst reißt der Aufrufer / Auto-Save).
+  expect(() => { result = SaveStore.write("zu-gross"); }).not.toThrow();
+  expect(result).toBe(false);             // Fehlschlag wird gemeldet, nicht verschluckt
+  expect(SaveStore.read()).toBe(null);    // nichts wurde unter dem Save-Key abgelegt
+  expect(warn).toHaveBeenCalledTimes(1);  // einmalige Warnung, kein Spam
+});
+
+test("writeState: voller localStorage crasht NICHT, gibt false zurück und warnt nur einmal", async () => {
+  const ls = makeQuotaStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  expect(() => SaveStore.writeState({ xp: 1 })).not.toThrow();
+  expect(SaveStore.writeState({ xp: 2 })).toBe(false); // jeder Auto-Save-Tick scheitert sauber
+  expect(SaveStore.readState()).toBe(null);            // nichts persistiert
+  expect(warn).toHaveBeenCalledTimes(1);               // trotz mehrfachem Scheitern nur 1x gewarnt
+});
+
+test("write/writeState: bei erfolgreichem Speichern wird true zurückgegeben", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  expect(SaveStore.write("ok")).toBe(true);
+  expect(SaveStore.writeState({ xp: 5 })).toBe(true);
+});
+
+/* ===== Backup-Slot: kein Stand geht durch Migration/Verwerfen verloren ===== */
+
+test("readState: sichert einen migrierten Alt-Stand (v0) vor dem Überschreiben ins Backup", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  const legacyRaw = JSON.stringify({ xp: 999, coins: 5 });
+  ls._map.set(SAVE_KEY, legacyRaw);
+
+  expect(SaveStore.readBackup()).toBe(null); // vorher nichts gesichert
+  SaveStore.readState();                     // migriert → muss Original sichern
+  expect(SaveStore.readBackup()).toBe(legacyRaw); // Original-Rohdatei liegt im Backup
+});
+
+test("readState: sichert eine kaputte Datei ins Backup, statt sie verloren zu geben", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  const corruptRaw = "{kaputt-kein-json";
+  ls._map.set(SAVE_KEY, corruptRaw);
+
+  expect(SaveStore.readState()).toBe(null);          // frischer Start
+  expect(SaveStore.readBackup()).toBe(corruptRaw);   // aber die Rohdatei ist gerettet
+});
+
+test("readState: sichert einen Zukunfts-Stand (v>CURRENT) vor dem Herunterstufen ins Backup", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  const futureRaw = JSON.stringify({ v: 999, data: { xp: 123 } });
+  ls._map.set(SAVE_KEY, futureRaw);
+
+  SaveStore.readState(); // best effort zurückgeben, aber Original sichern (sonst Downgrade-Verlust)
+  expect(SaveStore.readBackup()).toBe(futureRaw);
+});
+
+test("readState: ein Roundtrip in aktueller Version legt KEIN Backup an", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore } = await import("../src/store");
+
+  SaveStore.writeState({ xp: 7 }); // schreibt in aktueller Version
+  SaveStore.readState();           // keine Migration nötig
+  expect(SaveStore.readBackup()).toBe(null); // also auch kein unnötiges Verdoppeln
 });
