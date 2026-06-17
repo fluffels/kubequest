@@ -1,7 +1,8 @@
 node_modules/
 dist/
 dist-offline/
-.claude/
+.claude/*
+!.claude/skills/
 .vscode/
 .idea/*
 !.idea/runConfigurations/
