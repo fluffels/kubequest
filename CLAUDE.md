@@ -9,7 +9,7 @@
 ```
 1. npm install                              # einmalig
 2. npm run dev                              # Dev-Server, angezeigte Adresse im Browser öffnen
-3. Freies Ticket wählen                     # niedrigste freie Nummer (nicht assigned), NICHT nach Inhalt/prio aussuchen
+3. Freies Ticket wählen                     # nach Prio: hoch→mittel→niedrig, INNERHALB der Prio niedrigste freie Nummer; nicht nach Inhalt aussuchen
 4. gh issue edit <nr> --add-assignee @me    # SOFORT claimen = "in Arbeit"-Marker, dann mit gh issue view <nr> prüfen
 5. git worktree add .claude/worktrees/kq-<nr> -b feature/kq-<nr>-<slug>   # eigener Worktree, bevor du Dateien anfasst
 6. coden                                    # im Worktree umsetzen, deutsche Umlaute in Texten/Kommentaren
@@ -87,7 +87,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 
 - **Was ist das Spiel?** KubeQuest – ein 2D-Lernspiel (Phaser 3) für Docker/K8s/Helm/Terraform; die Spielwelt **ist** der Cluster. → [README.md](README.md)
 - **Wie starte ich?** `npm install` → `npm run dev` → angezeigte Adresse im Browser. → Schnellstart oben.
-- **Welches Ticket nehme ich?** Deterministisch die **niedrigste freie Nummer** (kein Assignee, kein offener PR/Branch/Worktree) – nicht nach Inhalt/prio aussuchen. Sofort self-assignen. → [AGENTS.md › Kollisionsschutz](AGENTS.md#wo-die-todos-leben).
+- **Welches Ticket nehme ich?** Deterministisch nach **Priorität** (`prio:hoch` → `prio:mittel` → `prio:niedrig` → ohne Label), **innerhalb der Prio die niedrigste freie Nummer** (kein Assignee, kein offener PR/Branch/Worktree) – nicht nach Inhalt aussuchen. Sofort self-assignen. → [AGENTS.md › Kollisionsschutz](AGENTS.md#wo-die-todos-leben).
 - **Wie schließe ich ab?** Tests grün + im Browser verifiziert → nach `main` mergen → Worktree/Branch aufräumen → Issue schließen. → [AGENTS.md › Git-Workflow](AGENTS.md#das-wichtigste-zuerst-harte-regeln).
 
 ---
