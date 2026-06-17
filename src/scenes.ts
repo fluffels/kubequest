@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -287,13 +287,20 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       }
       this.labels.push({ x: 6.5, y: 23.4, text: "Bos Dock", color: "#ffffff" });
 
-      // Dein Schiff (Grundfläche aus world.ts SHIP – Single Source of Truth, #42)
+      // Dein Schiff (Grundfläche aus world.ts SHIP – Single Source of Truth, #42).
+      // #108: Das Schiff SCHWIMMT – Wasser unterm Rumpf statt rechteckigem Holz-Deck;
+      // nur ein schmaler Steg/Anleger (SHIP_PIER) ist Holz. Pro Kachel entscheidet die
+      // pure shipTile()-Geometrie aus world.ts. Beides bleibt begehbar (solidGrid 0),
+      // damit man übers Deck zur Kajüten-Luke läuft – das Schiff-Sprite deckt das Deck ab.
       this.ship = { x: SHIP.x, y: SHIP.y, w: SHIP.w, h: SHIP.h };
-      for (let y = this.ship.y; y < this.ship.y + this.ship.h; y++)
-        for (let x = this.ship.x; x < this.ship.x + this.ship.w; x++) {
-          this.set(x, y, -11); this.solidGrid[y * W + x] = 0;
+      const shipY0 = Math.min(this.ship.y, SHIP_PIER.y0);
+      const shipY1 = Math.max(this.ship.y + this.ship.h - 1, SHIP_PIER.y1);
+      for (let y = shipY0; y <= shipY1; y++)
+        for (let x = 0; x < W; x++) {
+          const t = shipTile(x, y);
+          if (!t) continue;
+          this.set(x, y, t === "pier" ? -10 : -2); this.solidGrid[y * W + x] = 0;
         }
-      for (let y = 27; y < 31; y++) { for (const x of [33, 34]) { this.set(x, y, -10); this.solidGrid[y * W + x] = 0; } }
       this.labels.push({ x: this.ship.x + 4.5, y: this.ship.y - 0.6, text: "Dein Schiff", color: "#ffffff" });
 
       // Anleger zum GitOps-Archipel (#92): begehbarer Steg ins offene Wasser, vom
@@ -399,7 +406,7 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       // Wasser-Rand-Set nach Nachbar-Material: Holz (Steg/Schiff) > Stein (Kai) > Sand (Küste)
       const edgeSet = (x: number, y: number) => {
         const cs = [rawAt(x - 1, y - 1), rawAt(x, y - 1), rawAt(x - 1, y), rawAt(x, y)];
-        if (cs.some((c) => c === -10 || c === -11)) return "dock";
+        if (cs.some((c) => c === -10)) return "dock";   // Holz-Steg/Anleger (#108: kein Schiffsdeck-Holz mehr)
         if (cs.some((c) => c === 96 || c === 97 || c === 98)) return "kai";
         return "coast";
       };
@@ -409,7 +416,7 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
           const v = this.get(x, y);
           if (has(x, y, 0)) {                                              // berührt Wasser -> Rand-Set nach Material
             rt.drawFrame(edgeSet(x, y), WANG[corners(x, y, 1)], x * T, y * T);
-          } else if (v === -10 || v === -11) {                            // Steg/Schiffsdeck innen -> volle Planke
+          } else if (v === -10) {                                         // Steg/Anleger innen -> volle Planke
             rt.drawFrame("dock", WANG[15], x * T, y * T);
           } else if (v === 96 || v === 97 || v === 98) {                  // Stein-Kai innen -> voller Stein
             rt.drawFrame("kai", WANG[15], x * T, y * T);

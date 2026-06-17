@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, SHIP_PIER, shipTile } from "../src/world";
 
 const W = 52, H = 40; // wie WorldScene.create()
 
@@ -182,4 +182,55 @@ test("doorAt liefert null neben der Schiffs-Luke (kein versehentliches Betreten 
 test("Schiffs-Luke kollidiert mit keiner Haustür-Kachel (eindeutiger Eingang)", () => {
   const houseKeys = new Set(DOORS.map((d) => d.ty * W + d.tx));
   expect(houseKeys.has(SHIP_DOOR.ty * W + SHIP_DOOR.tx)).toBe(false);
+});
+
+/* ===== Schiff schwimmt im Wasser + Steg (#108) =====
+ * Regression gegen den Bug, dass das Schiff auf einem rechteckigen Holz-Deck mitten
+ * im Wasser lag. shipTile() darf unterm Rumpf NUR Wasser (oder den Holz-Steg)
+ * liefern – nie ein Holz-Deck – und der Steg muss vom Wasser bis aufs Deck reichen. */
+
+test("#108: unter dem ganzen Rumpf liegt Wasser oder Steg – nirgendwo ein Holz-Deck", () => {
+  let waterTiles = 0;
+  for (let y = SHIP.y; y < SHIP.y + SHIP.h; y++)
+    for (let x = SHIP.x; x < SHIP.x + SHIP.w; x++) {
+      const t = shipTile(x, y);
+      // Jede Rumpf-Kachel ist abgedeckt (nie null) und ist Wasser oder Steg, nie Holz-Deck
+      expect(t === "water" || t === "pier", `Rumpf-Kachel (${x},${y}) ist ${t}`).toBe(true);
+      if (t === "water") waterTiles++;
+    }
+  // Der Großteil der Grundfläche ist Wasser (das Schiff schwimmt) – nicht nur Steg
+  expect(waterTiles).toBeGreaterThan(SHIP.w * SHIP.h / 2);
+});
+
+test("#108: die Rumpf-Mitte (abseits des Stegs) ist Wasser", () => {
+  expect(shipTile(SHIP.x, SHIP.y + SHIP.h - 1)).toBe("water");      // vordere Ecke
+  expect(shipTile(SHIP.x + SHIP.w - 1, SHIP.y)).toBe("water");      // hintere Ecke
+});
+
+test("#108: der Steg ist Holz und reicht vom Wasser VOR dem Rumpf bis aufs Deck", () => {
+  expect(SHIP_PIER.y0).toBeLessThan(SHIP.y);                         // ragt vor den Rumpf ins Wasser
+  expect(SHIP_PIER.y1).toBeGreaterThanOrEqual(SHIP.y);              // erreicht das Deck
+  expect(shipTile(SHIP_PIER.x, SHIP_PIER.y0)).toBe("pier");          // Steg-Anfang (außerhalb Rumpf)
+  expect(shipTile(SHIP_PIER.x, SHIP.y)).toBe("pier");               // Übergang Steg → Deck
+  // Steg ist schmal (kein Holz-Rechteck): genau SHIP_PIER.w Kacheln breit
+  for (let y = SHIP.y; y < SHIP.y + SHIP.h; y++) {
+    let pierInRow = 0;
+    for (let x = SHIP.x; x < SHIP.x + SHIP.w; x++) if (shipTile(x, y) === "pier") pierInRow++;
+    expect(pierInRow).toBeLessThanOrEqual(SHIP_PIER.w);
+  }
+});
+
+test("#108: die Kajüten-Luke ist über den Steg erreichbar (begehbar + an Steg angrenzend)", () => {
+  expect(shipTile(SHIP_DOOR.tx, SHIP_DOOR.ty)).not.toBeNull();       // im Schiffsbereich (begehbar)
+  const adjacentPier = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(
+    ([dx, dy]) => shipTile(SHIP_DOOR.tx + dx, SHIP_DOOR.ty + dy) === "pier",
+  );
+  expect(adjacentPier, "Luke muss an eine Steg-Kachel grenzen").toBe(true);
+});
+
+test("#108: außerhalb von Schiff und Steg greift die normale Welt-Logik (null)", () => {
+  expect(shipTile(SHIP.x - 5, SHIP.y)).toBeNull();                   // weit links vom Schiff
+  expect(shipTile(SHIP.x + SHIP.w + 2, SHIP.y)).toBeNull();          // rechts vom Schiff
+  expect(shipTile(SHIP_PIER.x, SHIP_PIER.y1 + 5)).toBeNull();        // unterhalb von Schiff/Steg
+  expect(shipTile(0, 0)).toBeNull();
 });

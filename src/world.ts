@@ -59,6 +59,37 @@ export const SHIP = { x: 30, y: 29, w: 9, h: 6 } as const;
  *  Bewusst NICHT in DOORS: das Schiff hängt nicht an einem NPC_SPAWN. */
 export const SHIP_DOOR: Door = { id: "schiff", tx: 34, ty: 32, title: "Deine Kajüte", theme: "ship", npc: "kralle" };
 
+/* ===== Schiff schwimmt im Wasser + Holz-Steg (#108) =====
+ * Früher lag das ganze Schiff auf einem rechteckigen Holz-Deck mitten im Wasser –
+ * ein Boot gehört aufs Wasser. Diese reine Geometrie sagt scenes.ts pro Kachel im
+ * Schiffsbereich, was dort liegt: Wasser unterm Rumpf (Schiff schwimmt) bzw. eine
+ * schmale Holzplanke als Steg/Anleger (Zugang aufs Deck). Phaser-frei und in
+ * test/world.test.ts geprüft, damit Rumpf-Wasser und Steg nicht wieder zu einem
+ * Holz-Rechteck verschmelzen. */
+
+/** Steg/Anleger zum eigenen Schiff: schmale Holzplanke (2 Kacheln breit), die vom
+ *  Land/Wasser bis aufs Deck reicht. y0 liegt VOR dem Rumpf (sichtbarer Steg im
+ *  Wasser), y1 reicht bis aufs Deck (an die Kajüten-Luke heran). */
+export const SHIP_PIER = { x: 33, w: 2, y0: 27, y1: 31 } as const;
+
+export type ShipTile = "water" | "pier" | null;
+
+/** Was liegt auf Kachel (x,y) im Schiffsbereich?
+ *  - `"pier"`: begehbare Holzplanke (Steg/Anleger, Zugang aufs Deck).
+ *  - `"water"`: Wasser unterm Rumpf bzw. rund ums Schiff – das Schiff schwimmt.
+ *    Bewusst begehbar (solidGrid 0 in scenes.ts), weil das Schiff-Sprite das Deck
+ *    abdeckt; so läuft man übers Deck zur Kajüten-Luke (SHIP_DOOR).
+ *  - `null`: außerhalb von Schiff und Steg – hier entscheidet die normale Welt-Logik.
+ *  Liefert NIE ein Holz-Deck-Rechteck unterm Rumpf zurück (das war Bug #108). */
+export function shipTile(x: number, y: number): ShipTile {
+  const onPier = x >= SHIP_PIER.x && x < SHIP_PIER.x + SHIP_PIER.w &&
+                 y >= SHIP_PIER.y0 && y <= SHIP_PIER.y1;
+  if (onPier) return "pier";
+  const inHull = x >= SHIP.x && x < SHIP.x + SHIP.w &&
+                 y >= SHIP.y && y < SHIP.y + SHIP.h;
+  return inHull ? "water" : null;
+}
+
 /** Alle betretbaren Eingänge (Häuser + Schiff). */
 const ENTRANCES: Door[] = [...DOORS, SHIP_DOOR];
 
