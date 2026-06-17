@@ -1067,14 +1067,11 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
       // Piratenboot segelt heran
       const boat = this.add.container(this.W * T + 30, 31 * T).setDepth(8000);
-      const hull = this.add.graphics();
-      hull.fillStyle(0x2a2030); hull.fillRect(-14, 0, 28, 8);
-      hull.fillStyle(0x1a141e); hull.fillRect(-14, 8, 28, 3);
-      hull.fillStyle(0x4a3a52); hull.fillRect(-1, -14, 2, 14);
+      // Pixelart-Piratenschiff (#185) statt der früheren code-gezeichneten fillRect-Rümpfe.
+      // 128×96-Asset (dunkler Rumpf + schwarzes Totenkopf-Segel), Bug nach links = in
+      // Fahrtrichtung; auf Gegner-Größe herunterskaliert. Überfall-/Tween-Logik unverändert.
+      const hull = this.add.image(0, -4, "pirate_ship").setOrigin(0.5, 0.5).setScale(0.34);
       boat.add(hull);
-      const flag = this.add.image(5, -11, "px").setScale(5, 3).setTint(0x111111);
-      boat.add(flag);
-      boat.add(this.add.text(5, -11, "☠", { fontSize: "5px", resolution: 8 }).setOrigin(0.5));
       this.tweens.add({ targets: boat, x: 24 * T, duration: 2600, ease: "Sine.out" });
       this.tweens.add({ targets: boat, y: 31 * T - 2, duration: 700, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
