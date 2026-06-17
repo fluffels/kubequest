@@ -1,0 +1,70 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "tiledversion": "1.10.2",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "infinite": false,
+  "width": 8,
+  "height": 6,
+  "tilewidth": 16,
+  "tileheight": 16,
+  "nextlayerid": 3,
+  "nextobjectid": 1,
+  "compressionlevel": -1,
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "town",
+      "image": "../town.png",
+      "imagewidth": 192,
+      "imageheight": 176,
+      "tilewidth": 16,
+      "tileheight": 16,
+      "tilecount": 132,
+      "columns": 12,
+      "margin": 0,
+      "spacing": 0
+    }
+  ],
+  "layers": [
+    {
+      "id": 1,
+      "name": "Boden",
+      "type": "tilelayer",
+      "visible": true,
+      "opacity": 1,
+      "x": 0,
+      "y": 0,
+      "width": 8,
+      "height": 6,
+      "data": [
+        2, 1, 1, 1, 1, 1, 1, 2,
+        1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1,
+        2, 1, 1, 1, 1, 1, 1, 2
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Kollision",
+      "type": "tilelayer",
+      "visible": true,
+      "opacity": 1,
+      "x": 0,
+      "y": 0,
+      "width": 8,
+      "height": 6,
+      "data": [
+        14, 14, 14, 14, 14, 14, 14, 14,
+        14,  0,  0,  0,  0,  0,  0, 14,
+        14,  0,  0,  0,  0,  0,  0, 14,
+        14,  0,  0,  0,  0,  0,  0, 14,
+        14,  0,  0,  0,  0,  0,  0, 14,
+        14, 14, 14, 14, 14, 14, 14, 14
+      ]
+    }
+  ]
+}

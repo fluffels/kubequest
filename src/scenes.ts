@@ -21,6 +21,10 @@ import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runt
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
+import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
+// #191: rohe Tiled-Map als String (Vite ?raw) – wird inline in beide Build-Wege
+// gebündelt, bleibt also auch im Offline-Single-File self-contained (kein Fetch).
+import testMapRaw from "../assets/maps/test-map.tmj?raw";
 
   const T = 16;
 
@@ -69,7 +73,10 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
           tex.add(i, 0, (i % a.cols) * frame, Math.floor(i / a.cols) * frame, frame, frame);
         }
       }
-      this.scene.start("World");
+      // #191: Mit ?maptest in der URL startet statt der Welt die Tiled-Loader-Testszene
+      // (parallel zur prozeduralen buildMap()). Sonst ganz normal die WorldScene.
+      const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
+      this.scene.start(params.has("maptest") ? "MapTest" : "World");
     }
   }
 
@@ -1742,4 +1749,63 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
     }
   }
 
-  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene };
+  /** #191 (Teil 1 von Epic #57): Grundgerüst für die spätere Tiled-Map-Migration.
+   *  Lädt EINE minimale .tmj über Phasers Tilemap-API – bewusst PARALLEL zur
+   *  prozeduralen buildMap() der WorldScene, die unangetastet bleibt. Erreichbar
+   *  über ?maptest in der URL. Beweist den ganzen Pfad an einem Stück: .tmj
+   *  parsen/validieren (tilemap.ts) → Tileset-Name auf ein ASSET_MANIFEST-Bild
+   *  mappen → Tile-Layer rendern → Kollisionslayer als solide markieren (das
+   *  Debug-Overlay macht den Kollisions-Ring sichtbar). Noch KEINE echte
+   *  Hafenkarte – die kommt in #192. */
+  class TilemapTestScene extends Phaser.Scene {
+    [key: string]: any;
+    constructor() { super("MapTest"); }
+
+    create() {
+      // 1) .tmj parsen + validieren (reine Logik aus tilemap.ts). Das geparste,
+      //    geprüfte Objekt geht 1:1 in Phasers Tilemap-Cache – kein zweites Parsen.
+      const data = parseTiledMap(JSON.parse(testMapRaw));
+      this.cache.tilemap.add("test-map", { format: Phaser.Tilemaps.Formats.TILED_JSON, data });
+      const map = this.make.tilemap({ key: "test-map" });
+
+      // 2) Tileset-Bild ↔ Tiled-Tileset auflösen: der Tileset-Name im .tmj ist der
+      //    ASSET_MANIFEST-Schlüssel der bereits in der BootScene geladenen Textur.
+      const manifestKeys = ASSET_MANIFEST.map((a) => a.key);
+      const tilesets = resolveTilesets(data, manifestKeys)
+        .map((r) => map.addTilesetImage(r.tiledName, r.assetKey))
+        .filter((t): t is Phaser.Tilemaps.Tileset => t !== null);
+
+      // 3) Boden-Layer rendern.
+      map.createLayer("Boden", tilesets, 0, 0);
+
+      // 4) Kollisionslayer: alle gesetzten Kacheln (gid != 0) kollidieren. Die reine
+      //    collisionGrid()-Funktion liefert dasselbe Raster (row-major wie world.ts)
+      //    für die spätere Spiel-Logik; hier zusätzlich Phasers Layer-Kollision +
+      //    Debug-Overlay als Sicht-Beweis im Browser.
+      const collision = map.createLayer("Kollision", tilesets, 0, 0);
+      collision?.setCollisionByExclusion([-1]);
+      this.solidGrid = collisionGrid(data, "Kollision");
+
+      const debug = this.add.graphics().setDepth(100);
+      collision?.renderDebug(debug, {
+        tileColor: null,
+        collidingTileColor: new Phaser.Display.Color(255, 90, 60, 120),
+        faceColor: new Phaser.Display.Color(255, 230, 130, 200),
+      });
+
+      // Kamera mittig auf die kleine Map, kräftiger Zoom (16px-Tiles).
+      const cam = this.cameras.main;
+      cam.setBackgroundColor(0x1b2433);
+      cam.centerOn(map.widthInPixels / 2, map.heightInPixels / 2);
+      cam.setZoom(6);
+
+      // Fixierte Beschriftung, damit klar ist: das ist die Tiled-Testszene (#191).
+      const cw = cam.width, ch = cam.height;
+      this.add.text(cw / 2, 12, "🧭 Tiled-Loader-Test (#191)", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
+        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      this.add.text(cw / 2, ch - 16, "Boden-Layer + Kollisions-Ring (rot) aus assets/maps/test-map.tmj – parallel zu buildMap()", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "11px", color: "#cfe3ff", resolution: 2 })
+        .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+    }
+  }
+
+  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene, TilemapTestScene };
