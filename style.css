@@ -407,3 +407,132 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   .term-tasks { width: auto; max-height: 30vh; border-right: none; border-bottom: 1px solid var(--border); }
   .hud-keys { display: none; }
 }
+
+/* ============================================================
+ * Stardew-Look fürs HUD & die Overlay-Panels (#189)
+ *
+ * Zwei Bausteine, beide ohne Bilddatei (CSS-only, damit der
+ * Single-File-Offline-Build nichts extra einbetten muss):
+ *   1. Pixelschrift "KQPixel" (fonts.css) auf der „Chrome" –
+ *      HUD-Chips, Panel-Köpfe, Buttons, Labels. Fließtext
+ *      (Dialoge, Panel-Body, Terminal) bleibt bewusst in der gut
+ *      lesbaren Sans/Mono – lange deutsche Sätze in Pixelschrift
+ *      sind schwer lesbar; Stardew nutzt Pixelschrift auch nur
+ *      für UI-Beschriftungen, nicht für lange Lauftexte.
+ *   2. Holz-„Pixel-Rahmen": eckige Kanten (kein border-radius),
+ *      warme Holz-Palette aus docs/stardew-referenz.md §2, eine
+ *      Lichtrichtung (oben-links hell, unten-rechts dunkel) über
+ *      gestapelte solide Ränder + inset-Schatten statt weicher
+ *      Verläufe/Rundungen.
+ *
+ * Emojis (🪙 🔥 🕐 ⚓ ☰ 🚶 💬 📻 📜 …): bewusst VORERST behalten –
+ * sie sind farbige OS-Emoji und brechen den Pixel-Look, echte
+ * Pixel-Icons sind aber eigene PixelLab-Asset-Arbeit (Generierung +
+ * Slicing + Einbinden). Ausgelagert als Folge-Ticket; die Begründung
+ * je Element steht dort. Hier sitzen sie nun wenigstens in den neuen
+ * Holzrahmen statt auf flachem CSS.
+ * ============================================================ */
+:root {
+  --wood-hi:    #c08a52; /* Holz Highlight (oben-links)        */
+  --wood:       #8f5e34; /* Holz Grundton                       */
+  --wood-dk:    #5f3d22; /* Holz Schatten (unten-rechts)        */
+  --wood-edge:  #3f2817; /* getönte Outline (nicht reinschwarz) */
+  --wood-panel: #2a1c10; /* dunkles Holz-Panel als Lesegrund    */
+}
+
+/* gemeinsamer Holz-Pixel-Rahmen: eckig, mehrlagige Kante, eine
+ * Lichtrichtung. Als eigene Regel, damit HUD-Chips, Panels und
+ * Buttons exakt denselben Rahmen teilen (Einheitlichkeit = Stardew). */
+.hud-rank, .hud-coins, .hud-streak, .hud-clock, .hud-keys,
+.hud-menu-btn, .panel, button {
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+
+/* --- HUD-Chips als kleine Holzschilder --- */
+#hud { padding-top: 12px; }
+.hud-left { gap: 10px; }
+.hud-rank, .hud-coins, .hud-streak, .hud-clock {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  background: linear-gradient(var(--wood), var(--wood-dk));
+  border: 2px solid var(--wood-edge);
+  box-shadow:
+    inset 0 0 0 1px var(--wood-hi),
+    inset 2px 2px 0 0 rgba(255, 228, 185, 0.22),
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.32);
+  font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
+}
+.hud-rank { flex-direction: column; align-items: stretch; gap: 2px; min-width: 150px; }
+#hud-rankname { font-family: "KQPixel", system-ui, sans-serif; font-size: 0.62em; letter-spacing: 0.02em; }
+.xptext, .hud-label, .hud-income { font-family: "KQPixel", system-ui, sans-serif; font-size: 0.55em; }
+.hud-coins, .hud-streak, .hud-clock { font-size: 0.62em; }
+.hud-clock { color: var(--text); }
+/* XP-Balken: eckig + Holzkante statt runder Pille */
+.xpbar {
+  border-radius: 0;
+  border: 1px solid var(--wood-edge);
+  background: rgba(0, 0, 0, 0.55);
+  height: 8px;
+}
+#hud-xpfill { border-radius: 0; }
+
+/* --- Tastenleiste & Menü-Button als Holzleiste --- */
+.hud-keys {
+  font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
+  font-size: 0.55em;
+  padding: 6px 10px;
+  background: linear-gradient(var(--wood), var(--wood-dk));
+  border: 2px solid var(--wood-edge);
+  box-shadow: inset 0 0 0 1px var(--wood-hi), inset -2px -2px 0 0 rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+.hud-quest { font-family: "KQPixel", "Segoe UI", system-ui, sans-serif; font-size: 0.7em; }
+
+/* --- Overlay-Panels als Holz-Dialogkasten --- */
+.panel {
+  background: var(--wood-panel);
+  border: 4px solid var(--wood);
+  box-shadow:
+    0 0 0 2px var(--wood-edge),
+    inset 0 0 0 2px var(--wood-dk),
+    inset 3px 3px 0 2px rgba(255, 228, 185, 0.10),
+    inset -3px -3px 0 2px rgba(0, 0, 0, 0.30),
+    0 12px 44px rgba(0, 0, 0, 0.7);
+}
+.panel-head {
+  background: linear-gradient(var(--wood), var(--wood-dk));
+  border-bottom: 3px solid var(--wood-edge);
+  font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
+  font-size: 0.85em;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* --- Buttons als Holzknöpfe (eckig, Pixelschrift, eine Lichtrichtung) --- */
+button {
+  font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
+  font-size: 0.72em;
+  letter-spacing: 0.02em;
+  background: linear-gradient(var(--wood), var(--wood-dk));
+  border: 2px solid var(--wood-edge);
+  color: var(--text);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: inset 2px 2px 0 0 rgba(255, 228, 185, 0.18), inset -2px -2px 0 0 rgba(0, 0, 0, 0.32);
+}
+button:hover { filter: brightness(1.15); }
+button.primary { background: linear-gradient(var(--accent), #e0a838); color: #1a1304; border-color: var(--wood-edge); }
+button.danger { background: linear-gradient(#9a3b3b, #6f2727); color: #ffd9d9; border-color: var(--wood-edge); }
+button.danger:hover { filter: brightness(1.2); background: linear-gradient(#b34545, #7f2d2d); }
+
+/* Pixelschrift auch auf kurzen Beschriftungen in den Panels … */
+.dlg-name, .tt-head, .menu-audio-title, .ql-title, .si-name { font-family: "KQPixel", "Segoe UI", system-ui, sans-serif; }
+.dlg-name { font-size: 0.8em; }
+/* … aber Fließtext/Code/Terminal bleiben in der lesbaren Schrift. */
+.dlg-text, .panel-body p, .term-out, .quiz-explain { font-family: "Segoe UI", system-ui, sans-serif; }
