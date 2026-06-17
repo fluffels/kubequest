@@ -441,6 +441,11 @@ import { worldScene, interiorOpen } from "./runtime";
     runQuestStep() {
       const step = Game.currentStep();
       if (!step) return;
+      // Szenario eines Dialog-/Choice-Schritts beim Betreten einmischen. Funk-Schritte
+      // bekommen ihr Szenario in afterStep/finishFunkStep; Dialog-/Choice-Schritte liefen
+      // bisher durch keinen Merge-Pfad, sodass z.B. das Dockerfile aus q3b live fehlte und
+      // erst nach einem Reload (game.ts re-merged erreichte Szenarien) auftauchte (#214).
+      if (step.scenario) { Game.sim.mergeScenario(step.scenario); Game.save(); }
       if (step.type === "dialog") {
         this.showDialogue(step.npc, step.lines, () => this.afterStep());
       } else if (step.type === "choice") {
