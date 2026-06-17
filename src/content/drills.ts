@@ -2,9 +2,9 @@
  * Jede Drill-Funktion bekommt den Simulator und liefert eine frische Aufgabe
  * (ggf. mit Vorbereitung der Welt). PRACTICE ordnet die Drills den NPCs zu.
  */
-import type { Sim, Deployment, NetworkPolicyRes } from "../sim";
+import type { Sim, Deployment, NetworkPolicyRes, ArgoApp } from "../sim";
 import { pick, rnd } from "./util";
-import { NETPOL_YAML, DOCKERFILE } from "./manifests";
+import { NETPOL_YAML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML } from "./manifests";
 
 const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
 const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
@@ -58,6 +58,24 @@ function ensureNetworkPolicy(sim: Sim): NetworkPolicyRes {
     sim.exec("kubectl apply -f " + file);
   }
   return sim.networkPolicies[0];
+}
+
+/** Namen für die GitOps-/Argo-Übungen (#98) – klein, mit Bindestrich, eigene Seekarten-Welt. */
+const ARGO_APP_NAMES = ["kai-speicher", "lotsen-funk", "anker-dienst", "moewen-app", "flotten-karte", "leuchtturm-wache"];
+
+/** Sorgt dafür, dass eine Argo-Application existiert, und gibt sie zurück.
+ *  Mit `fresh` immer eine NEU angelegte (also garantiert noch <code>OutOfSync</code>) –
+ *  das braucht die Sync-Übung, damit es wirklich etwas zu synchronisieren gibt. */
+function ensureArgoApp(sim: Sim, fresh = false): ArgoApp {
+  if (!fresh && sim.argoApps.length > 0) return sim.argoApps[0];
+  let name = pick(ARGO_APP_NAMES);
+  while (sim.argoApps.some(a => a.name === name)) name = pick(ARGO_APP_NAMES) + rnd(2, 99);
+  const file = "ensure-application.yaml";
+  sim.files[file] = ARGO_APPLICATION_MANUAL_YAML;
+  // autoSync:false → Argo kennt den Soll-Zustand, hat ihn aber noch nicht gezogen (OutOfSync).
+  sim.applyEffects[file] = { application: { name, repo: "https://github.com/port-kubernia/seekarten.git", path: name, autoSync: false, selfHeal: false, deployment: { name, image: "nginx:1.27", replicas: 2 } } };
+  sim.exec("kubectl apply -f " + file);
+  return sim.argoApps.find(a => a.name === name)!;
 }
 
 /** Eine generierte Übungsaufgabe (Drill). */
@@ -296,6 +314,28 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const np = ensureNetworkPolicy(sim);
     return { text: "Reiß die Hafenmauer <code>" + np.name + "</code> wieder ein.", accept: [new RegExp("^kubectl\\s+delete\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete networkpolicy " + np.name, hint: "kubectl delete networkpolicy <name>" };
   },
+  // GitOps-Archipel (#98): Üben mit Argo CD – Application anlegen, Überblick, Akte lesen, Soll ziehen.
+  "argo-apply": sim => {
+    // Frische Seekarte: bei jedem Aufruf ein neuer, noch unbekannter Auftrag (sonst „unchanged“).
+    let name = pick(ARGO_APP_NAMES);
+    while (sim.argoApps.some(a => a.name === name)) name = pick(ARGO_APP_NAMES) + rnd(2, 99);
+    const file = "drill-application.yaml";
+    sim.files[file] = ARGO_APPLICATION_MANUAL_YAML;
+    sim.applyEffects[file] = { application: { name, repo: "https://github.com/port-kubernia/seekarten.git", path: name, autoSync: false, selfHeal: false, deployment: { name, image: "nginx:1.27", replicas: 2 } } };
+    return { text: "Eine Argo-<b>Application</b> ist ein ganz normales Manifest: wende die Seekarte <code>" + file + "</code> deklarativ an, damit Argo den neuen Auftrag kennt.", accept: [/^kubectl\s+apply\s+-f\s+drill-application\.yaml$/], solution: "kubectl apply -f " + file, hint: "Der vertraute Befehl: kubectl apply -f <datei>" };
+  },
+  "argo-app-list": sim => {
+    ensureArgoApp(sim);
+    return { text: "Verschaff dir den Flotten-Überblick: zeig alle <b>Argo-Applications</b> mit ihrem Sync- und Health-Status.", accept: [/^argocd\s+app\s+(list|ls)$/], solution: "argocd app list", hint: "argocd app list (oder ls)" };
+  },
+  "argo-app-get": sim => {
+    const app = ensureArgoApp(sim);
+    return { text: "Öffne die Akte der Application <code>" + app.name + "</code> – lies Sync Status und Health.", accept: [new RegExp("^argocd\\s+app\\s+get\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app get " + app.name, hint: "Muster: argocd app get <name> – die Namen zeigt 'argocd app list'." };
+  },
+  "argo-app-sync": sim => {
+    const app = ensureArgoApp(sim, true); // garantiert OutOfSync: es gibt echt etwas zu ziehen
+    return { text: "Die Application <code>" + app.name + "</code> ist <b>OutOfSync</b>. Zieh den im Git deklarierten Soll-Zustand in den Cluster (Pull-Prinzip).", accept: [new RegExp("^argocd\\s+app\\s+sync\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app sync " + app.name, hint: "Muster: argocd app sync <name>" };
+  },
 };
 
 /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
@@ -306,4 +346,5 @@ export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   runa: [{ drill: "helm-install", after: "q10" }, { drill: "helm-list", after: "q10" }, { drill: "helm-upgrade", after: "q11" }, { drill: "helm-rollback", after: "q11" }, { drill: "helm-create", after: "q21" }, { drill: "helm-lint", after: "q21" }, { drill: "helm-package", after: "q21" }, { drill: "helm-install-local", after: "q21" }],
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
   juno: [{ drill: "k-logs", after: "q15" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }, { drill: "k-set-resources", after: "q27" }],
+  argo: [{ drill: "argo-apply", after: "q29" }, { drill: "argo-app-list", after: "q29" }, { drill: "argo-app-get", after: "q29" }, { drill: "argo-app-sync", after: "q29" }],
 };
