@@ -28,6 +28,10 @@ import dock from "../assets/pixellab/water-wood.png";
 
 // PixelLab-Objekte
 import flowers from "../assets/pixellab/flowers.png";
+// Gestreute Gras-Büschel (#107): echte Pixelart-Sprites statt prozeduraler Dreieck-Halme
+import grasstuft0 from "../assets/pixellab/grasstuft0.png";
+import grasstuft1 from "../assets/pixellab/grasstuft1.png";
+import grasstuft2 from "../assets/pixellab/grasstuft2.png";
 import tree from "../assets/pixellab/tree.png";
 import pine from "../assets/pixellab/pine.png";
 import bush from "../assets/pixellab/bush.png";
@@ -90,6 +94,10 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
 
   // Einzelobjekte ohne Slicing (ganze Bilder)
   { key: "flowers", src: flowers, kind: "plain" },
+  // Gras-Büschel-Varianten (#107) – gestreut über die Wiese (spawnGrassDetail)
+  { key: "grasstuft0", src: grasstuft0, kind: "plain" },
+  { key: "grasstuft1", src: grasstuft1, kind: "plain" },
+  { key: "grasstuft2", src: grasstuft2, kind: "plain" },
   { key: "tree", src: tree, kind: "plain" },
   { key: "pine", src: pine, kind: "plain" },
   { key: "bush", src: bush, kind: "plain" },

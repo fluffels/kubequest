@@ -485,32 +485,6 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
         gg.fillCircle(gs / 2, gs / 2, (gs / 2) * t);
       }
       gg.generateTexture("glowSoft", gs, gs); gg.destroy();
-      this.makeGrassTextures();
-    }
-
-    /** Drei kleine Gras-Büschel-Texturen aus schmalen, sich verjüngenden Halmen
-     *  (#40). Bewusst WEISS gezeichnet – die Grün-Nuance kommt erst beim Streuen
-     *  per Tint pro Büschel (grassTuftStyle.shade), damit jede Wiese leicht anders
-     *  schattiert ist statt aus einem einzigen wiederholten Tile zu bestehen. */
-    makeGrassTextures() {
-      // Pro Variante: Liste von Halmen [Versatz-X von der Mitte, Höhe]. Mehr & breitere
-      // Halme = dichteres Büschel; die fächerförmige dritte Variante wirkt am üppigsten.
-      const variants: [number, number][][] = [
-        [[-3, 7], [0, 10], [3, 8]],
-        [[-4, 6], [-1, 9], [2, 10], [4, 7]],
-        [[0, 11], [-2, 8], [2, 8], [-4, 5], [4, 5]],
-      ];
-      const w = 12, h = 13;
-      variants.forEach((blades, i) => {
-        const g = this.make.graphics({ add: false } as any);
-        for (const [bx, bh] of blades) {
-          const baseX = w / 2 + bx;
-          const lean = bx * 0.18;                 // äußere Halme neigen sich leicht nach außen
-          g.fillStyle(0xffffff, 0.92);
-          g.fillTriangle(baseX - 1.3, h, baseX + 1.3, h, baseX + lean, h - bh);
-        }
-        g.generateTexture("grasstuft" + i, w, h); g.destroy();
-      });
     }
 
     spawnFlowers() {
@@ -533,13 +507,17 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
       }
     }
 
-    /** Dichte Gras-Büschel über die Wiese streuen (#40, Stardew-Look). Macht aus
+    /** Dichte Gras-Büschel über die Wiese streuen (#107, Stardew-Look). Macht aus
      *  dem wiederholten Wang-Gras-Tile eine abwechslungsreiche Wiese: viele kleine
-     *  Büschel, jedes per grassTuftStyle deterministisch in Form, Grün-Nuance,
-     *  Neigung, Größe und Spiegelung variiert. Platzierung wie bei den Blumen rein
-     *  deterministisch (#3) – gleiche Welt → gleiche Wiese, kein Flackern beim Laden. */
+     *  Büschel aus echten PixelLab-Pixelart-Sprites (grasstuft0..2), jedes per
+     *  grassTuftStyle deterministisch in Form-Variante, Helligkeit, Neigung, Größe
+     *  und Spiegelung variiert. Ersetzt die früheren prozedural gezeichneten
+     *  Dreieck-Halme aus #40. Platzierung wie bei den Blumen rein deterministisch
+     *  (#3) – gleiche Welt → gleiche Wiese, kein Flackern beim Laden. */
     spawnGrassDetail() {
       const VARIANTS = 3;
+      // Die Sprites sind 48×48; auf ~Kachelhöhe herunterskaliert (zusätzlich × s.scale).
+      const BASE = 0.34;
       const accept = (x: number, y: number) => {
         const v = this.ground[y * this.W + x];
         return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
@@ -550,17 +528,16 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
         jitter: { x: [1, 15], y: [6, 15] },
       })) {
         const s = grassTuftStyle(strSeed("grass-style"), p.x, p.y, VARIANTS);
-        // Grün-Nuance: Grundton Wiesengrün, Helligkeit/Sättigung leicht je shade verschoben.
-        const tint = Phaser.Display.Color.HSLToColor(
-          (105 + s.shade * 12) / 360,         // Farbton: Gelb-Grün ↔ Blau-Grün
-          0.45 + s.shade * 0.08,              // Sättigung
-          0.34 + s.shade * 0.07,              // Helligkeit
-        ).color;
+        // Die Farbe trägt jetzt das Pixelart-Sprite selbst (#107). Pro Büschel nur noch
+        // eine dezente Helligkeitsvariation (multiplikativer Grau-Tint ~0.82..1.0),
+        // damit nicht jedes Büschel exakt gleich wirkt – ohne den Pixelart-Farbton zu
+        // überfärben (das wäre der alte Stilbruch aus #40).
+        const b = Math.round((0.82 + (s.shade * 0.5 + 0.5) * 0.18) * 255);
         const img = this.add.image(p.x * T + p.jx, p.y * T + p.jy, "grasstuft" + s.variant)
           .setOrigin(0.5, 1)
-          .setScale((s.flip ? -1 : 1) * s.scale, s.scale)
+          .setScale((s.flip ? -1 : 1) * s.scale * BASE, s.scale * BASE)
           .setAngle(s.angle)
-          .setTint(tint)
+          .setTint(Phaser.Display.Color.GetColor(b, b, b))
           .setDepth(p.y * T + 4);             // y-sortiert, knapp unter Blumen/Objekten
         this.registerCullable(img, p.x * T + p.jx, p.y * T + p.jy);
       }
