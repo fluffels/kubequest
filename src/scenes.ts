@@ -24,6 +24,7 @@ import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
 import { harborGeometry, PIER_XS } from "./harbormap";
 import { ATLAS_CHARS, CELL_W, CELL_H, GLYPH_W, GLYPH_H, glyphMatrix, sanitize } from "./pixelfont";
+import { spreadLabelsVertically, type LayoutBox } from "./labellayout";
 // #193: Karten kommen über die Map-Registry (Map-ID → rohes .tmj + Metadaten)
 // statt über fest importierte Pfade. Die ?raw-.tmj-Strings (inline in beide
 // Build-Wege gebündelt, also auch offline self-contained, kein Fetch) liegen jetzt
@@ -194,7 +195,8 @@ import { getMapEntry } from "./mapregistry";
       this.solidGrid = new Uint8Array(this.W * this.H);
       this.decoList = [];
       this.labels = [];
-      this.dynLabels = [];   // dynamische Cluster-Tags (Nähe-Aufdeckung): { obj, x, y }
+      this.signBoxes = [];   // feste Holz-Schilder als Hindernisse fürs Tag-Entzerren (#207)
+      this.dynLabels = [];   // dynamische Cluster-Tags (Nähe-Aufdeckung): { obj, x, y, ty }
       this.podSlots = {};
       this.slotUsed = new Array(36).fill(false);
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
@@ -538,8 +540,12 @@ import { getMapEntry } from "./mapregistry";
       const h = Math.max(13, Math.ceil(txt.height) + 7);
       const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
       board.y = -h / 2; txt.y = -h / 2;   // unten am Bezugspunkt verankert (wie altes origin 0.5,1)
+      // Schild-Rechteck als festes Hindernis fürs Tag-Entzerren merken (#207): Container
+      // ist um 0.8 skaliert, das Brett sitzt oberhalb des Bezugspunkts (board.y=-h/2,
+      // Höhe h) → Welt-Box [y-0.8h, y]. Cluster-Tags weichen diesen Boxen aus.
+      if (this.signBoxes) this.signBoxes.push({ x, y: y - 0.4 * h, w: 0.8 * w, h: 0.8 * h, movable: false });
       // Tiefe = Welt-y (wie Bäume/Fässer/Krabben): Objekte derselben/näheren Reihe liegen davor
-      // statt darunter; Tech-Tags (Tiefe 9600) bleiben ohnehin oben → nichts wird mehr verdeckt.
+      // statt darunter; Tech-Tags sind y-sortiert (#207) und überlagern die Figuren nicht mehr.
       return this.add.container(x, y, [board, txt]).setScale(0.8).setDepth(y);
     }
 
@@ -554,7 +560,9 @@ import { getMapEntry } from "./mapregistry";
       const bg = this.add.rectangle(0, 0, w, h, 0x0a101c, 0.82).setOrigin(0.5);
       txt.setPosition(-w / 2 + padL, 0);
       const dot = this.add.circle(-w / 2 + 4.5, 0, 1.5, statusColor);
-      return this.add.container(x, y, [bg, txt, dot]).setDepth(9600).setAlpha(0);
+      // Tiefe setzt der Aufrufer (mkTag) y-sortiert am Bezugs-Objekt aus (#207),
+      // damit davorstehende Figuren das Tag verdecken statt umgekehrt.
+      return this.add.container(x, y, [bg, txt, dot]).setAlpha(0);
     }
 
     /** Weicher Schatten unter einer Figur – radial ausgefranste Textur statt harter Ellipse (#4). */
@@ -998,8 +1006,12 @@ import { getMapEntry } from "./mapregistry";
       // (lx,ly) = Tag-Position, (ax,ay) = Bezugspunkt des Objekts (Distanz zur Figur).
       const mkTag = (lx: number, ly: number, str: string, status: number, ax: number, ay: number) => {
         const tag = this.makeTechTag(lx, ly, str, status);
+        // Tiefe am Bezugs-Objekt (ay) ausrichten statt fix ganz oben: so rendert eine
+        // davorstehende Figur (größeres Fuß-y → größere Tiefe) ÜBER dem Tag und wird
+        // nicht mehr verdeckt (#207) – analog zur y-Sortierung der Holz-Schilder.
+        tag.setDepth(ay);
         this.dynGroup.add(tag);
-        this.dynLabels.push({ obj: tag, x: ax, y: ay });
+        this.dynLabels.push({ obj: tag, x: ax, y: ay, ty: ly });
       };
 
       // Deployment-Tags über der ersten Kiste (kaputte rot mit Status!)
@@ -1044,15 +1056,30 @@ import { getMapEntry } from "./mapregistry";
     }
 
     /** Nähe-Aufdeckung: dynamische Cluster-Tags nur nahe der Figur einblenden
-     *  (sanfter Fade), damit nie alle gleichzeitig sichtbar sind und überlappen. */
+     *  (sanfter Fade), damit nie alle gleichzeitig sichtbar sind und überlappen.
+     *  Zusätzlich werden die GERADE sichtbaren Tags vertikal entzerrt (#207), damit
+     *  sich ihre Texte – und die der festen Holz-Schilder – nicht überlagern. */
     revealNearbyLabels() {
       const pl = this.playerPos;
       const FULL = 42, FADE = 84;   // px: voll sichtbar <=FULL, ausgeblendet >=FADE
+      const visible = [];
       for (const dl of this.dynLabels) {
         const d = Math.hypot(dl.x - pl.x, dl.y - pl.y);
         const a = d <= FULL ? 1 : d >= FADE ? 0 : 1 - (d - FULL) / (FADE - FULL);
         dl.obj.setAlpha(a).setVisible(a > 0.02);
+        if (a > 0.02) visible.push(dl);
+        else dl.obj.y = dl.ty;   // ausgeblendet → zurück auf die Basis-Position
       }
+      // Entzerren: feste Schilder als unbewegliche Hindernisse zuerst, dann die
+      // sichtbaren Tags (gemessen an ihrer Basis-Position ty + Panel-Größe).
+      const boxes: LayoutBox[] = this.signBoxes ? this.signBoxes.slice() : [];
+      const offset = boxes.length;
+      for (const dl of visible) {
+        const bg = dl.obj.list[0];   // Hintergrund-Rechteck des Tech-Tags (Maße = Panel)
+        boxes.push({ x: dl.obj.x, y: dl.ty, w: bg.width, h: bg.height });
+      }
+      const dys = spreadLabelsVertically(boxes, 2);
+      visible.forEach((dl, i) => { dl.obj.y = dl.ty + dys[offset + i]; });
     }
 
     /** Off-screen-Culling der statischen Deko (#82). Gedrosselt: die (potentiell
