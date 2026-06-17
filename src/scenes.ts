@@ -23,6 +23,7 @@ import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
 import { harborGeometry, decodeHarborGround, parseHarborMap, PIER_XS } from "./harbormap";
+import { ATLAS_CHARS, CELL_W, CELL_H, GLYPH_W, GLYPH_H, glyphMatrix, sanitize } from "./pixelfont";
 // #191/#192: rohe Tiled-Maps als String (Vite ?raw) – werden inline in beide
 // Build-Wege gebündelt, bleiben also auch im Offline-Single-File self-contained
 // (kein Fetch). test-map = Loader-Demo (#191), harbor = echte Hafenkarte (#192).
@@ -54,6 +55,97 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
   function hueColor(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.7, 0.55).color; }
   function hueColorLight(h: number) { return Phaser.Display.Color.HSLToColor(h / 360, 0.8, 0.75).color; }
 
+  /* ---------- Pixel-Bitmap-Font für alle In-Welt-Texte (#188) ----------
+   * Eine gemeinsame, im 5×7-Pixelraster gezeichnete Schrift ersetzt die System-Fonts
+   * (Verdana/Consolas/monospace) bei Schildern, Cluster-Tags, „!"-Markern, schwebenden
+   * Belohnungen und Interior-/Archipel-Titeln → echter Pixelart-Look (Stardew-Messlatte #44).
+   * Die Glyphen-Daten liegen Phaser-frei + unit-getestet in pixelfont.ts; hier wird daraus
+   * EINMALIG (global im Cache) eine Canvas-Textur gebacken und als Phaser-RetroFont registriert. */
+  const FONT_KEY = "pixelfont", FONT_TEX = "pixelfontTex", COIN_TEX = "coinIcon";
+
+  function buildPixelFont(scene: Phaser.Scene) {
+    if (scene.cache.bitmapFont.exists(FONT_KEY)) return;   // global, nur einmal nötig
+    const cols = ATLAS_CHARS.length;
+    const texW = cols * CELL_W, texH = CELL_H;
+    const canvas = scene.textures.createCanvas(FONT_TEX, texW, texH);
+    if (!canvas) return;
+    const ctx = canvas.getContext();
+    ctx.clearRect(0, 0, texW, texH);
+    ctx.fillStyle = "#ffffff";
+    for (let i = 0; i < cols; i++) {
+      const m = glyphMatrix(ATLAS_CHARS[i]);
+      const ox = i * CELL_W;
+      for (let gy = 0; gy < GLYPH_H; gy++)
+        for (let gx = 0; gx < GLYPH_W; gx++)
+          if (m[gy][gx]) ctx.fillRect(ox + gx, gy, 1, 1);
+    }
+    canvas.refresh();
+    const data = Phaser.GameObjects.RetroFont.Parse(scene, {
+      image: FONT_TEX, width: CELL_W, height: CELL_H,
+      chars: ATLAS_CHARS, charsPerRow: cols,
+      "spacing.x": 0, "spacing.y": 0, "offset.x": 0, "offset.y": 0, lineSpacing: 0,
+    });
+    scene.cache.bitmapFont.add(FONT_KEY, data);
+  }
+
+  /** Pixel-Münz-Icon für schwebende Belohnungs-Texte (ersetzt das 🪙-Emoji, #188). */
+  function buildCoinIcon(scene: Phaser.Scene) {
+    if (scene.textures.exists(COIN_TEX)) return;
+    const g = scene.make.graphics({ add: false } as any);
+    g.fillStyle(0x8a5a12, 1); g.fillCircle(5, 5, 5);         // dunkler Rand
+    g.fillStyle(0xf2b937, 1); g.fillCircle(5, 5, 4);         // Gold-Körper
+    g.fillStyle(0xffe08a, 1); g.fillCircle(3.6, 3.6, 1.3);   // Glanzpunkt
+    g.fillStyle(0xc8881f, 1); g.fillRect(3, 4, 4, 2);        // eingeprägter Steg
+    g.generateTexture(COIN_TEX, 10, 10); g.destroy();
+  }
+
+  function fontColor(hex?: string) {
+    return hex ? parseInt(hex.replace("#", ""), 16) : 0xffffff;
+  }
+
+  /** Erzeugt einen In-Welt-Pixeltext (Phaser-BitmapText). `str` wird vorher entschärft
+   *  (Emoji raus, fehlende Zeichen → sichtbarer Fallback), damit nie eine Glyphe fehlt. */
+  function pixelText(
+    scene: Phaser.Scene, x: number, y: number, str: string,
+    opts: { color?: string; size?: number; origin?: number | [number, number]; depth?: number; shadow?: boolean } = {},
+  ) {
+    const t = scene.add.bitmapText(x, y, FONT_KEY, sanitize(str));
+    if (opts.size) t.setFontSize(opts.size);
+    t.setTint(fontColor(opts.color));
+    if (Array.isArray(opts.origin)) t.setOrigin(opts.origin[0], opts.origin[1]);
+    else if (opts.origin !== undefined) t.setOrigin(opts.origin);
+    if (opts.depth !== undefined) t.setDepth(opts.depth);
+    if (opts.shadow) t.setDropShadow(0, 1, 0x000000, 0.6);
+    return t;
+  }
+
+  /** Schwebender Belohnungs-/Effekt-Text (#188): Pixelschrift + Pixel-Münz-Icon statt
+   *  🪙-Emoji. Reine Emoji-Floats (z.B. ✨) bleiben System-Text – die Bitmap-Font hat
+   *  dafür keine Glyphe. Beides steigt auf und blendet aus. */
+  function floatPixelText(scene: Phaser.Scene, x: number, y: number, str: string, color?: string) {
+    const coin = str.includes("🪙");
+    const clean = sanitize(str);
+    const cont = scene.add.container(x, y).setDepth(10001);
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    let cursor = 0;
+    if (clean) {
+      const t = pixelText(scene, 0, 0, clean, { color: color || "#ffd97a", origin: [0, 0.5], shadow: true });
+      parts.push(t); cursor = t.width;
+    } else if (!coin) {
+      // Übrig bleibt nur ein Emoji (z.B. ✨) – als System-Text behalten.
+      const t = scene.add.text(0, 0, str, { fontSize: "6px", color: color || "#ffd97a", resolution: 8 }).setOrigin(0, 0.5);
+      parts.push(t); cursor = t.width;
+    }
+    if (coin) {
+      const gap = clean ? 3 : 0;
+      const icon = scene.add.image(cursor + gap, 0, COIN_TEX).setOrigin(0, 0.5);
+      parts.push(icon); cursor += gap + 10;
+    }
+    cont.add(parts);
+    cont.x = x - cursor / 2;   // ganzes Float zentrieren (wie früher origin 0.5)
+    scene.tweens.add({ targets: cont, y: y - 14, alpha: 0, duration: 1400, ease: "Sine.out", onComplete: () => cont.destroy() });
+  }
+
   class BootScene extends Phaser.Scene {
     [key: string]: any;
     constructor() { super("Boot"); }
@@ -64,6 +156,10 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
       for (const a of ASSET_MANIFEST) this.load.image(a.key, a.src);
     }
     create() {
+      // Pixel-Bitmap-Font + Münz-Icon einmalig backen (#188) – global im Cache,
+      // damit World/Interior/Archipel/MapTest sie ohne erneutes Laden nutzen.
+      buildPixelFont(this);
+      buildCoinIcon(this);
       // Nur Sheets in Frames schneiden; plains bleiben ganze Bilder. Spaltenzahl und
       // Frame-Größe kommen aus dem Manifest (Default 16), nicht mehr aus Listen hier.
       for (const a of ASSET_MANIFEST) {
@@ -434,10 +530,9 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
      *  Am 16px-Maßstab orientiert (knappes Padding + leicht runterskaliert) und per
      *  y-Tiefe in die Welt einsortiert, damit es Fässer/Pod-Kisten/Tech-Tags nicht verdeckt. */
     makeSign(x: number, y: number, text: string) {
-      const txt = this.add.text(0, 0, text, {
-        fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px",
-        color: "#3a2410", resolution: 10,
-      }).setOrigin(0.5).setShadow(0, 0.5, "rgba(255,243,214,0.45)", 0);
+      // Eingravierte Pixelschrift (#188): heller Drop-Shadow nach unten = Gravur-Effekt.
+      const txt = pixelText(this, 0, 0, text, { color: "#3a2410", origin: 0.5 });
+      txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
       const w = Math.max(18, Math.ceil(txt.width) + 10);
       const h = Math.max(13, Math.ceil(txt.height) + 7);
       const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
@@ -450,13 +545,15 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
     /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
      *  / gelb Warnung). Startet unsichtbar – wird per Nähe-Aufdeckung eingeblendet. */
     makeTechTag(x: number, y: number, text: string, statusColor: number) {
-      const txt = this.add.text(0, 0, text, {
-        fontFamily: "Consolas, 'Courier New', monospace", fontSize: "5px", color: "#e3edf8",
-        backgroundColor: "rgba(10,16,28,0.82)", padding: { left: 8, right: 4, top: 1, bottom: 1 }, resolution: 10,
-      }).setOrigin(0.5);
-      const dot = this.add.circle(-txt.width / 2 + 4.5, 0, 1.5, statusColor);
-      txt.y = -txt.height / 2; dot.y = -txt.height / 2;   // unten verankert (über dem Objekt)
-      return this.add.container(x, y, [txt, dot]).setDepth(9600).setAlpha(0);
+      // Pixelschrift (#188) auf dunklem Panel + farbiger Status-Punkt. BitmapText kann
+      // keinen Hintergrund/Padding wie add.text – darum eigenes Rechteck dahinter.
+      const txt = pixelText(this, 0, 0, text, { color: "#e3edf8", origin: [0, 0.5] });
+      const padL = 9, padR = 4, padY = 2;
+      const w = txt.width + padL + padR, h = txt.height + padY * 2;
+      const bg = this.add.rectangle(0, 0, w, h, 0x0a101c, 0.82).setOrigin(0.5);
+      txt.setPosition(-w / 2 + padL, 0);
+      const dot = this.add.circle(-w / 2 + 4.5, 0, 1.5, statusColor);
+      return this.add.container(x, y, [bg, txt, dot]).setDepth(9600).setAlpha(0);
     }
 
     /** Weicher Schatten unter einer Figur – radial ausgefranste Textur statt harter Ellipse (#4). */
@@ -730,8 +827,7 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
           ? this.add.image(d.x * T + 8, baseY, meta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(d.y * T + T)
           : this.add.image(d.x * T + 8, baseY, "dungeon", meta.sprite).setDepth(d.y * T + T);
         this.tweens.add({ targets: spr, y: baseY - 1, duration: 900 + Math.random() * 400, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-        const marker = this.add.text(d.x * T + 8, d.y * T - 6, "!", { fontFamily: "Consolas", fontSize: "8px", color: "#ffc857", fontStyle: "bold", resolution: 8 })
-          .setOrigin(0.5, 1).setDepth(10000).setShadow(0.5, 0.5, "#000", 1);
+        const marker = pixelText(this, d.x * T + 8, d.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
         this.tweens.add({ targets: marker, y: d.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
         return { id: d.id, x: d.x, y: d.y, sprite: spr, marker };
       });
@@ -824,9 +920,7 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
     burstAtPlayer(kind: string) { this.burstAt(this.playerPos.x, this.playerPos.y - 8, kind); }
 
     floatText(x: number, y: number, str: string, color?: string) {
-      const t = this.add.text(x, y, str, { fontFamily: "Consolas", fontSize: "6px", color: color || "#ffd97a", resolution: 8 })
-        .setOrigin(0.5).setDepth(10001).setShadow(0.5, 0.5, "#000", 1);
-      this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: 1400, ease: "Sine.out", onComplete: () => t.destroy() });
+      floatPixelText(this, x, y, str, color);
     }
 
     /* ============ Cluster → Welt ============ */
@@ -1356,12 +1450,9 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
       // Fixierte Beschriftung (oben Titel, unten Hinweis)
       const cw = cam.width, ch = cam.height;
       const npcName = meta ? meta.name + " · " + meta.title : "";
-      this.add.text(cw / 2, 12, (isShip ? "⚓ " : "🚪 ") + door.title, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
-        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
-      if (npcName) this.add.text(cw / 2, 32, npcName, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "11px", color: "#cdd9e8", resolution: 2 })
-        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
-      this.add.text(cw / 2, ch - 22, isShip ? "E – an Deck   ·   ↓ durch die Luke" : "E – Hinausgehen   ·   ↓ durch die Tür", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "12px", color: "#ffd97a", resolution: 2 })
-        .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      pixelText(this, cw / 2, 12, (isShip ? "⚓ " : "🚪 ") + door.title, { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      if (npcName) pixelText(this, cw / 2, 34, npcName, { color: "#cdd9e8", size: 12, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 22, isShip ? "E – an Deck   ·   ↓ durch die Luke" : "E – Hinausgehen   ·   ↓ durch die Tür", { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
 
       // E war beim Betreten evtl. noch gedrückt – erst nach Loslassen reagieren.
       this.ePrev = true;
@@ -1470,8 +1561,8 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
       this.add.ellipse(npx, npBaseY, 12, 5, 0x000000, 0.26).setDepth(npBaseY - 1);
       const argoSpr = this.add.image(npx, npBaseY, argoMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(ARCHIPEL_NPC.y * T + T);
       this.tweens.add({ targets: argoSpr, y: npBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      const argoMarker = this.add.text(npx, ARCHIPEL_NPC.y * T - 6, "!", { fontFamily: "Consolas", fontSize: "8px", color: "#ffc857", fontStyle: "bold", resolution: 8 })
-        .setOrigin(0.5, 1).setDepth(10000).setShadow(0.5, 0.5, "#000", 1).setVisible(false);
+      const argoMarker = pixelText(this, npx, ARCHIPEL_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
+      argoMarker.setVisible(false);
       this.tweens.add({ targets: argoMarker, y: ARCHIPEL_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
       this.npcs = [{ id: ARCHIPEL_NPC.id, x: ARCHIPEL_NPC.x, y: ARCHIPEL_NPC.y, sprite: argoSpr, marker: argoMarker }];
 
@@ -1491,10 +1582,8 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
       // Fixierte Beschriftung: Titel oben, Hinweis unten.
       const cw = cam.width, ch = cam.height;
-      this.add.text(cw / 2, 12, "⚓ GitOps-Archipel", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
-        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
-      this.add.text(cw / 2, ch - 22, "Zum Steg laufen ⚓ – zurück nach Port Kubernia", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "12px", color: "#ffd97a", resolution: 2 })
-        .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      pixelText(this, cw / 2, 12, "⚓ GitOps-Archipel", { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 22, "Zum Steg laufen ⚓ – zurück nach Port Kubernia", { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
 
       // Ein paar Möwen für die Hafen-Atmosphäre (wie auf der Hauptkarte).
       this.time.addEvent({ delay: 6500, loop: true, callback: () => { if (Math.random() < 0.6) this.spawnGull(); } });
@@ -1596,8 +1685,8 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
     /** Holz-Wegweiser (9-Slice) wie auf der Hauptkarte. */
     makeSign(x: number, y: number, text: string) {
-      const txt = this.add.text(0, 0, text, { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "5px", color: "#3a2410", resolution: 10 })
-        .setOrigin(0.5).setShadow(0, 0.5, "rgba(255,243,214,0.45)", 0);
+      const txt = pixelText(this, 0, 0, text, { color: "#3a2410", origin: 0.5 });
+      txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
       const w = Math.max(18, Math.ceil(txt.width) + 10), h = Math.max(13, Math.ceil(txt.height) + 7);
       const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
       board.y = -h / 2; txt.y = -h / 2;
@@ -1641,9 +1730,7 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
     }
 
     floatText(x: number, y: number, str: string, color?: string) {
-      const t = this.add.text(x, y, str, { fontFamily: "Consolas", fontSize: "6px", color: color || "#ffd97a", resolution: 8 })
-        .setOrigin(0.5).setDepth(10001).setShadow(0.5, 0.5, "#000", 1);
-      this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: 1400, ease: "Sine.out", onComplete: () => t.destroy() });
+      floatPixelText(this, x, y, str, color);
     }
 
     exitToWorld() {
@@ -1761,10 +1848,8 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
       // Fixierte Beschriftung, damit klar ist: das ist die Tiled-Testszene (#191).
       const cw = cam.width, ch = cam.height;
-      this.add.text(cw / 2, 12, "🧭 Tiled-Loader-Test (#191)", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "16px", color: "#ffe9b0", fontStyle: "bold", resolution: 2 })
-        .setOrigin(0.5, 0).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
-      this.add.text(cw / 2, ch - 16, "Boden-Layer + Kollisions-Ring (rot) aus assets/maps/test-map.tmj – parallel zu buildMap()", { fontFamily: "Verdana, 'Segoe UI', sans-serif", fontSize: "11px", color: "#cfe3ff", resolution: 2 })
-        .setOrigin(0.5, 1).setScrollFactor(0).setDepth(20000).setShadow(0, 1, "#000", 3);
+      pixelText(this, cw / 2, 12, "🧭 Tiled-Loader-Test (#191)", { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 16, "Boden-Layer + Kollisions-Ring (rot) aus assets/maps/test-map.tmj – parallel zu buildMap()", { color: "#cfe3ff", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
     }
   }
 

@@ -42,7 +42,7 @@ Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bünde
 
 **Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt. Leitidee: Die Spiellogik bleibt **Phaser-frei und damit im Node-Test prüfbar**; nur `scenes.ts`/`ui.ts` fassen Phaser bzw. das DOM an. Deshalb liegen z.B. Welt-Geometrie (`world.ts`), Deko-Platzierung (`decor.ts`) und HUD-Uhr (`clock.ts`) bewusst **außerhalb** von `scenes.ts`.
 
-- **pure Domäne** (kein Phaser, voll unit-testbar): `sim.ts` (Cluster-Simulator), `content.ts` (Fassade über `src/content/*`: Quests/Drills/Quiz/NPCs/Progression/Minispiel), `world.ts`, `decor.ts`, `clock.ts`.
+- **pure Domäne** (kein Phaser, voll unit-testbar): `sim.ts` (Cluster-Simulator), `content.ts` (Fassade über `src/content/*`: Quests/Drills/Quiz/NPCs/Progression/Minispiel), `world.ts`, `decor.ts`, `clock.ts`, `pixelfont.ts` (Glyphen-Daten der In-Welt-Bitmap-Font, #188).
 - **Anwendung:** `game.ts` (Spielstand, XP, Wirtschaft, Spaced Repetition), `runtime.ts` (Laufzeit-Singletons statt globalem `window`-Shim, bricht Import-Zyklen).
 - **Persistenz:** `store.ts` (SaveStore über localStorage; Andockpunkt fürs spätere Backend).
 - **Präsentation** (Phaser/DOM): `scenes.ts`, `ui.ts`, `sfx.ts`.
