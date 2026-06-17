@@ -22,12 +22,12 @@ import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
-import { harborGeometry, decodeHarborGround, parseHarborMap, PIER_XS } from "./harbormap";
-// #191/#192: rohe Tiled-Maps als String (Vite ?raw) – werden inline in beide
-// Build-Wege gebündelt, bleiben also auch im Offline-Single-File self-contained
-// (kein Fetch). test-map = Loader-Demo (#191), harbor = echte Hafenkarte (#192).
-import testMapRaw from "../assets/maps/test-map.tmj?raw";
-import harborMapRaw from "../assets/maps/harbor.tmj?raw";
+import { harborGeometry, PIER_XS } from "./harbormap";
+// #193: Karten kommen über die Map-Registry (Map-ID → rohes .tmj + Metadaten)
+// statt über fest importierte Pfade. Die ?raw-.tmj-Strings (inline in beide
+// Build-Wege gebündelt, also auch offline self-contained, kein Fetch) liegen jetzt
+// in der Registry; die Loader holen ihre Karte hier per getMapEntry().
+import { getMapEntry } from "./mapregistry";
 
   const T = 16;
 
@@ -264,10 +264,11 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
      *  Geometrie), kommt aber aus der Datei – der Beweis, dass der Tiled-Loader die
      *  echte Welt trägt. Erreichbar über ?tiledmap; buildMap() bleibt Default. */
     loadHarborMap() {
-      const map = parseHarborMap(JSON.parse(harborMapRaw));
-      this.ground = decodeHarborGround(map);
+      const entry = getMapEntry("harbor");
+      const map = entry.parse(JSON.parse(entry.raw));
+      this.ground = entry.decodeGround!(map);
       this.solidGrid = new Uint8Array(this.W * this.H);
-      collisionGrid(map, "Kollision").forEach((solid, i) => { if (solid) this.solidGrid[i] = 1; });
+      collisionGrid(map, entry.collisionLayer).forEach((solid, i) => { if (solid) this.solidGrid[i] = 1; });
       this.placeHarborObjects();
     }
 
@@ -739,9 +740,10 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
     spawnPlayer() {
       const sp = Game.state.player;
+      const spawn = getMapEntry("harbor").spawn;   // #193: Default-Spawn aus der Registry
       this.playerPos = {
-        x: sp && sp.x ? sp.x : (this.ship.x + 4) * T,
-        y: sp && sp.y ? sp.y : (this.ship.y + 2) * T,
+        x: sp && sp.x ? sp.x : spawn.x * T,
+        y: sp && sp.y ? sp.y : spawn.y * T,
         dir: 1, moving: false, face: "south",   // face: Blickrichtung für die 4-Richtungs-Sprites
       };
       this.playerShadow = this.addShadow(this.playerPos.x, this.playerPos.y + 6);
@@ -1721,7 +1723,7 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
     create() {
       // 1) .tmj parsen + validieren (reine Logik aus tilemap.ts). Das geparste,
       //    geprüfte Objekt geht 1:1 in Phasers Tilemap-Cache – kein zweites Parsen.
-      const data = parseTiledMap(JSON.parse(testMapRaw));
+      const data = parseTiledMap(JSON.parse(getMapEntry("test-map").raw));
       this.cache.tilemap.add("test-map", { format: Phaser.Tilemaps.Formats.TILED_JSON, data });
       const map = this.make.tilemap({ key: "test-map" });
 
