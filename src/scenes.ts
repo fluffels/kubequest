@@ -516,8 +516,8 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
      *  (#3) – gleiche Welt → gleiche Wiese, kein Flackern beim Laden. */
     spawnGrassDetail() {
       const VARIANTS = 3;
-      // Die Sprites sind 48×48; auf ~Kachelhöhe herunterskaliert (zusätzlich × s.scale).
-      const BASE = 0.34;
+      // Die Sprites sind 64×64; auf ~Kachelhöhe herunterskaliert (zusätzlich × s.scale).
+      const BASE = 0.26;
       const accept = (x: number, y: number) => {
         const v = this.ground[y * this.W + x];
         return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
