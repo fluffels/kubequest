@@ -1,6 +1,6 @@
 # Spielkonzept-Review: Führt der Lernpfad zu Senior-DevOps UND macht es Spaß? (#52)
 
-> Review/Konzept-Ticket, kein Feature-Bau. Wunsch von fluffels (sie ist die
+> Review/Konzept-Ticket, kein Feature-Bau. Wunsch der Maintainerin (sie ist die
 > Zielspielerin/-lernerin). Grundlage für gezielte Folge-Tickets.
 > Stand: Juni 2026, Code-Stand `main`. Verifiziert am Quest-Content
 > (`src/content/quests.ts`, q0–q21) und an den bestehenden Lernpfad-Tickets
