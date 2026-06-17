@@ -1111,11 +1111,9 @@ import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
       const kx = 26 * T, ky = 30 * T;
       const kraken = this.add.container(kx, ky + 30).setDepth(8000);
-      const body = this.add.graphics();
-      body.fillStyle(0x7b3fa0); body.fillCircle(0, 0, 9);
-      body.fillStyle(0xffffff); body.fillCircle(-3, -2, 2.2); body.fillCircle(3, -2, 2.2);
-      body.fillStyle(0x111111); body.fillCircle(-3, -2, 1); body.fillCircle(3, -2, 1);
-      for (let i = -3; i <= 3; i++) { body.fillStyle(0x7b3fa0); body.fillRect(i * 3.4 - 1, 7, 2, 7 + Math.abs(i)); }
+      // Pixelart-Sprite (#184) statt der früheren code-gezeichneten fillCircle/fillRect-Krake.
+      // 64×64-Asset, auf Gegner-Größe herunterskaliert; Wackel-/Auftauch-Tweens unten unverändert.
+      const body = this.add.image(0, 0, "kraken").setOrigin(0.5, 0.5).setScale(0.46);
       kraken.add(body);
       this.tweens.add({ targets: kraken, y: ky, duration: 900, ease: "Back.out" });
       this.tweens.add({ targets: kraken, angle: { from: -4, to: 4 }, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });

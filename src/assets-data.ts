@@ -51,6 +51,7 @@ import house_office from "../assets/pixellab/house_office.png";
 import house_forge from "../assets/pixellab/house_forge.png";
 import house_chart from "../assets/pixellab/house_chart.png";
 import ship from "../assets/pixellab/ship.png";
+import kraken from "../assets/pixellab/kraken.png";   // Hacker-Krake (Gegner, #184)
 
 // PixelLab-Figuren (nur south-Frame genutzt)
 import char_player from "../assets/pixellab/char_player.png";
@@ -117,6 +118,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { key: "house_forge", src: house_forge, kind: "plain" },
   { key: "house_chart", src: house_chart, kind: "plain" },
   { key: "ship", src: ship, kind: "plain" },
+  { key: "kraken", src: kraken, kind: "plain" },   // Hacker-Krake (Gegner, #184)
 
   // PixelLab-Figuren (nur south-Frame genutzt)
   { key: "char_player", src: char_player, kind: "plain" },
