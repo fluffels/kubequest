@@ -1,11 +1,17 @@
 # Tiled-Maps (`assets/maps/`)
 
-Hier liegen die Spielkarten als **Tiled-JSON** (`.tmj`). Das ist Teil 1 der
+Hier liegen die Spielkarten als **Tiled-JSON** (`.tmj`). Begonnen als Teil 1 der
 Tiled-Migration ([#191](https://github.com/fluffels/kubequest/issues/191), Epic
 [#57](https://github.com/fluffels/kubequest/issues/57)) – das Fundament:
-ein Export-Format + ein generischer Loader, der **eine** Map rendert. Die echte
-Hafenkarte wird hier noch **nicht** abgelöst (das ist #192); die prozedurale
-`buildMap()` in [`src/scenes.ts`](../../src/scenes.ts) bleibt vorerst die Welt.
+ein Export-Format + ein generischer Loader, der **eine** Map rendert.
+
+Seit **Teil 2 ([#192](https://github.com/fluffels/kubequest/issues/192))** liegt
+zusätzlich die **echte Hafenkarte** als Daten vor (`harbor.tmj`, 52×40): mit
+`?tiledmap` in der URL kommt der Hafen-Boden + die Kollision aus der Datei statt
+aus der prozeduralen `buildMap()`. Das ist **pixelgleich** – derselbe Renderer
+(`renderGround()`), nur die Geometrie-Quelle wechselt. `buildMap()` bleibt der
+Default (Umschalt-Pfad); abgelöst wird sie erst in
+[#196](https://github.com/fluffels/kubequest/issues/196).
 
 ## Format-Konvention
 
@@ -34,18 +40,45 @@ Hafenkarte wird hier noch **nicht** abgelöst (das ist #192); die prozedurale
   Tileset→Asset-Mapping): [`src/tilemap.ts`](../../src/tilemap.ts), getestet in
   [`test/tilemap.test.ts`](../../test/tilemap.test.ts) (parst u. a. das echte
   `test-map.tmj` und prüft die Fehlerfälle).
-- Phaser-Rendering (`make.tilemap` / `addTilesetImage` / `createLayer` +
-  Kollision): die `TilemapTestScene` in [`src/scenes.ts`](../../src/scenes.ts).
+- Hafenkarte-Geometrie + Tiled-Serialisierung (Phaser-frei):
+  [`src/harbormap.ts`](../../src/harbormap.ts), getestet in
+  [`test/harbormap.test.ts`](../../test/harbormap.test.ts). Dieselbe Quelle
+  erzeugt `harbor.tmj` (Generator, s. u.) und decodiert es im Datenpfad zurück.
+- Phaser-Rendering der Loader-Demo (`make.tilemap` / `addTilesetImage` /
+  `createLayer` + Kollision): die `TilemapTestScene` in
+  [`src/scenes.ts`](../../src/scenes.ts). Die **Hafenkarte** rendert dagegen über
+  den bestehenden `renderGround()`/`renderStatics()` (Wang-Autotiling + PixelLab)
+  – ein Kachel-Sheet-`createLayer` könnte den Look nicht 1:1 reproduzieren; darum
+  trägt `harbor.tmj` die Geometrie als **Daten** (Boden = semantische
+  Terrain-Codes, leicht offset-kodiert für Tileds gid≥1; Kollision = solide
+  Kacheln) und `WorldScene.loadHarborMap()` speist damit denselben Renderer.
 
 ## Im Browser ansehen
 
-`npm run dev` starten und die angezeigte Adresse mit `?maptest` öffnen, z. B.
-`http://localhost:5173/?maptest`. Statt der Welt startet dann die
-`TilemapTestScene` und rendert `test-map.tmj`: ein Boden-Layer mit einem
-Kollisions-Ring, dessen kollidierbare Kacheln rot eingefärbt sind.
+`npm run dev` starten und die angezeigte Adresse öffnen:
+
+- **`?maptest`** (z. B. `http://localhost:5173/?maptest`) – die
+  `TilemapTestScene` (#191): `test-map.tmj` mit Boden-Layer + rot eingefärbtem
+  Kollisions-Ring.
+- **`?tiledmap`** (z. B. `http://localhost:5173/?tiledmap`) – die normale
+  `WorldScene`, aber Boden + Kollision kommen aus `harbor.tmj` statt aus
+  `buildMap()` (#192). Sieht identisch zum Standard-Start aus – das ist der Beweis.
+
+## Generieren / aktualisieren
+
+`harbor.tmj` ist ein **generiertes Artefakt** aus `harborTiledMap()` in
+`src/harbormap.ts`. Neu erzeugen nach einer Geometrie-Änderung:
+
+```
+GEN_HARBOR=1 npx vitest run test/harbormap.test.ts
+```
+
+Ein Test vergleicht die ausgelieferte Datei gegen `harborTiledMap()` und schlägt
+fehl, sobald sie auseinanderlaufen (Drift-Schutz).
 
 ## Dateien
 
 | Datei | Inhalt |
 |---|---|
 | `test-map.tmj` | minimale 8×6-Demo-Map: Tileset `town`, Layer `Boden` + `Kollision` (Rand-Ring solide). Dient als Loader-Beweis und als Fixture für `test/tilemap.test.ts`. |
+| `harbor.tmj` | die echte 52×40-Hafenkarte als Daten (#192): Layer `Boden` (Terrain-Codes) + `Kollision` (Wasser/Struktur). Generiert aus `src/harbormap.ts`; geladen via `?tiledmap`. |

@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -22,9 +22,12 @@ import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
-// #191: rohe Tiled-Map als String (Vite ?raw) – wird inline in beide Build-Wege
-// gebündelt, bleibt also auch im Offline-Single-File self-contained (kein Fetch).
+import { harborGeometry, decodeHarborGround, parseHarborMap, PIER_XS } from "./harbormap";
+// #191/#192: rohe Tiled-Maps als String (Vite ?raw) – werden inline in beide
+// Build-Wege gebündelt, bleiben also auch im Offline-Single-File self-contained
+// (kein Fetch). test-map = Loader-Demo (#191), harbor = echte Hafenkarte (#192).
 import testMapRaw from "../assets/maps/test-map.tmj?raw";
+import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 
   const T = 16;
 
@@ -123,7 +126,11 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       this.makeFxTextures();   // weiche Schatten- & Glüh-Textur (#4)
       this.lampGlows = [];     // Laternen-Glühen, das nachts aufleuchtet (#4)
 
-      this.buildMap();
+      // #192: Mit ?tiledmap kommt die Hafenkarte aus assets/maps/harbor.tmj statt
+      // aus der prozeduralen buildMap() – pixelgleich (gleicher Renderer), nur die
+      // Geometrie-Quelle wechselt. buildMap() bleibt der Default.
+      this.tiledMap = params.has("tiledmap");
+      if (this.tiledMap) this.loadHarborMap(); else this.buildMap();
       this.renderGround();
       this.renderStatics();
       this.spawnFlowers();
@@ -230,13 +237,6 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       this.cullables.push({ obj, x: px, y: py } as Cullable);
       return obj;
     }
-    path(x0: number, y0: number, x1: number, y1: number) {
-      let x = x0, y = y0;
-      const sx = Math.sign(x1 - x0), sy = Math.sign(y1 - y0);
-      while (x !== x1) { this.set(x, y, DIRT); x += sx; }
-      while (y !== y1) { this.set(x, y, DIRT); y += sy; }
-      this.set(x1, y1, DIRT);
-    }
     /** PixelLab-Gebäude: ein ganzes Haus als Bild über der w×3-Kachel-Grundfläche.
      *  Kollision = die Grundfläche solide (wie früher); das hohe Dach ragt sichtbar
      *  nach oben (begehbar dahinter, Tiefe nach Fußlinie → korrektes Vorne/Hinten). */
@@ -246,90 +246,69 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY);
     }
 
-    /** Wo trifft Land auf Wasser? Kai & Schiffsbereich gerade, sonst geschwungener Strand. */
-    coastY(x: number) {
-      if (x >= 3 && x <= 24) return 27;   // Hafenkai: gemauerte, gerade Kante
-      if (x >= 30 && x <= 38) return 27;  // Wasser rund ums Schiff
-      let c = 26 + Math.round(Math.sin(x * 0.9) * 1.2 + Math.sin(x * 0.31) * 0.9);
-      if (x >= 43) c = Math.min(c, 26);   // Platz für Leuchtturm-Strand & Ost-Plateau
-      return Math.max(25, Math.min(28, c));
+    /** Hafenkarte prozedural aufbauen (Default-Pfad). Die reine Boden-/Kollisions-
+     *  Geometrie liegt seit #192 Phaser-frei in harbormap.ts (harborGeometry) –
+     *  damit sie als assets/maps/harbor.tmj serialisiert und im Datenpfad
+     *  (loadHarborMap) wieder geladen werden kann. Die sichtbaren Objekte und die
+     *  davon abhängigen Felder setzt placeHarborObjects() – in BEIDEN Pfaden gleich. */
+    buildMap() {
+      const geo = harborGeometry(this.W, this.H);
+      this.ground = geo.ground;
+      this.solidGrid = Uint8Array.from(geo.solid);
+      this.placeHarborObjects();
     }
 
-    buildMap() {
-      const W = this.W, H = this.H;
-      for (let x = 0; x < W; x++) {
-        const cY = this.coastY(x);
-        const beach = !(x >= 3 && x <= 24) && !(x >= 30 && x <= 38); // Kai/Schiff: kein Sandstrand
-        for (let y = 0; y < H; y++) {
-          if (y >= cY + (beach ? 2 : 0)) {
-            this.set(x, y, -2); this.solidGrid[y * W + x] = 1;       // Wasser
-          } else if (beach && y >= cY) {
-            this.set(x, y, -3);                                       // Sandstrand (begehbar, PixelLab-Wang)
-          } else {
-            const r = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 100;
-            this.set(x, y, r < 80 ? 0 : r < 93 ? 1 : 2);             // Gras, natürlich gemischt
-          }
-        }
-      }
+    /** Datenpfad (#192, Epic #57): Boden + Kollision aus assets/maps/harbor.tmj
+     *  laden statt sie prozedural zu erzeugen, dann dieselben Objekte platzieren.
+     *  Ergebnis ist pixelgleich zu buildMap() (gleicher Renderer, gleiche
+     *  Geometrie), kommt aber aus der Datei – der Beweis, dass der Tiled-Loader die
+     *  echte Welt trägt. Erreichbar über ?tiledmap; buildMap() bleibt Default. */
+    loadHarborMap() {
+      const map = parseHarborMap(JSON.parse(harborMapRaw));
+      this.ground = decodeHarborGround(map);
+      this.solidGrid = new Uint8Array(this.W * this.H);
+      collisionGrid(map, "Kollision").forEach((solid, i) => { if (solid) this.solidGrid[i] = 1; });
+      this.placeHarborObjects();
+    }
+
+    /** Sichtbare Hafen-Objekte (Bäume, Stege-Schilder, Schiff, Markt, Gebäude,
+     *  Deko, Leuchtturm, Türen) + die davon abhängigen Szenen-Felder (piers, ship,
+     *  flagPoles, lighthouse, tfPlatform, labels). Solids von Gebäuden/Bäumen/Deko
+     *  und das Freiräumen der Türen passieren hier – idempotent über dem geladenen
+     *  Kollisionsraster, also identisch in beidem Pfaden. Die harbor.tmj trägt nur
+     *  die Terrain-Kollision; Gebäude/NPCs/Türen wandern erst in #194/#195 in
+     *  Tiled-Objektlayer (Boden/Wege/Wasser-Kollision sind hier schon datengetrieben). */
+    placeHarborObjects() {
+      const W = this.W;
+      // Waldsaum: oben durchgehend, an den Seitenrändern bis zur Küste
       for (let x = 0; x < W; x++) this.tree(x, 0);
       for (let y = 0; y < 24; y++) { this.tree(0, y); this.tree(W - 1, y); }
 
-      // Dock-Plattform
-      for (let y = 24; y <= 26; y++) for (let x = 3; x <= 24; x++) this.set(x, y, STONE[(x * 3 + y) % 3]);
-
-      // Stege = Nodes
-      this.piers = [{ x: 5, name: "ahoi-control" }, { x: 11, name: "ahoi-worker-1" }, { x: 17, name: "ahoi-worker-2" }];
-      for (const p of this.piers) {
-        for (let y = 27; y <= 33; y++) for (let x = p.x; x < p.x + 3; x++) {
-          this.set(x, y, -10); this.solidGrid[y * W + x] = 0;
-        }
-        this.labels.push({ x: p.x + 1.5, y: 27.4, text: p.name, color: "#ffd97a" });
-      }
+      // Stege = Cluster-Knoten (Steg-Geometrie liegt in harborGeometry; hier nur
+      // die Knoten-Daten + Schilder, an denselben Spalten PIER_XS).
+      this.piers = PIER_XS.map((x, i) => ({ x, name: ["ahoi-control", "ahoi-worker-1", "ahoi-worker-2"][i] }));
+      for (const p of this.piers) this.labels.push({ x: p.x + 1.5, y: 27.4, text: p.name, color: "#ffd97a" });
       this.labels.push({ x: 6.5, y: 23.4, text: "Bos Dock", color: "#ffffff" });
 
       // Dein Schiff (Grundfläche aus world.ts SHIP – Single Source of Truth, #42).
-      // #108: Das Schiff SCHWIMMT – Wasser unterm Rumpf statt rechteckigem Holz-Deck;
-      // nur ein schmaler Steg/Anleger (SHIP_PIER) ist Holz. Pro Kachel entscheidet die
-      // pure shipTile()-Geometrie aus world.ts. Beides bleibt begehbar (solidGrid 0),
-      // damit man übers Deck zur Kajüten-Luke läuft – das Schiff-Sprite deckt das Deck ab.
+      // Die Schiffs-Terrain-Geometrie (#108: Schiff SCHWIMMT – Wasser unterm Rumpf +
+      // schmaler Holz-Steg SHIP_PIER, kein rechteckiges Deck) liegt in harborGeometry;
+      // hier nur das Daten-Feld + Schild.
       this.ship = { x: SHIP.x, y: SHIP.y, w: SHIP.w, h: SHIP.h };
-      const shipY0 = Math.min(this.ship.y, SHIP_PIER.y0);
-      const shipY1 = Math.max(this.ship.y + this.ship.h - 1, SHIP_PIER.y1);
-      for (let y = shipY0; y <= shipY1; y++)
-        for (let x = 0; x < W; x++) {
-          const t = shipTile(x, y);
-          if (!t) continue;
-          this.set(x, y, t === "pier" ? -10 : -2); this.solidGrid[y * W + x] = 0;
-        }
       this.labels.push({ x: this.ship.x + 4.5, y: this.ship.y - 0.6, text: "Dein Schiff", color: "#ffffff" });
 
-      // Anleger zum GitOps-Archipel (#92): begehbarer Steg ins offene Wasser, vom
-      // Kai aus erreichbar; das Steg-Ende (WORLD_TO_ARCHIPEL) warpt zur Insel.
-      for (let y = WORLD_JETTY.y0; y <= WORLD_JETTY.y1; y++)
-        for (let x = WORLD_JETTY.x; x < WORLD_JETTY.x + WORLD_JETTY.w; x++) {
-          this.set(x, y, -10); this.solidGrid[y * W + x] = 0;
-        }
+      // Anleger zum GitOps-Archipel (#92): Schild am Steg ins offene Wasser.
       this.labels.push({ x: WORLD_JETTY.x + WORLD_JETTY.w / 2, y: WORLD_JETTY.y0 - 0.7, text: "Zum Archipel", color: "#ffe9b0" });
 
       // Marktplatz
-      for (let y = 16; y <= 22; y++) for (let x = 24; x <= 32; x++) this.set(x, y, DIRT);
       this.objDeco(28, 18, "well", 0.55, true);
       this.objDeco(31, 16, "stall", 0.6, true);
       this.labels.push({ x: 31.5, y: 15.4, text: "Markt", color: "#ffffff" });
       this.objDeco(24, 22, "signpost", 0.6, false);
 
-      this.path(28, 22, 28, 24);
-      this.path(26, 16, 26, 14);
-      this.path(24, 19, 13, 19); this.path(13, 19, 13, 15);
-      this.path(32, 19, 41, 19);
-      this.path(33, 16, 40, 13);
-      this.path(26, 14, 26, 13);   // Weg bis vor die Tür der Hafenmeisterei
-      this.path(40, 13, 40, 12);   // Weg bis vor die Tür des Kartenhauses
-
       // Gebäude & Zonen
       this.building(23, 10, 7, "house_office", 1.05);
       this.labels.push({ x: 26.5, y: 9.4, text: "Hafenmeisterei", color: "#ffffff" });
-      for (let y = 10; y <= 15; y++) for (let x = 8; x <= 17; x++) this.set(x, y, DIRT);
       this.building(8, 8, 5, "house_forge", 0.82);
       this.deco(12, 12, "dungeon", ANVIL, true);
       this.deco(14, 12, "dungeon", TABLE, true);
@@ -340,7 +319,6 @@ import testMapRaw from "../assets/maps/test-map.tmj?raw";
       this.building(38, 9, 5, "house_chart", 0.9);
       this.labels.push({ x: 40.5, y: 8.4, text: "Kartenhaus", color: "#ffffff" });
 
-      for (let y = 18; y <= 22; y++) for (let x = 41; x <= 46; x++) this.set(x, y, DIRT);
       this.deco(43, 19, "dungeon", TABLE, true);
       this.deco(43, 18.6, "dungeon", BOOK, false);
       this.labels.push({ x: 43.5, y: 17.4, text: "Vermessung", color: "#ffffff" });
