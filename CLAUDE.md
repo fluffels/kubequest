@@ -9,7 +9,7 @@
 ```
 1. npm install                              # einmalig
 2. npm run dev                              # Dev-Server, angezeigte Adresse im Browser öffnen
-3. Freies Ticket wählen                     # nach Prio: hoch→mittel→niedrig, INNERHALB der Prio niedrigste freie Nummer; nicht nach Inhalt aussuchen
+3. gh issue list --state open --limit 500   # GANZE Liste holen! ohne --limit nur die 30 neuesten. Dann nach Prio (hoch→mittel→niedrig) + niedrigster freier Nummer wählen, nicht nach Inhalt
 4. gh issue edit <nr> --add-assignee @me    # SOFORT claimen = "in Arbeit"-Marker, dann mit gh issue view <nr> prüfen
 5. git worktree add .claude/worktrees/kq-<nr> -b feature/kq-<nr>-<slug>   # eigener Worktree, bevor du Dateien anfasst
 6. coden                                    # im Worktree umsetzen, deutsche Umlaute in Texten/Kommentaren
@@ -81,13 +81,13 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | 📋 Agenten-Regeln, Board-Workflow, Konventionen | [AGENTS.md](AGENTS.md) |
 | 🎨 PixelLab-Assets (Liste + IDs) | [assets/pixellab/README.md](assets/pixellab/README.md) |
 | 🧪 Tests (Vitest) | [`test/`](test/) – `sim.test.ts`, `content.test.ts`, `quests.test.ts` u.a. |
-| ✅ Backlog / TODOs | GitHub Issues + Project-Board (`gh issue list`, `gh project list --owner fluffels`) |
+| ✅ Backlog / TODOs | GitHub Issues + Project-Board (`gh issue list --state open --limit 500`, `gh project list --owner fluffels`) |
 
 ## ❓ Die vier Einstiegsfragen
 
 - **Was ist das Spiel?** KubeQuest – ein 2D-Lernspiel (Phaser 3) für Docker/K8s/Helm/Terraform; die Spielwelt **ist** der Cluster. → [README.md](README.md)
 - **Wie starte ich?** `npm install` → `npm run dev` → angezeigte Adresse im Browser. → Schnellstart oben.
-- **Welches Ticket nehme ich?** Deterministisch nach **Priorität** (`prio:hoch` → `prio:mittel` → `prio:niedrig` → ohne Label), **innerhalb der Prio die niedrigste freie Nummer** (kein Assignee, kein offener PR/Branch/Worktree) – nicht nach Inhalt aussuchen. Sofort self-assignen. → [AGENTS.md › Kollisionsschutz](AGENTS.md#wo-die-todos-leben).
+- **Welches Ticket nehme ich?** Erst die **ganze** offene Liste holen (`gh issue list --state open --limit 500` – ohne `--limit` nur die 30 neuesten!), dann deterministisch nach **Priorität** (`prio:hoch` → `prio:mittel` → `prio:niedrig` → ohne Label), **innerhalb der Prio die niedrigste freie Nummer** (kein Assignee, kein offener PR/Branch/Worktree) – nicht nach Inhalt aussuchen. Sofort self-assignen. → [AGENTS.md › Kollisionsschutz](AGENTS.md#wo-die-todos-leben).
 - **Wie schließe ich ab?** Tests grün + im Browser verifiziert → nach `main` mergen → Worktree/Branch aufräumen → Issue schließen. → [AGENTS.md › Git-Workflow](AGENTS.md#das-wichtigste-zuerst-harte-regeln).
 
 ---
