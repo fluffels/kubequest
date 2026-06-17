@@ -1305,7 +1305,7 @@ export const QUESTS: Quest[] = [
         "Das Logbuch ist dein <b>Git-Repo</b>. Dort hinein schreibst du den <b>Soll-Zustand</b> – deklarativ als Manifeste, genau wie Ada es dir beigebracht hat: welche Dienste, welche Version, wie viele Kopien.",
         "Git ist damit die <b>einzige Quelle der Wahrheit</b> (engl. <i>single source of truth</i>). Nicht der Cluster, nicht dein Gedächtnis, nicht ein mühsam zusammengeklicktes Etwas – sondern <b>das Repo</b>. Willst du wissen, was laufen soll? Lies das Logbuch.",
       ]},
-      { type: "choice", npc: "argo",
+      { type: "choice", npc: "argo", reviewId: "q-gitops-truth",
         q: "Was ist bei GitOps die <b>einzige Quelle der Wahrheit</b> für den Soll-Zustand?",
         options: [
           { t: "Das Git-Repo – dort steht deklarativ, was laufen soll.", ok: true,
@@ -1318,7 +1318,7 @@ export const QUESTS: Quest[] = [
         "Hier wohnt ein Crewmitglied <b>im</b> Cluster: <b>Argo CD</b>, mein Namensvetter. Es schaut unermüdlich ins Logbuch und <b>zieht</b> sich den Soll-Zustand selbst heran (<i>pull</i>). Niemand drückt von außen etwas rein – der Cluster holt sich seine Wahrheit ab.",
         "Push heißt also: von außen reingeschoben. Pull heißt: der Cluster zieht es sich selbst. Klingt nach einer Kleinigkeit – ist aber der ganze Unterschied.",
       ]},
-      { type: "choice", npc: "argo",
+      { type: "choice", npc: "argo", reviewId: "q-gitops-pull",
         q: "<b>Push</b>- gegen <b>Pull</b>-Deployment – was trifft zu?",
         options: [
           { t: "Pull: ein Agent IM Cluster zieht den Soll-Zustand aus Git. Push: jemand von außen drückt ihn hinein (kubectl/Pipeline).", ok: true,
@@ -1389,7 +1389,7 @@ export const QUESTS: Quest[] = [
           check: (sim: Sim) => sim.deployments.some(d => d.name === "hafen-lager"),
           solution: "kubectl get deployments", hint: "kubectl get deployments (oder deploy)." },
       ]},
-      { type: "choice", npc: "argo",
+      { type: "choice", npc: "argo", reviewId: "q-gitops-sync",
         q: "Frische <code>argocd app get hafen-lager</code> nochmal ab: Was bedeutet jetzt <b>Synced</b> statt OutOfSync?",
         options: [
           { t: "Cluster-Ist und Git-Soll stimmen überein – Argo hat den deklarierten Zustand hergestellt.", ok: true,
@@ -1461,7 +1461,7 @@ export const QUESTS: Quest[] = [
         "<b>2 Replikas</b> – genau wie die Seekarte deklariert. Du hast auf null skaliert, aber Argo hat den Drift in demselben Atemzug erkannt und rückgängig gemacht. Bevor du nachschauen konntest, war der Git-Soll bereits wiederhergestellt.",
         "Das ist das Pull-Prinzip in seiner schärfsten Form: <b>manuelle Änderungen am Cluster sind vergänglich</b>. Egal was du tippst – solange die Seekarte etwas anderes sagt, ist die Hand-Änderung nur ein kurzes Zucken. <i>Git gewinnt immer.</i> 🧭",
       ]},
-      { type: "choice", npc: "argo",
+      { type: "choice", npc: "argo", reviewId: "q-gitops-heal",
         q: "Was tut Argo CD, wenn <b>Self-Heal</b> aktiv ist und jemand ein Deployment manuell skaliert?",
         options: [
           { t: "Es erkennt den Drift und stellt den im Git deklarierten Soll-Zustand automatisch wieder her.", ok: true,
@@ -1537,7 +1537,7 @@ export const QUESTS: Quest[] = [
         "Das ist die Skalier-Idee in Reinform: <b>eine Wurzel statt n Einzel-Anlagen</b>. Kommt ein neuer Dienst dazu, legst du eine weitere <code>Application</code>-Datei in den <code>flotte/</code>-Ordner – und beim nächsten Abgleich zieht die Wurzel sie automatisch mit rein. Du fasst nie wieder jede App einzeln an.",
         "Und weil alles in Git steht, gilt der Überblick für die ganze Flotte auf einen Blick: <code>argocd app list</code> zeigt dir den Sync- und Health-Status <i>jeder</i> App – verwaltet von einer einzigen Wurzel. So segelt der ganze Archipel im Gleichschritt. 🧭⚓",
       ]},
-      { type: "choice", npc: "argo",
+      { type: "choice", npc: "argo", reviewId: "q-gitops-appofapps",
         q: "Warum skaliert das <b>App-of-Apps-Muster</b> besser als jede Application einzeln von Hand anzulegen?",
         options: [
           { t: "Eine einzige Wurzel-Application zeigt auf einen Ordner voller weiterer Applications – ein Sync legt die ganze Flotte an, neue Dienste kommen als Datei im Ordner automatisch dazu.", ok: true,
