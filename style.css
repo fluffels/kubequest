@@ -419,28 +419,45 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
  *      lesbaren Sans/Mono – lange deutsche Sätze in Pixelschrift
  *      sind schwer lesbar; Stardew nutzt Pixelschrift auch nur
  *      für UI-Beschriftungen, nicht für lange Lauftexte.
- *   2. Holz-„Pixel-Rahmen": eckige Kanten (kein border-radius),
- *      warme Holz-Palette aus docs/stardew-referenz.md §2, eine
+ *   2. „Pixel-Rahmen": eckige Kanten (kein border-radius), eine
  *      Lichtrichtung (oben-links hell, unten-rechts dunkel) über
  *      gestapelte solide Ränder + inset-Schatten statt weicher
- *      Verläufe/Rundungen.
+ *      Verläufe/Rundungen. Die FARBE des Rahmens ist seit #206 das
+ *      gedämpfte Navy/Stahlblau (s. :root unten), nicht mehr Holz-Braun.
  *
  * Emojis (🪙 🔥 🕐 ⚓ ☰ 🚶 💬 📻 📜 …): bewusst VORERST behalten –
  * sie sind farbige OS-Emoji und brechen den Pixel-Look, echte
  * Pixel-Icons sind aber eigene PixelLab-Asset-Arbeit (Generierung +
  * Slicing + Einbinden). Ausgelagert als Folge-Ticket; die Begründung
- * je Element steht dort. Hier sitzen sie nun wenigstens in den neuen
- * Holzrahmen statt auf flachem CSS.
+ * je Element steht dort. Hier sitzen sie nun wenigstens in den
+ * Pixel-Rahmen statt auf flachem CSS.
  * ============================================================ */
+/* #206: Panel-/HUD-Rahmenpalette – das Meerblau der Spielwelt, nur dunkler.
+ * #189 hatte die „Chrome" auf warmes Holz-Braun umgestellt; das wirkte für ein
+ * K8s/Docker-Lernspiel themenfremd. Statt Braun (und statt eines grellen oder
+ * grau-blauen Navys) nimmt die UI jetzt denselben türkis-azurblauen Farbton wie
+ * das Wasser der Karte (Stardew-Wasserpalette §2: #6fb4cf/#3f86ad/#2b5f82/#1f4257),
+ * aber ein paar Stufen DUNKLER – so harmoniert die Oberfläche mit dem Meer, bleibt
+ * aber ein ruhiger Lesegrund. Als Rahmenfamilie aufgefächert (Highlight oben-links
+ * → Grundton → Schatten unten-rechts → tiefe Outline); die Pixel-Rahmen-STRUKTUR
+ * aus #189 bleibt, nur die Farbe wechselt. */
 :root {
-  --wood-hi:    #c08a52; /* Holz Highlight (oben-links)        */
-  --wood:       #8f5e34; /* Holz Grundton                       */
-  --wood-dk:    #5f3d22; /* Holz Schatten (unten-rechts)        */
-  --wood-edge:  #3f2817; /* getönte Outline (nicht reinschwarz) */
-  --wood-panel: #2a1c10; /* dunkles Holz-Panel als Lesegrund    */
+  --frame-hi:    #3f86ad; /* Meerblau-Highlight (oben-links) = Wasser-Grundton */
+  --frame:       #2b5f82; /* dunkleres Meerblau als Grundton (Wasser-Schatten)  */
+  --frame-dk:    #1f4257; /* tiefes Meerblau (Schatten unten-rechts)            */
+  --frame-edge:  #142d3c; /* tiefe blaugrüne Outline (nicht reinschwarz)        */
+  --frame-panel: #13293a; /* dunkler Meer-Navy-Panel als Lesegrund              */
+
+  /* Geteilte Flächen-/Linien-Variablen in derselben dunklen Meerblau-Familie,
+   * damit HUD, Panels, Logbuch, Dialog und Innen-Karten EINE kohärente Palette
+   * teilen (kein Braun/Blau-Mix wie zuvor). */
+  --panel:     #122636; /* Lesegrund (Dialog/Toast): dunkles Meer-Navy        */
+  --panel2:    #1c3c52; /* Innen-Karten/Heads: mittleres Meerblau, hebt sich ab */
+  --border:    #2f6e91; /* Linien/Kanten im Meerblau                           */
+  --text-dim:  #9fbccb; /* gedämpfter Text kühl-blau                            */
 }
 
-/* gemeinsamer Holz-Pixel-Rahmen: eckig, mehrlagige Kante, eine
+/* gemeinsamer Pixel-Rahmen (Navy/Stahlblau): eckig, mehrlagige Kante, eine
  * Lichtrichtung. Als eigene Regel, damit HUD-Chips, Panels und
  * Buttons exakt denselben Rahmen teilen (Einheitlichkeit = Stardew). */
 .hud-rank, .hud-coins, .hud-streak, .hud-clock, .hud-keys,
@@ -449,7 +466,7 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   image-rendering: pixelated;
 }
 
-/* --- HUD-Chips als kleine Holzschilder --- */
+/* --- HUD-Chips als kleine Blau-Schilder --- */
 #hud { padding-top: 12px; }
 .hud-left { gap: 10px; }
 .hud-rank, .hud-coins, .hud-streak, .hud-clock {
@@ -457,11 +474,11 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   align-items: center;
   gap: 7px;
   padding: 5px 10px;
-  background: linear-gradient(var(--wood), var(--wood-dk));
-  border: 2px solid var(--wood-edge);
+  background: linear-gradient(var(--frame), var(--frame-dk));
+  border: 2px solid var(--frame-edge);
   box-shadow:
-    inset 0 0 0 1px var(--wood-hi),
-    inset 2px 2px 0 0 rgba(255, 228, 185, 0.22),
+    inset 0 0 0 1px var(--frame-hi),
+    inset 2px 2px 0 0 rgba(190, 214, 255,0.22),
     inset -2px -2px 0 0 rgba(0, 0, 0, 0.32);
   font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
   color: var(--text);
@@ -472,42 +489,44 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 .xptext, .hud-label, .hud-income { font-family: "KQPixel", system-ui, sans-serif; font-size: 0.55em; }
 .hud-coins, .hud-streak, .hud-clock { font-size: 0.62em; }
 .hud-clock { color: var(--text); }
-/* XP-Balken: eckig + Holzkante statt runder Pille */
+/* XP-Balken: eckig + Navy-Kante statt runder Pille */
 .xpbar {
   border-radius: 0;
-  border: 1px solid var(--wood-edge);
+  border: 1px solid var(--frame-edge);
   background: rgba(0, 0, 0, 0.55);
   height: 8px;
 }
 #hud-xpfill { border-radius: 0; }
 
-/* --- Tastenleiste & Menü-Button als Holzleiste --- */
+/* --- Tastenleiste & Menü-Button als Blau-Leiste --- */
 .hud-keys {
   font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
   font-size: 0.55em;
   padding: 6px 10px;
-  background: linear-gradient(var(--wood), var(--wood-dk));
-  border: 2px solid var(--wood-edge);
-  box-shadow: inset 0 0 0 1px var(--wood-hi), inset -2px -2px 0 0 rgba(0, 0, 0, 0.3);
+  background: linear-gradient(var(--frame), var(--frame-dk));
+  border: 2px solid var(--frame-edge);
+  box-shadow: inset 0 0 0 1px var(--frame-hi), inset -2px -2px 0 0 rgba(0, 0, 0, 0.3);
   color: var(--text);
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
 }
 .hud-quest { font-family: "KQPixel", "Segoe UI", system-ui, sans-serif; font-size: 0.7em; }
 
-/* --- Overlay-Panels als Holz-Dialogkasten --- */
+/* --- Overlay-Panels als Navy-Dialogkasten --- */
 .panel {
-  background: var(--wood-panel);
-  border: 4px solid var(--wood);
+  /* sanfter Meerblau-Verlauf (Licht oben-links) ums dunkle --panel herum, damit der
+   * Lesegrund Tiefe bekommt statt flach zu wirken (#206). */
+  background: linear-gradient(155deg, #173347, #0e1f2c);
+  border: 4px solid var(--frame);
   box-shadow:
-    0 0 0 2px var(--wood-edge),
-    inset 0 0 0 2px var(--wood-dk),
-    inset 3px 3px 0 2px rgba(255, 228, 185, 0.10),
+    0 0 0 2px var(--frame-edge),
+    inset 0 0 0 2px var(--frame-dk),
+    inset 3px 3px 0 2px rgba(190, 214, 255,0.10),
     inset -3px -3px 0 2px rgba(0, 0, 0, 0.30),
     0 12px 44px rgba(0, 0, 0, 0.7);
 }
 .panel-head {
-  background: linear-gradient(var(--wood), var(--wood-dk));
-  border-bottom: 3px solid var(--wood-edge);
+  background: linear-gradient(var(--frame), var(--frame-dk));
+  border-bottom: 3px solid var(--frame-edge);
   font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
   font-size: 0.85em;
   letter-spacing: 0.02em;
@@ -515,20 +534,20 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
 }
 
-/* --- Buttons als Holzknöpfe (eckig, Pixelschrift, eine Lichtrichtung) --- */
+/* --- Buttons als Blau-Knöpfe (eckig, Pixelschrift, eine Lichtrichtung) --- */
 button {
   font-family: "KQPixel", "Segoe UI", system-ui, sans-serif;
   font-size: 0.72em;
   letter-spacing: 0.02em;
-  background: linear-gradient(var(--wood), var(--wood-dk));
-  border: 2px solid var(--wood-edge);
+  background: linear-gradient(var(--frame), var(--frame-dk));
+  border: 2px solid var(--frame-edge);
   color: var(--text);
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
-  box-shadow: inset 2px 2px 0 0 rgba(255, 228, 185, 0.18), inset -2px -2px 0 0 rgba(0, 0, 0, 0.32);
+  box-shadow: inset 2px 2px 0 0 rgba(190, 214, 255,0.18), inset -2px -2px 0 0 rgba(0, 0, 0, 0.32);
 }
 button:hover { filter: brightness(1.15); }
-button.primary { background: linear-gradient(var(--accent), #e0a838); color: #1a1304; border-color: var(--wood-edge); }
-button.danger { background: linear-gradient(#9a3b3b, #6f2727); color: #ffd9d9; border-color: var(--wood-edge); }
+button.primary { background: linear-gradient(var(--accent), #e0a838); color: #1a1304; border-color: var(--frame-edge); }
+button.danger { background: linear-gradient(#9a3b3b, #6f2727); color: #ffd9d9; border-color: var(--frame-edge); }
 button.danger:hover { filter: brightness(1.2); background: linear-gradient(#b34545, #7f2d2d); }
 
 /* Pixelschrift auch auf kurzen Beschriftungen in den Panels … */
