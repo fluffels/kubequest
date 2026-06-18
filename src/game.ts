@@ -470,6 +470,17 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       return due.slice(0, limit || 10).map(d => d.id);
     },
 
+    /** Sanftes Wiederholungs-Gate (#222): true, wenn der Spieler gerade am ANFANG
+     *  einer Quest steht (Schritt 0) und mindestens eine Karte fällig ist. Dann
+     *  frischt er erst kurz auf, bevor die nächste Hauptquest startet. Sind keine
+     *  Karten fällig (oder steht man mitten in einer Quest / sind alle durch),
+     *  blockiert nichts – das Gate ist weich und nur so oft wie nötig. */
+    shouldReviewGate(): boolean {
+      if (this.state.questStep !== 0) return false;
+      if (!this.currentQuest()) return false;
+      return this.dueReviewItems().length > 0;
+    },
+
     /** Fürs FREIE Üben: alle gelernten Karten, unabhängig von der Fälligkeit, in
      *  zufälliger Reihenfolge. Rein lesend – verändert den Spaced-Repetition-Plan
      *  NICHT (anders als reviewResult). So kann man so oft üben, wie man will. */

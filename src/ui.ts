@@ -63,6 +63,7 @@ import { worldScene, interiorOpen } from "./runtime";
     _drillTask: null as any, // aktuelle generierte Drill-Aufgabe des Quest-Schritts
     stack: null as any,      // Stapel-Minispiel
     failCount: 0,
+    _gateClearedIdx: -1,     // questIdx, für den das Wiederholungs-Gate schon erledigt ist (#222)
     choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
     choiceSel: 0,
 
@@ -358,12 +359,17 @@ import { worldScene, interiorOpen } from "./runtime";
      *  Innenraum direkt ansprechen kann. Der Guard in interact() bleibt – er
      *  verhindert weiterhin, dass man durch die Wand mit Außen-NPCs der
      *  pausierten Welt redet. */
-    talkTo(npcId: string) {
+    talkTo(npcId: string): void {
       if (npcId === "pelle") return this.openShop();
       if (npcId === "kralle") return this.openReview();
 
       const step = Game.currentStep();
       if (step && (step.type === "dialog" || step.type === "choice") && step.npc === npcId) {
+        // Sanftes Wiederholungs-Gate (#222): bevor eine NEUE Quest startet (Schritt 0)
+        // und nur wenn Karten fällig sind, kurz auffrischen – einmal pro Quest.
+        if (Game.shouldReviewGate() && this._gateClearedIdx !== Game.state.questIdx) {
+          return this.openReviewGate(npcId);
+        }
         return this.runQuestStep();
       }
       this.showNpcMenu(npcId);
@@ -1044,6 +1050,27 @@ import { worldScene, interiorOpen } from "./runtime";
       this.renderReviewItem();
     },
 
+    /** Wiederholungs-Gate (#222): kurz vor dem Start einer neuen Quest fällige Karten
+     *  auffrischen. Freundliche Ankündigung, dann die fälligen Karten; danach geht es
+     *  automatisch in die Quest weiter (siehe Gate-Abschluss in renderReviewItem). */
+    openReviewGate(npcId: string): void {
+      this.closeOverlays();
+      const dueIds = Game.dueReviewItems(10);
+      if (dueIds.length === 0) { // Sicherheitsnetz: nichts fällig -> direkt zur Quest
+        this._gateClearedIdx = Game.state.questIdx;
+        return this.talkTo(npcId);
+      }
+      $("overlay-review").classList.remove("hidden");
+      this.review = { ids: dueIds, idx: 0, right: 0, free: false, gate: { npcId, questIdx: Game.state.questIdx } };
+      const n = dueIds.length;
+      const kartenWort = n === 1 ? "1 Karte" : n + " Karten";
+      $("review-body").innerHTML = `<div style="text-align:center">
+        <div style="font-size:3em">🦀</div>
+        <p>„Halt, Lotse! Bevor die nächste Aufgabe losgeht, frischen wir kurz <b>${kartenWort}</b> auf – dann sitzt das Gelernte für immer. Schnipp, das geht fix!“</p>
+        <button class="primary" id="gate-start">${kartenWort} auffrischen, dann weiter ⚓</button></div>`;
+      $("gate-start").onclick = () => this.renderReviewItem();
+    },
+
     /** Freies Üben: zieht aus ALLEN gelernten Karten, beliebig oft. Lässt den
      *  Spaced-Repetition-Plan unangetastet und gibt keine Belohnung (kein Farmen). */
     startFreePractice() {
@@ -1063,6 +1090,19 @@ import { worldScene, interiorOpen } from "./runtime";
           Game.state.stats.reviews++;
           Game.save();
           if (r.right === r.ids.length) this.reward(10, 10, "🌟 Perfekte Quizrunde!");
+        }
+        // Wiederholungs-Gate (#222): erledigt -> nicht erneut blockieren, weiter zur Quest.
+        if (r.gate) {
+          this._gateClearedIdx = r.gate.questIdx;
+          const npcId = r.gate.npcId;
+          $("review-body").innerHTML = `<div style="text-align:center">
+            <div style="font-size:3em">🦀</div>
+            <h2>Aufgefrischt! ${r.right} von ${r.ids.length} richtig.</h2>
+            <p class="dim">Schnipp – jetzt sitzt's wieder. Weiter geht dein Abenteuer!</p>
+            <button class="primary" id="gate-continue">Weiter geht's! ⚓</button></div>`;
+          $("gate-continue").onclick = () => { this.closeOverlays(); this.talkTo(npcId); };
+          this.review = null;
+          return;
         }
         $("review-body").innerHTML = `<div style="text-align:center">
           <div style="font-size:3em">🦀</div>

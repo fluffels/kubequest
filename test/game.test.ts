@@ -354,3 +354,31 @@ test("load: ein VOLLSTÄNDIG valider Stand überlebt unverändert (kein Over-San
   expect(Game.state.stats.stackBest).toBe(30);
   expect(Game.state.stats.stormsFixed).toBe(3);            // dynamische Zusatz-Stat bleibt
 });
+
+test("Wiederholungs-Gate (#222): greift nur am Quest-Anfang, wenn Karten fällig sind", () => {
+  Game.state.questStep = 0;
+  // Keine fälligen Karten -> kein Gate (blockiert nicht)
+  expect(Game.shouldReviewGate()).toBe(false);
+  // Eine fällige Karte (due in der Vergangenheit) am Quest-Anfang -> Gate
+  Game.state.review["q-ch1-1"] = { box: 1, due: 0 };
+  expect(Game.dueReviewItems().length).toBeGreaterThan(0);
+  expect(Game.shouldReviewGate()).toBe(true);
+  // Mitten in der Quest (Schritt > 0) -> NICHT unterbrechen
+  Game.state.questStep = 3;
+  expect(Game.shouldReviewGate()).toBe(false);
+});
+
+test("Wiederholungs-Gate (#222): nicht fällige Karten blockieren nicht", () => {
+  Game.state.questStep = 0;
+  Game.state.review["q-ch1-1"] = { box: 3, due: 9_999_999 }; // weit in der Zukunft
+  expect(Game.dueReviewItems().length).toBe(0);
+  expect(Game.shouldReviewGate()).toBe(false);
+});
+
+test("Wiederholungs-Gate (#222): nach der letzten Quest kein Gate", () => {
+  Game.state.questStep = 0;
+  Game.state.review["q-ch1-1"] = { box: 1, due: 0 };
+  Game.state.questIdx = KQContent.QUESTS.length; // alle Quests durch
+  expect(Game.currentQuest()).toBe(null);
+  expect(Game.shouldReviewGate()).toBe(false);
+});
