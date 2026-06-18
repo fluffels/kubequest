@@ -106,7 +106,8 @@ export const QUESTS: Quest[] = [
   { id: "q3", title: "Namen und Hintergrund", giver: "bo", rewardXp: 35, rewardCoins: 25,
     steps: [
       { type: "dialog", npc: "bo", lines: [
-        "LETZTE DOCKER-LEKTION. Profis geben Kisten <b>eigene Namen</b> (<code>--name</code>) und schicken sie in den <b>Hintergrund</b> (<code>-d</code> wie „detached“), damit das Funkgerät frei bleibt.",
+        "LETZTE DOCKER-LEKTION. Profis geben Kisten <b>eigene Namen</b> (<code>--name</code>) und schicken sie mit <code>-d</code> in den <b>Hintergrund</b>.",
+        "<code>-d</code> heißt <b>„detached“</b> – abgekoppelt. OHNE <code>-d</code> klemmt sich dein <b>Funkgerät an die Kiste</b>: Du siehst ihre Ausgabe, aber die Leitung ist <b>blockiert</b>, bis die Kiste schließt – kein anderer Befehl geht durch. MIT <code>-d</code> läuft die Kiste <b>abgekoppelt im Hintergrund weiter</b>, und das Funkgerät ist sofort wieder frei für den nächsten Befehl. Bo lässt das Funkgerät NIE blockieren. Bo ist Stein.",
         "Zusammen: <code>docker run -d --name webserver nginx</code>. Sieht lang aus – ist nur run + zwei Extras. Du schaffst das.",
       ]},
       { type: "teach", brief: "Profi-Start", cmd: {
