@@ -160,10 +160,11 @@ export const QUESTS: Quest[] = [
         text: "Zeig deine Images an. <code>hafenwache</code> mit Tag <code>1.0</code> müsste jetzt dabei sein!",
         accept: [/^docker\s+images$/], solution: "docker images", hint: "docker + Mehrzahl von „image“." } },
       { type: "dialog", npc: "bo", lines: [
-        "Ein Image kann <b>mehrere Namen</b> tragen – wie Etiketten auf derselben Kiste. <code>docker tag</code> hängt ein zweites Etikett an. Üblich: derselbe Build bekommt zusätzlich <code>:latest</code> („die neueste Version“), damit andere ihn ohne Versionsnummer ziehen können.",
+        "Ein Image kann <b>mehrere Namen</b> tragen – wie zwei Etiketten an <b>derselben</b> Kiste, nicht zwei Kisten. <code>docker tag</code> hängt nur einen <b>zweiten Namen</b> an dasselbe Image – es entsteht <b>kein neues</b> Image und kein anderer Stand. <code>hafenwache:1.0</code> und <code>hafenwache:latest</code> sind danach <b>dasselbe</b> Image.",
+        "Üblich ist der Zusatz-Name <code>:latest</code> – aber Vorsicht: das ist <b>nicht automatisch „die neueste Version“</b>, sondern nur ein <b>Konventions-Name</b>. Er zeigt auf das, was zuletzt als <code>:latest</code> getaggt wurde, damit andere das Image ohne Versionsnummer ziehen können. Ein Tag ist eben ein <b>Zeiger</b>, keine Kopie.",
       ]},
       { type: "teach", brief: "Zweites Etikett", cmd: {
-        id: "t-tag", intro: "🆕 Neuer Befehl: <code>docker tag &lt;quelle&gt; &lt;ziel&gt;</code> – gibt einem vorhandenen Image einen weiteren Namen.",
+        id: "t-tag", intro: "🆕 Neuer Befehl: <code>docker tag &lt;quelle&gt; &lt;ziel&gt;</code> – hängt einem vorhandenen Image einen weiteren Namen an (kein neues Image, nur ein zweites Etikett an derselben Kiste).",
         text: "Gib deinem <code>hafenwache:1.0</code> zusätzlich das Etikett <code>hafenwache:latest</code>.",
         accept: [/^docker\s+tag\s+hafenwache:1\.0\s+hafenwache:latest$/], solution: "docker tag hafenwache:1.0 hafenwache:latest",
         hint: "Muster: docker tag <quelle> <ziel> – erst das vorhandene Image, dann der neue Name." } },
