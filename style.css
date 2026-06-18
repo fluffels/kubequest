@@ -66,7 +66,7 @@ button.primary { background: var(--accent); color: #1a1304; font-weight: bold; b
   align-items: center;
   gap: 16px;
   padding: 8px 14px;
-  background: linear-gradient(rgba(8, 14, 24, 0.85), rgba(8, 14, 24, 0.55) 80%, transparent);
+  background: linear-gradient(rgba(18, 38, 54, 0.85), rgba(18, 38, 54, 0.55) 80%, transparent);
   pointer-events: none;
   z-index: 5;
   flex-wrap: wrap;
@@ -102,7 +102,7 @@ button.primary { background: var(--accent); color: #1a1304; font-weight: bold; b
   margin-left: auto;
   font-size: 0.85em;
   padding: 5px 12px;
-  background: rgba(8, 14, 24, 0.85);
+  background: rgba(18, 38, 54, 0.85);
 }
 
 .hud-income { color: var(--good); font-size: 0.75em; }
@@ -193,7 +193,7 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   left: 50%;
   bottom: 26vh;
   transform: translateX(-50%);
-  background: rgba(8, 14, 24, 0.9);
+  background: rgba(18, 38, 54, 0.9);
   border: 1px solid var(--accent);
   color: var(--accent);
   border-radius: 8px;
