@@ -57,6 +57,30 @@ test("Befehls-Karten: Lösung matcht die eigene accept-Regex", () => {
   }
 });
 
+test("docker run: Flag-Reihenfolge ist frei – Drill & Karte akzeptieren -d/--name in beider Reihenfolge, lehnen Image-zuerst ab (#211)", () => {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  // Befehls-Karte c-ch1-4 (feste Werte webserver/nginx)
+  const card = KQContent.CMD_CARDS.find(c => c.id === "c-ch1-4");
+  assert.ok(card, "c-ch1-4 nicht gefunden");
+  const cardOk = (s: string) => card!.accept.some(re => re.test(norm(s)));
+  assert.ok(cardOk("docker run -d --name webserver nginx"), "Karte: -d vor --name muss gelten");
+  assert.ok(cardOk("docker run --name webserver -d nginx"), "Karte: --name vor -d muss GENAUSO gelten");
+  assert.ok(!cardOk("docker run nginx -d --name webserver"), "Karte: Image vor den Optionen muss scheitern");
+
+  // Drill docker-run-named (zufälliger Name/Image) – über mehrere Ziehungen prüfen
+  const make = KQContent.DRILLS["docker-run-named"];
+  for (let i = 0; i < 40; i++) {
+    const task = make(new KQSim({}));
+    const m = norm(task.solution).match(/^docker run -d --name (\S+) (\S+)$/);
+    assert.ok(m, "unerwartete Musterlösung: " + task.solution);
+    const [, name, img] = m!;
+    const ok = (s: string) => task.accept.some(re => re.test(norm(s)));
+    assert.ok(ok(`docker run -d --name ${name} ${img}`), "Drill: -d vor --name muss gelten (" + task.solution + ")");
+    assert.ok(ok(`docker run --name ${name} -d ${img}`), "Drill: --name vor -d muss GENAUSO gelten (" + task.solution + ")");
+    assert.ok(!ok(`docker run ${img} -d --name ${name}`), "Drill: Image vor den Optionen muss scheitern (" + task.solution + ")");
+  }
+});
+
 test("Befehls-Karten: jede trägt eine nicht-leere Begründung (explain, #233)", () => {
   const fehlend = cardsMissingExplain(KQContent.CMD_CARDS);
   assert.deepEqual(fehlend, [], "CMD-Karten ohne explain: " + fehlend.join(", "));
