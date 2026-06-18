@@ -856,7 +856,8 @@ import { worldScene, interiorOpen } from "./runtime";
         Bo ruft die Schichten durcheinander. Stapel sie in der <b>richtigen Reihenfolge</b>: unten anfangen (Basis zuerst)!
         <button id="stack-info" title="Erklärung nochmal ansehen" style="float:right;font-size:.85em">ℹ️ Erklärung</button></p>
         <div class="stack-area"><div class="stack-pile" id="stack-pile"></div>
-        <div class="stack-choices" id="stack-choices"></div></div>`;
+        <div class="stack-choices" id="stack-choices"></div></div>
+        <div class="stack-feedback" id="stack-feedback"></div>`;
       $("stack-body").innerHTML = html;
       $("stack-info").onclick = () => this.renderStackIntro();
       const choices = $("stack-choices");
@@ -879,6 +880,9 @@ import { worldScene, interiorOpen } from "./runtime";
         div.textContent = "📦 " + layer;
         $("stack-pile").prepend(div);
         SFX.success();
+        const fb = $("stack-feedback");
+        fb.className = "stack-feedback";
+        fb.innerHTML = "";
         if (st.placed >= st.target.length) {
           st.round++;
           setTimeout(() => this.renderStackRound(), 700);
@@ -888,9 +892,20 @@ import { worldScene, interiorOpen } from "./runtime";
         btn.classList.add("wrong");
         setTimeout(() => btn.classList.remove("wrong"), 400);
         SFX.wrong();
-        const expected = st.placed === 0 ? "der Basis (FROM …)" : "der nächsten Schicht über „" + st.target[st.placed - 1].split(" (")[0] + "“";
-        $("stack-pile").insertAdjacentHTML("beforebegin", "");
-        this.toast("❌ Nicht ganz – wir sind bei " + expected + ".");
+        // Konkrete Begründung, warum diese Schicht (noch) nicht passt – und sie bleibt
+        // stehen, bis der nächste Zug kommt, statt nach Sekunden zu verschwinden (#217).
+        const clickedName = layer.split(" (")[0];
+        const nextName = st.target[st.placed].split(" (")[0];
+        let reason: string;
+        if (st.placed === 0) {
+          reason = `Ganz <b>unten</b> muss die <b>Basis</b> liegen: <code>${nextName}</code> (die <code>FROM …</code>-Schicht). Darauf baut alles andere auf.`;
+        } else {
+          const belowName = st.target[st.placed - 1].split(" (")[0];
+          reason = `<b>${clickedName}</b> kommt erst weiter oben. Als Nächstes fehlt <code>${nextName}</code> direkt über „${belowName}“. Merke: Schichten stapeln von unten nach oben – Basis zuerst (bleibt im Cache), Startbefehl zuletzt.`;
+        }
+        const fb = $("stack-feedback");
+        fb.className = "stack-feedback bad";
+        fb.innerHTML = "❌ " + reason;
       }
     },
 
