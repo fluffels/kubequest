@@ -808,7 +808,21 @@ import { worldScene, interiorOpen } from "./runtime";
       this.closeOverlays();
       $("overlay-stack").classList.remove("hidden");
       this.stack = { round: 0, score: 0 };
-      this.renderStackRound();
+      this.renderStackIntro();
+    },
+
+    /** Kurze Einführung VOR der ersten Runde – kein Vorwissen annehmen (#216):
+     *  erklärt Image/Schicht/Basis-Image/ubuntu/Cache in wenigen Sätzen. */
+    renderStackIntro() {
+      $("stack-body").innerHTML = `<div class="stack-intro">
+        <div style="font-size:2.4em;text-align:center">📦</div>
+        <h2 style="text-align:center">Wie ein Image aufgebaut ist</h2>
+        <p>Ein <b>Docker-Image</b> ist der Bauplan für einen Container – und es entsteht in <b>Schichten</b> (engl. „Layer“), eine auf der anderen, wie ein Stapel Kisten.</p>
+        <p>Ganz unten liegt die <b>Basis-Schicht</b>: ein fertiges Image, auf dem du aufbaust – z.B. <code>ubuntu</code> (ein schlankes Linux-System) oder <code>nginx</code> (ein fertiger Webserver). Darüber kommt Schicht für Schicht dein eigenes Zeug: Software installieren, Dateien kopieren, Startbefehl.</p>
+        <p><b>Warum die Reihenfolge zählt:</b> Was sich selten ändert (die Basis), gehört nach unten; dein Code (ändert sich oft) nach oben. So kann Docker die unteren Schichten wiederverwenden (den <b>Cache</b>) und nur neu bauen, was sich wirklich geändert hat – das macht das Bauen (<b>Build</b>) schnell.</p>
+        <p class="dim">Gleich rührt Bo die Schichten durcheinander – stapel sie richtig: <b>Basis zuerst (unten), Startbefehl zuletzt (oben)</b>.</p>
+        <button class="primary" id="stack-start">Los geht's – stapeln!</button></div>`;
+      $("stack-start").onclick = () => this.renderStackRound();
     },
 
     renderStackRound() {
