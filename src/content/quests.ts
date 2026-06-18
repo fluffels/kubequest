@@ -76,6 +76,7 @@ export const QUESTS: Quest[] = [
         accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Nur zwei Buchstaben nach docker." } },
       { type: "dialog", npc: "bo", lines: [
         "Siehst du die Namen in der NAMES-Spalte? Docker erfindet welche, wenn du keinen vergibst. Mit dem Namen kannst du eine Kiste gezielt <b>stoppen</b>: <code>docker stop &lt;name&gt;</code>.",
+        "Das kryptische Kürzel in der <b>CONTAINER ID</b>-Spalte ganz links? Das vergibt Docker selbst – ein <b>eindeutiger Stempel</b> pro Kiste, damit keine zwei verwechselt werden. Bo merkt sich sowas nie. Bo nimmt den Namen. Bo ist Stein.",
       ]},
       { type: "teach", brief: "Kiste stoppen", cmd: {
         id: "t-stop", intro: "🆕 Neuer Befehl: <code>docker stop</code> – hält einen Container an.",
@@ -195,6 +196,9 @@ export const QUESTS: Quest[] = [
         id: "t-pods", intro: "🆕 Neuer Befehl: <code>kubectl get pods</code> – zeigt alle Pods.",
         text: "Zeig alle Pods an – und schau dann zum Dock: Die Kisten dort sind GENAU diese Pods!",
         accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Gleiches Muster wie bei nodes." } },
+      { type: "dialog", npc: "ole", lines: [
+        "Fällt dir was an den Pod-Namen auf? <code>kantine-9f4c2-x7k1</code> – die kryptischen Anhängsel hat niemand getippt. Die hängt <b>Kubernetes automatisch dran</b>, damit jeder Pod garantiert einen <b>eindeutigen</b> Namen hat. Steckt ein <b>Deployment</b> dahinter, kommt der mittlere Block vom ReplicaSet, der hintere wird pro Pod gewürfelt – darum darfst du beim <code>describe</code> nicht raten, sondern den vollen Namen aus der Liste abtippen.",
+      ]},
       { type: "drill", brief: "Oles Übungsrunde", pool: ["k-get-nodes", "k-get-pods"], count: 2,
         intro: "Einmal tief durchatmen und wiederholen:" },
       { type: "choice", npc: "ole", reviewId: "q-ch2-2",
