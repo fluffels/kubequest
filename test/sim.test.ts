@@ -58,6 +58,22 @@ test("docker build: ohne Dockerfile UND ohne -t klare Fehler – kein Phantom-Im
   assert.equal(sim.docker.pulled.length, 0, "auch hier darf kein Image entstehen");
 });
 
+test("docker build: ohne Build-Kontext-Punkt '.' scheitert realistisch + erklärt den Punkt (#220)", () => {
+  sim.files["Dockerfile"] = "FROM nginx:1.27";
+  // -t und Name sind korrekt, aber der abschließende '.' (Build-Kontext) fehlt –
+  // echtes Docker bricht hier mit "requires exactly 1 argument" ab, statt falschen Erfolg zu melden.
+  const ohnePunkt = sim.exec("docker build -t hafenwache:1.0");
+  assert.ok(ohnePunkt.error, "ohne Build-Kontext darf der Build NICHT als Erfolg gelten");
+  assert.doesNotMatch(ohnePunkt.output!, /Successfully (built|tagged)/, "kein falscher Erfolg im Terminal");
+  assert.match(ohnePunkt.output!, /requires exactly 1 argument/, "realistische Docker-Fehlermeldung");
+  assert.match(ohnePunkt.output!, /Kontext|Punkt|aktuellen Ordner/i, "der Hinweis erklärt den fehlenden Kontext-Punkt");
+  assert.equal(sim.docker.pulled.length, 0, "ohne Kontext darf kein Image entstehen");
+  // Gegenprobe: derselbe Befehl MIT Punkt geht glatt durch
+  const mitPunkt = sim.exec("docker build -t hafenwache:1.0 .");
+  assert.ok(!mitPunkt.error, "mit Build-Kontext '.' muss der Build durchgehen");
+  assert.match(mitPunkt.output!, /Successfully tagged hafenwache:1\.0/);
+});
+
 test("docker tag: zweiter Name fürs Image; unbekannte Quelle scheitert (#66)", () => {
   sim.files["Dockerfile"] = "FROM nginx:1.27";
   sim.exec("docker build -t hafenwache:1.0 .");

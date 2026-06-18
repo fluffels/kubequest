@@ -681,6 +681,23 @@ export interface Scenario {
         // docker build -t <name[:tag]> <kontext>  – baut aus dem Dockerfile ein eigenes Image.
         const tagSpec = this._flagValue(t, "-t") || this._flagValue(t, "--tag");
         if (!tagSpec) return this._err("docker build: Ohne -t bekommt dein Image keinen Namen.", "Muster: docker build -t <name>:<tag> .");
+        // Build-Kontext = das positionale Argument (PATH | URL | -) hinter den Optionen.
+        // Fehlt es, bricht echtes Docker mit "requires exactly 1 argument" ab – kein falscher Erfolg.
+        const valueFlags = new Set(["-t", "--tag", "-f", "--file"]);
+        let hasContext = false;
+        for (let i = 2; i < t.length; i++) {
+          const tok = t[i];
+          if (tok.startsWith("-")) {
+            // Wert-Flag ohne "="-Form frisst das nächste Token als seinen Wert.
+            if (!tok.includes("=") && valueFlags.has(tok)) i++;
+            continue;
+          }
+          hasContext = true;
+        }
+        if (!hasContext) {
+          return this._err('"docker build" requires exactly 1 argument.',
+            "Am Ende fehlt der Build-Kontext-Punkt '.' – er sagt: der Bauplan (Dockerfile) liegt HIER im aktuellen Ordner. Muster: docker build -t <name>:<tag> .");
+        }
         if (!this.files["Dockerfile"]) {
           return this._err("ERROR: failed to read dockerfile: open Dockerfile: no such file or directory",
             "docker build liest den Bauplan aus einer Datei namens 'Dockerfile' im aktuellen Ordner. Schau mit 'ls', ob sie da ist.");
