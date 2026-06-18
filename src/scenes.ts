@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, TALK_RANGE, interiorEAction, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, TALK_RANGE, interiorEAction, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -839,10 +839,10 @@ import { getMapEntry } from "./mapregistry";
 
     spawnNpcs() {
       // Feste Standplätze aus this.npcSpawns (Code-Default oder – im Datenpfad –
-      // aus dem Tiled-Objektlayer, #195); Kralle wird relativ zum Schiff eingefügt
-      // (an Originalposition: vor Juno) und steht bewusst NICHT im Objektlayer.
+      // aus dem Tiled-Objektlayer, #195); Kralle wird auf ihren Deck-Standplatz
+      // (SHIP_KRALLE, #205) eingefügt und steht bewusst NICHT im Objektlayer.
       const defs = [...this.npcSpawns];
-      defs.splice(6, 0, { id: "kralle", x: this.ship.x + 7, y: this.ship.y + 1 });
+      defs.splice(6, 0, { id: "kralle", x: SHIP_KRALLE.x, y: SHIP_KRALLE.y });
       // #31: NPCs solide machen – man läuft nicht mehr durch sie hindurch.
       // Reden (E) bleibt möglich, weil nearestNpc von der Nachbarkachel aus greift.
       for (const idx of npcSolidIndices(defs, this.W, this.H)) this.solidGrid[idx] = 1;

@@ -86,6 +86,34 @@ export const SHIP = { x: 30, y: 29, w: 9, h: 6 } as const;
  *  Bewusst NICHT in DOORS: das Schiff hängt nicht an einem NPC_SPAWN. */
 export const SHIP_DOOR: Door = { id: "schiff", tx: 34, ty: 32, title: "Deine Kajüte", theme: "ship", npc: "kralle" };
 
+/* ===== Begehbares Deck als Boots-Silhouette (#205) =====
+ * Früher war die GANZE rechteckige SHIP-Grundfläche begehbar – dadurch lief man auf
+ * den Wasserkacheln in den Ecken rund ums Boot, und die Quiz-Krabbe Kralle stand
+ * sichtbar IM Wasser rechts neben dem Schiff. Das Boot ist aber kein Rechteck: hier
+ * liegt die boot-förmige Deckfläche als Daten – pro Kachelreihe die Spanne [x0,x1]
+ * der Kacheln, die wirklich auf dem Rumpf liegen (an der Deckung der Schiffs-Sprite-
+ * Pixel abgemessen: nur Kacheln mit ≥60% Boot zählen als Deck). Außerhalb dieser
+ * Spannen bleibt im Schiffsbereich das solide Wasser stehen → Kollision rund ums
+ * Schiff. Phaser-frei und in test/world.test.ts gepinnt. */
+export const SHIP_DECK: ReadonlyArray<{ y: number; x0: number; x1: number }> = [
+  { y: 31, x0: 33, x1: 37 },
+  { y: 32, x0: 31, x1: 38 },
+  { y: 33, x0: 32, x1: 37 },
+];
+
+/** Liegt Kachel (x,y) auf dem begehbaren Schiffsdeck (Boots-Silhouette, #205)? */
+export function onShipDeck(x: number, y: number): boolean {
+  const row = SHIP_DECK.find((r) => r.y === y);
+  return !!row && x >= row.x0 && x <= row.x1;
+}
+
+/** Standplatz der Quiz-Krabbe Kralle an Deck (#205). Liegt bewusst auf einer Deck-
+ *  Kachel (onShipDeck), damit die Krabbe sichtbar AN DECK steht statt im Wasser
+ *  daneben (alter Bug: relativ zum Schiff auf eine Wasserkachel rechts vom Rumpf).
+ *  scenes.ts platziert Kralle aus dieser Quelle, damit Standplatz und Deck nicht
+ *  auseinanderdriften. */
+export const SHIP_KRALLE = { x: SHIP.x + 6, y: SHIP.y + 3 } as const;   // (36,32)
+
 /* ===== Schiff schwimmt im Wasser + Holz-Steg (#108) =====
  * Früher lag das ganze Schiff auf einem rechteckigen Holz-Deck mitten im Wasser –
  * ein Boot gehört aufs Wasser. Diese reine Geometrie sagt scenes.ts pro Kachel im
@@ -103,18 +131,18 @@ export type ShipTile = "water" | "pier" | null;
 
 /** Was liegt auf Kachel (x,y) im Schiffsbereich?
  *  - `"pier"`: begehbare Holzplanke (Steg/Anleger, Zugang aufs Deck).
- *  - `"water"`: Wasser unterm Rumpf bzw. rund ums Schiff – das Schiff schwimmt.
- *    Bewusst begehbar (solidGrid 0 in scenes.ts), weil das Schiff-Sprite das Deck
- *    abdeckt; so läuft man übers Deck zur Kajüten-Luke (SHIP_DOOR).
- *  - `null`: außerhalb von Schiff und Steg – hier entscheidet die normale Welt-Logik.
+ *  - `"water"`: begehbares Deck – Wasser unterm Rumpf, das das Schiff-Sprite abdeckt;
+ *    so läuft man übers Deck zur Kajüten-Luke (SHIP_DOOR). NUR auf der boot-förmigen
+ *    Deckfläche (onShipDeck), nicht auf der ganzen Grundfläche (#205).
+ *  - `null`: außerhalb von Steg und Deck – inkl. der Wasser-Ecken rund ums Boot
+ *    innerhalb der SHIP-Grundfläche; dort greift die normale Welt-Logik (solides
+ *    Wasser → Kollision rund ums Schiff, #205).
  *  Liefert NIE ein Holz-Deck-Rechteck unterm Rumpf zurück (das war Bug #108). */
 export function shipTile(x: number, y: number): ShipTile {
   const onPier = x >= SHIP_PIER.x && x < SHIP_PIER.x + SHIP_PIER.w &&
                  y >= SHIP_PIER.y0 && y <= SHIP_PIER.y1;
   if (onPier) return "pier";
-  const inHull = x >= SHIP.x && x < SHIP.x + SHIP.w &&
-                 y >= SHIP.y && y < SHIP.y + SHIP.h;
-  return inHull ? "water" : null;
+  return onShipDeck(x, y) ? "water" : null;
 }
 
 /** Alle betretbaren Eingänge (Häuser + Schiff) als Code-Default. Dient zugleich

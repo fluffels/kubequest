@@ -102,11 +102,19 @@ describe("harborGeometry – Maße & bekannte Kacheln", () => {
     }
   });
 
-  it("Schiff schwimmt (#108): Wasser unterm Rumpf (begehbar) + Holz-Steg", () => {
-    expect(g(30, 29)).toBe(WATER);   // Rumpf-Kachel: Wasser unterm Schiff …
-    expect(s(30, 29)).toBe(0);       // … aber begehbar (Schiff-Sprite deckt es ab)
+  it("Schiff schwimmt (#108): Wasser unterm Deck (begehbar) + Holz-Steg", () => {
+    expect(g(34, 32)).toBe(WATER);   // Deck-Kachel (Kajüten-Luke): Wasser unterm Schiff …
+    expect(s(34, 32)).toBe(0);       // … aber begehbar (Schiff-Sprite deckt es ab)
     expect(g(33, 27)).toBe(PIER);    // SHIP_PIER: schmaler Holz-Anleger
     expect(s(33, 27)).toBe(0);
+  });
+
+  it("Kollision rund ums Schiff (#205): Rechteck-Ecken sind solides Wasser, nicht begehbar", () => {
+    // Das Boot ist kein Rechteck – die Ecken der SHIP-Grundfläche liegen im Wasser.
+    expect(g(30, 29)).toBe(WATER);   // hintere Ecke: Wasser …
+    expect(s(30, 29)).toBe(1);       // … und solide (man läuft nicht mehr daneben ins Wasser)
+    expect(g(38, 29)).toBe(WATER);
+    expect(s(38, 29)).toBe(1);
   });
 
   it("Archipel-Anleger ist begehbares Holz", () => {

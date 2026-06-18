@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, interiorEAction, type Door, type Spawn } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, SHIP_DECK, SHIP_KRALLE, onShipDeck, shipTile, interiorEAction, type Door, type Spawn } from "../src/world";
 import type { TiledObjectGroup } from "../src/tilemap";
 
 const W = 52, H = 40; // wie WorldScene.create()
@@ -190,22 +190,23 @@ test("Schiffs-Luke kollidiert mit keiner Haustür-Kachel (eindeutiger Eingang)",
  * im Wasser lag. shipTile() darf unterm Rumpf NUR Wasser (oder den Holz-Steg)
  * liefern – nie ein Holz-Deck – und der Steg muss vom Wasser bis aufs Deck reichen. */
 
-test("#108: unter dem ganzen Rumpf liegt Wasser oder Steg – nirgendwo ein Holz-Deck", () => {
-  let waterTiles = 0;
-  for (let y = SHIP.y; y < SHIP.y + SHIP.h; y++)
-    for (let x = SHIP.x; x < SHIP.x + SHIP.w; x++) {
-      const t = shipTile(x, y);
-      // Jede Rumpf-Kachel ist abgedeckt (nie null) und ist Wasser oder Steg, nie Holz-Deck
-      expect(t === "water" || t === "pier", `Rumpf-Kachel (${x},${y}) ist ${t}`).toBe(true);
-      if (t === "water") waterTiles++;
+test("#108: über die Deck-Silhouette liegt Wasser (Schiff schwimmt), kein Holz-Deck", () => {
+  let waterTiles = 0, pierTiles = 0;
+  for (const row of SHIP_DECK)
+    for (let x = row.x0; x <= row.x1; x++) {
+      const t = shipTile(x, row.y);
+      // Jede Deck-Kachel ist begehbar und liegt über Wasser oder Steg, nie über einem
+      // Holz-Deck-Rechteck (ShipTile hat bewusst keinen Holz-Deck-Typ).
+      expect(t === "water" || t === "pier", `Deck-Kachel (${x},${row.y}) ist ${t}`).toBe(true);
+      if (t === "water") waterTiles++; else if (t === "pier") pierTiles++;
     }
-  // Der Großteil der Grundfläche ist Wasser (das Schiff schwimmt) – nicht nur Steg
-  expect(waterTiles).toBeGreaterThan(SHIP.w * SHIP.h / 2);
+  // Der Großteil des Decks ist Wasser (das Schiff schwimmt) – nicht nur Steg
+  expect(waterTiles).toBeGreaterThan(pierTiles);
 });
 
-test("#108: die Rumpf-Mitte (abseits des Stegs) ist Wasser", () => {
-  expect(shipTile(SHIP.x, SHIP.y + SHIP.h - 1)).toBe("water");      // vordere Ecke
-  expect(shipTile(SHIP.x + SHIP.w - 1, SHIP.y)).toBe("water");      // hintere Ecke
+test("#108: die Deck-Mitte (abseits des Stegs) ist Wasser", () => {
+  expect(shipTile(SHIP_DOOR.tx, SHIP_DOOR.ty)).toBe("water");      // Kajüten-Luke mittig im Deck
+  expect(shipTile(SHIP_KRALLE.x, SHIP_KRALLE.y)).toBe("water");    // Kralles Deck-Standplatz
 });
 
 test("#108: der Steg ist Holz und reicht vom Wasser VOR dem Rumpf bis aufs Deck", () => {
@@ -234,6 +235,55 @@ test("#108: außerhalb von Schiff und Steg greift die normale Welt-Logik (null)"
   expect(shipTile(SHIP.x + SHIP.w + 2, SHIP.y)).toBeNull();          // rechts vom Schiff
   expect(shipTile(SHIP_PIER.x, SHIP_PIER.y1 + 5)).toBeNull();        // unterhalb von Schiff/Steg
   expect(shipTile(0, 0)).toBeNull();
+});
+
+/* ===== Krabbe an Deck + Kollision rund ums Schiff (#205) =====
+ * Regression gegen den Bug, dass die GANZE rechteckige SHIP-Grundfläche begehbar war:
+ * dadurch lief man auf den Wasserkacheln in den Ecken rund ums Boot, und die Quiz-
+ * Krabbe Kralle stand sichtbar IM Wasser rechts neben dem Schiff. Das begehbare Deck
+ * muss boot-förmig sein (Ecken solide), und Kralle muss auf einer Deck-Kachel stehen. */
+
+test("#205: die Ecken der SHIP-Grundfläche sind NICHT begehbar (Wasser rund ums Boot)", () => {
+  // Das Boot ist kein Rechteck – die vier Ecken der Grundfläche liegen im offenen Wasser.
+  expect(shipTile(SHIP.x, SHIP.y)).toBeNull();                       // hinten links
+  expect(shipTile(SHIP.x + SHIP.w - 1, SHIP.y)).toBeNull();          // hinten rechts
+  expect(shipTile(SHIP.x, SHIP.y + SHIP.h - 1)).toBeNull();          // vorne links
+  expect(shipTile(SHIP.x + SHIP.w - 1, SHIP.y + SHIP.h - 1)).toBeNull(); // vorne rechts
+});
+
+test("#205: das begehbare Deck ist echte Teilmenge der Grundfläche und liegt darin", () => {
+  const deckTiles = SHIP_DECK.flatMap((r) => {
+    const xs: { x: number; y: number }[] = [];
+    for (let x = r.x0; x <= r.x1; x++) xs.push({ x, y: r.y });
+    return xs;
+  });
+  // Jede Deck-Kachel liegt innerhalb der SHIP-Grundfläche …
+  for (const { x, y } of deckTiles) {
+    expect(x >= SHIP.x && x < SHIP.x + SHIP.w, `Deck-x ${x} außerhalb`).toBe(true);
+    expect(y >= SHIP.y && y < SHIP.y + SHIP.h, `Deck-y ${y} außerhalb`).toBe(true);
+  }
+  // … aber das Deck ist kleiner als das volle Rechteck (boot-förmig, nicht alles begehbar).
+  expect(deckTiles.length).toBeLessThan(SHIP.w * SHIP.h);
+  // onShipDeck stimmt mit der shipTile-„water"-Fläche überein (eine Quelle).
+  for (const { x, y } of deckTiles) expect(onShipDeck(x, y)).toBe(true);
+});
+
+test("#205: Kralle steht an Deck (nicht im Wasser daneben)", () => {
+  expect(onShipDeck(SHIP_KRALLE.x, SHIP_KRALLE.y)).toBe(true);
+  expect(shipTile(SHIP_KRALLE.x, SHIP_KRALLE.y)).toBe("water");   // begehbares Deck
+  expect(SHIP_KRALLE).not.toEqual({ x: SHIP_DOOR.tx, y: SHIP_DOOR.ty }); // nicht auf der Luke
+});
+
+test("#205: das Deck ist vom Steg aus erreichbar (eine Deck-Kachel grenzt an den Steg)", () => {
+  const deckTiles = SHIP_DECK.flatMap((r) => {
+    const xs: { x: number; y: number }[] = [];
+    for (let x = r.x0; x <= r.x1; x++) xs.push({ x, y: r.y });
+    return xs;
+  });
+  const touchesPier = deckTiles.some(({ x, y }) =>
+    [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => shipTile(x + dx, y + dy) === "pier"),
+  );
+  expect(touchesPier, "kein Deck-Feld grenzt an den Steg – Deck unerreichbar").toBe(true);
 });
 
 /* ===== Datengetriebenes Warp-/Tür-System (#194) ===== */
