@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door, type Spawn } from "../src/world";
 import type { TiledObjectGroup } from "../src/tilemap";
 
 const W = 52, H = 40; // wie WorldScene.create()
@@ -296,4 +296,38 @@ test("doorAt (Default-Eingänge) bleibt deckungsgleich zu findDoorAt(ENTRANCES)"
   for (const d of [...DOORS, SHIP_DOOR]) {
     expect(doorAt(d.tx * TILE + 8, d.ty * TILE + 8)).toEqual(findDoorAt(ENTRANCES, d.tx * TILE + 8, d.ty * TILE + 8));
   }
+});
+
+/* ===== Datengetriebene NPC-Standplätze (#195) ===== */
+
+/** Baut einen Tiled-Objektlayer aus Spawns (wie ihn harborNpcLayer() erzeugt):
+ *  16×16-Rechteck pro NPC, (Bruch-)Kachel als Pixel-Ecke, NPC-ID im name. */
+function npcGroupFrom(spawns: Spawn[]): TiledObjectGroup {
+  return {
+    id: 4, name: "NPCs", type: "objectgroup", visible: true, opacity: 1,
+    objects: spawns.map((s, i) => ({
+      id: i + 1, name: s.id, type: "npc", x: s.x * TILE, y: s.y * TILE, width: TILE, height: TILE,
+    })),
+  };
+}
+
+test("npcsFromObjectGroup round-trippt NPC_SPAWNS verlustfrei (auch Bruch-Koordinaten)", () => {
+  expect(npcsFromObjectGroup(npcGroupFrom([...NPC_SPAWNS]))).toEqual([...NPC_SPAWNS]);
+});
+
+test("npcsFromObjectGroup rechnet Pixel-Ecke korrekt in (Bruch-)Kachel zurück – NICHT gefloort", () => {
+  // Red-Green: würde npcsFromObjectGroup floor(x/TILE) nutzen (wie die Türen), ginge
+  // die Bruch-Position y 14.6 verloren (würde zu 14) und der Round-Trip oben kippte.
+  const [n] = npcsFromObjectGroup(npcGroupFrom([{ id: "ole", x: 26, y: 14.6 }]));
+  expect(n.x).toBe(26);
+  expect(n.y).toBe(14.6);
+});
+
+test("npcsFromObjectGroup behält Reihenfolge + IDs bei (Kralle-Splice in scenes.ts hängt daran)", () => {
+  const npcs = npcsFromObjectGroup(npcGroupFrom([...NPC_SPAWNS]));
+  expect(npcs.map((n) => n.id)).toEqual(NPC_SPAWNS.map((s) => s.id));
+});
+
+test("npcsFromObjectGroup auf leerem Layer liefert keine Spawns", () => {
+  expect(npcsFromObjectGroup(npcGroupFrom([]))).toEqual([]);
 });

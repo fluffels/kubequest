@@ -81,4 +81,4 @@ fehl, sobald sie auseinanderlaufen (Drift-Schutz).
 | Datei | Inhalt |
 |---|---|
 | `test-map.tmj` | minimale 8×6-Demo-Map: Tileset `town`, Layer `Boden` + `Kollision` (Rand-Ring solide). Dient als Loader-Beweis und als Fixture für `test/tilemap.test.ts`. |
-| `harbor.tmj` | die echte 52×40-Hafenkarte als Daten (#192): Layer `Boden` (Terrain-Codes) + `Kollision` (Wasser/Struktur). Generiert aus `src/harbormap.ts`; geladen via `?tiledmap`. |
+| `harbor.tmj` | die echte 52×40-Hafenkarte als Daten (#192): Tile-Layer `Boden` (Terrain-Codes) + `Kollision` (Wasser/Struktur) sowie die Objektlayer `Türen` (Türen/Warps, #194) und `NPCs` (feste NPC-Standplätze, #195). Generiert aus `src/harbormap.ts` (neu erzeugen: `GEN_HARBOR=1 npx vitest run test/harbormap.test.ts`); geladen via `?tiledmap`. |

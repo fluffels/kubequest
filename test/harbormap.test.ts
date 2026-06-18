@@ -34,9 +34,11 @@ import {
   decodeHarborGround,
   harborWarpLayer,
   WARP_LAYER,
+  harborNpcLayer,
+  NPC_LAYER,
 } from "../src/harbormap";
 import { collisionGrid, objectGroup } from "../src/tilemap";
-import { ENTRANCES, doorsFromObjectGroup } from "../src/world";
+import { ENTRANCES, doorsFromObjectGroup, npcsFromObjectGroup, NPC_SPAWNS } from "../src/world";
 
 const harborPath = fileURLToPath(new URL("../assets/maps/harbor.tmj", import.meta.url));
 
@@ -138,10 +140,10 @@ describe("harborTiledMap – Round-Trip Geometrie ⇄ Tiled", () => {
   const map = parseHarborMap(harborTiledMap());
   const geo = harborGeometry();
 
-  it("ist eine gültige 52×40-Map mit Boden + Kollision + Türen-Objektlayer", () => {
+  it("ist eine gültige 52×40-Map mit Boden + Kollision + Türen- + NPC-Objektlayer", () => {
     expect(map.width).toBe(HARBOR_W);
     expect(map.height).toBe(HARBOR_H);
-    expect(map.layers.map((l) => l.name)).toEqual(["Boden", "Kollision", "Türen"]);
+    expect(map.layers.map((l) => l.name)).toEqual(["Boden", "Kollision", "Türen", "NPCs"]);
   });
 
   it("Boden decodiert exakt zur Geometrie zurück", () => {
@@ -202,6 +204,44 @@ describe("Türen-/Warp-Objektlayer (#194)", () => {
     // verkürzen, kippt der Round-Trip-Test oben sofort (tx läge dann bei 26/16≈1).
     expect((harborWarpLayer() as any).name).toBe(WARP_LAYER);
     expect((harborWarpLayer() as any).objects).toHaveLength(ENTRANCES.length);
+  });
+});
+
+describe("NPC-Spawn-Objektlayer (#195)", () => {
+  const map = parseHarborMap(harborTiledMap());
+
+  it("trägt einen Objektlayer 'NPCs' mit je einem Objekt pro fester Standplatz", () => {
+    const group = objectGroup(map, NPC_LAYER);
+    expect(group.type).toBe("objectgroup");
+    expect(group.objects).toHaveLength(NPC_SPAWNS.length);
+    // Objektkoordinaten sind Pixel der linken oberen Ecke der Standplatz-Kachel.
+    const first = group.objects[0];
+    expect(first.name).toBe(NPC_SPAWNS[0].id);
+    expect(first.x).toBe(NPC_SPAWNS[0].x * 16);
+    expect(first.y).toBe(NPC_SPAWNS[0].y * 16);
+  });
+
+  it("round-trippt verlustfrei zurück zu den Code-Standplätzen NPC_SPAWNS", () => {
+    const npcs = npcsFromObjectGroup(objectGroup(map, NPC_LAYER));
+    expect(npcs).toEqual([...NPC_SPAWNS]);
+  });
+
+  it("enthält Kralle NICHT (sie wird relativ zum Schiff zur Laufzeit ergänzt)", () => {
+    const npcs = npcsFromObjectGroup(objectGroup(map, NPC_LAYER));
+    expect(npcs.some((n) => n.id === "kralle")).toBe(false);
+  });
+
+  it("vergibt NPC-Objekt-ids hinter den Tür-Objekten (map-weit eindeutig)", () => {
+    // Red-Green: kollidierten die ids mit den Tür-Objekten (1..ENTRANCES.length),
+    // wäre die Map in Tiled ungültig. Die NPC-ids starten bei ENTRANCES.length+1.
+    const ids = objectGroup(map, NPC_LAYER).objects.map((o) => o.id);
+    expect(Math.min(...ids)).toBe(ENTRANCES.length + 1);
+    expect(new Set(ids).size).toBe(ids.length);   // keine Dubletten
+  });
+
+  it("harborNpcLayer ist ein eigenständiger gültiger Objektlayer", () => {
+    expect((harborNpcLayer() as any).name).toBe(NPC_LAYER);
+    expect((harborNpcLayer() as any).objects).toHaveLength(NPC_SPAWNS.length);
   });
 });
 

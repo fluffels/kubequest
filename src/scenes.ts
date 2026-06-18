@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, SHIP, SHIP_DOOR, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -356,6 +356,9 @@ import { getMapEntry } from "./mapregistry";
       // #194: Türen aus den Code-Eingängen (Default-Pfad). Der Datenpfad liest sie
       // stattdessen aus dem Tiled-Objektlayer – beide füllen dasselbe this.doors.
       this.doors = ENTRANCES.slice();
+      // #195: NPC-Standplätze aus der Code-Liste (Default-Pfad); der Datenpfad liest
+      // sie aus dem Tiled-Objektlayer – beide füllen dasselbe this.npcSpawns.
+      this.npcSpawns = NPC_SPAWNS.slice();
       this.placeHarborObjects();
     }
 
@@ -373,6 +376,9 @@ import { getMapEntry } from "./mapregistry";
       // #194: Türen/Warps datengetrieben aus dem Objektlayer der .tmj statt aus der
       // Hardcode-Liste – der Beweis, dass der Tiled-Loader auch die Türen trägt.
       this.doors = entry.warpLayer ? doorsFromObjectGroup(objectGroup(map, entry.warpLayer)) : ENTRANCES.slice();
+      // #195: NPC-Standplätze datengetrieben aus dem Objektlayer der .tmj statt aus
+      // der Hardcode-Liste – der Beweis, dass der Tiled-Loader auch die NPCs trägt.
+      this.npcSpawns = entry.npcLayer ? npcsFromObjectGroup(objectGroup(map, entry.npcLayer)) : NPC_SPAWNS.slice();
       this.placeHarborObjects();
     }
 
@@ -381,8 +387,9 @@ import { getMapEntry } from "./mapregistry";
      *  flagPoles, lighthouse, tfPlatform, labels). Solids von Gebäuden/Bäumen/Deko
      *  und das Freiräumen der Türen passieren hier – idempotent über dem geladenen
      *  Kollisionsraster, also identisch in beidem Pfaden. Die harbor.tmj trägt
-     *  Terrain-Kollision (Boden/Wege/Wasser) UND seit #194 die Türen/Warps als
-     *  Objektlayer (this.doors); nur Gebäude-/NPC-Spawns sind noch Code (#195). */
+     *  Terrain-Kollision (Boden/Wege/Wasser), seit #194 die Türen/Warps und seit
+     *  #195 die NPC-Standplätze als Objektlayer (this.doors / this.npcSpawns); nur
+     *  die Gebäude-Spawns sind noch Code. */
     placeHarborObjects() {
       const W = this.W;
       // Waldsaum: oben durchgehend, an den Seitenrändern bis zur Küste
@@ -831,9 +838,10 @@ import { getMapEntry } from "./mapregistry";
     }
 
     spawnNpcs() {
-      // Feste Standplätze aus dem puren world-Modul; Kralle wird relativ zum
-      // Schiff eingefügt (an Originalposition: vor Juno).
-      const defs = [...NPC_SPAWNS];
+      // Feste Standplätze aus this.npcSpawns (Code-Default oder – im Datenpfad –
+      // aus dem Tiled-Objektlayer, #195); Kralle wird relativ zum Schiff eingefügt
+      // (an Originalposition: vor Juno) und steht bewusst NICHT im Objektlayer.
+      const defs = [...this.npcSpawns];
       defs.splice(6, 0, { id: "kralle", x: this.ship.x + 7, y: this.ship.y + 1 });
       // #31: NPCs solide machen – man läuft nicht mehr durch sie hindurch.
       // Reden (E) bleibt möglich, weil nearestNpc von der Nachbarkachel aus greift.

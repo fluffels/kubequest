@@ -22,7 +22,7 @@
  * SHIP_PIER ist Holz (-10). Die Wasser/Steg-Aufteilung im Schiffsbereich liefert
  * die pure shipTile()-Geometrie aus world.ts.
  */
-import { SHIP, SHIP_PIER, shipTile, TILE, ENTRANCES, type Door } from "./world";
+import { SHIP, SHIP_PIER, shipTile, TILE, ENTRANCES, NPC_SPAWNS, type Door, type Spawn } from "./world";
 import { WORLD_JETTY } from "./archipel";
 import { parseTiledMap, tileLayer, type TiledMap } from "./tilemap";
 
@@ -196,6 +196,53 @@ export function harborWarpLayer(): Record<string, unknown> {
   };
 }
 
+/* ===== NPC-Standplätze als Objektlayer (#195, Teil 5 von Epic #57) =====
+ * Die festen NPC-Standplätze kommen jetzt datengetrieben aus einem Tiled-
+ * Objektlayer statt aus der Hardcode-Liste NPC_SPAWNS. Quelle der Objekte ist
+ * dieselbe Liste NPC_SPAWNS aus world.ts – analog dazu, wie der Tür-Layer aus
+ * ENTRANCES entsteht. Der Datenpfad (scenes.ts loadHarborMap) liest sie per
+ * npcsFromObjectGroup() zurück; der Round-Trip ist per Test gepinnt. Die
+ * Quiz-Krabbe Kralle steht bewusst NICHT hier (relativ zum Schiff, erst zur
+ * Laufzeit ergänzt) – genau wie sie auch in NPC_SPAWNS fehlt. */
+
+/** Name des NPC-Spawn-Objektlayers in der Hafen-.tmj. */
+export const NPC_LAYER = "NPCs";
+
+/** Ein NPC-Standplatz als Tiled-Rechteck-Objekt: (x,y) = linke obere Ecke in Pixeln
+ *  auf der (ggf. Bruch-)Standplatz-Kachel; die NPC-ID steht im `name`. Keine
+ *  Custom-Properties – ein Standplatz ist nur Position + ID. Die Objekt-`id` setzt
+ *  sich hinter den Tür-Objekten fort (map-weit eindeutig in Tiled). */
+function npcObject(s: Spawn, id: number): Record<string, unknown> {
+  return {
+    id,
+    name: s.id,
+    type: "npc",
+    x: s.x * TILE,
+    y: s.y * TILE,
+    width: TILE,
+    height: TILE,
+    rotation: 0,
+    visible: true,
+  };
+}
+
+/** Der NPC-Spawn-Objektlayer der Hafenkarte – aus NPC_SPAWNS serialisiert. Die
+ *  Objekt-ids beginnen hinter den Tür-Objekten (ENTRANCES.length), damit sie
+ *  map-weit eindeutig bleiben. */
+export function harborNpcLayer(): Record<string, unknown> {
+  return {
+    id: 4,
+    name: NPC_LAYER,
+    type: "objectgroup",
+    visible: true,
+    opacity: 1,
+    x: 0,
+    y: 0,
+    draworder: "topdown",
+    objects: NPC_SPAWNS.map((s, i) => npcObject(s, ENTRANCES.length + i + 1)),
+  };
+}
+
 /** Baut das vollständige Tiled-JSON-Objekt der Hafenkarte (Quelle für harbor.tmj).
  *  Das eingebettete `town`-Tileset erfüllt nur das Schema (Name ∈ ASSET_MANIFEST,
  *  image vorhanden); gerendert wird der Boden NICHT daraus, sondern aus den
@@ -213,8 +260,8 @@ export function harborTiledMap(): Record<string, unknown> {
     height: HARBOR_H,
     tilewidth: 16,
     tileheight: 16,
-    nextlayerid: 4,
-    nextobjectid: ENTRANCES.length + 1,
+    nextlayerid: 5,
+    nextobjectid: ENTRANCES.length + NPC_SPAWNS.length + 1,
     compressionlevel: -1,
     tilesets: [
       {
@@ -257,6 +304,7 @@ export function harborTiledMap(): Record<string, unknown> {
         data: solid.map((s) => (s ? COLLISION_GID : 0)),
       },
       harborWarpLayer(),
+      harborNpcLayer(),
     ],
   };
 }

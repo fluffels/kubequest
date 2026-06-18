@@ -9,8 +9,8 @@
   "height": 40,
   "tilewidth": 16,
   "tileheight": 16,
-  "nextlayerid": 4,
-  "nextobjectid": 5,
+  "nextlayerid": 5,
+  "nextobjectid": 12,
   "compressionlevel": -1,
   "tilesets": [
     {
@@ -255,6 +255,95 @@
               "value": "kralle"
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "NPCs",
+      "type": "objectgroup",
+      "visible": true,
+      "opacity": 1,
+      "x": 0,
+      "y": 0,
+      "draworder": "topdown",
+      "objects": [
+        {
+          "id": 5,
+          "name": "ole",
+          "type": "npc",
+          "x": 416,
+          "y": 233.6,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 6,
+          "name": "bo",
+          "type": "npc",
+          "x": 128,
+          "y": 400,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 7,
+          "name": "ada",
+          "type": "npc",
+          "x": 640,
+          "y": 217.6,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 8,
+          "name": "runa",
+          "type": "npc",
+          "x": 208,
+          "y": 208,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 9,
+          "name": "theo",
+          "type": "npc",
+          "x": 704,
+          "y": 329.6,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 10,
+          "name": "pelle",
+          "type": "npc",
+          "x": 496,
+          "y": 275.2,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
+        },
+        {
+          "id": 11,
+          "name": "juno",
+          "type": "npc",
+          "x": 732.8,
+          "y": 387.2,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true
         }
       ]
     }

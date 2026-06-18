@@ -150,6 +150,18 @@ export function doorsFromObjectGroup(group: TiledObjectGroup): Door[] {
   });
 }
 
+/** NPC-Standplätze aus einem Tiled-Objektlayer lesen (#195). Jedes Objekt trägt die
+ *  NPC-ID als `name`; (x,y) sind Pixel der linken oberen Ecke der Standplatz-Kachel.
+ *  Anders als bei den Türen (doorsFromObjectGroup) werden die Koordinaten NICHT
+ *  gefloort: NPCs stehen bewusst auf Bruch-Kachelpositionen (z.B. y 14.6), also ist
+ *  die Kachelkoordinate px/TILE EXAKT (Multiplikation/Division mit der Zweierpotenz
+ *  16 ist verlustfrei, der Round-Trip trifft NPC_SPAWNS punktgenau). So ersetzt der
+ *  Objektlayer die Hardcode-Liste NPC_SPAWNS, ohne dass scenes.ts die Standplätze
+ *  kennt. */
+export function npcsFromObjectGroup(group: TiledObjectGroup): Spawn[] {
+  return group.objects.map((o) => ({ id: o.name, x: o.x / TILE, y: o.y / TILE }));
+}
+
 /** Die Kachel, auf der ein NPC „steht" – passend zur Flooring-Logik von
  *  isSolidAt(). Der NPC-Mittelpunkt liegt bei (x*TILE+8 / y*TILE+8). */
 export function npcTile(x: number, y: number): { tx: number; ty: number } {
