@@ -1,0 +1,49 @@
+name: CI
+
+# Qualitätstore bei jedem Push auf main und bei jedem Pull Request.
+# Hält main grün: Tests + Typecheck + beide Builds müssen durchlaufen.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Veraltete Runs desselben Branches/PRs abbrechen, sobald ein neuer startet.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Tests, Typecheck & Builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Typecheck (strict)
+        run: npm run typecheck
+
+      - name: Host-Build
+        run: npm run build
+
+      - name: Offline-Build
+        run: npm run build:offline
+
+      - name: Offline-Build als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubequest-offline
+          path: dist-offline/index.html
+          if-no-files-found: error

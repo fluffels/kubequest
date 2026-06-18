@@ -4,6 +4,9 @@
   "description": "KubeQuest – das Hafen-Abenteuer: ein 2D-Lernspiel für Docker, Kubernetes, Helm & Terraform.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

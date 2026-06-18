@@ -1,5 +1,7 @@
 # ⚓ KubeQuest – Das Hafen-Abenteuer
 
+[![CI](https://github.com/fluffels/kubequest/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fluffels/kubequest/actions/workflows/ci.yml)
+
 Ein **2D-Lernspiel** (gebaut mit **Phaser 3**) für Docker, Kubernetes, Helm, Terraform und Security-Grundlagen – von „Helm? Das setzt man doch auf den Kopf?" bis zum souveränen Umgang mit den Profi-Werkzeugen. Du läufst durch die Hafenstadt **Port Kubernia**, löst Quests und funkst echte Befehle an den Cluster.
 
 **Die Spielwelt IST der Cluster:**
