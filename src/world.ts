@@ -27,6 +27,18 @@ export const NPC_SPAWNS: Spawn[] = [
 /** Reichweite, ab der mit einem NPC geredet werden kann (nearestNpc in scenes.ts). */
 export const TALK_RANGE = 1.7 * TILE;
 
+/** #201: Was tut die E-Taste im Hausinnenraum gerade?
+ *  Steht der Spieler beim Bewohner (in Talk-Reichweite) und drückt E, soll er
+ *  mit ihm reden – nicht hinausgehen. Sonst gilt wie bisher: E-Flanke oder auf
+ *  der Tür-Schwelle stehen → hinaus. Pur, damit die Entscheidung (statt nur in
+ *  der Phaser-Szene zu stecken) im Node-Test abgesichert ist; die InteriorScene
+ *  in scenes.ts berechnet `eFlank`/`onExit`/`nearNpc` und ruft das hier auf. */
+export function interiorEAction(opts: { eFlank: boolean; onExit: boolean; nearNpc: boolean }): "talk" | "exit" | "none" {
+  if (opts.eFlank && opts.nearNpc) return "talk";
+  if (opts.eFlank || opts.onExit) return "exit";
+  return "none";
+}
+
 /* ===== Türen / betretbare Häuser (#6) =====
  * Jede Tür ist eine begehbare Kachel im vorderen Mittelbau eines Gebäudes
  * (die zugehörige Solid-Kachel wird in scenes.ts wieder freigeräumt). Läuft
