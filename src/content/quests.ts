@@ -138,9 +138,12 @@ export const QUESTS: Quest[] = [
         scenario: { files: { "Dockerfile": DOCKERFILE } },
         lines: [
           "Erinnerst du dich ans <b>Stapel-Spiel</b>? Ein Image ist ein Stapel aus <b>Schichten</b>. Diesen Stapel beschreibst du in einer Datei: dem <b>Dockerfile</b>. Das ist DEIN Bauplan.",
-          "Bo hat dir einen hingelegt. Schau ihn dir an mit <code>cat Dockerfile</code> – <code>cat</code> ist ein winziger Linux-Befehl, der einfach den <b>Inhalt einer Datei ins Terminal schreibt</b> (Muster: <code>cat &lt;datei&gt;</code>). Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App.",
+          "Kurz die <b>Terminal-Basics</b>, bevor wir loslegen – zwei winzige Linux-Befehle: <code>ls</code> zeigt, <b>was im aktuellen Ordner liegt</b> (ein Blick ins Frachtregal), und <code>cat &lt;datei&gt;</code> <b>schreibt den Inhalt einer Datei ins Terminal</b>. (In einer echten Shell wechselst du mit <code>cd</code> den Ordner und <code>pwd</code> zeigt, wo du gerade stehst – an deinem Funkgerät bleibst du immer im selben Ordner, die zwei brauchst du hier also nicht.)",
+          "Bo hat dir einen Bauplan hingelegt. Erst <code>ls</code> – dann lies ihn mit <code>cat Dockerfile</code>. Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App.",
         ] },
       { type: "terminal", brief: "Bauplan lesen", tasks: [
+        { id: "t-ls-dockerfile", text: "Erst der Blick ins Regal: <code>ls</code> – was liegt hier?",
+          accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
         { id: "t-cat-dockerfile", text: "Lies den Bauplan: <code>cat Dockerfile</code>. Siehst du das <code>FROM</code> ganz oben?",
           accept: [/^cat\s+Dockerfile$/], solution: "cat Dockerfile", hint: "cat <datei>" },
       ]},
