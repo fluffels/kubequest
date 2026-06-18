@@ -808,12 +808,19 @@ import { worldScene, interiorOpen } from "./runtime";
       this.closeOverlays();
       $("overlay-stack").classList.remove("hidden");
       this.stack = { round: 0, score: 0 };
-      this.renderStackIntro();
+      // Beim ALLERERSTEN Mal wird die Einführung erzwungen; danach geht's direkt
+      // los, und die Erklärung bleibt über den „ℹ️ Erklärung“-Knopf jederzeit
+      // wieder aufrufbar (#216).
+      if (Game.state.stats.stackIntroSeen) this.renderStackRound();
+      else this.renderStackIntro();
     },
 
-    /** Kurze Einführung VOR der ersten Runde – kein Vorwissen annehmen (#216):
-     *  erklärt Image/Schicht/Basis-Image/ubuntu/Cache in wenigen Sätzen. */
+    /** Kurze Einführung – kein Vorwissen annehmen (#216): erklärt
+     *  Image/Schicht/Basis-Image/ubuntu/Cache in wenigen Sätzen. Wird beim ersten
+     *  Spielen automatisch gezeigt und ist danach jederzeit wieder aufrufbar. */
     renderStackIntro() {
+      Game.state.stats.stackIntroSeen = 1; // gesehen – ab jetzt nur noch auf Wunsch
+      Game.save();
       $("stack-body").innerHTML = `<div class="stack-intro">
         <div style="font-size:2.4em;text-align:center">📦</div>
         <h2 style="text-align:center">Wie ein Image aufgebaut ist</h2>
@@ -821,7 +828,7 @@ import { worldScene, interiorOpen } from "./runtime";
         <p>Ganz unten liegt die <b>Basis-Schicht</b>: ein fertiges Image, auf dem du aufbaust – z.B. <code>ubuntu</code> (ein schlankes Linux-System) oder <code>nginx</code> (ein fertiger Webserver). Darüber kommt Schicht für Schicht dein eigenes Zeug: Software installieren, Dateien kopieren, Startbefehl.</p>
         <p><b>Warum die Reihenfolge zählt:</b> Was sich selten ändert (die Basis), gehört nach unten; dein Code (ändert sich oft) nach oben. So kann Docker die unteren Schichten wiederverwenden (den <b>Cache</b>) und nur neu bauen, was sich wirklich geändert hat – das macht das Bauen (<b>Build</b>) schnell.</p>
         <p class="dim">Gleich rührt Bo die Schichten durcheinander – stapel sie richtig: <b>Basis zuerst (unten), Startbefehl zuletzt (oben)</b>.</p>
-        <button class="primary" id="stack-start">Los geht's – stapeln!</button></div>`;
+        <button class="primary" id="stack-start">Verstanden – stapeln!</button></div>`;
       $("stack-start").onclick = () => this.renderStackRound();
     },
 
@@ -846,10 +853,12 @@ import { worldScene, interiorOpen } from "./runtime";
       st.target = round.layers;
       st.placed = 0;
       let html = `<p><b>Runde ${st.round + 1}/${rounds.length}: ${round.name}</b> –
-        Bo ruft die Schichten durcheinander. Stapel sie in der <b>richtigen Reihenfolge</b>: unten anfangen (Basis zuerst)!</p>
+        Bo ruft die Schichten durcheinander. Stapel sie in der <b>richtigen Reihenfolge</b>: unten anfangen (Basis zuerst)!
+        <button id="stack-info" title="Erklärung nochmal ansehen" style="float:right;font-size:.85em">ℹ️ Erklärung</button></p>
         <div class="stack-area"><div class="stack-pile" id="stack-pile"></div>
         <div class="stack-choices" id="stack-choices"></div></div>`;
       $("stack-body").innerHTML = html;
+      $("stack-info").onclick = () => this.renderStackIntro();
       const choices = $("stack-choices");
       for (const layer of shuffled(round.layers)) {
         const b = document.createElement("button");
