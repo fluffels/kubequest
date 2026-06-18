@@ -7,6 +7,25 @@ import { KQContent } from "../src/content";
 import { validateContent, type ContentBundle } from "../src/content/validate";
 import { KQAssets } from "../src/assets-data";
 import { ARCHIPEL_NPC } from "../src/archipel";
+import { Sim as KQSim } from "../src/sim";
+
+/** Findet Befehls-Karten ohne nicht-leere Begründung (`explain`, #233) – sonst
+ *  bliebe das Spaced-Repetition-Feedback bei „nur falsch ohne Warum". Als Helfer,
+ *  um denselben Check Red-Green abzusichern. */
+function cardsMissingExplain(cards: { id: string; explain?: string }[]): string[] {
+  return cards.filter(c => !c.explain || !c.explain.trim()).map(c => c.id);
+}
+
+/** Findet Drills, deren generierte Aufgabe keine nicht-leere Begründung (`why`, #233)
+ *  trägt. Jeder Drill wird gegen einen frischen Sim instanziiert (wie im Spiel). */
+function drillsMissingWhy(drills: typeof KQContent.DRILLS): string[] {
+  const out: string[] = [];
+  for (const [id, make] of Object.entries(drills)) {
+    const task = make(new KQSim({}));
+    if (!task.why || !task.why.trim()) out.push(id);
+  }
+  return out;
+}
 
 /** Findet NPCs ohne Sprite-Asset (tex fehlt im Manifest) – das macht einen NPC
  *  „tot": Phaser fiele auf den grün-schwarzen Platzhalter zurück. Smalltalk ist
@@ -36,6 +55,28 @@ test("Befehls-Karten: Lösung matcht die eigene accept-Regex", () => {
     assert.ok(card.accept.some(re => re.test(norm)), card.id + ": " + norm);
     assert.ok(KQContent.QUESTS.some(q => q.id === card.chapter), card.id + ": unbekannte Quest " + card.chapter);
   }
+});
+
+test("Befehls-Karten: jede trägt eine nicht-leere Begründung (explain, #233)", () => {
+  const fehlend = cardsMissingExplain(KQContent.CMD_CARDS);
+  assert.deepEqual(fehlend, [], "CMD-Karten ohne explain: " + fehlend.join(", "));
+});
+
+test("Red-Green: eine Befehls-Karte ohne explain wird gemeldet", () => {
+  // Ein Check, der auch bei fehlender Begründung grün bliebe, wäre wertlos (#233).
+  const fehlend = cardsMissingExplain([...KQContent.CMD_CARDS, { id: "c-leer", explain: "  " }]);
+  assert.ok(fehlend.includes("c-leer"), "leere Begründung nicht gemeldet: " + fehlend.join(", "));
+});
+
+test("Drills: jede generierte Aufgabe trägt eine nicht-leere Begründung (why, #233)", () => {
+  const fehlend = drillsMissingWhy(KQContent.DRILLS);
+  assert.deepEqual(fehlend, [], "Drills ohne why: " + fehlend.join(", "));
+});
+
+test("Red-Green: ein Drill ohne why wird gemeldet", () => {
+  const kaputt = { ...KQContent.DRILLS, "drill-leer": (_sim: KQSim) => ({ text: "x", accept: [/^x$/], solution: "x", hint: "x", why: "" }) };
+  const fehlend = drillsMissingWhy(kaputt as typeof KQContent.DRILLS);
+  assert.ok(fehlend.includes("drill-leer"), "Drill ohne why nicht gemeldet: " + fehlend.join(", "));
 });
 
 test("Quests: NPCs existieren, Choices haben genau richtige Antworten, reviewIds gültig", () => {
