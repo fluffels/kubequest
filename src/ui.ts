@@ -681,9 +681,12 @@ import { worldScene, interiorOpen } from "./runtime";
         } else if (fb && !result.error) {
           // Befehl lief fehlerfrei, erfüllt die Aufgabe aber (noch) nicht → SOFORT sanft rückmelden
           // (sonst bleibt das Spiel stumm, obwohl im Terminal eine Erfolgs-ID steht – siehe Issue #17)
-          const tip = /^docker\s+run\b/.test(norm)
-            ? "Bei <code>docker run</code>: hinter <code>--name</code> steht dein Wunschname, das Image kommt ganz zuletzt – Muster <code>docker run -d --name &lt;name&gt; &lt;image&gt;</code>."
-            : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.";
+          // „Nie nur falsch, immer begründen" (#233): Drills tragen ein why; sonst der generische Muster-Tipp.
+          const tip = task.why
+            ? task.why
+            : /^docker\s+run\b/.test(norm)
+              ? "Bei <code>docker run</code>: hinter <code>--name</code> steht dein Wunschname, das Image kommt ganz zuletzt – Muster <code>docker run -d --name &lt;name&gt; &lt;image&gt;</code>."
+              : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.";
           fb.innerHTML = '<div class="tt-feedback">❌ Fast – der Befehl lief durch, erfüllt die Aufgabe aber noch nicht. ' + tip + '</div>';
         }
       }
@@ -777,7 +780,9 @@ import { worldScene, interiorOpen } from "./runtime";
       this.refreshHud();
       this.renderTermTasks();
       const fb = $("tt-feedback");
-      if (fb) fb.innerHTML = '<div class="tt-feedback">🧭 <b>Lösung:</b> <code>' + esc(task.solution) + "</code> – selbst eintippen!</div>";
+      // „Warum so?" gleich mitliefern (#233), nicht nur die Musterlösung zeigen.
+      const why = task.why ? ' <span class="dim">' + task.why + "</span>" : "";
+      if (fb) fb.innerHTML = '<div class="tt-feedback">🧭 <b>Lösung:</b> <code>' + esc(task.solution) + "</code> – selbst eintippen!" + why + "</div>";
     },
 
     /* ========== Üben ========== */
@@ -1076,7 +1081,9 @@ import { worldScene, interiorOpen } from "./runtime";
       ev.target.disabled = true;
       const card = r.current.content.card;
       const correct = card.accept.some((re: RegExp) => re.test(line));
-      this.finishReviewItem(correct, "Die Lösung: <code>" + esc(card.solution) + "</code>");
+      // Nicht nur die Musterlösung zeigen, sondern begründen warum (#233) – analog zum Quiz-explain.
+      const sol = correct ? "" : "Die Lösung: <code>" + esc(card.solution) + "</code>. ";
+      this.finishReviewItem(correct, sol + (card.explain || ""));
     },
 
     finishReviewItem(correct: boolean, explainHtml: string) {
