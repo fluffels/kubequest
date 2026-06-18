@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, TALK_RANGE, interiorEAction, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -1468,10 +1468,15 @@ import { getMapEntry } from "./mapregistry";
         this.solid[f.ty * RW + f.tx] = 1;
       }
 
-      // NPC-Figur des Hauses/Schiffs (Deko – reden weiterhin draußen) + Namensschild
+      // NPC-Figur des Hauses/Schiffs (#201: drinnen ansprechbar) + Namensschild
       const meta = door.npc ? (KQContent.NPCS as any)[door.npc] : undefined;
       const ntx = this.exitTx, nty = 2;
       this.solid[nty * RW + ntx] = 1;
+      // #201: Standplatz des Bewohners merken, damit die E-Taste kontextabhängig
+      // wird (steht der Spieler in Talk-Reichweite → reden statt hinausgehen).
+      this.npcId = door.npc;
+      this.npcX = ntx * T + 8;
+      this.npcY = nty * T + 8;
       const nbaseY = nty * T + 15;
       this.add.ellipse(ntx * T + 8, nty * T + 15, 10, 4, 0x000000, 0.26).setDepth(1.6);
       const npc = meta && meta.tex
@@ -1498,7 +1503,11 @@ import { getMapEntry } from "./mapregistry";
       const npcName = meta ? meta.name + " · " + meta.title : "";
       pixelText(this, cw / 2, 12, (isShip ? "⚓ " : "🚪 ") + door.title, { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
       if (npcName) pixelText(this, cw / 2, 34, npcName, { color: "#cdd9e8", size: 12, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
-      pixelText(this, cw / 2, ch - 22, isShip ? "E – an Deck   ·   ↓ durch die Luke" : "E – Hinausgehen   ·   ↓ durch die Tür", { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
+      // #201: Hinweis wird in update() kontextabhängig (beim Bewohner „reden").
+      this.isShip = isShip;
+      this.hintExit = isShip ? "E – an Deck   ·   ↓ durch die Luke" : "E – Hinausgehen   ·   ↓ durch die Tür";
+      this.hintTalk = (meta ? "E – mit " + meta.name + " reden" : "E – reden") + (isShip ? "   ·   ↓ Luke" : "   ·   ↓ Tür");
+      this.hint = pixelText(this, cw / 2, ch - 22, this.hintExit, { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
 
       // E war beim Betreten evtl. noch gedrückt – erst nach Loslassen reagieren.
       this.ePrev = true;
@@ -1553,10 +1562,20 @@ import { getMapEntry } from "./mapregistry";
       this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
       this.pShadow.setPosition(pl.x, pl.y + 6);
 
-      // Hinausgehen: E (Flanke) oder auf der Tür-Schwelle stehen.
+      // #201: E ist kontextabhängig. Steht der Spieler beim Bewohner (in
+      // Talk-Reichweite) → mit ihm reden; sonst (E-Flanke oder auf der
+      // Tür-Schwelle) → hinausgehen. Die Entscheidung liegt pur in
+      // interiorEAction() (world.ts), hier nur das Sammeln der Eingaben.
       const e = !blocked && (!!keys["e"] || !!keys["Enter"] || !!keys[" "]);
       const onExit = Math.floor(pl.x / T) === this.exitTx && Math.floor(pl.y / T) === this.exitTy;
-      if (!blocked && ((e && !this.ePrev) || onExit)) { this.exitInterior(); return; }
+      const nearNpc = !!this.npcId && Math.hypot(pl.x - this.npcX, pl.y - this.npcY) <= TALK_RANGE;
+      // Hinweis live umschalten (nur wenn man wirklich reden kann).
+      this.hint.setText(sanitize(nearNpc ? this.hintTalk : this.hintExit));
+      if (!blocked) {
+        const action = interiorEAction({ eFlank: e && !this.ePrev, onExit, nearNpc });
+        if (action === "talk") { UI.talkTo(this.npcId); this.ePrev = e; return; }
+        if (action === "exit") { this.exitInterior(); return; }
+      }
       this.ePrev = e;
     }
   }

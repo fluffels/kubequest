@@ -349,7 +349,16 @@ import { worldScene, interiorOpen } from "./runtime";
       if (!ws) return;
       const near = ws.nearestNpc();
       if (!near) return;
-      const npcId = near.id;
+      this.talkTo(near.id);
+    },
+
+    /** Talk-Routing für einen NPC: Pelle→Shop, Kralle→Quiz, laufender Quest-Step,
+     *  sonst das NPC-Menü. Bewusst aus interact() herausgezogen und OHNE den
+     *  interiorOpen()-Guard, damit die InteriorScene (#201) den Bewohner im
+     *  Innenraum direkt ansprechen kann. Der Guard in interact() bleibt – er
+     *  verhindert weiterhin, dass man durch die Wand mit Außen-NPCs der
+     *  pausierten Welt redet. */
+    talkTo(npcId: string) {
       if (npcId === "pelle") return this.openShop();
       if (npcId === "kralle") return this.openReview();
 

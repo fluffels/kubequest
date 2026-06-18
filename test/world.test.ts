@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door, type Spawn } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, interiorEAction, type Door, type Spawn } from "../src/world";
 import type { TiledObjectGroup } from "../src/tilemap";
 
 const W = 52, H = 40; // wie WorldScene.create()
@@ -330,4 +330,41 @@ test("npcsFromObjectGroup behält Reihenfolge + IDs bei (Kralle-Splice in scenes
 
 test("npcsFromObjectGroup auf leerem Layer liefert keine Spawns", () => {
   expect(npcsFromObjectGroup(npcGroupFrom([]))).toEqual([]);
+});
+
+/* ===== #201: E im Hausinnenraum ist kontextabhängig (reden vs. hinausgehen) =====
+ * Die Entscheidung steckt pur in interiorEAction(), damit sie ohne Phaser im
+ * Node-Test prüfbar ist. InteriorScene.update() sammelt nur eFlank/onExit/nearNpc.
+ * Bewusst inkl. Negativfällen (fern vom NPC, Schwelle, kein Tastendruck). */
+
+test("#201 beim Bewohner + E-Flanke → reden (nicht hinausgehen)", () => {
+  // Das ist der eigentliche Bugfix: vorher führte E hier IMMER zum Hinausgehen.
+  expect(interiorEAction({ eFlank: true, onExit: false, nearNpc: true })).toBe("talk");
+});
+
+test("#201 fern vom Bewohner + E-Flanke → hinausgehen (Negativfall)", () => {
+  expect(interiorEAction({ eFlank: true, onExit: false, nearNpc: false })).toBe("exit");
+});
+
+test("#201 auf der Tür-Schwelle ohne Tastendruck → hinausgehen (wie bisher)", () => {
+  expect(interiorEAction({ eFlank: false, onExit: true, nearNpc: false })).toBe("exit");
+});
+
+test("#201 Schwelle zählt fürs Hinausgehen, auch wenn man (theoretisch) nah am NPC wäre", () => {
+  // onExit ohne E-Flanke darf nie 'talk' werden – reden braucht die E-Flanke.
+  expect(interiorEAction({ eFlank: false, onExit: true, nearNpc: true })).toBe("exit");
+});
+
+test("#201 nah am NPC, aber E nur gehalten (keine Flanke) → nichts tun", () => {
+  // Ohne frische E-Flanke wird weder geredet noch (außerhalb der Schwelle) gegangen.
+  expect(interiorEAction({ eFlank: false, onExit: false, nearNpc: true })).toBe("none");
+});
+
+test("#201 weder Tastendruck noch Schwelle noch NPC-Nähe → nichts tun", () => {
+  expect(interiorEAction({ eFlank: false, onExit: false, nearNpc: false })).toBe("none");
+});
+
+test("#201 reden hat Vorrang vor hinausgehen, wenn beides zuträfe", () => {
+  // Falls eFlank+nearNpc+onExit zusammenkämen, gewinnt 'talk' (man will reden).
+  expect(interiorEAction({ eFlank: true, onExit: true, nearNpc: true })).toBe("talk");
 });
