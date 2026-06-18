@@ -32,8 +32,11 @@ import {
   harborTiledMap,
   parseHarborMap,
   decodeHarborGround,
+  harborWarpLayer,
+  WARP_LAYER,
 } from "../src/harbormap";
-import { collisionGrid } from "../src/tilemap";
+import { collisionGrid, objectGroup } from "../src/tilemap";
+import { ENTRANCES, doorsFromObjectGroup } from "../src/world";
 
 const harborPath = fileURLToPath(new URL("../assets/maps/harbor.tmj", import.meta.url));
 
@@ -135,10 +138,10 @@ describe("harborTiledMap – Round-Trip Geometrie ⇄ Tiled", () => {
   const map = parseHarborMap(harborTiledMap());
   const geo = harborGeometry();
 
-  it("ist eine gültige 52×40-Map mit Boden + Kollision", () => {
+  it("ist eine gültige 52×40-Map mit Boden + Kollision + Türen-Objektlayer", () => {
     expect(map.width).toBe(HARBOR_W);
     expect(map.height).toBe(HARBOR_H);
-    expect(map.layers.map((l) => l.name)).toEqual(["Boden", "Kollision"]);
+    expect(map.layers.map((l) => l.name)).toEqual(["Boden", "Kollision", "Türen"]);
   });
 
   it("Boden decodiert exakt zur Geometrie zurück", () => {
@@ -170,11 +173,44 @@ describe("ausgeliefertes Artefakt assets/maps/harbor.tmj", () => {
   });
 });
 
+describe("Türen-/Warp-Objektlayer (#194)", () => {
+  const map = parseHarborMap(harborTiledMap());
+
+  it("trägt einen Objektlayer 'Türen' mit je einem Objekt pro Eingang", () => {
+    const group = objectGroup(map, WARP_LAYER);
+    expect(group.type).toBe("objectgroup");
+    expect(group.objects).toHaveLength(ENTRANCES.length);
+    // Objektkoordinaten sind Pixel der linken oberen Ecke der Tür-Kachel.
+    const first = group.objects[0];
+    expect(first.x).toBe(ENTRANCES[0].tx * 16);
+    expect(first.y).toBe(ENTRANCES[0].ty * 16);
+    expect(first.width).toBe(16);
+  });
+
+  it("round-trippt verlustfrei zurück zu den Code-Eingängen ENTRANCES", () => {
+    const doors = doorsFromObjectGroup(objectGroup(map, WARP_LAYER));
+    expect(doors).toEqual([...ENTRANCES]);
+  });
+
+  it("trägt die Schiffs-Luke (theme 'ship') als Warp-Objekt mit", () => {
+    const doors = doorsFromObjectGroup(objectGroup(map, WARP_LAYER));
+    expect(doors.some((d) => d.theme === "ship" && d.id === "schiff")).toBe(true);
+  });
+
+  it("harborWarpLayer ist ein eigenständiger gültiger Objektlayer", () => {
+    // Red-Green-Absicherung: würde warpObject die Pixel-Umrechnung (tx*16) auf tx
+    // verkürzen, kippt der Round-Trip-Test oben sofort (tx läge dann bei 26/16≈1).
+    expect((harborWarpLayer() as any).name).toBe(WARP_LAYER);
+    expect((harborWarpLayer() as any).objects).toHaveLength(ENTRANCES.length);
+  });
+});
+
 describe("parseHarborMap – Negativfälle", () => {
   it("lehnt eine Map mit falschen Maßen ab", () => {
     const wrong = harborTiledMap();
     (wrong as any).width = 8;
-    (wrong as any).layers.forEach((l: any) => { l.width = 8; l.data = l.data.slice(0, 8 * HARBOR_H); });
+    // Nur die Tile-Layer haben ein data-Raster; der Objektlayer (Türen) wird übersprungen.
+    (wrong as any).layers.forEach((l: any) => { if (Array.isArray(l.data)) { l.width = 8; l.data = l.data.slice(0, 8 * HARBOR_H); } });
     expect(() => parseHarborMap(wrong)).toThrow(/52×40|passt nicht/);
   });
 });

@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, SHIP, SHIP_DOOR, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -21,7 +21,7 @@ import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runt
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
-import { parseTiledMap, collisionGrid, resolveTilesets } from "./tilemap";
+import { parseTiledMap, collisionGrid, resolveTilesets, objectGroup } from "./tilemap";
 import { harborGeometry, PIER_XS } from "./harbormap";
 import { ATLAS_CHARS, CELL_W, CELL_H, GLYPH_W, GLYPH_H, glyphMatrix, sanitize } from "./pixelfont";
 import { spreadLabelsVertically, type LayoutBox } from "./labellayout";
@@ -353,6 +353,9 @@ import { getMapEntry } from "./mapregistry";
       const geo = harborGeometry(this.W, this.H);
       this.ground = geo.ground;
       this.solidGrid = Uint8Array.from(geo.solid);
+      // #194: Türen aus den Code-Eingängen (Default-Pfad). Der Datenpfad liest sie
+      // stattdessen aus dem Tiled-Objektlayer – beide füllen dasselbe this.doors.
+      this.doors = ENTRANCES.slice();
       this.placeHarborObjects();
     }
 
@@ -367,6 +370,9 @@ import { getMapEntry } from "./mapregistry";
       this.ground = entry.decodeGround!(map);
       this.solidGrid = new Uint8Array(this.W * this.H);
       collisionGrid(map, entry.collisionLayer).forEach((solid, i) => { if (solid) this.solidGrid[i] = 1; });
+      // #194: Türen/Warps datengetrieben aus dem Objektlayer der .tmj statt aus der
+      // Hardcode-Liste – der Beweis, dass der Tiled-Loader auch die Türen trägt.
+      this.doors = entry.warpLayer ? doorsFromObjectGroup(objectGroup(map, entry.warpLayer)) : ENTRANCES.slice();
       this.placeHarborObjects();
     }
 
@@ -374,9 +380,9 @@ import { getMapEntry } from "./mapregistry";
      *  Deko, Leuchtturm, Türen) + die davon abhängigen Szenen-Felder (piers, ship,
      *  flagPoles, lighthouse, tfPlatform, labels). Solids von Gebäuden/Bäumen/Deko
      *  und das Freiräumen der Türen passieren hier – idempotent über dem geladenen
-     *  Kollisionsraster, also identisch in beidem Pfaden. Die harbor.tmj trägt nur
-     *  die Terrain-Kollision; Gebäude/NPCs/Türen wandern erst in #194/#195 in
-     *  Tiled-Objektlayer (Boden/Wege/Wasser-Kollision sind hier schon datengetrieben). */
+     *  Kollisionsraster, also identisch in beidem Pfaden. Die harbor.tmj trägt
+     *  Terrain-Kollision (Boden/Wege/Wasser) UND seit #194 die Türen/Warps als
+     *  Objektlayer (this.doors); nur Gebäude-/NPC-Spawns sind noch Code (#195). */
     placeHarborObjects() {
       const W = this.W;
       // Waldsaum: oben durchgehend, an den Seitenrändern bis zur Küste
@@ -436,11 +442,15 @@ import { getMapEntry } from "./mapregistry";
       this.carveDoors();   // #6: Häuser betretbar machen
     }
 
-    /** #6: In jede Gebäude-Front eine begehbare Tür schneiden (Solid-Kachel der
-     *  unteren Mittel-Kachel wieder freigeben) und sichtbar markieren. Das
-     *  Betreten erkennt update() über doorAt() der reinen world-Geometrie. */
+    /** #6/#194: In jede Gebäude-Front eine begehbare Tür schneiden (Solid-Kachel
+     *  der unteren Mittel-Kachel wieder freigeben) und sichtbar markieren. Quelle
+     *  ist this.doors (Code-Default oder Tiled-Objektlayer). Die Schiffs-Luke
+     *  (theme "ship") wird hier NICHT gemalt – sie ist eine Decksluke, die
+     *  placeHarborObjects() separat als Companionway zeichnet. Das Betreten erkennt
+     *  update() über findDoorAt() gegen dieselbe this.doors-Liste. */
     carveDoors() {
-      for (const d of DOORS) {
+      for (const d of this.doors as Door[]) {
+        if (d.theme === "ship") continue;
         this.solidGrid[d.ty * this.W + d.tx] = 0;
         this.makeDoor(d.tx, d.ty);
       }
@@ -1306,9 +1316,11 @@ import { getMapEntry } from "./mapregistry";
         keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
       if (!moveKeyDown && !onArchWarp) this.archipelArmed = true;
 
-      // #6: Auf einer Tür-Kachel? -> Haus betreten (Rest dieses Frames überspringen).
+      // #6/#194: Auf einer Tür-Kachel? -> Haus/Schiff betreten (Rest dieses Frames
+      // überspringen). this.doors kommt aus dem Tiled-Objektlayer (Datenpfad) bzw.
+      // den Code-Eingängen (Default) – findDoorAt prüft generisch dagegen.
       if (!blocked) {
-        const door = doorAt(pl.x, pl.y);
+        const door = findDoorAt(this.doors as Door[], pl.x, pl.y);
         if (door) { this.enterInterior(door); return; }
         if (this.archipelArmed && onArchWarp) { this.enterArchipel(); return; }
       }

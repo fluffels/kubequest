@@ -22,7 +22,7 @@
  * SHIP_PIER ist Holz (-10). Die Wasser/Steg-Aufteilung im Schiffsbereich liefert
  * die pure shipTile()-Geometrie aus world.ts.
  */
-import { SHIP, SHIP_PIER, shipTile } from "./world";
+import { SHIP, SHIP_PIER, shipTile, TILE, ENTRANCES, type Door } from "./world";
 import { WORLD_JETTY } from "./archipel";
 import { parseTiledMap, tileLayer, type TiledMap } from "./tilemap";
 
@@ -146,6 +146,56 @@ const COLLISION_GID = 14;
 export function encodeGround(code: number): number { return code + GROUND_GID_OFFSET; }
 export function decodeGround(gid: number): number { return gid - GROUND_GID_OFFSET; }
 
+/* ===== Türen / Warps als Objektlayer (#194, Teil 4 von Epic #57) =====
+ * Die Türen kommen jetzt datengetrieben aus einem Tiled-Objektlayer statt aus der
+ * Hardcode-Liste DOORS. Quelle der Objekte sind die Code-Eingänge ENTRANCES
+ * (Häuser + Schiff) aus world.ts – analog dazu, wie der Boden-Layer aus
+ * harborGeometry() entsteht. Der Datenpfad (scenes.ts loadHarborMap) liest sie
+ * per doorsFromObjectGroup() zurück; der Round-Trip ist per Test gepinnt. */
+
+/** Name des Tür-/Warp-Objektlayers in der Hafen-.tmj. */
+export const WARP_LAYER = "Türen";
+
+/** Eine Tür/Warp als Tiled-Rechteck-Objekt: (x,y) = linke obere Ecke in Pixeln,
+ *  16×16 groß auf der Tür-Kachel; die Warp-Daten als Custom-Properties. */
+function warpObject(d: Door, id: number): Record<string, unknown> {
+  const properties: { name: string; type: string; value: string | number }[] = [
+    { name: "theme", type: "string", value: d.theme },
+    { name: "title", type: "string", value: d.title },
+  ];
+  if (d.npc !== undefined) properties.push({ name: "npc", type: "string", value: d.npc });
+  if (d.target !== undefined) properties.push({ name: "target", type: "string", value: d.target });
+  if (d.targetX !== undefined) properties.push({ name: "targetX", type: "int", value: d.targetX });
+  if (d.targetY !== undefined) properties.push({ name: "targetY", type: "int", value: d.targetY });
+  return {
+    id,
+    name: d.id,
+    type: "warp",
+    x: d.tx * TILE,
+    y: d.ty * TILE,
+    width: TILE,
+    height: TILE,
+    rotation: 0,
+    visible: true,
+    properties,
+  };
+}
+
+/** Der Tür-/Warp-Objektlayer der Hafenkarte – aus den Code-Eingängen serialisiert. */
+export function harborWarpLayer(): Record<string, unknown> {
+  return {
+    id: 3,
+    name: WARP_LAYER,
+    type: "objectgroup",
+    visible: true,
+    opacity: 1,
+    x: 0,
+    y: 0,
+    draworder: "topdown",
+    objects: ENTRANCES.map((d, i) => warpObject(d, i + 1)),
+  };
+}
+
 /** Baut das vollständige Tiled-JSON-Objekt der Hafenkarte (Quelle für harbor.tmj).
  *  Das eingebettete `town`-Tileset erfüllt nur das Schema (Name ∈ ASSET_MANIFEST,
  *  image vorhanden); gerendert wird der Boden NICHT daraus, sondern aus den
@@ -163,8 +213,8 @@ export function harborTiledMap(): Record<string, unknown> {
     height: HARBOR_H,
     tilewidth: 16,
     tileheight: 16,
-    nextlayerid: 3,
-    nextobjectid: 1,
+    nextlayerid: 4,
+    nextobjectid: ENTRANCES.length + 1,
     compressionlevel: -1,
     tilesets: [
       {
@@ -206,6 +256,7 @@ export function harborTiledMap(): Record<string, unknown> {
         height: HARBOR_H,
         data: solid.map((s) => (s ? COLLISION_GID : 0)),
       },
+      harborWarpLayer(),
     ],
   };
 }

@@ -16,6 +16,8 @@ import {
   tileLayer,
   collisionGrid,
   resolveTilesets,
+  objectGroup,
+  tiledProps,
   type TiledMap,
 } from "../src/tilemap";
 import { ASSET_MANIFEST } from "../src/assets-data";
@@ -46,6 +48,7 @@ describe("parseTiledMap – echtes Artefakt test-map.tmj", () => {
   it("jeder Tile-Layer hat width*height Kacheln", () => {
     const map = parseTiledMap(freshRaw());
     for (const layer of map.layers) {
+      if (layer.type !== "tilelayer") continue;
       expect(layer.data.length, layer.name).toBe(map.width * map.height);
     }
   });
@@ -147,10 +150,10 @@ describe("parseTiledMap – Validierung (Negativfälle)", () => {
     expect(() => parseTiledMap(raw)).toThrow(/image/);
   });
 
-  it("lehnt Nicht-Tile-Layer ab (Teil 1)", () => {
+  it("lehnt unbekannte Layer-Typen ab (nur tilelayer/objectgroup)", () => {
     const raw = freshRaw();
-    raw.layers[0].type = "objectgroup";
-    expect(() => parseTiledMap(raw)).toThrow(/tilelayer/);
+    raw.layers[0].type = "imagelayer";
+    expect(() => parseTiledMap(raw)).toThrow(/tilelayer.*objectgroup|objectgroup/);
   });
 
   it("erkennt eine Layer-Größe, die nicht zur Map passt", () => {
@@ -173,6 +176,80 @@ describe("parseTiledMap – Validierung (Negativfälle)", () => {
     const raw2 = freshRaw();
     raw2.layers[0].data[0] = 1.5;
     expect(() => parseTiledMap(raw2)).toThrow(/ungültige gid/);
+  });
+});
+
+/* ===== Objekt-Layer (#194, Teil 4) ===== */
+
+/** Baut eine minimale gültige Map mit einem Objekt-Layer „Warps" (ein Objekt mit
+ *  Properties) – Basis für die Positiv-/Negativfälle. */
+function rawWithObjectLayer(): Record<string, any> {
+  const base = freshRaw();
+  base.layers.push({
+    id: 9,
+    name: "Warps",
+    type: "objectgroup",
+    visible: true,
+    opacity: 1,
+    objects: [
+      {
+        id: 1, name: "tuer1", type: "warp", x: 32, y: 48, width: 16, height: 16,
+        properties: [
+          { name: "theme", type: "string", value: "office" },
+          { name: "title", type: "string", value: "Büro" },
+        ],
+      },
+    ],
+  });
+  return base;
+}
+
+describe("parseTiledMap – Objekt-Layer", () => {
+  it("parst einen objectgroup-Layer mit Objekten + Properties", () => {
+    const map = parseTiledMap(rawWithObjectLayer());
+    const group = objectGroup(map, "Warps");
+    expect(group.type).toBe("objectgroup");
+    expect(group.objects).toHaveLength(1);
+    const o = group.objects[0];
+    expect(o.name).toBe("tuer1");
+    expect(o.x).toBe(32);
+    expect(o.y).toBe(48);
+    expect(tiledProps(o)).toEqual({ theme: "office", title: "Büro" });
+  });
+
+  it("objectGroup wirft, wenn der Layer fehlt oder ein Tile-Layer ist", () => {
+    const map = parseTiledMap(rawWithObjectLayer());
+    expect(() => objectGroup(map, "GibtsNicht")).toThrow(/nicht gefunden/);
+    expect(() => objectGroup(map, "Boden")).toThrow(/tilelayer.*objectgroup|ist ein tilelayer/);
+  });
+
+  it("tileLayer wirft, wenn der Name ein Objekt-Layer ist (kein data-Zugriff ins Leere)", () => {
+    const map = parseTiledMap(rawWithObjectLayer());
+    expect(() => tileLayer(map, "Warps")).toThrow(/objectgroup|erwartet wurde ein tilelayer/);
+  });
+
+  it("lehnt einen objectgroup-Layer ohne objects-Array ab", () => {
+    const raw = rawWithObjectLayer();
+    delete raw.layers[raw.layers.length - 1].objects;
+    expect(() => parseTiledMap(raw)).toThrow(/objects-Array/);
+  });
+
+  it("lehnt ein Objekt ohne name ab (name = stabile ID)", () => {
+    const raw = rawWithObjectLayer();
+    delete raw.layers[raw.layers.length - 1].objects[0].name;
+    expect(() => parseTiledMap(raw)).toThrow(/braucht einen name/);
+  });
+
+  it("lehnt eine property mit nicht unterstütztem Wert-Typ ab", () => {
+    const raw = rawWithObjectLayer();
+    raw.layers[raw.layers.length - 1].objects[0].properties[0].value = { nested: true };
+    expect(() => parseTiledMap(raw)).toThrow(/nicht unterstützten Wert-Typ/);
+  });
+
+  it("lehnt ein Objekt ohne numerische Koordinaten ab", () => {
+    const raw = rawWithObjectLayer();
+    raw.layers[raw.layers.length - 1].objects[0].x = "nope";
+    expect(() => parseTiledMap(raw)).toThrow(/Zahl für x/);
   });
 });
 
