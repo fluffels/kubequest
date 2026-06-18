@@ -1066,6 +1066,11 @@ export const QUESTS: Quest[] = [
           { t: "Aus einer einzigen großen YAML-Datei mit allem drin.", ok: false,
             reply: "Nein – gerade NICHT. Die Stärke ist die Trennung: Vorlage (templates) und Werte (values.yaml) getrennt, Steckbrief in Chart.yaml." },
         ]},
+      { type: "dialog", npc: "runa", lines: [
+        "Drei Werft-Kniffe noch fürs echte Leben, Lotse: Im <code>Chart.yaml</code> stehen ZWEI Versionen – <code>version</code> ist die der <b>Verpackung</b> (SemVer: Major bricht was, Minor = neue Property, Patch = Kleinkram), <code>appVersion</code> die der <b>Fracht</b> (deiner App). Bei jeder Änderung die Chart-version hochziehen, sonst sind Rollback und Diffs blind.",
+        "Charts können andere Charts <b>mitschleppen</b>: Unter <code>dependencies:</code> bündelt ein <b>Umbrella-Chart</b> ganze Subcharts (backend, keycloak …), jedes mit gepinnter Version. <code>helm dependency update</code> zurrt sie in <code>Chart.lock</code> fest – reproduzierbar, überall gleich.",
+        "Und statt EINER <code>values.yaml</code> legst du mehrere übereinander: <code>helm install … -f base.yaml -f prod.yaml</code> – das spätere <code>-f</code> gewinnt. Gleiches Chart, andere Werte je Hafen (Test, Prod, je Region). Kralle drillt dich dazu ab! ⎈",
+      ]},
     ]},
 
   { id: "q22", title: "Die Hafenmauer", giver: "juno", rewardXp: 60, rewardCoins: 45,
