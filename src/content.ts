@@ -11,5 +11,6 @@ import { DRILLS, PRACTICE } from "./content/drills";
 import { SMALLTALK } from "./content/smalltalk";
 import { CRAB_QUIZ, CMD_CARDS } from "./content/quiz";
 import { STACK_ROUNDS, corruptImage } from "./content/minigame";
+import { GLOSSARY, applyGlossary } from "./content/glossary";
 
-export const KQContent = { RANKS, SHOP, NPCS, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS, corruptImage };
+export const KQContent = { RANKS, SHOP, NPCS, QUESTS, SMALLTALK, CRAB_QUIZ, CMD_CARDS, DRILLS, PRACTICE, STACK_ROUNDS, corruptImage, GLOSSARY, applyGlossary };

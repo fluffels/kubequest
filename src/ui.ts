@@ -508,7 +508,7 @@ import { worldScene, interiorOpen } from "./runtime";
 
     renderDialogueLine() {
       const d = this.dialogue;
-      $("dlg-text").innerHTML = d.lines[d.idx];
+      $("dlg-text").innerHTML = KQContent.applyGlossary(d.lines[d.idx]);
       $("dlg-next").textContent = d.idx < d.lines.length - 1 ? "▼ weiter (E)" : "✔ fertig (E)";
       $("dlg-next").classList.remove("hidden");
     },
@@ -530,14 +530,14 @@ import { worldScene, interiorOpen } from "./runtime";
       this.dialogue = { npcId: step.npc, lines: [], idx: 0, onDone, choice: step };
       $("dlg-name").textContent = npc.name + " · " + npc.title;
       this.drawNpcPortrait($("dlg-portrait-canvas") as HTMLCanvasElement, npc);
-      $("dlg-text").innerHTML = "🤔 " + step.q;
+      $("dlg-text").innerHTML = "🤔 " + KQContent.applyGlossary(step.q);
       $("dlg-next").textContent = "↑/↓ wählen · Enter bestätigen";
       $("dlg-next").classList.remove("hidden");
       const box = $("dlg-choices");
       box.innerHTML = "";
       for (const opt of shuffled<any>(step.options)) {
         const btn = document.createElement("button");
-        btn.innerHTML = opt.t;
+        btn.innerHTML = KQContent.applyGlossary(opt.t);
         btn.onclick = () => this.answerChoice(step, opt, btn);
         box.appendChild(btn);
       }
@@ -558,7 +558,7 @@ import { worldScene, interiorOpen } from "./runtime";
       Game.choiceResult(step.reviewId, opt.ok);
       if (opt.ok) this.reward(12, 6);
       else SFX.wrong();
-      $("dlg-text").innerHTML = (opt.ok ? "✅ " : "❌ ") + opt.reply;
+      $("dlg-text").innerHTML = (opt.ok ? "✅ " : "❌ ") + KQContent.applyGlossary(opt.reply);
       $("dlg-next").textContent = "✔ weiter (E)";
       $("dlg-next").classList.remove("hidden");
       d.choice = null;
@@ -636,8 +636,8 @@ import { worldScene, interiorOpen } from "./runtime";
         const q = Game.currentQuest();
         html += `<div class="tt-head">📜 ${q.title}: ${step.brief}</div>`;
         if (step.type === "teach") {
-          html += `<div class="tt-new">${step.cmd.intro}</div>`;
-          html += `<div class="tt-item current">▶️ ${step.cmd.text}</div>`;
+          html += `<div class="tt-new">${KQContent.applyGlossary(step.cmd.intro)}</div>`;
+          html += `<div class="tt-item current">▶️ ${KQContent.applyGlossary(step.cmd.text)}</div>`;
         } else if (step.type === "drill") {
           html += `<div class="dim" style="margin-bottom:8px">${step.intro}</div>`;
           html += `<div class="dim">Übung ${Math.min((Game.state.taskIdx || 0) + 1, step.count)} von ${step.count}</div>`;

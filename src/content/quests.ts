@@ -68,7 +68,7 @@ export const QUESTS: Quest[] = [
   { id: "q2", title: "Den Überblick behalten", giver: "bo", rewardXp: 30, rewardCoins: 22,
     steps: [
       { type: "dialog", npc: "bo", lines: [
-        "ZWEITE LEKTION. Kisten starten kannst du. Aber: Welche laufen gerade? Dafür gibt es <code>docker ps</code> – die Liste aller <b>laufenden</b> Container.",
+        "ZWEITE LEKTION. Kisten starten kannst du. Aber: Welche laufen gerade? Dafür gibt es <code>docker ps</code> – die Liste aller <b>laufenden</b> [[Container]].",
       ]},
       { type: "teach", brief: "Kisten-Liste", cmd: {
         id: "t-ps", intro: "🆕 Neuer Befehl: <code>docker ps</code> – zeigt laufende Container.",
@@ -108,7 +108,7 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "bo", lines: [
         "LETZTE DOCKER-LEKTION. Profis geben Kisten <b>eigene Namen</b> (<code>--name</code>) und schicken sie mit <code>-d</code> in den <b>Hintergrund</b>.",
         "<code>-d</code> heißt <b>„detached“</b> – abgekoppelt. OHNE <code>-d</code> klemmt sich dein <b>Funkgerät an die Kiste</b>: Du siehst ihre Ausgabe, aber die Leitung ist <b>blockiert</b>, bis die Kiste schließt – kein anderer Befehl geht durch. MIT <code>-d</code> läuft die Kiste <b>abgekoppelt im Hintergrund weiter</b>, und das Funkgerät ist sofort wieder frei für den nächsten Befehl. Bo lässt das Funkgerät NIE blockieren. Bo ist Stein.",
-        "Zusammen: <code>docker run -d --name webserver nginx</code>. Sieht lang aus – Bo zerlegt es Stück für Stück: <code>run</code> startet eine Kiste · <code>-d</code> ab in den Hintergrund · <code>--name webserver</code> = so soll <b>DEINE</b> Kiste heißen (<b>Wunschname, frei wählbar</b>) · <code>nginx</code> = das <b>Image</b>, der Bausatz, aus dem die Kiste entsteht (kommt von außen, NICHT frei erfunden).",
+        "Zusammen: <code>docker run -d --name webserver nginx</code>. Sieht lang aus – Bo zerlegt es Stück für Stück: <code>run</code> startet eine Kiste · <code>-d</code> ab in den Hintergrund · <code>--name webserver</code> = so soll <b>DEINE</b> Kiste heißen (<b>Wunschname, frei wählbar</b>) · <code>nginx</code> = das <b>[[Image]]</b>, der Bausatz, aus dem die Kiste entsteht (kommt von außen, NICHT frei erfunden).",
         "Verwechsle die letzten zwei NIE: hinter <code>--name</code> steht dein eigener Name, ganz hinten steht das Image. <code>docker run -d --name <b>meine-kiste</b> nginx</code> ginge genauso – nur <code>nginx</code> muss als Bauplan existieren.",
         "Noch eine Erleichterung: Die <b>Reihenfolge der Optionen ist frei</b> – <code>-d --name webserver</code> oder <code>--name webserver -d</code>, beides gilt. Bo-Regel: <b>erst alle Optionen, dann das Image</b> ganz zuletzt. Was NACH dem Image steht, hält die Kiste für einen eigenen Befehl. Du schaffst das.",
       ]},
@@ -128,7 +128,7 @@ export const QUESTS: Quest[] = [
             reply: "NEIN. Nicht schneller – ÜBERALL GLEICH. Das ist der Schatz." },
         ]},
       { type: "dialog", npc: "bo", lines: [
-        "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Aber eins fehlt noch: Bisher hast du nur <b>fertige</b> Baupläne aus der Registry geholt. Ein echter Profi baut auch seinen <b>eigenen</b>. Bleib noch einen Moment bei Bo!",
+        "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Aber eins fehlt noch: Bisher hast du nur <b>fertige</b> Baupläne aus der [[Registry]] geholt. Ein echter Profi baut auch seinen <b>eigenen</b>. Bleib noch einen Moment bei Bo!",
       ]},
     ]},
 
@@ -175,8 +175,8 @@ export const QUESTS: Quest[] = [
       { type: "choice", npc: "bo", reviewId: "q-ch1-6",
         q: "Was ist der Unterschied zwischen <code>docker pull</code> und <code>docker build</code>?",
         options: [
-          { t: "pull lädt ein FERTIGES Image aus der Registry, build baut aus einem Dockerfile ein EIGENES.", ok: true,
-            reply: "GENAU. Konsumieren vs. selbst herstellen. Mit build bist du nicht mehr auf fremde Baupläne angewiesen. <i>*anerkennendes Knirschen*</i>" },
+          { t: "pull lädt ein FERTIGES [[Image]] aus der [[Registry]], build baut aus einem Dockerfile ein EIGENES.", ok: true,
+            reply: "GENAU. Konsumieren vs. selbst herstellen. Mit [[build]] bist du nicht mehr auf fremde Baupläne angewiesen. <i>*anerkennendes Knirschen*</i>" },
           { t: "Kein Unterschied – beide laden ein Image herunter.", ok: false,
             reply: "NEIN. pull HOLT ein fertiges Image. build STELLT eines HER – aus deinem Dockerfile. Das ist der ganze Punkt!" },
         ]},
