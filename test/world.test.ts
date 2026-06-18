@@ -6,7 +6,8 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, SHIP, SHIP_DOOR, SHIP_PIER, shipTile } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, shipTile, type Door } from "../src/world";
+import type { TiledObjectGroup } from "../src/tilemap";
 
 const W = 52, H = 40; // wie WorldScene.create()
 
@@ -233,4 +234,66 @@ test("#108: außerhalb von Schiff und Steg greift die normale Welt-Logik (null)"
   expect(shipTile(SHIP.x + SHIP.w + 2, SHIP.y)).toBeNull();          // rechts vom Schiff
   expect(shipTile(SHIP_PIER.x, SHIP_PIER.y1 + 5)).toBeNull();        // unterhalb von Schiff/Steg
   expect(shipTile(0, 0)).toBeNull();
+});
+
+/* ===== Datengetriebenes Warp-/Tür-System (#194) ===== */
+
+/** Baut einen Tiled-Objektlayer aus Türen (wie ihn harborWarpLayer() erzeugt):
+ *  16×16-Rechteck pro Tür, Kachel als Pixel-Ecke, Warp-Daten als Properties. */
+function groupFrom(doors: Door[]): TiledObjectGroup {
+  return {
+    id: 1, name: "Türen", type: "objectgroup", visible: true, opacity: 1,
+    objects: doors.map((d, i) => {
+      const properties = [
+        { name: "theme", type: "string", value: d.theme },
+        { name: "title", type: "string", value: d.title },
+        ...(d.npc !== undefined ? [{ name: "npc", type: "string", value: d.npc }] : []),
+        ...(d.target !== undefined ? [{ name: "target", type: "string", value: d.target }] : []),
+        ...(d.targetX !== undefined ? [{ name: "targetX", type: "int", value: d.targetX }] : []),
+        ...(d.targetY !== undefined ? [{ name: "targetY", type: "int", value: d.targetY }] : []),
+      ];
+      return { id: i + 1, name: d.id, type: "warp", x: d.tx * TILE, y: d.ty * TILE, width: TILE, height: TILE, properties };
+    }),
+  };
+}
+
+test("doorsFromObjectGroup round-trippt die Code-Eingänge verlustfrei", () => {
+  expect(doorsFromObjectGroup(groupFrom([...ENTRANCES]))).toEqual([...ENTRANCES]);
+});
+
+test("doorsFromObjectGroup rechnet Pixel-Ecke korrekt in Kachel zurück", () => {
+  // Red-Green: ohne floor(x/TILE) läge tx bei einem Pixelwert (z.B. 416 statt 26).
+  const [d] = doorsFromObjectGroup(groupFrom([{ id: "x", tx: 26, ty: 12, title: "T", theme: "office" }]));
+  expect(d.tx).toBe(26);
+  expect(d.ty).toBe(12);
+});
+
+test("doorsFromObjectGroup liest einen Map-Warp (Zielkarte + Zielkoordinate)", () => {
+  const [d] = doorsFromObjectGroup(groupFrom([
+    { id: "anleger", tx: 21, ty: 31, title: "Insel", theme: "", target: "archipel", targetX: 14, targetY: 19 },
+  ]));
+  expect(d.target).toBe("archipel");
+  expect(d.targetX).toBe(14);
+  expect(d.targetY).toBe(19);
+});
+
+test("doorsFromObjectGroup lässt npc/target weg, wenn keine Property gesetzt ist", () => {
+  const [d] = doorsFromObjectGroup(groupFrom([{ id: "x", tx: 1, ty: 1, title: "T", theme: "office" }]));
+  expect(d.npc).toBeUndefined();
+  expect(d.target).toBeUndefined();
+});
+
+test("findDoorAt trifft eine Tür aus einer übergebenen Liste und liefert sonst null", () => {
+  const doors = doorsFromObjectGroup(groupFrom([...ENTRANCES]));
+  for (const d of doors) {
+    expect(findDoorAt(doors, d.tx * TILE + 8, d.ty * TILE + 8)?.id).toBe(d.id);
+    expect(findDoorAt(doors, (d.tx - 1) * TILE + 8, d.ty * TILE + 8)).toBeNull();
+  }
+  expect(findDoorAt([], 0, 0)).toBeNull();
+});
+
+test("doorAt (Default-Eingänge) bleibt deckungsgleich zu findDoorAt(ENTRANCES)", () => {
+  for (const d of [...DOORS, SHIP_DOOR]) {
+    expect(doorAt(d.tx * TILE + 8, d.ty * TILE + 8)).toEqual(findDoorAt(ENTRANCES, d.tx * TILE + 8, d.ty * TILE + 8));
+  }
 });

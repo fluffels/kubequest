@@ -9,8 +9,8 @@
   "height": 40,
   "tilewidth": 16,
   "tileheight": 16,
-  "nextlayerid": 3,
-  "nextobjectid": 1,
+  "nextlayerid": 4,
+  "nextobjectid": 5,
   "compressionlevel": -1,
   "tilesets": [
     {
@@ -132,6 +132,130 @@
         14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
         14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
         14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Türen",
+      "type": "objectgroup",
+      "visible": true,
+      "opacity": 1,
+      "x": 0,
+      "y": 0,
+      "draworder": "topdown",
+      "objects": [
+        {
+          "id": 1,
+          "name": "hafenmeisterei",
+          "type": "warp",
+          "x": 416,
+          "y": 192,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "theme",
+              "type": "string",
+              "value": "office"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "value": "Hafenmeisterei"
+            },
+            {
+              "name": "npc",
+              "type": "string",
+              "value": "ole"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "name": "werft",
+          "type": "warp",
+          "x": 160,
+          "y": 160,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "theme",
+              "type": "string",
+              "value": "forge"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "value": "Werft"
+            },
+            {
+              "name": "npc",
+              "type": "string",
+              "value": "runa"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "kartenhaus",
+          "type": "warp",
+          "x": 640,
+          "y": 176,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "theme",
+              "type": "string",
+              "value": "chart"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "value": "Kartenhaus"
+            },
+            {
+              "name": "npc",
+              "type": "string",
+              "value": "ada"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "name": "schiff",
+          "type": "warp",
+          "x": 544,
+          "y": 512,
+          "width": 16,
+          "height": 16,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "theme",
+              "type": "string",
+              "value": "ship"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "value": "Deine Kajüte"
+            },
+            {
+              "name": "npc",
+              "type": "string",
+              "value": "kralle"
+            }
+          ]
+        }
       ]
     }
   ]

@@ -5,6 +5,8 @@
  * und in test/world.test.ts direkt abgetestet.
  */
 
+import { type TiledObjectGroup, tiledProps } from "./tilemap";
+
 /** Kachelgröße in Pixeln (muss zu T in scenes.ts passen). */
 export const TILE = 16;
 
@@ -37,10 +39,23 @@ export interface Door {
   tx: number;
   ty: number;
   title: string;
-  theme: "office" | "forge" | "chart" | "ship";
+  /** Innenraum-Thema (office/forge/chart/ship …). Bewusst `string`, nicht mehr ein
+   *  fest verdrahtetes Enum (#194): die Türen kommen jetzt aus dem Tiled-Objektlayer,
+   *  das Thema ist eine Daten-Property. `INTERIORS` in scenes.ts ist über `string`
+   *  geschlüsselt; unbekannte Themen fallen dort auf einen leeren Raum zurück. */
+  theme: string;
   /** Bewohner-NPC (Deko-Figur im Innenraum). Beim Schiff die Quiz-Krabbe Kralle,
    *  die nicht in NPC_SPAWNS steht – darum optional. */
   npc?: string;
+  /** Optionaler Karten-Warp (#194): Ziel-Map-ID aus der Registry. Ist `target`
+   *  gesetzt, ist die Tür kein Innenraum, sondern ein Übergang zu einer anderen
+   *  Karte – der Warp-Handler löst die Karte über die Registry auf und setzt den
+   *  Spieler auf (targetX,targetY). Ohne `target` = Innenraum (theme). Die
+   *  bestehenden Hafentüren sind alle Innenräume; das Feld trägt das künftige
+   *  Map-zu-Map-Warpen (z.B. Archipel) über dieselbe Objektlayer-Datenform. */
+  target?: string;
+  targetX?: number;
+  targetY?: number;
 }
 
 export const DOORS: Door[] = [
@@ -90,14 +105,49 @@ export function shipTile(x: number, y: number): ShipTile {
   return inHull ? "water" : null;
 }
 
-/** Alle betretbaren Eingänge (Häuser + Schiff). */
-const ENTRANCES: Door[] = [...DOORS, SHIP_DOOR];
+/** Alle betretbaren Eingänge (Häuser + Schiff) als Code-Default. Dient zugleich
+ *  als Quelle, aus der die Hafenkarte ihren Tiled-Objektlayer „Türen" serialisiert
+ *  (harbormap.ts) – der Datenpfad liest sie von dort zurück (#194). */
+export const ENTRANCES: Door[] = [...DOORS, SHIP_DOOR];
 
-/** Tür/Luke auf der Kachel unter (px,py) (Pixel-Koordinaten, gefloort wie isSolidAt),
- *  oder null. Damit erkennt scenes.ts in der Update-Schleife das Betreten. */
-export function doorAt(px: number, py: number): Door | null {
+/** Tür/Luke auf der Kachel unter (px,py) in einer GEGEBENEN Tür-Liste (Pixel-
+ *  Koordinaten, gefloort wie isSolidAt), oder null. Generisch (#194): der
+ *  Datenpfad reicht die aus dem Objektlayer geparsten Türen herein, statt die
+ *  Hardcode-Liste zu nutzen. */
+export function findDoorAt(doors: readonly Door[], px: number, py: number): Door | null {
   const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
-  return ENTRANCES.find((d) => d.tx === tx && d.ty === ty) || null;
+  return doors.find((d) => d.tx === tx && d.ty === ty) || null;
+}
+
+/** Wie findDoorAt, aber gegen die Code-Default-Eingänge (ENTRANCES). Behält die
+ *  bisherige Aufrufform für den Nicht-Tiled-Pfad und die Tests bei. */
+export function doorAt(px: number, py: number): Door | null {
+  return findDoorAt(ENTRANCES, px, py);
+}
+
+/** Türen/Warps aus einem Tiled-Objektlayer lesen (#194). Jedes Objekt ist ein
+ *  16×16-Rechteck auf einer Kachel; (x,y) sind Pixel der linken oberen Ecke, also
+ *  Kachel = floor(px/TILE). Properties: `theme` (Innenraum), `title`, `npc` und –
+ *  für künftige Map-Warps – `target`/`targetX`/`targetY`. So ersetzt der Objektlayer
+ *  die Hardcode-Liste DOORS, ohne dass scenes.ts Türen kennt. */
+export function doorsFromObjectGroup(group: TiledObjectGroup): Door[] {
+  return group.objects.map((o) => {
+    const p = tiledProps(o);
+    const door: Door = {
+      id: o.name,
+      tx: Math.floor(o.x / TILE),
+      ty: Math.floor(o.y / TILE),
+      title: typeof p.title === "string" ? p.title : o.name,
+      theme: typeof p.theme === "string" ? p.theme : "",
+    };
+    if (typeof p.npc === "string" && p.npc) door.npc = p.npc;
+    if (typeof p.target === "string" && p.target) {
+      door.target = p.target;
+      if (typeof p.targetX === "number") door.targetX = p.targetX;
+      if (typeof p.targetY === "number") door.targetY = p.targetY;
+    }
+    return door;
+  });
 }
 
 /** Die Kachel, auf der ein NPC „steht" – passend zur Flooring-Logik von

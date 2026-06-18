@@ -6,9 +6,12 @@
  * Datei kommt bewusst ohne Phaser aus (wie world.ts/decor.ts) und wird in
  * test/tilemap.test.ts direkt im Node-Test geprüft.
  *
- * Bewusst minimal: Teil 1 deckt orthogonale Maps mit eingebetteten Tilesets und
- * Tile-Layern ab (Boden + Kollision). Object-Layer (Türen/NPC-Spawns, #194/#195)
- * und externe Tileset-Dateien kommen erst in späteren Teilen dazu.
+ * Teil 1 deckte orthogonale Maps mit eingebetteten Tilesets und Tile-Layern ab
+ * (Boden + Kollision). Teil 4 (#194) ergänzt Objekt-Layer (`objectgroup`) mit
+ * benannten Objekten + Custom-Properties – die Datengrundlage für das Warp-/
+ * Tür-System (Türen aus dem Objektlayer statt aus der Hardcode-Liste `DOORS`);
+ * NPC-Spawns (#195) nutzen dieselben Objekt-Layer. Externe Tileset-Dateien sind
+ * weiterhin nicht unterstützt.
  */
 
 /** Ein im .tmj eingebettetes Tileset. Die Pixelmaße/Spalten brauchen wir, damit
@@ -39,7 +42,45 @@ export interface TiledTileLayer {
   opacity: number;
 }
 
-/** Die für Teil 1 relevante Teilmenge einer Tiled-Map (orthogonal, Tile-Layer). */
+/** Eine Custom-Property an einem Tiled-Objekt (Tiled speichert sie als Liste von
+ *  {name,type,value}). Wert auf die in Tiled üblichen Skalartypen begrenzt. */
+export interface TiledProperty {
+  name: string;
+  type: string;
+  value: string | number | boolean;
+}
+
+/** Ein Objekt in einem Objekt-Layer (Rechteck/Punkt). Für unser Warp-System ist
+ *  jedes Objekt ein 16×16-Rechteck auf einer Kachel: (x,y) ist die linke obere
+ *  Ecke in PIXELN (nicht Kacheln), `name` die stabile ID, `properties` tragen die
+ *  Warp-Daten (theme/title/npc bzw. Zielkarte+Zielkoordinate). */
+export interface TiledObject {
+  id: number;
+  name: string;
+  /** Tiled-„class"/type des Objekts (oft leer); wir lesen die Semantik aus name+properties. */
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  properties?: TiledProperty[];
+}
+
+/** Ein Objekt-Layer (`objectgroup`): trägt benannte Objekte statt eines
+ *  Kachelrasters. Datengrundlage für Türen/Warps (#194) und NPC-Spawns (#195). */
+export interface TiledObjectGroup {
+  id: number;
+  name: string;
+  type: "objectgroup";
+  objects: TiledObject[];
+  visible: boolean;
+  opacity: number;
+}
+
+/** Ein Layer ist entweder ein Kachelraster oder ein Objekt-Layer. */
+export type TiledLayer = TiledTileLayer | TiledObjectGroup;
+
+/** Die unterstützte Teilmenge einer Tiled-Map (orthogonal, Tile- + Objekt-Layer). */
 export interface TiledMap {
   type: "map";
   orientation: "orthogonal";
@@ -48,7 +89,7 @@ export interface TiledMap {
   tilewidth: number;
   tileheight: number;
   tilesets: TiledTileset[];
-  layers: TiledTileLayer[];
+  layers: TiledLayer[];
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -112,9 +153,14 @@ function parseTileset(raw: unknown, i: number): TiledTileset {
   };
 }
 
-function parseLayer(raw: unknown, i: number, mapW: number, mapH: number): TiledTileLayer {
+function parseLayer(raw: unknown, i: number, mapW: number, mapH: number): TiledLayer {
   if (!isObj(raw)) throw new Error(`Tiled-Map: Layer #${i} ist kein Objekt`);
-  if (raw.type !== "tilelayer") throw new Error(`Tiled-Map: Layer "${String(raw.name)}" hat type "${String(raw.type)}" – Teil 1 unterstützt nur "tilelayer"`);
+  if (raw.type === "objectgroup") return parseObjectGroup(raw, i);
+  if (raw.type !== "tilelayer") throw new Error(`Tiled-Map: Layer "${String(raw.name)}" hat type "${String(raw.type)}" – unterstützt sind "tilelayer" und "objectgroup"`);
+  return parseTileLayer(raw, i, mapW, mapH);
+}
+
+function parseTileLayer(raw: Record<string, unknown>, i: number, mapW: number, mapH: number): TiledTileLayer {
   if (typeof raw.name !== "string" || raw.name.length === 0) throw new Error(`Tiled-Map: Layer #${i} braucht einen name`);
   if (raw.width !== mapW || raw.height !== mapH) {
     throw new Error(`Tiled-Map: Layer "${raw.name}" (${String(raw.width)}×${String(raw.height)}) passt nicht zur Map-Größe (${mapW}×${mapH})`);
@@ -140,11 +186,77 @@ function parseLayer(raw: unknown, i: number, mapW: number, mapH: number): TiledT
   };
 }
 
-/** Findet einen Tile-Layer per Name; wirft, wenn er fehlt. */
+function parseObjectGroup(raw: Record<string, unknown>, i: number): TiledObjectGroup {
+  if (typeof raw.name !== "string" || raw.name.length === 0) throw new Error(`Tiled-Map: Layer #${i} braucht einen name`);
+  if (!Array.isArray(raw.objects)) throw new Error(`Tiled-Map: Objekt-Layer "${raw.name}" braucht ein objects-Array`);
+  const objects = raw.objects.map((o, j) => parseTiledObject(o, j, raw.name as string));
+  return {
+    id: typeof raw.id === "number" ? raw.id : i + 1,
+    name: raw.name,
+    type: "objectgroup",
+    objects,
+    visible: raw.visible !== false,
+    opacity: typeof raw.opacity === "number" ? raw.opacity : 1,
+  };
+}
+
+function parseTiledObject(raw: unknown, j: number, layerName: string): TiledObject {
+  if (!isObj(raw)) throw new Error(`Tiled-Map: Objekt #${j} im Layer "${layerName}" ist kein Objekt`);
+  if (typeof raw.name !== "string" || raw.name.length === 0) throw new Error(`Tiled-Map: Objekt #${j} im Layer "${layerName}" braucht einen name (= stabile ID)`);
+  const num = (v: unknown, field: string): number => {
+    if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`Tiled-Map: Objekt "${raw.name}" braucht eine Zahl für ${field}`);
+    return v;
+  };
+  return {
+    id: typeof raw.id === "number" ? raw.id : j + 1,
+    name: raw.name,
+    type: typeof raw.type === "string" ? raw.type : "",
+    x: num(raw.x, "x"),
+    y: num(raw.y, "y"),
+    width: num(raw.width, "width"),
+    height: num(raw.height, "height"),
+    ...(raw.properties !== undefined ? { properties: parseProperties(raw.properties, raw.name) } : {}),
+  };
+}
+
+function parseProperties(raw: unknown, objName: string): TiledProperty[] {
+  if (!Array.isArray(raw)) throw new Error(`Tiled-Map: properties von Objekt "${objName}" müssen ein Array sein`);
+  return raw.map((p, k) => {
+    if (!isObj(p) || typeof p.name !== "string" || p.name.length === 0) {
+      throw new Error(`Tiled-Map: property #${k} von Objekt "${objName}" braucht einen name`);
+    }
+    const t = typeof p.value;
+    if (t !== "string" && t !== "number" && t !== "boolean") {
+      throw new Error(`Tiled-Map: property "${p.name}" von Objekt "${objName}" hat einen nicht unterstützten Wert-Typ (${t}) – erlaubt: string/number/boolean`);
+    }
+    return { name: p.name, type: typeof p.type === "string" ? p.type : t, value: p.value as string | number | boolean };
+  });
+}
+
+/** Findet einen Tile-Layer per Name; wirft, wenn er fehlt oder ein Objekt-Layer
+ *  ist (damit `data`-Zugriffe nie ins Leere greifen). */
 export function tileLayer(map: TiledMap, name: string): TiledTileLayer {
   const layer = map.layers.find((l) => l.name === name);
   if (!layer) throw new Error(`Tiled-Map: Layer "${name}" nicht gefunden (vorhanden: ${map.layers.map((l) => l.name).join(", ")})`);
+  if (layer.type !== "tilelayer") throw new Error(`Tiled-Map: Layer "${name}" ist ein ${layer.type}, erwartet wurde ein tilelayer`);
   return layer;
+}
+
+/** Findet einen Objekt-Layer per Name; wirft, wenn er fehlt oder ein Tile-Layer
+ *  ist. Liefert die typisierten Objekte (Türen/Warps/Spawns). */
+export function objectGroup(map: TiledMap, name: string): TiledObjectGroup {
+  const layer = map.layers.find((l) => l.name === name);
+  if (!layer) throw new Error(`Tiled-Map: Objekt-Layer "${name}" nicht gefunden (vorhanden: ${map.layers.map((l) => l.name).join(", ")})`);
+  if (layer.type !== "objectgroup") throw new Error(`Tiled-Map: Layer "${name}" ist ein ${layer.type}, erwartet wurde ein objectgroup`);
+  return layer;
+}
+
+/** Custom-Properties eines Objekts als bequemes Name→Wert-Mapping (Tiled legt
+ *  sie als Liste ab). Fehlende properties → leeres Objekt. */
+export function tiledProps(obj: TiledObject): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  for (const p of obj.properties ?? []) out[p.name] = p.value;
+  return out;
 }
 
 /** Kollisionsraster aus einem benannten Layer: `true`, wo eine Kachel liegt

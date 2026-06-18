@@ -12,7 +12,7 @@
  * Funktionen liegen schon Phaser-frei in harbormap.ts/tilemap.ts.
  */
 import { parseTiledMap, type TiledMap } from "./tilemap";
-import { parseHarborMap, decodeHarborGround, HARBOR_W, HARBOR_H } from "./harbormap";
+import { parseHarborMap, decodeHarborGround, HARBOR_W, HARBOR_H, WARP_LAYER } from "./harbormap";
 import { SHIP } from "./world";
 import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 import testMapRaw from "../assets/maps/test-map.tmj?raw";
@@ -37,6 +37,10 @@ export interface MapEntry {
   /** Layer-Namen, die die Loader brauchen. */
   readonly groundLayer: string;
   readonly collisionLayer: string;
+  /** Optionaler Objekt-Layer mit Türen/Warps (#194). Karten ohne eigene Türen
+   *  (Test-Map) lassen ihn weg; der Loader liest ihn per objectGroup()/
+   *  doorsFromObjectGroup(). */
+  readonly warpLayer?: string;
   /** Spawnpunkt in Kachelkoordinaten (Fallback, falls kein Spielstand-Pos). */
   readonly spawn: { readonly x: number; readonly y: number };
   /** Map-spezifische Validierung (z.B. Hafen prüft die festen 52×40-Maße). */
@@ -58,6 +62,7 @@ export const MAP_REGISTRY: Readonly<Record<MapId, MapEntry>> = {
     tilesets: ["town"],
     groundLayer: "Boden",
     collisionLayer: "Kollision",
+    warpLayer: WARP_LAYER,
     // Default-Spawn = vorderes Deck des eigenen Schiffs (wie bisher in spawnPlayer
     // aus SHIP abgeleitet, jetzt eine Quelle).
     spawn: { x: SHIP.x + 4, y: SHIP.y + 2 },
