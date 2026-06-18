@@ -138,7 +138,7 @@ export const QUESTS: Quest[] = [
         scenario: { files: { "Dockerfile": DOCKERFILE } },
         lines: [
           "Erinnerst du dich ans <b>Stapel-Spiel</b>? Ein Image ist ein Stapel aus <b>Schichten</b>. Diesen Stapel beschreibst du in einer Datei: dem <b>Dockerfile</b>. Das ist DEIN Bauplan.",
-          "Bo hat dir einen hingelegt. Schau ihn dir an: <code>cat Dockerfile</code>. Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App.",
+          "Bo hat dir einen hingelegt. Schau ihn dir an mit <code>cat Dockerfile</code> – <code>cat</code> ist ein winziger Linux-Befehl, der einfach den <b>Inhalt einer Datei ins Terminal schreibt</b> (Muster: <code>cat &lt;datei&gt;</code>). Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App.",
         ] },
       { type: "terminal", brief: "Bauplan lesen", tasks: [
         { id: "t-cat-dockerfile", text: "Lies den Bauplan: <code>cat Dockerfile</code>. Siehst du das <code>FROM</code> ganz oben?",
