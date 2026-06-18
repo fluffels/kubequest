@@ -21,6 +21,11 @@ import { worldScene, interiorOpen } from "./runtime";
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  // Befehls-Karten im Krabben-Quiz: so viele Tipp-Versuche, bevor die Lösung
+  // gezeigt und die Karte als "nicht gekonnt" gewertet wird (#234). Jederzeit
+  // kann man per "Lösung zeigen" früher aussteigen – man hängt also nie fest.
+  const CMD_MAX_ATTEMPTS = 3;
+
   function shuffled<T>(arr: T[]): T[] {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -91,6 +96,7 @@ import { worldScene, interiorOpen } from "./runtime";
           case "startFreePractice": this.startFreePractice(); break;
           case "nextReviewItem": this.nextReviewItem(); break;
           case "answerReviewQuiz": this.answerReviewQuiz(Number(el.dataset.oi)); break;
+          case "revealReviewCmd": this.revealReviewCmd(); break;
         }
       });
       // Audio-Regler/-Schalter im Menü: Checkboxen feuern "change", Slider "input".
@@ -1046,7 +1052,7 @@ import { worldScene, interiorOpen } from "./runtime";
               </div></div>`;
         return;
       }
-      this.review = { ids: dueIds, idx: 0, right: 0, free: false };
+      this.review = { ids: dueIds, idx: 0, right: 0, assisted: 0, free: false };
       this.renderReviewItem();
     },
 
@@ -1077,7 +1083,7 @@ import { worldScene, interiorOpen } from "./runtime";
       $("overlay-review").classList.remove("hidden");
       const ids = Game.freeReviewItems(10);
       if (ids.length === 0) { this.openReview(); return; }
-      this.review = { ids, idx: 0, right: 0, free: true };
+      this.review = { ids, idx: 0, right: 0, assisted: 0, free: true };
       this.renderReviewItem();
     },
 
@@ -1107,6 +1113,7 @@ import { worldScene, interiorOpen } from "./runtime";
         $("review-body").innerHTML = `<div style="text-align:center">
           <div style="font-size:3em">🦀</div>
           <h2>${r.right} von ${r.ids.length} richtig!</h2>
+          ${r.assisted ? `<p class="dim">🪄 ${r.assisted} mit Hilfe gelöst – die üben wir zur Sicherheit bald nochmal.</p>` : ""}
           <p class="dim">${free
             ? "Freies Üben – so oft du willst! (zählt nicht in den täglichen Wiederholungs-Plan)"
             : "Richtige Karten kommen seltener wieder, falsche öfter – bis alles sitzt. Schnipp!"}</p>
@@ -1120,7 +1127,7 @@ import { worldScene, interiorOpen } from "./runtime";
       const itemId = r.ids[r.idx];
       const content = Game.findReviewContent(itemId);
       if (!content) { r.idx++; return this.renderReviewItem(); }
-      r.current = { itemId, content, answered: false };
+      r.current = { itemId, content, answered: false, attempts: 0 };
 
       let body;
       if (content.kind === "quiz") {
@@ -1164,28 +1171,68 @@ import { worldScene, interiorOpen } from "./runtime";
       if (!r || r.current.answered) return;
       const line = ev.target.value.trim().replace(/\s+/g, " ");
       if (!line) return;
-      r.current.answered = true;
-      ev.target.disabled = true;
       const card = r.current.content.card;
       const correct = card.accept.some((re: RegExp) => re.test(line));
-      // Nicht nur die Musterlösung zeigen, sondern begründen warum (#233) – analog zum Quiz-explain.
-      const sol = correct ? "" : "Die Lösung: <code>" + esc(card.solution) + "</code>. ";
-      this.finishReviewItem(correct, sol + (card.explain || ""));
+      if (correct) {
+        // Beim 1. Versuch richtig zählt voll; erst nach Retry richtig = "mit Hilfe gelöst" (#234).
+        const assisted = r.current.attempts > 0;
+        r.current.answered = true;
+        ev.target.disabled = true;
+        this.finishReviewItem(true, card.explain || "", assisted);
+        return;
+      }
+      // Falsch: nicht weiterspringen, sondern erneut tippen lassen (#234). Begründung
+      // warum falsch zeigen (#233) – aber NICHT die Musterlösung, sonst wird sie nur
+      // abgeschrieben statt gekonnt. Nach CMD_MAX_ATTEMPTS Versuchen die Lösung zeigen.
+      r.current.attempts++;
+      SFX.wrong();
+      if (r.current.attempts >= CMD_MAX_ATTEMPTS) { this.revealReviewCmd(); return; }
+      const remaining = CMD_MAX_ATTEMPTS - r.current.attempts;
+      $("review-explain").innerHTML = `
+        <div class="quiz-explain">❌ <b>Nicht ganz.</b> ${card.explain || ""}
+          <div class="dim" style="margin-top:.4em">🦀 „Nochmal tippen, Matrose!“ – noch ${remaining} Versuch${remaining === 1 ? "" : "e"}.</div></div>
+        <div class="actions"><button data-action="revealReviewCmd">Lösung zeigen ➡️</button></div>`;
+      // Eingabefeld wieder freigeben und markieren, damit gleich neu getippt werden kann.
+      ev.target.disabled = false;
+      ev.target.focus();
+      ev.target.select();
     },
 
-    finishReviewItem(correct: boolean, explainHtml: string) {
+    /** Bricht den Tipp-Versuch bei einer Befehls-Karte ab: zeigt die Musterlösung
+     *  und wertet die Karte als "nicht gekonnt" (aufgegeben / Versuche aufgebraucht, #234). */
+    revealReviewCmd() {
       const r = this.review;
+      if (!r || r.current.answered || r.current.content.kind !== "cmd") return;
+      r.current.answered = true;
+      const inp = $("review-input") as HTMLInputElement | null;
+      if (inp) inp.disabled = true;
+      const card = r.current.content.card;
+      this.finishReviewItem(false, "Die Lösung: <code>" + esc(card.solution) + "</code>. " + (card.explain || ""));
+    },
+
+    finishReviewItem(correct: boolean, explainHtml: string, assisted = false) {
+      const r = this.review;
+      // "Mit Hilfe gelöst" (erst nach Retry richtig) zählt fürs Spaced Repetition NICHT
+      // als sicher gekonnt – die Karte soll bald wiederkommen (#234, offene Frage).
+      const secure = correct && !assisted;
       if (r.free) {
         // Freies Üben: SR-Plan unangetastet lassen, keine Belohnung (kein Farmen)
-        if (correct) { r.right++; SFX.success(); }
+        if (correct) { if (secure) r.right++; else r.assisted++; SFX.success(); }
         else SFX.wrong();
       } else {
-        Game.reviewResult(r.current.itemId, correct);
-        if (correct) { r.right++; this.reward(4, 3); }
-        else SFX.wrong();
+        Game.reviewResult(r.current.itemId, secure);
+        if (correct) {
+          if (secure) { r.right++; this.reward(4, 3); }
+          else { r.assisted++; SFX.success(); }   // mit Hilfe: kein voller Reward
+        } else SFX.wrong();
       }
+      const head = correct
+        ? (assisted
+            ? "✅ <b>Richtig – mit Hilfe gelöst.</b> 🦀 Die Karte kommt zur Sicherheit bald nochmal."
+            : "✅ <b>Richtig!</b> Schnipp-schnapp-applaus! 🦀")
+        : "❌ <b>Nicht ganz.</b>";
       $("review-explain").innerHTML = `
-        <div class="quiz-explain">${correct ? "✅ <b>Richtig!</b> Schnipp-schnapp-applaus! 🦀" : "❌ <b>Nicht ganz.</b>"} ${explainHtml}</div>
+        <div class="quiz-explain">${head} ${explainHtml}</div>
         <div class="actions"><button class="primary" data-action="nextReviewItem">Weiter ➡️</button></div>`;
     },
 

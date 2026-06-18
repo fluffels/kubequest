@@ -37,7 +37,7 @@ Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
 2. **⌨️ Nachtippen** – du tippst ihn selbst im Funkgerät
 3. **🏋️ Drills** – Zufalls-Varianten („anderes Image, anderer Name, andere Zahl") bis es sitzt
 4. **🤔 Verständnisfrage** – ins Gespräch eingebaut, keine Quiz-Wände
-5. **🦀 Krabbe Kralle** – tägliche Karteikarten (Spaced Repetition), falsch Beantwortetes kommt öfter
+5. **🦀 Krabbe Kralle** – tägliche Karteikarten (Spaced Repetition), falsch Beantwortetes kommt öfter; bei Befehls-Karten darfst du nach einem Fehler den Befehl **erneut eintippen** (Lösung gibt's auf Wunsch oder nach ein paar Versuchen)
 
 Dazu kannst du **jederzeit bei jedem NPC üben** (ansprechen → „Üben") – gibt Dublonen!
 
