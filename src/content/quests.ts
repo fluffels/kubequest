@@ -10,7 +10,7 @@ import type { Sim } from "../sim";
 import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
-  ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML,
+  ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML, SERVICEMONITOR_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1635,5 +1635,101 @@ export const QUESTS: Quest[] = [
           { t: "Die Wurzel-Application rollt selbst alle Dienste aus und macht die Kind-Applications überflüssig.", ok: false,
             reply: "Andersherum: Die Wurzel rollt <i>keinen</i> eigenen Dienst aus. Sie zeigt nur auf die Kind-Applications – die rollen ihre Dienste selbst aus. Genau diese Trennung ist der Kern des Musters." },
         ]},
+    ]},
+
+  // ===== Phase 5: Monitoring-Leuchtturm – Quest 1 (Einstieg): Metriken & Prometheus (#113) =====
+  // Erste Quest bei Leuchtturmwärterin Lumi: warum Observability, wie Prometheus per PULL
+  // über /metrics scrapt (Targets up/down), `kubectl top pods/nodes` lesen und mit einem
+  // ServiceMonitor festlegen, WELCHEN Service Prometheus abgrast. Hands-on gegen den Sim
+  // (#109/#110), Theorie über Dialog/Choice. Entspannt & belohnend (#52).
+  { id: "q32", title: "Licht ins Dunkel: die ersten Metriken", giver: "lumi", rewardXp: 50, rewardCoins: 40,
+    steps: [
+      { type: "dialog", npc: "lumi", lines: [
+        "Ahoi und herauf auf die Klippe! Ich bin <b>Lumi</b>, ich halte hier oben den <b>Monitoring-Leuchtturm</b> am Brennen. Schön, dass du den Aufstieg gewagt hast.",
+        "Mein Wahlspruch: <b>Erst messen, dann meckern.</b> Drüben im Hafen läuft alles – aber <i>woher</i> weißt du das eigentlich? Was du nicht <b>siehst</b>, kannst du nicht reparieren. Genau dafür gibt es <b>Observability</b>: den Hafen sichtbar machen.",
+        "Mein wichtigstes Werkzeug heißt <b>Prometheus</b>. Stell es dir wie meinen Leuchtturm-Blick vor: In festem Takt – etwa alle 15 Sekunden – schaut Prometheus bei jedem Dienst vorbei und liest dessen Zahlen ab.",
+      ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Und merk dir die Richtung, das ist der Knackpunkt: Prometheus <b>holt</b> sich die Zahlen selbst – es <b>scrapt</b> (engl. <i>to scrape</i> = abkratzen/abgrasen) jeden Dienst über dessen <code>/metrics</code>-Seite. Das ist <b>Pull</b>: der Wächter geht zu den Diensten, nicht die Dienste zum Wächter.",
+        "Jeden Dienst, den Prometheus abgrast, nennen wir ein <b>Target</b> (Scrape-Ziel). Antwortet es, steht das Target auf <b>up</b>; schweigt es, auf <b>down</b> – und ein stummes Target ist oft das erste Zeichen, dass etwas im Argen liegt.",
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-scrape",
+        q: "Wie kommt <b>Prometheus</b> an die Zahlen eines Dienstes?",
+        options: [
+          { t: "Es <b>scrapt</b> sie im Takt selbst ab – es ruft die <code>/metrics</code>-Seite des Dienstes auf (Pull). Antwortet das Target, ist es <b>up</b>.", ok: true,
+            reply: "Genau! Pull-Prinzip: Prometheus geht von sich aus bei jedem Target vorbei und liest <code>/metrics</code>. Schweigt eins, steht es auf <b>down</b> – das erste Warnsignal." },
+          { t: "Jeder Dienst schickt seine Zahlen von sich aus an Prometheus (Push), sobald sich etwas ändert.", ok: false,
+            reply: "Nicht beim klassischen Prometheus: Es <i>holt</i> (pull) die Metriken selbst über <code>/metrics</code> ab, statt sie zugeschickt zu bekommen. Die Richtung ist genau andersherum." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Genug Theorie – schau selbst hin. Die schnellste Sofort-Ansicht der Last bekommst du mit <code>kubectl top</code>: Es zeigt dir live, wie viel <b>CPU</b> und <b>Speicher</b> gerade verbraucht wird. Fang bei den Pods an.",
+      ]},
+      { type: "teach", brief: "Last der Pods lesen", cmd: {
+        id: "t-top-pods",
+        intro: "🆕 Neuer Befehl: <code>kubectl top pods</code> – zeigt die <b>aktuelle</b> CPU- (in Millicores, <code>m</code>) und Speicher-Last (in <code>Mi</code>) je laufendem Pod. Die Zahlen liefert der metrics-server, dieselbe Quelle, aus der auch Prometheus schöpft.",
+        text: "Lies die Pod-Last: <code>kubectl top pods</code>. Welcher Pod zieht am meisten?",
+        accept: [/^kubectl\s+top\s+(pods|pod|po)$/], solution: "kubectl top pods",
+        hint: "kubectl top pods (Kurzform: po)." } },
+      { type: "terminal", brief: "Auch die Stege messen", tasks: [
+        { id: "t-top-nodes", text: "Zoom eine Ebene raus: <code>kubectl top nodes</code> zeigt die Last pro <b>Node</b> (Steg) – CPU/Speicher absolut und in Prozent. So siehst du, ob ein ganzer Server an seine Grenze kommt.",
+          accept: [/^kubectl\s+top\s+(nodes|node|no)$/], solution: "kubectl top nodes",
+          hint: "kubectl top nodes (Kurzform: no)." },
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-top",
+        q: "Was zeigt dir <code>kubectl top pods</code>?",
+        options: [
+          { t: "Die <b>aktuelle</b> CPU- und Speicher-Last je laufendem Pod (CPU in <code>m</code>, Speicher in <code>Mi</code>).", ok: true,
+            reply: "Richtig! Ein Live-Blick auf den Verbrauch – ideal, um schnell den heißen Pod zu finden. <code>kubectl top nodes</code> macht dasselbe für die ganzen Stege." },
+          { t: "Die <b>Logs</b> jedes Pods, also die Textausgaben des Programms.", ok: false,
+            reply: "Das wären <code>kubectl logs</code>. <code>top</code> zeigt keine Texte, sondern Zahlen: wie viel CPU und Speicher gerade verbraucht wird." },
+          { t: "Ob ein Pod <b>läuft</b> oder abgestürzt ist (Status Running/CrashLoop).", ok: false,
+            reply: "Den Status zeigt <code>kubectl get pods</code>. <code>top</code> geht eine Stufe tiefer: nicht <i>ob</i>, sondern <i>wie viel</i> er gerade verbraucht." },
+        ]},
+      { type: "dialog", npc: "lumi",
+        scenario: {
+          files: { "servicemonitor.yaml": SERVICEMONITOR_YAML },
+          applyEffects: {
+            "servicemonitor.yaml": { serviceMonitor: { name: "lager-monitor", selector: "lager", port: "metrics", interval: "30s" } },
+          },
+        },
+        lines: [
+          "<code>top</code> ist der schnelle Blick. Damit Prometheus einen Dienst aber <b>dauerhaft</b> im Takt abgrast, muss ich ihm sagen: „Diesen Service bitte scrapen.“ Dafür gibt es ein eigenes Manifest – den <b>ServiceMonitor</b>.",
+          "Ein ServiceMonitor ist ein deklaratives Stück YAML (eine CRD des Prometheus-Operators): sein <code>selector</code> wählt per Label den Service aus, seine <code>endpoints</code> sagen, an welchem Port und in welchem Takt <code>/metrics</code> abgegrast wird.",
+          "Ich hab dir einen vorbereitet: <code>servicemonitor.yaml</code> für unseren <b>lager</b>-Service. Schau ihn dir erst an, dann grasen wir ihn an Prometheus an.",
+        ] },
+      { type: "terminal", brief: "Den Scrape-Auftrag lesen", tasks: [
+        { id: "t-sm-ls", text: "Was liegt hier? <code>ls</code>.",
+          accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-sm-cat", text: "Lies den Auftrag: <code>cat servicemonitor.yaml</code>. Findest du <code>kind: ServiceMonitor</code>, den <code>selector</code> (welcher Service) und das <code>interval</code> (wie oft gescrapt wird)?",
+          accept: [/^cat\s+servicemonitor\.yaml$/], solution: "cat servicemonitor.yaml", hint: "cat servicemonitor.yaml" },
+      ]},
+      { type: "teach", brief: "Service ins Monitoring nehmen", cmd: {
+        id: "t-sm-apply",
+        intro: "🆕 Der ServiceMonitor ist ein ganz normales Manifest – du wendest ihn mit dem vertrauten <code>kubectl apply -f</code> an. Ab jetzt weiß Prometheus, dass es den <b>lager</b>-Service scrapen soll.",
+        text: "Nimm den Service ins Monitoring: wende <code>servicemonitor.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+servicemonitor\.yaml$/],
+        check: (sim: Sim) => sim.serviceMonitors.some(s => s.name === "lager-monitor"),
+        solution: "kubectl apply -f servicemonitor.yaml",
+        hint: "kubectl apply -f <datei> – der vertraute Befehl aus dem Kartenhaus." } },
+      { type: "terminal", brief: "Nachschauen, was gescrapt wird", tasks: [
+        { id: "t-sm-get", text: "Prüf, dass der Auftrag steht: <code>kubectl get servicemonitors</code>. Dein <code>lager-monitor</code> taucht jetzt auf – Prometheus grast den Service ab.",
+          accept: [/^kubectl\s+get\s+(servicemonitors|servicemonitor|smon)$/],
+          check: (sim: Sim) => sim.serviceMonitors.some(s => s.name === "lager-monitor"),
+          solution: "kubectl get servicemonitors", hint: "kubectl get servicemonitors (Kurzform: smon)." },
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-servicemonitor",
+        q: "Wozu dient ein <b>ServiceMonitor</b>?",
+        options: [
+          { t: "Er sagt Prometheus deklarativ, <b>welchen</b> Service es scrapen soll – per <code>selector</code> (Label) plus Port & Intervall in <code>endpoints</code>.", ok: true,
+            reply: "Genau! Der ServiceMonitor ist der deklarative Scrape-Auftrag: Selector wählt den Service, endpoints legen Port und Takt fest. Kein Prometheus-Config-Gefummel von Hand. 🔦" },
+          { t: "Er startet einen neuen Pod, der den Service überwacht und bei Fehlern neu startet.", ok: false,
+            reply: "Nein – er startet nichts. Ein ServiceMonitor ist nur eine Beschreibung für Prometheus: <i>welchen</i> Service grase ich ab und wie. Das Scrapen macht Prometheus selbst." },
+          { t: "Er verschickt die Metriken per Push an einen externen Server.", ok: false,
+            reply: "Andersherum: Prometheus <i>holt</i> sich die Metriken (Pull). Der ServiceMonitor legt nur fest, <b>welches</b> Target dafür in Frage kommt – verschickt selbst nichts." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Sieh an – du misst, statt zu raten. <code>top</code> für den schnellen Blick, ein <b>ServiceMonitor</b>, damit Prometheus dauerhaft dranbleibt. Das Fundament steht.",
+        "Beim nächsten Mal machen wir die Zahlen <b>hübsch</b>: ein <b>Grafana</b>-Dashboard, das den Hafen auf einen Blick zeigt – schöner als jeder Sonnenuntergang. Komm wieder hoch auf die Klippe! 🔦",
+      ]},
     ]},
 ];
