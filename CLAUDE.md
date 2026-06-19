@@ -57,7 +57,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Datei | Schicht | Inhalt |
 |---|---|---|
 | [`src/main.ts`](src/main.ts) | Einstieg | Start & Tastatursteuerung |
-| [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl inkl. `top`/`logs -f`/`--previous`, helm, terraform, git, argocd/GitOps); Observability-Grundlage #109: Pod-/Node-Metriken, Alert-State (firing→resolved), Prometheus-Scrape-Targets – via `podMetrics()`/`nodeMetrics()`/`alerts()`/`scrapeTargets()` |
+| [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl inkl. `top`/`logs -f`/`--previous`, helm, terraform, git, argocd/GitOps); Observability-Grundlage #109: Pod-/Node-Metriken, Alert-State (firing→resolved), Prometheus-Scrape-Targets – via `podMetrics()`/`nodeMetrics()`/`alerts()`/`scrapeTargets()`; Monitoring-CRDs (ServiceMonitor/PrometheusRule/Grafana) via `kubectl apply`/`get` #110 (Manifeste in [`src/content/manifests.ts`](src/content/manifests.ts)) |
 | [`src/content.ts`](src/content.ts) | pure Domäne | Fassade: bündelt `src/content/*` (Quests, Drills, Quiz, NPCs, Progression, Minispiel) zum `KQContent`-Objekt |
 | [`src/content/abbrev.ts`](src/content/abbrev.ts) | pure Domäne | Baustein-Katalog (#287/#298): SSOT aller Langform↔Kürzel-Paare (`-a`/`--all`, `pods`/`po` …) mit Freischalt-ID + `findAbbrevByShort` – Grundlage der „verdiente Abkürzung"-Mechanik (Gating #299, Lernpfad #300); validiert in `test/abbrev.test.ts` gegen den echten Content |
 | [`src/world.ts`](src/world.ts) | pure Domäne | Welt-Geometrie (Kachelraster, NPC-Standplätze, Solid-Kacheln) – Phaser-frei, von `scenes.ts` genutzt |
