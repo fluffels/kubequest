@@ -50,7 +50,7 @@ export interface GameState {
   /** Serialisierter Cluster-Zustand (genau die Form von Sim.snapshot()). */
   clusterSnapshot: Scenario | null;
   /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke; track = gewähltes Musikstück). */
-  audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number; track: string };
+  audio: AudioConfig;
   /** Spiel-Feel: Frequenz/Härte der Zufalls-Events (Anti-Frust, #71). */
   settings: { events: EventMode };
   /** Abgeschlossene Quests seit dem letzten Review-Gate-Feuern (#323).
@@ -63,6 +63,21 @@ export interface GameState {
  *  `normal` = volle Härte, `cozy` = seltener/sanfter + gemilderter Malus,
  *  `off` = keine Zufalls-Events und kein Malus. */
 export type EventMode = "normal" | "cozy" | "off";
+
+/** Audio-Einstellungen (Teil von GameState.audio). Liegt bewusst in der
+ *  Typ-/Domänen-Schicht, NICHT in `sfx.ts` (Präsentation): so können Anwendung
+ *  (game.ts) und das Laufzeit-Wiring (runtime.ts) den Typ nutzen, ohne auf die
+ *  Präsentations-Schicht zu zeigen. `sfx.ts` re-exportiert ihn nur. */
+export interface AudioConfig {
+  music: boolean;
+  sfx: boolean;
+  /** Lautstärke 0..1 */
+  musicVol: number;
+  /** Lautstärke 0..1 */
+  sfxVol: number;
+  /** ID des aktuell gewählten Musikstücks (siehe MUSIC_THEMES in sfx.ts). */
+  track: string;
+}
 
 /** Ergebnis einer simulierten Befehlszeile (Sim.exec). */
 export interface ExecResult {

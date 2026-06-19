@@ -7,8 +7,7 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
-import { SFX } from "./sfx";
-import { worldScene } from "./runtime";
+import { worldScene, applyAudioConfig } from "./runtime";
 import { NPC_SPAWNS, TILE } from "./world";
 import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
 
@@ -166,8 +165,8 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       sfx: typeof a.sfx === "boolean" ? a.sfx : d.sfx,
       musicVol: safeVol(a.musicVol, d.musicVol),
       sfxVol: safeVol(a.sfxVol, d.sfxVol),
-      // Track als String übernehmen; SFX.applyConfig prüft zur Laufzeit gegen die
-      // bekannten Themes und fällt sonst auf den Default zurück.
+      // Track als String übernehmen; die Audio-Schicht prüft ihn zur Laufzeit gegen
+      // die bekannten Themes und fällt sonst auf den Default zurück.
       track: typeof a.track === "string" ? a.track : d.track,
     };
   }
@@ -267,8 +266,9 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       } catch (e) {
         this.state = makeDefaultState();
       }
-      // Audio-Einstellungen aus dem Spielstand an die zentrale SFX-Schicht geben.
-      SFX.applyConfig(this.state.audio);
+      // Audio-Einstellungen aus dem Spielstand an die Präsentation geben – entkoppelt
+      // über den Laufzeit-Sink (#344), NICHT mehr per direktem sfx.ts-Import.
+      applyAudioConfig(this.state.audio);
       this.sim = new KQSim(this.state.clusterSnapshot || {});
       // Szenarien bereits erreichter Funk-Schritte wieder einmischen
       for (let qi = 0; qi <= Math.min(this.state.questIdx, KQContent.QUESTS.length - 1); qi++) {

@@ -7,17 +7,12 @@
  * SFX-Aufrufstelle einzeln.
  */
 
-/** Audio-Einstellungen, wie sie auch im Spielstand (GameState.audio) liegen. */
-export interface AudioConfig {
-  music: boolean;
-  sfx: boolean;
-  /** Lautstärke 0..1 */
-  musicVol: number;
-  /** Lautstärke 0..1 */
-  sfxVol: number;
-  /** ID des aktuell gewählten Musikstücks (siehe MUSIC_THEMES). */
-  track: string;
-}
+import type { AudioConfig } from "./types";
+import { setAudioSink } from "./runtime";
+
+/** Audio-Einstellungen (Spielstand `GameState.audio`). Definiert in der
+ *  Typ-Schicht (`types.ts`), hier nur re-exportiert für bestehende Importeure. */
+export type { AudioConfig };
 
 /** Ein auswählbares Musikstück. Alles prozedural (kein Audio-Asset, keine Lizenz):
  *  je Theme eine eigene Tonart/Akkordfolge, BPM und Klangfarbe, damit sich die
@@ -302,3 +297,11 @@ export const SFX = {
     this.cfg.sfxVol = v;
   },
 };
+
+// #344: Anwendung (game.ts) schob Audio-Settings früher direkt via Import in SFX
+// (Schichtverletzung Anwendung→Präsentation). Jetzt registriert die Präsentation
+// ihren Handler beim Laufzeit-Sink; game.ts ruft nur noch `applyAudioConfig` aus
+// runtime.ts. Die Abhängigkeit zeigt damit Präsentation→runtime (erlaubt), nicht
+// mehr Anwendung→Präsentation. Läuft beim Modul-Laden (main.ts importiert sfx vor
+// Game.load()).
+setAudioSink((cfg) => SFX.applyConfig(cfg));
