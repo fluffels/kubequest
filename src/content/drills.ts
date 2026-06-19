@@ -96,7 +96,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const img = pick(IMAGES);
     let name = pick(NAMES);
     while (sim.docker.containers.some(c => c.name === name && c.running)) name = pick(NAMES) + rnd(2, 99);
-    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:-d\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+-d)\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name <name> <image>", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name <name> <image>." };
+    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+(?:-d|--detach))\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name <name> <image> (statt -d gilt auch --detach)", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt; -d hat auch die Langform --detach), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name <name> <image>." };
   },
   "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker.", why: "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu." }),
   "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“.", why: "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten." }),
@@ -153,7 +153,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     sim.files["uebung.yaml"] = "# Übungs-Manifest\nkind: Deployment\n…";
     sim.applyEffects["uebung.yaml"] = { deployment: { name: "uebung", image: "nginx", replicas: 1 } };
     if (sim.deployments.some(d => d.name === "uebung")) sim.exec("kubectl delete deployment uebung");
-    return { text: "Wende die Datei <code>uebung.yaml</code> deklarativ an.", accept: [/^kubectl\s+apply\s+-f\s+uebung\.yaml$/], solution: "kubectl apply -f uebung.yaml", hint: "kubectl apply -f <datei>", why: "apply gleicht den Cluster an die Datei an – deklarativ und idempotent (zweimal apply schadet nicht). Muster: kubectl apply -f <datei>." };
+    return { text: "Wende die Datei <code>uebung.yaml</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+uebung\.yaml$/], solution: "kubectl apply -f uebung.yaml", hint: "kubectl apply -f <datei>", why: "apply gleicht den Cluster an die Datei an – deklarativ und idempotent (zweimal apply schadet nicht). Muster: kubectl apply -f <datei>." };
   },
   "helm-install": sim => {
     if (!sim.helmRepos.includes("bitnami")) sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami");
@@ -247,7 +247,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const fn = "notiz-" + sim.clock + "-" + rnd(100, 9999) + ".md";
     sim.files[fn] = "x"; sim.exec("git add " + fn);
     const msg = pick(["Seekarte ergänzt", "Tippfehler behoben", "Route aktualisiert", "Hafen kartiert"]);
-    return { text: "Halte die vorgemerkten Änderungen fest – Commit-Nachricht: <code>" + msg + "</code>.", accept: [new RegExp('^git\\s+commit\\s+-m\\s+"' + msg + '"$')], solution: 'git commit -m "' + msg + '"', hint: 'Muster: git commit -m "Nachricht"', why: 'commit hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht fest (lokal); hochgeladen wird erst mit push. Muster: git commit -m "Nachricht".' };
+    return { text: "Halte die vorgemerkten Änderungen fest – Commit-Nachricht: <code>" + msg + "</code>.", accept: [new RegExp('^git\\s+commit\\s+(?:-m|--message)\\s+"' + msg + '"$')], solution: 'git commit -m "' + msg + '"', hint: 'Muster: git commit -m "Nachricht"', why: 'commit hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht fest (lokal); hochgeladen wird erst mit push. Muster: git commit -m "Nachricht".' };
   },
   "git-branch": sim => {
     ensureGit(sim);
@@ -306,7 +306,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const file = "drill-netpol.yaml";
     sim.files[file] = NETPOL_YAML;
     sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
-    return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+-f\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f <datei>", why: "Auch eine NetworkPolicy ist ein ganz normales Manifest – mit kubectl apply -f <datei> wird sie deklarativ angewandt." };
+    return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f <datei>", why: "Auch eine NetworkPolicy ist ein ganz normales Manifest – mit kubectl apply -f <datei> wird sie deklarativ angewandt." };
   },
   "k-describe-netpol": sim => {
     const np = ensureNetworkPolicy(sim);
@@ -324,7 +324,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const file = "drill-application.yaml";
     sim.files[file] = ARGO_APPLICATION_MANUAL_YAML;
     sim.applyEffects[file] = { application: { name, repo: "https://github.com/port-kubernia/seekarten.git", path: name, autoSync: false, selfHeal: false, deployment: { name, image: "nginx:1.27", replicas: 2 } } };
-    return { text: "Eine Argo-<b>Application</b> ist ein ganz normales Manifest: wende die Seekarte <code>" + file + "</code> deklarativ an, damit Argo den neuen Auftrag kennt.", accept: [/^kubectl\s+apply\s+-f\s+drill-application\.yaml$/], solution: "kubectl apply -f " + file, hint: "Der vertraute Befehl: kubectl apply -f <datei>", why: "Eine Argo-Application ist selbst nur ein Manifest – mit dem vertrauten kubectl apply -f <datei> machst du Argo den Soll-Zustand bekannt." };
+    return { text: "Eine Argo-<b>Application</b> ist ein ganz normales Manifest: wende die Seekarte <code>" + file + "</code> deklarativ an, damit Argo den neuen Auftrag kennt.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-application\.yaml$/], solution: "kubectl apply -f " + file, hint: "Der vertraute Befehl: kubectl apply -f <datei>", why: "Eine Argo-Application ist selbst nur ein Manifest – mit dem vertrauten kubectl apply -f <datei> machst du Argo den Soll-Zustand bekannt." };
   },
   "argo-app-list": sim => {
     ensureArgoApp(sim);

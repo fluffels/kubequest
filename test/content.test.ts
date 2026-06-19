@@ -124,6 +124,62 @@ test("docker build: -t UND --tag gelten gleichwertig in Teach-Schritt, Karte & D
   assert.ok(/docker tag/.test(flag!.explain) && /--tag/.test(flag!.explain), "q-flag-build-t: explain entwirrt nicht -t/--tag vs docker tag");
 });
 
+test("Flag-Formen durchgängig: wo Kurz- UND Langform echtes CLI sind, akzeptieren ALLE Drills/Karten/Quest-Schritte beide (#286)", () => {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const tokens = (s: string) => norm(s).split(" ");
+  const hasTok = (s: string, t: string) => tokens(s).includes(t);
+  // Tauscht das erste eigenständige Token a gegen b (oder b gegen a) im Befehl.
+  const swap = (s: string, a: string, b: string): string | null => {
+    const t = tokens(s);
+    const ia = t.indexOf(a);
+    if (ia >= 0) { t[ia] = b; return t.join(" "); }
+    const ib = t.indexOf(b);
+    if (ib >= 0) { t[ib] = a; return t.join(" "); }
+    return null;
+  };
+
+  /** Echte (am CLI geprüfte) Kurz-/Langform-Paare, je mit Kontext-Bedingung, damit
+   *  dasselbe Kürzel je Befehl die RICHTIGE Langform bekommt (-f = --filename bei
+   *  kubectl, aber --values bei helm). KEINE erfundenen Formen: git checkout -b hat
+   *  bewusst KEINEN Eintrag (kein --branch bei checkout). */
+  const EQUIVS: { id: string; a: string; b: string; when: (sol: string) => boolean }[] = [
+    { id: "docker ps -a/--all",       a: "-a", b: "--all",      when: s => /^docker ps\b/.test(s) },
+    { id: "docker run -d/--detach",   a: "-d", b: "--detach",   when: s => /^docker run\b/.test(s) && (hasTok(s, "-d") || hasTok(s, "--detach")) },
+    { id: "docker build -t/--tag",    a: "-t", b: "--tag",      when: s => /^docker build\b/.test(s) },
+    { id: "kubectl -n/--namespace",   a: "-n", b: "--namespace", when: s => /^kubectl\b/.test(s) && (hasTok(s, "-n") || hasTok(s, "--namespace")) },
+    { id: "kubectl apply/create/delete -f/--filename", a: "-f", b: "--filename", when: s => /^kubectl (apply|create|delete)\b/.test(s) && (hasTok(s, "-f") || hasTok(s, "--filename")) },
+    { id: "helm install/upgrade -f/--values", a: "-f", b: "--values", when: s => /^helm (install|upgrade)\b/.test(s) && (hasTok(s, "-f") || hasTok(s, "--values")) },
+    { id: "git commit -m/--message",  a: "-m", b: "--message",  when: s => /^git commit\b/.test(s) },
+  ];
+
+  // Alle Stellen mit (Lösung + accept-Regex) einsammeln: Karten, Drills (instanziiert),
+  // Quest-Teach- und -Terminal-Schritte – exakt die Quellen, die der Spieler tippt.
+  const items: { label: string; solution: string; accept: RegExp[] }[] = [];
+  for (const c of KQContent.CMD_CARDS) items.push({ label: "Karte " + c.id, solution: c.solution, accept: c.accept });
+  for (const [id, make] of Object.entries(KQContent.DRILLS)) {
+    // mehrere Ziehungen, damit zufällige Namen/Tags abgedeckt sind
+    for (let i = 0; i < 8; i++) { const t = make(new KQSim({})); items.push({ label: "Drill " + id, solution: t.solution, accept: t.accept }); }
+  }
+  for (const quest of KQContent.QUESTS) for (const step of quest.steps as any[]) {
+    if (step.type === "teach") items.push({ label: `${quest.id}/${step.cmd.id}`, solution: step.cmd.solution, accept: step.cmd.accept });
+    if (step.type === "terminal") for (const t of step.tasks) items.push({ label: `${quest.id}/${t.id}`, solution: t.solution, accept: t.accept });
+  }
+
+  const fehler: string[] = [];
+  for (const it of items) {
+    const sol = norm(it.solution);
+    for (const eq of EQUIVS) {
+      if (!eq.when(sol)) continue;
+      const variante = swap(sol, eq.a, eq.b);
+      if (!variante || variante === sol) continue;
+      // Sowohl die Lösung selbst als auch ihre gleichwertige Form müssen gelten.
+      if (!it.accept.some(re => re.test(sol))) fehler.push(`${it.label}: Lösung „${sol}" matcht eigene accept-Regex nicht`);
+      if (!it.accept.some(re => re.test(variante))) fehler.push(`${it.label} [${eq.id}]: „${variante}" wird zu Unrecht abgelehnt (gleichwertig zu „${sol}")`);
+    }
+  }
+  assert.deepEqual(fehler, [], "Zu enge accept-Regex – beide Flag-Formen müssen gelten:\n" + fehler.join("\n"));
+});
+
 test("Drills & Karten lehnen ungelehrte Extras ab (Supersets), erlaubte Varianten bleiben gültig (#253)", () => {
   const norm = (s: string) => s.trim().replace(/\s+/g, " ");
   const drillOk = (id: string, build: (sol: string) => string, mustPass: boolean) => {
