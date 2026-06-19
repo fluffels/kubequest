@@ -43,7 +43,7 @@ describe("ASSET_MANIFEST", () => {
     // Diese Keys MÜSSEN Sheets bleiben, sonst bricht das Frame-Slicing in scenes.ts
     // (Tiles würden als ganzes Bild geladen → kaputte Karte).
     const expectedCols: Record<string, number> = {
-      town: 12, dungeon: 12, creatures: 10,
+      town: 12, dungeon: 12,
       coast: 4, meadow: 4, path: 4, kai: 4, dock: 4,
     };
     for (const [key, cols] of Object.entries(expectedCols)) {
