@@ -271,10 +271,11 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "ole", lines: [
         "Jetzt wird's mächtig. Unbequeme Wahrheit: <b>Pods sind sterblich.</b> Deshalb erstellt man sie nie einzeln, sondern gibt einen Dauerauftrag: ein <b>Deployment</b>.",
         "Ein Deployment sagt: „Halte IMMER N Kopien am Laufen.“ Stirbt eine → sofort Ersatz. Erstellt wird es so: <code>kubectl create deployment kasse --image=nginx</code>.",
+        "Zwei Teile, nicht verwechseln: <code>kasse</code> ist nur der <b>Name</b> – ein frei wählbares Etikett, damit du das Deployment wiederfindest (könnte auch <code>fischtheke</code> heißen, der Name bestimmt NICHT, was läuft). Was tatsächlich läuft, sagt <code>--image</code>: hier <b>nginx</b>, ein simpler Webserver, den wir als <b>Platzhalter</b> für „irgendeine App“ nehmen – ein echtes „Kassen-Image“ gibt's nicht. Im echten Job stünde da das Image eurer eigenen App.",
       ]},
       { type: "teach", brief: "Dauerauftrag erteilen", cmd: {
-        id: "t-create", intro: "🆕 Neuer Befehl: <code>kubectl create deployment &lt;name&gt; --image=&lt;image&gt;</code> – der Dauerauftrag (<code>--image</code> ist Pflicht).",
-        text: "Erstelle ein Deployment <code>kasse</code> mit dem Image <code>nginx</code>. (Der Fischmarkt braucht eine Kasse!)",
+        id: "t-create", intro: "🆕 Neuer Befehl: <code>kubectl create deployment &lt;name&gt; --image=&lt;image&gt;</code> – <b>Name</b> = frei wählbares Etikett, <b>--image</b> = was läuft (Pflicht).",
+        text: "Erstelle ein Deployment <code>kasse</code> mit dem Image <code>nginx</code>. (Name <code>kasse</code> ist Story-Deko fürs Wiederfinden; <code>nginx</code> ist der Platzhalter-Webserver, der real läuft.)",
         accept: [/^kubectl\s+create\s+deployment\s+kasse\s+--image[=\s]nginx(:\S+)?$/], solution: "kubectl create deployment kasse --image=nginx",
         hint: "Muster: kubectl create deployment <name> --image=<image>" } },
       { type: "dialog", npc: "ole", lines: [
