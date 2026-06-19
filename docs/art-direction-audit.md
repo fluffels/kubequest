@@ -40,7 +40,7 @@ verkleinern.
 |---|---|---|---|
 | **Boden / Terrain** | PixelLab-Wang-Tilesets (coast, meadow, path, kai, dock), 16×16, über `lower_base_tile_id` verkettet → pixelgleiche Übergänge (`renderGround`, `scenes.ts`). | ✅ **Kohärent.** Einheitliche Pixeldichte, sauberes Autotiling. Stärkster Bereich. | – |
 | **Gras (Deko)** | Prozedurale Dreieck-Halme: `g.fillTriangle(...)` erzeugt `grasstuft`-Texturen (`scenes.ts` ~467). | ❌ **Stilbruch.** Gemalte Vektordreiecke, keine Pixelart, fremde Detailtiefe neben den Tilesets. | **#107** (Gras als echtes Stardew-Pixelart, Re-Do von #40). |
-| **Gebäude** | PixelLab `house_office/forge/chart` + `lighthouse`, hoch aufgelöst, via `building()` mit Tiefe gerendert. | ⚠️ **Kohärent in Pixeldichte/Politur**, aber schräge **2.5D-Sicht** statt frontale `view: side`-Messlatte (Leuchtturm dagegen `view: side`). Uneinheitliche Blickachse. | **Neues Entscheidungs-Ticket** (2.5D vs. frontal klären, siehe unten). |
+| **Gebäude** | PixelLab `house_office/forge/chart` + `lighthouse`, hoch aufgelöst, via `building()` mit Tiefe gerendert. | ✅ **Kohärent in Pixeldichte/Politur.** 2.5D (`high top-down`) für Gebäude ist **bewusste Ausnahme** (zeigt Dach + Tiefe wie Stardew bei Gebäuden, ermöglicht Depth-Sortierung). Leuchtturm = senkrechte Struktur → `view: side` korrekt. Entschieden in **#181** (2026-06-19). | – |
 | **Schiff (Spieler)** | PixelLab `ship.png` (hoch aufgelöst, Hintergrund auf Transparenz freigestellt); ersetzt die früheren prozeduralen Primitive. | ✅ **Asset-seitig kohärent.** Aber Platzierungs-Bug: liegt auf einer Holz-Plattform statt im Wasser. | **#108** (Platzierung – kein Stilthema). |
 | **Gegner (Krake, Piraten-Schiff)** | Rein prozedural mit `graphics` gemalt: Kraken-Körper `fillCircle/fillRect` (`scenes.ts` ~1046), Piraten-Rumpf `fillRect` (~1002). | ❌ **Stilbruch.** Code-Primitive statt Pixelart-Assets, fremde Formensprache. | Erfasst über **#53** (Nicht-Pixelart-Inventar + Per-Element-Tickets). |
 | **NPCs / Figuren** | PixelLab-Chibi-Figuren, `view: low top-down`; ältere `size 32`, neuere `size 48`→48² runtergerechnet mit gleicher Körperhöhe/Fußlinie. | ✅ **Kohärent.** Gemischte Generierungs-Größen, aber auf gleiche Höhe/Origin normalisiert (siehe `assets/pixellab/README.md`). Beobachten, nicht ticketn. | – (Beobachtung) |
@@ -59,7 +59,7 @@ Fast alle Abweichungen sind bereits geführt – das Audit ordnet sie der Messla
 | [#107](https://github.com/fluffels/kubequest/issues/107) | Gras als echtes Pixelart (Re-Do von #40) | offen |
 | [#53](https://github.com/fluffels/kubequest/issues/53) | Inventar aller Nicht-Pixelart-Grafiken (Gegner, HUD, Emojis) + Per-Element-Tickets | offen |
 | [#108](https://github.com/fluffels/kubequest/issues/108) | Schiff schwimmt im Wasser statt auf Holz-Plattform (Platzierung) | offen |
-| [#181](https://github.com/fluffels/kubequest/issues/181) | **Stil-Entscheidung Gebäude:** 2.5D (`high top-down`) vs. frontale `view: side`-Messlatte | mit diesem Audit angelegt |
+| [#181](https://github.com/fluffels/kubequest/issues/181) | **Stil-Entscheidung Gebäude:** 2.5D (`high top-down`) vs. frontale `view: side`-Messlatte | ✅ entschieden: 2.5D bleibt (Stardew-konforme Ausnahme) |
 
 Bewusst **kein** neues Ticket: Krake & Piraten-Schiff werden über das #53-Inventar
 erfasst (sonst Doppelung); die gemischten NPC-Größen sind auf gleiche Höhe
