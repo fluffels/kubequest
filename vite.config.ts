@@ -51,14 +51,28 @@ export function devNoFullReload(): Plugin {
 // per file:// laufen.
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const offline = mode === "offline";
+  // Dev-Panel-Build (#331): ein dritter Mode (`vite build --mode devpanel`), der
+  // das sonst dev-server-only Panel (#325) ABSICHTLICH MIT ausliefert – als eine
+  // self-contained Datei (wie offline), passwortgated über das aus dem CI-Secret
+  // injizierte VITE_KQ_DEVPANEL_PW. Das Build-Flag __KQ_DEVPANEL__ schaltet den
+  // Panel-Mount in main.ts frei; in ALLEN anderen Modi ist es per `define` ein
+  // statisches `false` → der dynamische devpanel-Import ist dort toter Code und
+  // wird rausgestrippt (öffentliche `build`/`build:offline` bleiben panel-frei).
+  const devpanel = mode === "devpanel";
+  const singleFile = offline || devpanel; // beide liefern EINE self-contained Datei
   return {
     base: "./",
-    // Offline-Build: alles inline (Single-File). Sonst: im Dev-Server den
+    define: {
+      // Statisch foldbares Flag (kein import.meta.env-Sub-Key, damit Vites eigene
+      // env-Behandlung unangetastet bleibt): true nur im devpanel-Mode.
+      __KQ_DEVPANEL__: JSON.stringify(devpanel),
+    },
+    // Single-File-Modi (offline/devpanel): alles inline. Sonst: im Dev-Server den
     // störenden Auto-Full-Reload unterbinden (#301); im Prod-Build ist das
     // `apply: "serve"`-Plugin inaktiv und bleibt wirkungslos.
-    plugins: offline ? [viteSingleFile()] : [devNoFullReload()],
+    plugins: singleFile ? [viteSingleFile()] : [devNoFullReload()],
     build: {
-      outDir: offline ? "dist-offline" : "dist",
+      outDir: devpanel ? "dist-devpanel" : offline ? "dist-offline" : "dist",
       emptyOutDir: true,
     },
     test: {

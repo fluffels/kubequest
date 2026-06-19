@@ -45,6 +45,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Dev-Server | `npm run dev` |
 | Host-/Prod-Build (Multi-File nach `dist/`) | `npm run build` |
 | Offline-Build (self-contained `dist-offline/index.html`) | `npm run build:offline` |
+| Dev-Panel-Build (#331, Panel MIT, passwortgated, `dist-devpanel/`) | `npm run build:devpanel` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (voll strict) | `npm run typecheck` |
 

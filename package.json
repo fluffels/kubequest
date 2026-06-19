@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:offline": "vite build --mode offline",
+    "build:devpanel": "vite build --mode devpanel",
     "preview": "vite preview",
     "preview:offline": "vite preview --outDir dist-offline",
     "test": "vitest run",

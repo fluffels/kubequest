@@ -11,7 +11,7 @@ import viteConfig, { devNoFullReload, CODE_CHANGED_EVENT } from "../vite.config"
 type ConfigFn = (env: {
   command: "build" | "serve";
   mode: string;
-}) => { plugins?: unknown[]; build?: { outDir?: string } };
+}) => { plugins?: unknown[]; build?: { outDir?: string }; define?: Record<string, string> };
 
 const resolve = (mode: string) =>
   (viteConfig as unknown as ConfigFn)({ command: "build", mode });
@@ -45,6 +45,43 @@ describe("Build-Strategie #58: Offline-Build (Single-File)", () => {
 
   it("aktiviert das Single-File-Plugin (alles inline für Doppelklick-Offline)", () => {
     expect(pluginNames(cfg.plugins)).toContain(SINGLEFILE);
+  });
+});
+
+/* Ticket #331: ein dritter Build-Weg `--mode devpanel`, der das Dev-Panel (#325)
+ * ABSICHTLICH mit ausliefert (self-contained, passwortgated). Diese Tests sichern:
+ *  - der Mode hat sein eigenes Ausgabeverzeichnis (keine Kollision mit den anderen),
+ *  - er ist self-contained (Single-File-Plugin, eine Datei zum Verteilen/Ziehen),
+ *  - das Build-Flag __KQ_DEVPANEL__ ist NUR hier ein statisches `true`,
+ *  - und – das eigentliche Geheimhaltungs-Tor – in `build`/`build:offline` ein
+ *    statisches `false`, damit das Panel aus den ÖFFENTLICHEN Builds rausgestrippt
+ *    wird (der dynamische devpanel-Import wird dort toter Code). */
+describe("Build-Strategie #331: Dev-Panel-Build (verteilbar, passwortgated)", () => {
+  const cfg = resolve("devpanel");
+
+  it("schreibt in ein eigenes Verzeichnis dist-devpanel/ (keine Kollision)", () => {
+    expect(cfg.build?.outDir).toBe("dist-devpanel");
+    expect(cfg.build?.outDir).not.toBe(resolve("production").build?.outDir);
+    expect(cfg.build?.outDir).not.toBe(resolve("offline").build?.outDir);
+  });
+
+  it("ist self-contained (Single-File-Plugin, eine verteilbare Datei)", () => {
+    expect(pluginNames(cfg.plugins)).toContain(SINGLEFILE);
+  });
+
+  it("setzt das Panel-Flag __KQ_DEVPANEL__ statisch auf true", () => {
+    expect(cfg.define?.__KQ_DEVPANEL__).toBe("true");
+  });
+});
+
+describe("Geheimhaltung #331/#325: Panel-Flag bleibt in öffentlichen Builds aus", () => {
+  // Der Riegel: nur dann strippt der Bundler den dynamischen devpanel-Import aus
+  // den ausgelieferten Builds, wenn __KQ_DEVPANEL__ dort ein statisches `false` ist.
+  it("ist im Prod-Build (dist/) statisch false", () => {
+    expect(resolve("production").define?.__KQ_DEVPANEL__).toBe("false");
+  });
+  it("ist im Offline-Build (dist-offline/) statisch false", () => {
+    expect(resolve("offline").define?.__KQ_DEVPANEL__).toBe("false");
   });
 });
 

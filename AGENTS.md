@@ -24,6 +24,7 @@
 | Dev-Server (Code-Änderung → manuell neu laden, #301) | `npm run dev` → angezeigte Adresse öffnen |
 | Host-/Prod-Build (Multi-File nach `dist/`, zum Ausliefern) | `npm run build` |
 | Offline-Build (eine self-contained `dist-offline/index.html`) | `npm run build:offline` |
+| Dev-Panel-Build (#331, Panel MIT, passwortgated via `VITE_KQ_DEVPANEL_PW`, nach `dist-devpanel/`) | `npm run build:devpanel` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (ganzes Projekt, voll strict) | `npm run typecheck` |
 | Typen prüfen (Alias, identisch zu `typecheck`) | `npm run typecheck:strict` |

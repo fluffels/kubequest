@@ -123,10 +123,15 @@ import { keys, clearKeys } from "./runtime";
         reset: () => { Game.reset(); location.reload(); },
       };
       console.info("🛠️ kqDev bereit: kqDev.roadmap() · kqDev.jump(idx) · kqDev.freshStart() · kqDev.reset()");
-      // Klickbares, passwortgegatetes Dev-Panel (#325) – die Komfortschicht auf
-      // der kqDev-API. Dynamisch importiert, damit das ganze Panel-Modul samt
-      // Passwort-Logik im Prod-/Offline-Build (import.meta.env.DEV === false)
-      // wegfällt (wie der Validate-Block oben).
+    }
+
+    // Klickbares, passwortgegatetes Dev-Panel (#325) – die Komfortschicht auf der
+    // kqDev-API. Aktiv im Dev-Server (import.meta.env.DEV) ODER im dedizierten
+    // Dev-Panel-Build (#331, __KQ_DEVPANEL__). In den normalen Prod-/Offline-Builds
+    // sind beide Flags statisch `false` → dieser Block samt dynamischem Import ist
+    // toter Code und wird komplett rausgestrippt (das Panel-Modul mit Passwort-
+    // Logik landet nie im ausgelieferten `build`/`build:offline`).
+    if (import.meta.env.DEV || __KQ_DEVPANEL__) {
       import("./devpanel").then(({ mountDevPanel }) => mountDevPanel());
     }
 
