@@ -6,23 +6,22 @@
  */
 
 import { type TiledObjectGroup, tiledProps } from "./tilemap";
+import { npcSpawnsForMap, type Spawn } from "./content/entities";
 
 /** Kachelgröße in Pixeln (muss zu T in scenes.ts passen). */
 export const TILE = 16;
 
-export interface Spawn { id: string; x: number; y: number }
+/** Re-Export, damit Altaufrufer `import { type Spawn } from "./world"` weiter
+ *  funktionieren; die Typ-Quelle ist jetzt die Entity-Registry (content/entities.ts). */
+export type { Spawn };
 
-/** Feste NPC-Standplätze (Kachel-Koordinaten). Kralle fehlt hier bewusst – die
- *  Quiz-Krabbe wird relativ zum Schiff platziert und erst zur Laufzeit ergänzt. */
-export const NPC_SPAWNS: Spawn[] = [
-  { id: "ole", x: 26, y: 14.6 },
-  { id: "bo", x: 8, y: 25 },
-  { id: "ada", x: 40, y: 13.6 },
-  { id: "runa", x: 13, y: 13 },
-  { id: "theo", x: 44, y: 20.6 },
-  { id: "pelle", x: 31, y: 17.2 },
-  { id: "juno", x: 45.8, y: 24.2 },
-];
+/** Feste NPC-Standplätze des Hafens (Kachel-Koordinaten) – seit #349 aus der
+ *  datengesteuerten Entity-Registry (`content/data/entities.json`, Karte "harbor")
+ *  abgeleitet statt hier hartcodiert. Die Reihenfolge ist load-bearing: harbormap.ts
+ *  serialisiert sie verlustfrei in den Tiled-Objektlayer (harbor.tmj). Kralle fehlt
+ *  bewusst – die Quiz-Krabbe wird relativ zum Schiff platziert und erst zur Laufzeit
+ *  ergänzt (SHIP_KRALLE), darum kein Registry-Eintrag. */
+export const NPC_SPAWNS: Spawn[] = npcSpawnsForMap("harbor");
 
 /** Reichweite, ab der mit einem NPC geredet werden kann (nearestNpc in scenes.ts). */
 export const TALK_RANGE = 1.7 * TILE;

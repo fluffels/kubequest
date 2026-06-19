@@ -15,6 +15,7 @@
  * von dort wiederverwendet statt ein drittes Mal definiert (wie in lighthouse.ts).
  */
 import { warpAt, type Warp } from "./archipel";
+import { npcSpawnForMap, type Spawn } from "./content/entities";
 
 export { warpAt, type Warp };
 
@@ -36,9 +37,10 @@ export const QX0 = 3, QX1 = 24, QY0 = 3, QY1 = 14;
 const CX = 14, CY = 8;   // Mitte der Quay-Fläche (Kontor-Platz mit NPC/Quest-Trigger)
 
 /** Standplatz des Viertel-NPC „Knut", Speicher-Verwalter (#125): Hüter der Daten/Volumes,
- *  gibt ab den stateful-Quests (#127/#129) die Hands-on-Aufgaben aus. Die id entspricht
- *  dem NPCS-/SMALLTALK-Schlüssel (analog "lumi" auf der Leuchtturm-Klippe). */
-export const WAREHOUSE_NPC = { id: "knut", x: CX - 2, y: CY } as const;
+ *  gibt ab den stateful-Quests (#127/#129) die Hands-on-Aufgaben aus. Seit #349 aus der
+ *  Entity-Registry (`content/data/entities.json`, Karte "warehouse") gelesen statt hier
+ *  hartcodiert; der Eintrag dort liegt auf (CX-2, CY) der Quay-Fläche. */
+export const WAREHOUSE_NPC: Spawn = npcSpawnForMap("warehouse");
 
 /** Quest-Trigger = das Lager-Kontor. Hier docken die Phase-7-Quests an (#127/#129). */
 export const WAREHOUSE_QUEST_TRIGGER = { id: "lager-kontor", x: CX + 2, y: CY } as const;

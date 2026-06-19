@@ -40,11 +40,11 @@
  * Eine Schema-Library nur fürs Laden wäre unnötiger Bundle-Ballast. Der
  * Validator hier ist klein, Phaser-frei und unit-getestet.
  *
- * Cross-Referenzen (Standplätze der zugereisten NPCs, früher als Kommentar an
- * den NPCS-Einträgen): „argo" → `archipel.ts` ARCHIPEL_NPC (#93), „lumi" →
- * `lighthouse.ts` LIGHTHOUSE_NPC (#112), „knut" → `warehouse.ts` WAREHOUSE_NPC
- * (#125). Diese Schlüssel müssen in npcs.json bleiben, sonst finden die Szenen
- * ihren NPC nicht.
+ * Hier liegt nur die NPC-*Identität* (Name/Titel/Sprite). WO ein NPC steht, ist
+ * seit #349 eigene Daten in `./data/entities.json` (Entity-Registry, `entities.ts`):
+ * `{ id, map, x, y }` je Standplatz, referenziert die `id` aus npcs.json. Diese
+ * Schlüssel müssen in npcs.json bleiben, sonst findet die Registry (und damit die
+ * Szene) ihren NPC nicht – der entities-Loader wirft dann `ContentValidationError`.
  */
 import npcsData from "./data/npcs.json";
 import smalltalkData from "./data/smalltalk.json";
