@@ -50,4 +50,6 @@ export const NPCS = {
   juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
   // GitOps-Archipel-Lotsin (Standplatz: archipel.ts ARCHIPEL_NPC, id "argo"; #93).
   argo:   { name: "Argo",          title: "GitOps-Lotsin",   sprite: 84,  tex: "char_argos" },
+  // Monitoring-Leuchtturm-Wärterin (Standplatz: lighthouse.ts LIGHTHOUSE_NPC, id "lumi"; #112).
+  lumi:   { name: "Lumi",          title: "Leuchtturmwärterin", sprite: 97, tex: "char_lumi" },
 };

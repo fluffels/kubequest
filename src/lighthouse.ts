@@ -33,10 +33,10 @@ const CX = 13, CY = 9;   // Mittelpunkt der Gras-Hochebene
 /** Standplatz des großen Leuchtturms (oben/Norden der Ebene). 2×2-Fußabdruck solide. */
 export const LIGHTHOUSE_TOWER = { x: CX, y: 5 } as const;
 
-/** Reservierter Standplatz des Observability-NPC (ein Folgeticket setzt hier den
- *  Sprite + die Phase-5-Quests, analog #93 beim Archipel). Bis dahin bleibt der Platz
- *  frei und begehbar. */
-export const LIGHTHOUSE_NPC = { id: "monitor", x: CX - 2, y: CY } as const;
+/** Standplatz des Observability-NPC „Lumi" (#112): die Leuchtturmwärterin, die ab
+ *  den Phase-5-Quests (#113–116) das Monitoring vergibt. Die id entspricht dem
+ *  NPCS-/SMALLTALK-Schlüssel (analog "argo" beim Archipel). */
+export const LIGHTHOUSE_NPC = { id: "lumi", x: CX - 2, y: CY } as const;
 
 /** Quest-Trigger = die Monitoring-Station (Dashboard + Alarmglocke). Hier docken die
  *  Phase-5-Observability-Quests an; bis dahin steht ein Schild als Platzhalter. */

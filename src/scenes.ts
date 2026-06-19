@@ -22,7 +22,7 @@ import {
   buildLighthouse,
   WORLD_TO_LIGHTHOUSE, WORLD_RETURN_LH,
   LIGHTHOUSE_TO_WORLD, LIGHTHOUSE_ARRIVAL,
-  LIGHTHOUSE_QUEST_TRIGGER, LIGHTHOUSE_TOWER,
+  LIGHTHOUSE_QUEST_TRIGGER, LIGHTHOUSE_TOWER, LIGHTHOUSE_NPC,
   LIGHTHOUSE_GRAFANA, LIGHTHOUSE_BELL,
 } from "./lighthouse";
 import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runtime";
@@ -1989,9 +1989,21 @@ import { getMapEntry } from "./mapregistry";
       this.objSprite(LIGHTHOUSE_BELL.x, LIGHTHOUSE_BELL.y, "alert_bell", 0.32, 18, 7);
       this.makeSign(LIGHTHOUSE_QUEST_TRIGGER.x * T + 8, (LIGHTHOUSE_QUEST_TRIGGER.y + 1) * T, "Monitoring");
 
-      // Reservierter NPC-Standplatz (Observability-Lotsin): bis das Kinderticket den
-      // Sprite + die Phase-5-Quests setzt (analog #93/#94–97), bleibt der Platz frei.
-      this.npcs = [];
+      // Observability-Wärterin „Lumi" (#112): steht am reservierten Standplatz und
+      // gibt ab den Phase-5-Quests (#113–116) das Monitoring aus. Gleiches Render-
+      // Schema wie Argo auf dem Archipel (tex-Figur am Schatten verankert,
+      // Origin 0.81 = Fußlinie, „!"-Marker). Reden läuft über E → UI.interact() →
+      // nearestNpc(); bis die Quests andocken, zeigt sie Smalltalk.
+      const lumiMeta = KQContent.NPCS.lumi;
+      const lnx = LIGHTHOUSE_NPC.x * T + 8, lnBaseY = LIGHTHOUSE_NPC.y * T + 15;
+      this.solid[LIGHTHOUSE_NPC.y * this.W + LIGHTHOUSE_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.add.ellipse(lnx, lnBaseY, 12, 5, 0x000000, 0.26).setDepth(lnBaseY - 1);
+      const lumiSpr = this.add.image(lnx, lnBaseY, lumiMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(LIGHTHOUSE_NPC.y * T + T);
+      this.tweens.add({ targets: lumiSpr, y: lnBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const lumiMarker = pixelText(this, lnx, LIGHTHOUSE_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
+      lumiMarker.setVisible(false);
+      this.tweens.add({ targets: lumiMarker, y: LIGHTHOUSE_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.npcs = [{ id: LIGHTHOUSE_NPC.id, x: LIGHTHOUSE_NPC.x, y: LIGHTHOUSE_NPC.y, sprite: lumiSpr, marker: lumiMarker }];
 
       // Rück-Warp am südlichen Klippenrand sichtbar markieren (Abstiegs-Pfeil + Schild).
       const rx = LIGHTHOUSE_TO_WORLD.tx * T + 8, ry = LIGHTHOUSE_TO_WORLD.ty * T + 8;
@@ -2077,6 +2089,7 @@ import { getMapEntry } from "./mapregistry";
     scatterDecor() {
       const reserved = new Set([
         LIGHTHOUSE_QUEST_TRIGGER.y * this.W + LIGHTHOUSE_QUEST_TRIGGER.x,
+        LIGHTHOUSE_NPC.y * this.W + LIGHTHOUSE_NPC.x,
         LIGHTHOUSE_ARRIVAL.ty * this.W + LIGHTHOUSE_ARRIVAL.tx,
       ]);
       for (let y = 1; y < this.H - 1; y++) {
@@ -2127,8 +2140,17 @@ import { getMapEntry } from "./mapregistry";
       return !!this.solid[ty * this.W + tx];
     }
 
-    /** Kein NPC auf der Klippe (noch) – ui.ts ruft das trotzdem über worldScene() auf. */
-    nearestNpc() { return null; }
+    /** Nächster ansprechbarer NPC (E-Reichweite), gleiche Logik wie WorldScene –
+     *  ui.ts ruft das über worldScene() auf, um Reden/Quests anzubieten. */
+    nearestNpc() {
+      const pl = this.pl;
+      let best = null, bestD = 1.7 * T;
+      for (const n of this.npcs) {
+        const d = Math.hypot(n.x * T + 8 - pl.x, n.y * T + 8 - pl.y);
+        if (d < bestD) { bestD = d; best = n; }
+      }
+      return best;
+    }
 
     burstAtPlayer(_kind: string) {
       this.floatText(this.pl.x, this.pl.y - 8, "✨", "#ffe9b0");
@@ -2173,6 +2195,10 @@ import { getMapEntry } from "./mapregistry";
       const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
       this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
       this.pShadow.setPosition(pl.x, pl.y + 6);
+
+      // Quest-Marker über Lumi (zeigt „!", sobald die Phase-5-Quests einen
+      // Dialogschritt für sie anstehen lassen).
+      for (const n of this.npcs) n.marker.setVisible(!blocked && UI.questMarkerFor(n.id));
 
       UI.updatePrompt();
 

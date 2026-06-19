@@ -11,4 +11,5 @@ export const SMALLTALK = {
   pelle: ["Frische Ware, faire Preise! Na ja – Preise.", "Die Kanone da drüben? Bestseller, seit die Piraten wieder da sind."],
   juno: ["Ruhige See heute. ZU ruhig.", "get pods → describe → logs. Träum es. Lebe es.", "Der Leuchtturm hat 99,99% Uptime. Die fehlenden 0,01% verfolgen mich bis heute."],
   argo: ["Die <b>Seekarte</b> im Git sagt, wie der Hafen aussehen soll – ich halte ihn nur auf Kurs.", "Nicht <i>pushen</i>, Lotse. Der Cluster <b>zieht</b> sich den Soll-Zustand selbst. Pull-Prinzip!", "Verstellt jemand heimlich was am Hafen? Beim nächsten Abgleich dreh ich's zurück. Git gewinnt immer."],
+  lumi: ["Erst messen, dann meckern – was du nicht <b>siehst</b>, kannst du nicht reparieren.", "Halb drei Uhr nachts, vierter Kaffee, irgendwo feuert ein Alert. Nachtdienst auf dem Turm eben. <i>*nippt*</i>", "Prometheus kratzt alle 15 Sekunden meine Metriken ab. Und mein Grafana glüht hübscher als jeder Sonnenuntergang.", "Juno schwört auf die 99,99% Uptime. Ich sehe die fehlenden 0,01% – sie blinken rot auf meinem Dashboard."],
 };
