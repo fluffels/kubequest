@@ -133,7 +133,7 @@ import { getMapEntry } from "./mapregistry";
   /** Baut ein Orts-Schild (Welt + Archipel identisch, #254): kleine eingravierte
    *  Pixelschrift, sicher im hellen Innenfeld des 9-Slice-Bretts. Gibt Container +
    *  Maße zurück, damit WorldScene daraus die Tag-Ausweich-Box ableiten kann. */
-  function buildSign(scene: Phaser.Scene, x: number, y: number, text: string) {
+  function buildSign(scene: Phaser.Scene, x: number, y: number, text: string, depth?: number) {
     // Eingravierte Pixelschrift (#188): heller Drop-Shadow nach unten = Gravur-Effekt.
     const txt = pixelText(scene, 0, 0, text, { color: "#3a2410", origin: 0.5, size: SIGN_FONT });
     txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
@@ -143,7 +143,10 @@ import { getMapEntry } from "./mapregistry";
     board.y = -h / 2;
     // Schrift ins Innenfeld zentrieren: Rahmen oben (8) ≠ unten (6) → 1px tiefer als Brettmitte.
     txt.y = -h / 2 + (SIGN_BORDER.t - SIGN_BORDER.b) / 2;
-    const cont = scene.add.container(x, y, [board, txt]).setScale(SIGN_SCALE).setDepth(y);
+    // Tiefe normal y-sortiert (wie Bäume/Fässer), außer der Aufrufer gibt eine eigene
+    // vor: Hausschilder sitzen ÜBER ihrem Gebäude, dessen Tiefe aber an der Fußlinie
+    // hängt – ohne Override würde das hohe Dach (höhere Tiefe) das Schild verdecken (#290).
+    const cont = scene.add.container(x, y, [board, txt]).setScale(SIGN_SCALE).setDepth(depth ?? y);
     return { cont, w, h };
   }
 
@@ -448,16 +451,17 @@ import { getMapEntry } from "./mapregistry";
 
       // Gebäude & Zonen
       this.building(23, 10, 7, "house_office", 1.05);
-      this.labels.push({ x: 26.5, y: 9.4, text: "Hafenmeisterei", color: "#ffffff" });
+      // depth = Gebäude-Fußlinie (baseY) + 1 → Schild vor dem hohen Dach statt dahinter (#290)
+      this.labels.push({ x: 26.5, y: 9.4, text: "Hafenmeisterei", color: "#ffffff", depth: (10 + 3) * T + 1 });
       this.building(8, 8, 5, "house_forge", 0.82);
       this.deco(12, 12, "dungeon", ANVIL, true);
       this.deco(14, 12, "dungeon", TABLE, true);
       this.deco(14, 11.6, "dungeon", DEVICE, false);
-      this.labels.push({ x: 12.5, y: 7.4, text: "Werft", color: "#ffffff" });
+      this.labels.push({ x: 12.5, y: 7.4, text: "Werft", color: "#ffffff", depth: (8 + 3) * T + 1 });
       this.flagPoles = [{ x: 9, y: 10 }, { x: 10.5, y: 10 }, { x: 16, y: 10 }];
 
       this.building(38, 9, 5, "house_chart", 0.9);
-      this.labels.push({ x: 40.5, y: 8.4, text: "Kartenhaus", color: "#ffffff" });
+      this.labels.push({ x: 40.5, y: 8.4, text: "Kartenhaus", color: "#ffffff", depth: (9 + 3) * T + 1 });
 
       this.deco(43, 19, "dungeon", TABLE, true);
       this.deco(43, 18.6, "dungeon", BOOK, false);
@@ -577,8 +581,8 @@ import { getMapEntry } from "./mapregistry";
      *  per 9-Slice auf jede Textlänge gedehnt (Rahmen bleibt fix, Mitte streckt).
      *  Am 16px-Maßstab orientiert (knappes Padding + leicht runterskaliert) und per
      *  y-Tiefe in die Welt einsortiert, damit es Fässer/Pod-Kisten/Tech-Tags nicht verdeckt. */
-    makeSign(x: number, y: number, text: string) {
-      const { cont, w, h } = buildSign(this, x, y, text);
+    makeSign(x: number, y: number, text: string, depth?: number) {
+      const { cont, w, h } = buildSign(this, x, y, text, depth);
       // Schild-Rechteck als festes Hindernis fürs Tag-Entzerren merken (#207): Container
       // ist um SIGN_SCALE skaliert, das Brett sitzt oberhalb des Bezugspunkts (board.y=-h/2,
       // Höhe h) → Welt-Box [y-SIGN_SCALE·h, y]. Cluster-Tags weichen diesen Boxen aus.
@@ -829,7 +833,7 @@ import { getMapEntry } from "./mapregistry";
 
       // Beschriftungen: feste Orts-Schilder (Holzbrett, 9-Slice)
       for (const l of this.labels) {
-        this.makeSign(l.x * T, l.y * T, l.text);
+        this.makeSign(l.x * T, l.y * T, l.text, l.depth);
       }
 
       // Terraform-Plateau (Container, an/aus je nach State)
@@ -1780,8 +1784,8 @@ import { getMapEntry } from "./mapregistry";
     }
 
     /** Holz-Wegweiser (9-Slice) wie auf der Hauptkarte – gemeinsamer Aufbau (#254). */
-    makeSign(x: number, y: number, text: string) {
-      buildSign(this, x, y, text);
+    makeSign(x: number, y: number, text: string, depth?: number) {
+      buildSign(this, x, y, text, depth);
     }
 
     spawnGull() {
