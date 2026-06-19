@@ -664,8 +664,9 @@ import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
           <div class="dim">Gerade kein Auftrag – probier aus, was du gelernt hast!
           Alles, was du hier anrichtest, siehst du draußen in der Welt.
           <br><br>Mit <code>help</code> siehst du alle Befehle.
-          <br><br>💡 Übungs-Aufgaben mit Belohnung bekommst du bei der Crew: ansprechen → „Üben“.</div>
-          <div id="tt-feedback"></div>`;
+          <br><br>💡 Übungs-Aufgaben mit Belohnung bekommst du bei der Crew: ansprechen → „Üben”.
+          <br><br>💬 Bug gefunden oder Idee? <a href=”https://github.com/fluffels/kubequest/discussions” target=”_blank” rel=”noopener noreferrer”>GitHub Discussions</a></div>
+          <div id=”tt-feedback”></div>`;
         actions.innerHTML = "";
         return;
       }
