@@ -59,7 +59,9 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 ## Zurückgestellt — werden ignoriert
 
-Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, 23 Stück): u.a. der ganze „Echter Modus"-Bogen (#173–#178), Phase-10-Save-Sync (#158/#159/#160), die Expeditions-Flotte/Wachturm-Inseln (#130/#146–#148/#156), Storage-Lernpfad (#240/#241), Self-Hosting (#221), Tasten-Umbelegung (#232), Lazy-Asset-Loading (#198), Sprite-Atlas (#339), Schiff-Szene (#257), Enter/Leertaste-Dialoge (#312).
+Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, **23 Stück**, vollständig): „Echter Modus"-Bogen #173/#174/#175/#176/#177/#178, Phase-10-Save-Sync #158/#159/#160, neue Inseln/Bereiche + Progression #130 (Wachturm), #144 (Lagerhallen), #146/#147/#148/#156 (Expeditions-Flotte), Storage-Lernpfad #240/#241, Self-Hosting #221, Tasten-Umbelegung #232, Lazy-Asset-Loading #198, Sprite-Atlas #339, Schiff-Szene #257, Enter/Leertaste-Dialoge #312.
+
+Maßgeblich ist immer das **Label**, nicht diese Aufzählung: bei „nächstes Architektur" gilt jedes Issue mit `status:zurückgestellt` als übersprungen, auch falls die Liste hier mal nicht nachgezogen wurde.
 
 Wird eins davon reaktiviert (Label `status:zurückgestellt` entfernt), gehört es hier einsortiert.
 
