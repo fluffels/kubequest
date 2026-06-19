@@ -766,7 +766,7 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|servicemonitors|prometheusrules|grafanadatasources|grafanadashboards|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
+        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|servicemonitors|prometheusrules|grafanadatasources|grafanadashboards|alerts|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | create configmap | scale | expose | delete | apply -f <datei>",
         "             logs [-f] [--previous] <pod> | top pods|nodes | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
@@ -1068,8 +1068,15 @@ export interface Scenario {
           this.grafanaDashboards.map(d => [d.name, d.title, String(d.panels), this._age(d.created || 0)]));
       }
 
+      if (["alerts", "alert"].includes(what)) {
+        const active = this.alerts();
+        if (active.length === 0) return "No alerts firing.";
+        return table(["NAME", "SEVERITY", "STATE", "SUMMARY"],
+          active.map(a => [a.name, a.severity, a.state, a.summary]));
+      }
+
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, servicemonitors, prometheusrules, grafanadashboards, secrets, configmaps oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, servicemonitors, prometheusrules, grafanadashboards, alerts, secrets, configmaps oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -1759,15 +1766,18 @@ export interface Scenario {
 
     /** kubectl set resources deployment/<name> --limits=memory=256Mi [--requests=memory=128Mi]
      *  Setzt das memory-Limit. Ist der Dienst wegen OOMKilled kaputt und das neue Limit
-     *  reicht (>= memNeeded), heilt er – der Container hat endlich genug Platz. */
+     *  reicht (>= memNeeded), heilt er. Setzt auch --limits=cpu=<N>m: bei ≤ 499 m wird
+     *  cpuHeavy gelöscht und der HighPodCPU-Alert fällt auf resolved. */
     _kubectlSetResources(t: string[], raw: string) {
       let depName: string | null = null;
       if (t[3] && t[3].startsWith("deployment/")) depName = t[3].split("/")[1];
       else if (t[3] === "deployment") depName = t[4];
       const limitSpec = (raw.match(/--limits[=\s][^\s]*memory=([0-9]+(?:Mi|Gi|M|G)?)/) || [])[1];
       const requestSpec = (raw.match(/--requests[=\s][^\s]*memory=([0-9]+(?:Mi|Gi|M|G)?)/) || [])[1];
+      const cpuMatch = raw.match(/--limits[=\s][^\s]*cpu=([0-9]+)(m)?/);
+      const cpuLimitMilli = cpuMatch ? (cpuMatch[2] ? parseInt(cpuMatch[1], 10) : parseInt(cpuMatch[1], 10) * 1000) : null;
       if (!depName) return this._err("kubectl set resources: Welches Deployment?", "Muster: kubectl set resources deployment/<name> --limits=memory=256Mi --requests=memory=128Mi");
-      if (!limitSpec && !requestSpec) return this._err("kubectl set resources: Kein Limit/Request angegeben.", "Häng z.B. '--limits=memory=256Mi --requests=memory=128Mi' an.");
+      if (!limitSpec && !requestSpec && cpuLimitMilli === null) return this._err("kubectl set resources: Kein Limit/Request angegeben.", "Häng z.B. '--limits=memory=256Mi --requests=memory=128Mi' oder '--limits=cpu=200m' an.");
       const dep = this.deployments.find(d => d.name === depName);
       if (!dep) return this._err('Error from server (NotFound): deployments.apps "' + depName + '" not found', "Welche Deployments es gibt: 'kubectl get deployments'");
       const newLimit = limitSpec ? this._parseMem(limitSpec) : null;
@@ -1779,8 +1789,15 @@ export interface Scenario {
         dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
         healed = true;
       }
+      let cpuThrottled = false;
+      if (cpuLimitMilli !== null && cpuLimitMilli < 500 && dep.cpuHeavy) {
+        dep.cpuHeavy = false;
+        dep.pods = dep.pods.map(() => ({ name: makePodName(dep.name), created: this.clock, restarts: 0 }));
+        cpuThrottled = true;
+      }
       return "deployment.apps/" + depName + " resource requirements updated" +
-        (healed ? "\n💡 Genug Speicher! Die Pods starten neu und bleiben diesmal stehen – kein OOMKilled mehr." : "");
+        (healed ? "\n💡 Genug Speicher! Die Pods starten neu und bleiben diesmal stehen – kein OOMKilled mehr." : "") +
+        (cpuThrottled ? "\n💡 CPU-Limit gesetzt! Die Pods werden gedrosselt – der HighPodCPU-Alert fällt auf resolved." : "");
     }
 
     /** kubectl rollout restart deployment <name> */

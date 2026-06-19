@@ -11,7 +11,7 @@ import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
   ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML, SERVICEMONITOR_YAML,
-  GRAFANA_DATASOURCE_YAML, GRAFANA_DASHBOARD_YAML,
+  GRAFANA_DATASOURCE_YAML, GRAFANA_DASHBOARD_YAML, PROMETHEUSRULE_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1917,6 +1917,104 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "lumi", lines: [
         "Sieh an – Logs gelesen wie ein echter Wächter. Basis-Ausgabe, live folgen, Absturz-Log des Vorgängers: das Dreigespann trägt dich durch die meisten Nächte auf der Klippe.",
         "Metriken zeigen <i>was</i>, Logs zeigen <i>warum</i>. Ein letztes Werkzeug fehlt noch: <b>Alerts</b> – damit der Cluster dich weckt, bevor du überhaupt auf das Dashboard schauen musst. Komm wieder hoch! 🔦",
+      ]},
+    ]},
+
+  // ===== Phase 5: Monitoring-Leuchtturm – Quest 4: Alerts & PrometheusRule (#116) =====
+  // Vierte Quest bei Lumi: PrometheusRule anwenden, HighPodCPU-Alert feuern sehen,
+  // Ursache beheben (scale auf 0) und Alert auf resolved beobachten. Feedback-Schleife.
+  { id: "q35", title: "Der Cluster ruft: Alerts & PrometheusRule", giver: "lumi", rewardXp: 60, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "lumi", lines: [
+        "Willkommen zurück! Metriken zeigen <i>was</i>, Logs zeigen <i>warum</i> – aber wer weckt dich nachts, wenn etwas brennt? Das ist die dritte Säule der Observability: <b>Alerts</b>.",
+        "Prometheus wertet deine <b>Alert-Regeln</b> laufend gegen seine Metriken aus. Trifft eine Bedingung zu – und bleibt wahr – feuert ein Alert. Der <b>Alertmanager</b> entscheidet dann, wen er benachrichtigt.",
+        "Du schreibst die Regeln nicht in Textdateien: Du deklarierst sie als <b>PrometheusRule</b> – eine CRD des Prometheus-Operators – und der Cluster lernt selbst zu rufen.",
+      ]},
+      { type: "dialog", npc: "lumi",
+        scenario: {
+          deployments: [{ name: "rechenknecht", image: "python", replicas: 1, cpuHeavy: true }],
+          files: { "prometheusrule.yaml": PROMETHEUSRULE_YAML },
+          applyEffects: {
+            "prometheusrule.yaml": { prometheusRule: { name: "hafen-alarme", alert: "HighPodCPU", severity: "warning", expr: "rate(container_cpu_usage_seconds_total[5m]) > 0.5", forDuration: "5m" } },
+          },
+        },
+        lines: [
+          "Sieh an – da ist ein <b>rechenknecht</b>-Pod, der ungewöhnlich viel CPU zieht. Ich habe dir eine <code>prometheusrule.yaml</code> vorbereitet: Sie definiert die Regel, die Prometheus auf genau diesen Fall aufmerksam macht.",
+          "Schau rein, was da steht – und bringe sie dann in den Cluster.",
+        ] },
+      { type: "terminal", brief: "Alert-Regel lesen", tasks: [
+        { id: "t-pr-ls", text: "Was liegt hier? <code>ls</code>.",
+          accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-pr-cat", text: "Lies die Regel: <code>cat prometheusrule.yaml</code>. Findest du <code>alert: HighPodCPU</code>, den <code>expr</code> (die Bedingung in PromQL) und <code>for: 5m</code> (Wartezeit)?",
+          accept: [/^cat\s+prometheusrule\.yaml$/], solution: "cat prometheusrule.yaml", hint: "cat prometheusrule.yaml" },
+      ]},
+      { type: "teach", brief: "Alert-Regel aktivieren", cmd: {
+        id: "t-pr-apply",
+        intro: "🆕 Eine <code>PrometheusRule</code> ist ein normales Manifest – du wendest sie mit <code>kubectl apply -f</code> an wie jede andere Ressource. Ab jetzt kennt Prometheus die Regel und prüft sie gegen seine Metriken.",
+        text: "Aktiviere die Regel: wende <code>prometheusrule.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+prometheusrule\.yaml$/],
+        check: (sim: Sim) => sim.prometheusRules.some(r => r.name === "hafen-alarme"),
+        solution: "kubectl apply -f prometheusrule.yaml",
+        hint: "kubectl apply -f <datei> – der vertraute Befehl." } },
+      { type: "terminal", brief: "Regel prüfen", tasks: [
+        { id: "t-pr-get", text: "Prüf, dass die Regel steht: <code>kubectl get prometheusrules</code>. Deine <code>hafen-alarme</code> taucht jetzt auf.",
+          accept: [/^kubectl\s+get\s+(prometheusrules|prometheusrule|promrule|promrules)$/],
+          check: (sim: Sim) => sim.prometheusRules.some(r => r.name === "hafen-alarme"),
+          solution: "kubectl get prometheusrules", hint: "kubectl get prometheusrules (Kurzform: promrules)." },
+      ]},
+      { type: "teach", brief: "Aktive Alerts sehen", cmd: {
+        id: "t-alerts-get",
+        intro: "🆕 Neuer Befehl: <code>kubectl get alerts</code> – zeigt dir alle aktiven Alerts des Alertmanagers: Name, Schwere und ob sie gerade feuern (<code>firing</code>) oder bereits gelöst sind (<code>resolved</code>).",
+        text: "Sieh dir die Alerts an: <code>kubectl get alerts</code>. Feuert <code>HighPodCPU</code>?",
+        accept: [/^kubectl\s+get\s+alerts$/],
+        check: (sim: Sim) => sim.alerts().some(a => a.name === "HighPodCPU" && a.state === "firing"),
+        solution: "kubectl get alerts",
+        hint: "kubectl get alerts" } },
+      { type: "choice", npc: "lumi", reviewId: "q-obs-alert-firing",
+        q: "Ein Alert steht auf <code>firing</code>. Was bedeutet das?",
+        options: [
+          { t: "Die Bedingung (<code>expr</code>) ist wahr und hält lang genug an – der Alarm feuert aktiv.", ok: true,
+            reply: "Genau! Prometheus prüft laufend: Sobald der PromQL-Ausdruck wahr bleibt, feuert der Alert. Der Alertmanager entscheidet dann, wen er weckt – Slack, PagerDuty, E-Mail. Du hast die Semantik! 🔦" },
+          { t: "Ein Mensch hat den Alert manuell ausgelöst, weil ihm etwas im Dashboard auffiel.", ok: false,
+            reply: "Alerts feuern nicht manuell – das wäre Monitoring zum Selbst-Anrufen. Prometheus beobachtet die Metriken kontinuierlich und feuert von selbst, wenn eine Bedingung wahr bleibt. Kein Mensch muss dabei sein." },
+          { t: "Prometheus ist abgestürzt und kann keine Metriken mehr scrapen.", ok: false,
+            reply: "Wenn Prometheus selbst abgestürzt wäre, gäbe es gar keine Alerts. Ein firing-Alert zeigt das Gegenteil: Prometheus läuft, scrapt fleißig – und sieht dabei eine Bedingung, die zutrifft." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Der <b>rechenknecht</b>-Pod dreht auf Hochtouren. Sieh selbst – <code>kubectl top pods</code> zeigt, wie viel er zieht.",
+        "Dann skalierst du ihn auf null Replicas: keine Pods, keine Last, Bedingung erfüllt sich nicht mehr. Prometheus sieht es – und der Alert wechselt auf <b>resolved</b>.",
+      ] },
+      { type: "terminal", brief: "Heißen Pod identifizieren", tasks: [
+        { id: "t-top-hot", text: "Sieh, wer die CPU dominiert: <code>kubectl top pods</code>. Der <b>rechenknecht</b> liegt weit über der 500m-Schwelle.",
+          accept: [/^kubectl\s+top\s+(pods|pod|po)$/], solution: "kubectl top pods",
+          hint: "kubectl top pods – zeigt CPU und Memory je laufendem Pod." },
+      ]},
+      { type: "teach", brief: "Ursache beheben – Alert auflösen", cmd: {
+        id: "t-scale-zero",
+        intro: "Keine Pods mehr – keine CPU-Last. Prometheus sieht die Bedingung nicht mehr und markiert den Alert als <code>resolved</code>. In der Praxis ist das eine Sofort-Maßnahme, während man die eigentliche Ursache behebt.",
+        text: "Stoppe den heißen Dienst: <code>kubectl scale deployment rechenknecht --replicas=0</code>.",
+        accept: [/^kubectl\s+scale\s+deployment\s+rechenknecht\s+--replicas[=\s]0$/],
+        check: (sim: Sim) => sim.alerts().some(a => a.name === "HighPodCPU" && a.state === "resolved"),
+        solution: "kubectl scale deployment rechenknecht --replicas=0",
+        hint: "kubectl scale deployment rechenknecht --replicas=0" } },
+      { type: "terminal", brief: "Auflösung prüfen", tasks: [
+        { id: "t-alerts-resolved", text: "Prüfe den neuen Status: <code>kubectl get alerts</code>. Der <code>HighPodCPU</code>-Alert steht jetzt auf <b>resolved</b>.",
+          accept: [/^kubectl\s+get\s+alerts$/], solution: "kubectl get alerts",
+          hint: "kubectl get alerts" },
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-alert-resolved",
+        q: "Ein Alert wechselt von <b>firing</b> auf <b>resolved</b>. Was ist passiert?",
+        options: [
+          { t: "Die Bedingung ist nicht mehr wahr – die Ursache wurde behoben, Prometheus stellt keine Verletzung mehr fest.", ok: true,
+            reply: "Genau! Resolved heißt: Prometheus hat geprüft – die Bedingung trifft nicht mehr zu. Der Alert bleibt kurz sichtbar, damit du weißt, dass er da war und wieder weg ist. Kein stilles Verschwinden, sondern ein klares Signal. 🔦" },
+          { t: "Jemand hat den Alert manuell auf resolved gesetzt, um ihn zum Schweigen zu bringen.", ok: false,
+            reply: "Alerts resolved setzt niemand von Hand – das wäre Symptom-Verstecken statt Ursachen-Beheben. Resolved kommt automatisch, wenn Prometheus sieht, dass die Bedingung nicht mehr wahr ist." },
+          { t: "Der Alert wurde gelöscht und taucht erst wieder auf, wenn man ihn erneut anwendet.", ok: false,
+            reply: "Gelöscht ist nicht resolved: Gelöscht bedeutet, der Alert verschwindet vollständig aus dem System. Resolved ist ein Zustandsübergang – die Regel bleibt, der Alert wechselt den Status, und beim nächsten Feuern kommt er wieder." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Metriken, Dashboards, Logs, Alerts – du hast alle vier Werkzeuge in der Hand. Jetzt wacht der Cluster selbst und ruft dich, wenn etwas brennt. Das ist echte Observability.",
+        "Du bist bereit für alles, was der Hafen dir schickt. Viel Wind in den Segeln – und gute Wacht! 🔦",
       ]},
     ]},
 ];
