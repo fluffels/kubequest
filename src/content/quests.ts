@@ -234,7 +234,8 @@ export const QUESTS: Quest[] = [
         accept: [/^kubectl\s+describe\s+pods?\s+kantine-\S+$/], solution: "kubectl describe pod <name aus get pods>",
         hint: "Erst kubectl get pods, dann kubectl describe pod <name>." } },
       { type: "dialog", npc: "ole", lines: [
-        "Unten in den <b>Events</b> steht die Lebensgeschichte des Pods – Gold wert bei der Fehlersuche! Eins noch: Kubernetes selbst läuft AUCH als Pods, versteckt im Namespace <code>kube-system</code>.",
+        "Unten in den <b>Events</b> steht die Lebensgeschichte des Pods – Gold wert bei der Fehlersuche! <code>describe</code> ist die <b>Sicht von Kubernetes</b> auf den Pod: Zustand, Image, Ressourcen und vor allem das <b>Warum</b> – die Events. Was die <b>App</b> selbst ausgibt, zeigt es NICHT; dafür gibt es später bei Juno einen eigenen Befehl (<code>kubectl logs</code>).",
+        "Eins noch: Kubernetes selbst läuft AUCH als Pods, versteckt im Namespace <code>kube-system</code>.",
       ]},
       { type: "teach", brief: "Hinter die Kulissen", cmd: {
         id: "t-ns", intro: "🆕 Neue Flag: <code>-n &lt;namespace&gt;</code> – in einen anderen Namespace schauen.",
@@ -661,8 +662,18 @@ export const QUESTS: Quest[] = [
           solution: "kubectl get pods", hint: "get pods – STATUS muss Running sein." },
       ]},
       { type: "dialog", npc: "juno", lines: [
-        "Sauber repariert! Merk dir das Mantra für IMMER: <b>get pods → describe → logs.</b> Erst gucken, dann verstehen, dann fixen, dann verifizieren. Morgen zeige ich dir den fiesesten Fehler von allen …",
+        "Sauber repariert! Merk dir das Mantra für IMMER: <b>get pods → describe → logs.</b> Erst gucken, dann verstehen, dann fixen, dann verifizieren.",
+        "„<code>describe</code> UND <code>logs</code> – wo ist der Unterschied?“ Gute Frage, die verwechseln viele. <b><code>describe</code> = die Sicht von Kubernetes</b> auf den Pod: Zustand, Image, Limits und vor allem die <b>Events</b> – also <i>warum</i> er (nicht) läuft: ImagePullBackOff, Pending, OOMKilled, fehlgeschlagene Probe. <b><code>logs</code> = was die App selbst ausgibt</b> (stdout/stderr): ihre eigenen Meldungen, Stacktraces, Fehler.",
+        "<b>Faustregel:</b> erst <code>describe</code> (läuft er überhaupt? was sagen die Events?), dann <code>logs</code> (was meldet die App?). Startet der Container nie – ImagePullBackOff, Pending, OOMKilled –, helfen Logs nicht, da steht nichts; das verrät nur <code>describe</code>. Crasht die App beim Start (CrashLoop), sagt <code>describe</code> nur <i>dass</i> sie stirbt – den echten Grund zeigen die <code>logs</code>. Morgen zeige ich dir den fiesesten Fehler von allen …",
       ]},
+      { type: "choice", npc: "juno", reviewId: "q-ts-8",
+        q: "Ein Pod hängt in <code>ImagePullBackOff</code> – der Container ist nie gestartet. Womit kommst du ans Warum: <code>describe</code> oder <code>logs</code>?",
+        options: [
+          { t: "<code>describe</code> – die Events zeigen, warum das Image nicht geladen wird.", ok: true,
+            reply: "Genau! Kein gestarteter Container = keine App-Ausgabe, also auch keine Logs. Das Warum steht in den Events – die liefert describe." },
+          { t: "<code>logs</code> – da steht doch immer der Fehler drin.", ok: false,
+            reply: "Diesmal nicht: Der Container ist nie gelaufen, die App hat nie etwas ausgegeben – die Logs sind leer. Bei Pull-/Scheduling-/OOM-Problemen ist describe dran (die Events)." },
+        ]},
     ]},
 
   { id: "q16", title: "Das Flackern", giver: "juno", rewardXp: 55, rewardCoins: 40,
