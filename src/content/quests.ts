@@ -12,7 +12,7 @@ import {
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
   ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML, SERVICEMONITOR_YAML,
   GRAFANA_DATASOURCE_YAML, GRAFANA_DASHBOARD_YAML, PROMETHEUSRULE_YAML,
-  HEADLESS_SERVICE_YAML, STATEFULSET_YAML,
+  HEADLESS_SERVICE_YAML, STATEFULSET_YAML, STORAGECLASS_YAML, PVC_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -2081,6 +2081,80 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "knut", lines: [
         "Sauber verstaut, Kapitän. Stabile Namen, eigene Volumes – so lagert man, was bleiben muss.",
         "Als Nächstes zeige ich dir, <b>woher</b> der Speicher kommt: PersistentVolume, PVC und StorageClass. Aber das hebe ich mir für die nächste Schicht auf. 🪵",
+      ]},
+    ]},
+
+  // Phase 7 – Lagerhallen-Viertel (#24): Speicher anfordern (#129). Folgt auf q36 (StatefulSet);
+  // zoomt in die Speicher-Maschinerie unter den volumeClaimTemplates: PV, PVC, StorageClass.
+  { id: "q37", title: "Speicher anfordern: PVC, PV & StorageClass", giver: "knut", rewardXp: 55, rewardCoins: 40,
+    steps: [
+      { type: "dialog", npc: "knut", lines: [
+        "Zurück am Kai, Kapitän? Gut. Beim StatefulSet hast du gesehen, dass jeder Pod ein eigenes Volume bekommt. Heute zeige ich dir, <b>woher</b> dieser Speicher kommt.",
+        "Drei Begriffe, ein Bild aus meinem Lager: Die <b>StorageClass</b> ist das <b>Regal-System</b> (welche Sorte Platz, wie schnell, welche Cloud). Das <b>PersistentVolume (PV)</b> ist das <b>echte Regalfach</b>. Und das <b>PersistentVolumeClaim (PVC)</b> ist deine <b>Anforderung</b>: „Ich brauche 5 GB von dieser Sorte.“",
+        "Das Schöne: Du musst kein Fach von Hand bauen. Du reichst nur die Anforderung ein – die StorageClass <b>provisioniert</b> das Volume und bindet es. Schau dir die Karten an.",
+      ]},
+      { type: "terminal", brief: "Karten lesen",
+        scenario: {
+          files: { "storageclass.yaml": STORAGECLASS_YAML, "pvc.yaml": PVC_YAML },
+          applyEffects: {
+            "storageclass.yaml": { storageClass: { name: "kai-ssd", provisioner: "kubernetes.io/aws-ebs", reclaimPolicy: "Retain", isDefault: false } },
+            "pvc.yaml": { pvc: { name: "lager-daten", storage: "5Gi", storageClass: "kai-ssd", accessModes: "RWO" } },
+          },
+        },
+        tasks: [
+        { id: "t-pvc-ls", text: "Schau mit <code>ls</code>, was am Kai bereitliegt.", accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-pvc-cat", text: "Lies <code>cat pvc.yaml</code>. Findest du <code>storageClassName</code> und unter <code>requests</code> die angeforderte <code>storage</code>-Größe?",
+          accept: [/^cat\s+pvc\.yaml$/], solution: "cat pvc.yaml", hint: "cat <datei>" },
+      ]},
+      { type: "teach", brief: "Regal-System bereitstellen", cmd: {
+        id: "t-sc-apply", intro: "🆕 Die <b>StorageClass</b> beschreibt, welche Sorte Speicher der Cluster auf Anforderung beschafft (Provisioner, Geschwindigkeit, reclaimPolicy). Sie ist die Vorlage – noch kein Speicher.",
+        text: "Stell das Regal-System bereit: <code>kubectl apply -f storageclass.yaml</code>.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+storageclass\.yaml$/],
+        check: (sim: Sim) => sim.storageClasses.some(s => s.name === "kai-ssd"),
+        solution: "kubectl apply -f storageclass.yaml", hint: "kubectl apply -f <datei>" } },
+      { type: "teach", brief: "Speicher anfordern → Bound", cmd: {
+        id: "t-pvc-apply", intro: "🆕 Das <b>PVC</b> ist die Anforderung. Wendest du es an, sucht (bzw. provisioniert) die StorageClass ein passendes <b>PV</b> und <b>bindet</b> beide: Status <code>Pending</code> → <code>Bound</code>. Gebunden heißt: dein Anspruch hat echten Speicher bekommen.",
+        text: "Fordere den Speicher an: <code>kubectl apply -f pvc.yaml</code> – das PVC <code>lager-daten</code> wird <b>Bound</b>.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+pvc\.yaml$/],
+        check: (sim: Sim) => sim.pvcs.some(p => p.name === "lager-daten" && p.status === "Bound"),
+        solution: "kubectl apply -f pvc.yaml", hint: "kubectl apply -f <datei>" } },
+      { type: "terminal", brief: "Lager lesen", tasks: [
+        { id: "t-pvc-get", text: "Sieh die Anforderung: <code>kubectl get pvc</code> – Spalte STATUS zeigt <b>Bound</b>, dazu CAPACITY (5Gi), ACCESS MODES und STORAGECLASS.",
+          accept: [/^kubectl\s+get\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$/],
+          check: (sim: Sim) => sim.pvcs.some(p => p.name === "lager-daten" && p.status === "Bound"),
+          solution: "kubectl get pvc", hint: "kubectl get pvc" },
+        { id: "t-pv-get", text: "Und das echte Regalfach: <code>kubectl get pv</code> – die StorageClass hat dynamisch ein PV provisioniert und an dein PVC gebunden (CLAIM zeigt <code>default/lager-daten</code>).",
+          accept: [/^kubectl\s+get\s+(pv|persistentvolume|persistentvolumes)$/],
+          check: (sim: Sim) => sim.pvs.some(p => p.status === "Bound" && p.claim === "default/lager-daten"),
+          solution: "kubectl get pv", hint: "kubectl get pv" },
+      ]},
+      { type: "terminal", brief: "Speicher überlebt den Workload", tasks: [
+        { id: "t-pvc-dep", text: "Stell einen Workload an den Speicher: <code>kubectl create deployment datenbank --image=postgres</code>.",
+          accept: [/^kubectl\s+create\s+deployment\s+datenbank\s+--image[=\s]postgres(:\S+)?$/],
+          check: (sim: Sim) => sim.deployments.some(d => d.name === "datenbank"),
+          solution: "kubectl create deployment datenbank --image=postgres", hint: "kubectl create deployment <name> --image=<image>" },
+        { id: "t-pvc-del", text: "Jetzt der Beweis: reiß den Workload wieder ab – <code>kubectl delete deployment datenbank</code>.",
+          accept: [/^kubectl\s+delete\s+deployment\s+datenbank$/],
+          check: (sim: Sim) => !sim.deployments.some(d => d.name === "datenbank"),
+          solution: "kubectl delete deployment datenbank", hint: "kubectl delete deployment <name>" },
+        { id: "t-pvc-still", text: "Und nun <code>kubectl get pvc</code>: <code>lager-daten</code> ist <b>immer noch Bound</b>. Der Speicher ist ein eigenes, dauerhaftes Objekt – er hängt nicht am Pod. Pods kommen und gehen, die Daten bleiben.",
+          accept: [/^kubectl\s+get\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$/],
+          check: (sim: Sim) => sim.pvcs.some(p => p.name === "lager-daten" && p.status === "Bound") && !sim.deployments.some(d => d.name === "datenbank"),
+          solution: "kubectl get pvc", hint: "kubectl get pvc" },
+      ]},
+      { type: "choice", npc: "knut",
+        q: "PV, PVC, StorageClass – und was heißt <b>Bound</b>?",
+        options: [
+          { t: "StorageClass = Regal-System (Vorlage), PV = echtes Regalfach, PVC = deine Anforderung; Bound = Anforderung und Fach sind verbunden, der Speicher steht bereit.", ok: true,
+            reply: "Genau so. Du forderst über das PVC an, die StorageClass provisioniert das PV, und Bound heißt: beide sind verheiratet – dein Anspruch hat echten, dauerhaften Platz. 🗄️" },
+          { t: "PV und PVC sind dasselbe; die StorageClass ist nur ein Label, und Bound heißt „gelöscht“.", ok: false,
+            reply: "Nein – PV (das Fach) und PVC (die Anforderung) sind zwei Seiten. Die StorageClass beschafft das Fach. Bound ist das Gegenteil von gelöscht: verbunden und nutzbar." },
+          { t: "Das PVC ist der Speicher selbst; ohne PVC gibt es keine StorageClass, und Bound heißt „wird gerade gesucht“.", ok: false,
+            reply: "Fast nichts davon stimmt: Das PVC ist nur die Anforderung, nicht der Speicher. „Wird gesucht“ wäre Pending – Bound heißt, es ist schon gefunden und verbunden." },
+        ]},
+      { type: "dialog", npc: "knut", lines: [
+        "Jetzt kennst du den ganzen Weg: StorageClass beschafft, PV ist das Fach, PVC ist dein Anspruch – und Bound heißt, der Platz gehört dir.",
+        "Damit lagert im Hafen nichts mehr ins Leere. Gute Wacht am Kai, Kapitän! 🪵",
       ]},
     ]},
 ];
