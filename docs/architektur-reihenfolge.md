@@ -51,25 +51,24 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#344** | `game.ts → sfx.ts` Schichtverletzung beheben | Klein, voll abschließbar. **Voraussetzung für #347** (Wächter startet nur grün, wenn diese Verletzung weg ist). |
-| 2 | **#347** | Architektur-Wächter (`dependency-cruiser`) in CI | Sichert die Schichtung dauerhaft ab → hoher Stardew-Scope-Wert, schützt alle folgenden Refactors. Braucht **#344 vorher**. |
-| 3 | **#353** | Spielstand: aktuelle Quest per **ID** statt Zahl-Index (prio:mittel) | Save-Robustheit: Quests einschieben/umsortieren bricht keine Spielstände mehr — Kern-Stardew-Scope. Fundament für #354 und #332. |
-| 4 | **#354** | Sprechende Quest-IDs (`harbor-first-crate` statt `q2b`) | Repo-weiter Rename + Save-Migration. Setzt auf die **ID-basierte Save** aus #353 auf → danach. |
-| 5 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. |
-| 6 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347) abgesichert. ~500 sim-Tests: Red-Green beachten. |
-| 7 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
-| 8 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
-| 9 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
-| 10 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
-| 11 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
-| 12 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
-| 13 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen → **nach #353** sauberer. |
-| 14 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → erst wenn Save-Format (#353) sitzt. |
-| 15 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 16 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`) und **darf nicht vor dem finalen main-Merge** des Umbaus geschlossen werden (#348/#349/#350 noch offen). Deshalb nicht als sauber-abschließbarer „nächster" Pick vorne — erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
-| 17 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 18 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 19 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | **#347** | Architektur-Wächter (`dependency-cruiser`) in CI | Sichert die Schichtung dauerhaft ab → hoher Stardew-Scope-Wert, schützt alle folgenden Refactors. (#344 — die Voraussetzung — ist erledigt + geschlossen.) Umbau-gekoppelt: auf `umbau/skalierungs-fundament`. |
+| 2 | **#353** | Spielstand: aktuelle Quest per **ID** statt Zahl-Index (prio:mittel) | Save-Robustheit: Quests einschieben/umsortieren bricht keine Spielstände mehr — Kern-Stardew-Scope. Fundament für #354 und #332. |
+| 3 | **#354** | Sprechende Quest-IDs (`harbor-first-crate` statt `q2b`) | Repo-weiter Rename + Save-Migration. Setzt auf die **ID-basierte Save** aus #353 auf → danach. |
+| 4 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. |
+| 5 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347) abgesichert. ~500 sim-Tests: Red-Green beachten. |
+| 6 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
+| 7 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
+| 8 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
+| 9 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
+| 10 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
+| 11 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
+| 12 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen → **nach #353** sauberer. |
+| 13 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → erst wenn Save-Format (#353) sitzt. |
+| 14 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 15 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`); wird dort geschlossen, sobald fertig (#349/#350 noch offen). Erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
+| 16 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 17 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 18 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 
