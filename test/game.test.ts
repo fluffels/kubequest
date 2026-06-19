@@ -616,3 +616,26 @@ test("jumpToQuest: Sprung persistiert (load() liest denselben Quest-Stand zurüc
   expect(Game.state.questIdx).toBe(4);
   expect(Game.state.completedQuests).toEqual(KQContent.QUESTS.slice(0, 4).map(q => q.id));
 });
+
+test("jumpToQuest: Giver-Position überlebt eine LAUFENDE WorldScene (#335, gleiche Falle wie #295)", () => {
+  // Repro des über das Dev-Panel (#325) gemeldeten Bugs: Beim Sprung lebt die WorldScene
+  // noch und meldet die AKTUELLE Spielerposition. save() übernahm diese und überschrieb
+  // damit die gerade gesetzte Giver-Position – nach dem reload stand man wieder am alten
+  // Ort statt beim Quest-Giver (dieselbe Falle wie der Reset-Position-Bug #295/#296).
+  // Mit lebender Szene an FALSCHER Position springen und prüfen, dass RAM- UND
+  // persistierter Stand beim Giver liegen. (Der vorige #329-Test umging das per
+  // setWorldScene(null) und konnte den Bug deshalb nicht fangen – False Positive.)
+  const spawn = NPC_SPAWNS.find(s => s.id === KQContent.QUESTS[3].giver)!;
+  expect(spawn).toBeTruthy(); // Quest 3 hat einen festen Giver-Standplatz
+  const giverPos = { x: spawn.x * TILE, y: spawn.y * TILE };
+
+  setWorldScene({ player: { x: 9999, y: 9999 }, nearestNpc: () => null, burstAtPlayer: () => {} });
+  expect(Game.jumpToQuest(3)).toBe(true);
+  setWorldScene(null); // aufräumen für die übrigen Tests
+
+  // Im RAM steht die Figur beim Giver – NICHT an der Live-Position der Szene.
+  expect(Game.state.player).toEqual(giverPos);
+  // Und der persistierte Stand ebenso, sonst holt der reload die alte Position zurück.
+  const saved = JSON.parse(SaveStore.read()!);
+  expect(saved.data.player).toEqual(giverPos);
+});
