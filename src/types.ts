@@ -138,8 +138,22 @@ export interface TerminalStep extends StepBase {
   tasks: QuestTask[];
 }
 
+/** Geführtes Minispiel (#276): der Spieler muss ein Minispiel beim NPC aktiv
+ *  einmal durchspielen – der Schritt schließt erst nach dem Spielen ab, nicht
+ *  durch bloßes Weiterklicken. Macht neue Interaktionsarten auffindbar, statt
+ *  sie nur im Fließtext zu erwähnen. */
+export interface MinigameStep extends StepBase {
+  type: "minigame";
+  /** Bei welchem NPC das Minispiel im Menü liegt (steuert Marker/Wegweiser). */
+  npc: string;
+  /** Welches Minispiel verpflichtend gespielt werden muss. */
+  game: "stack";
+  /** Kurzlabel des Schritts (Anzeige/Doku). */
+  brief: string;
+}
+
 /** Ein Quest-Schritt – diskriminierte Union über `type`. */
-export type QuestStep = DialogStep | ChoiceStep | TeachStep | DrillStep | TerminalStep;
+export type QuestStep = DialogStep | ChoiceStep | TeachStep | DrillStep | TerminalStep | MinigameStep;
 
 /** Schritte, die im Funkgerät-Terminal laufen (statt im Dialog beim NPC). */
 export type FunkStep = TeachStep | DrillStep | TerminalStep;
