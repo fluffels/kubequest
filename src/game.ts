@@ -66,6 +66,13 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     // Umbrella-/Bundle-Charts (#264): in q21 im Schluss-Dialog erklärt (dependencies,
     // inoffizieller Begriff, vendored vs. Registry, condition:-Toggle) – hier drillt Kralle nach.
     q21: ["q-helm-deps", "q-helm-lock", "q-helm-umbrella-term", "q-helm-condition", "q-helm-subchart-source"],
+    // Monitoring-Leuchtturm (#118, Phase 5): SR-Karten zu Begriffen, die NICHT als
+    // Choice-reviewId in den Quests auftauchen – Scrape-Targets (q32), Log-Follow (q34),
+    // PrometheusRule/PromQL/Alertmanager (q35). Die übrigen q-obs-* hängen schon als
+    // Choice-Fragen in q32–q35 und kommen darüber in den Pool.
+    q32: ["q-obs-targets"],
+    q34: ["q-obs-logs-follow"],
+    q35: ["q-obs-prom-rule", "q-obs-promql", "q-obs-alertmanager"],
   };
 
   function today() {
