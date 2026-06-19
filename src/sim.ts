@@ -200,6 +200,45 @@ export interface ApplyEffect {
   // Eine Argo-Application-CRD: legt beim `kubectl apply -f` eine Argo-App im Sim-State an.
   // `childApps` macht sie zur App-of-Apps-Wurzel (verwaltet nur weitere Applications, kein eigenes Deployment).
   application?: { name: string; repo?: string; path?: string; autoSync?: boolean; selfHeal?: boolean; deployment?: { name: string; image: string; replicas: number }; service?: { name: string; type?: string; port: string | number }; childApps?: ArgoChildSpec[] };
+  // Observability-CRDs (#110): vom `kubectl apply -f` der Monitoring-Manifeste angelegt.
+  serviceMonitor?: { name: string; selector: string; port?: string; interval?: string };
+  prometheusRule?: { name: string; alert: string; severity?: string; expr?: string; forDuration?: string };
+  grafanaDatasource?: { name: string; dsType?: string; url?: string };
+  grafanaDashboard?: { name: string; title: string; panels?: number };
+}
+
+/* ---------- Observability-Manifeste als Cluster-Objekte (#110) ---------- */
+
+/** ServiceMonitor: legt fest, welchen Service Prometheus scrapt. */
+export interface ServiceMonitorRes {
+  name: string;
+  selector: string;   // app-Label des gescrapten Service
+  port: string;       // benannter Port / Portnummer des /metrics-Endpunkts
+  interval: string;   // Scrape-Intervall, z.B. "30s"
+  created?: number;
+}
+/** PrometheusRule: eine Alert-Regel samt Schwelle. */
+export interface PrometheusRuleRes {
+  name: string;
+  alert: string;       // Name des Alarms, z.B. "HighPodCPU"
+  expr: string;        // Bedingung (PromQL-artig)
+  forDuration: string; // Dauer vor dem Feuern, z.B. "5m"
+  severity: string;    // "warning" | "critical"
+  created?: number;
+}
+/** GrafanaDatasource: woher Grafana die Metriken zieht. */
+export interface GrafanaDatasourceRes {
+  name: string;
+  dsType: string;      // z.B. "prometheus"
+  url: string;
+  created?: number;
+}
+/** GrafanaDashboard: ein deklaratives Dashboard (Titel + Panel-Anzahl). */
+export interface GrafanaDashboardRes {
+  name: string;
+  title: string;
+  panels: number;
+  created?: number;
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
@@ -250,6 +289,10 @@ export interface Scenario {
   configMaps?: ConfigMap[];
   files?: Record<string, string>;
   applyEffects?: Record<string, ApplyEffect>;
+  serviceMonitors?: ServiceMonitorRes[];
+  prometheusRules?: PrometheusRuleRes[];
+  grafanaDatasources?: GrafanaDatasourceRes[];
+  grafanaDashboards?: GrafanaDashboardRes[];
   argoApps?: ArgoApp[];
   helmRepos?: string[];
   releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
@@ -341,6 +384,10 @@ export interface Scenario {
     configMaps!: ConfigMap[];
     files!: Record<string, string>;
     applyEffects!: Record<string, ApplyEffect>;
+    serviceMonitors!: ServiceMonitorRes[];
+    prometheusRules!: PrometheusRuleRes[];
+    grafanaDatasources!: GrafanaDatasourceRes[];
+    grafanaDashboards!: GrafanaDashboardRes[];
     argoApps!: ArgoApp[];
     helmRepos!: string[];
     releases!: Release[];
@@ -384,6 +431,10 @@ export interface Scenario {
       this.configMaps = (sc.configMaps || []).map(c => Object.assign({}, c));
       this.files = Object.assign({}, sc.files || {});
       this.applyEffects = sc.applyEffects || {}; // dateiname -> Wirkung von kubectl apply -f
+      this.serviceMonitors = (sc.serviceMonitors || []).map(s => Object.assign({}, s));
+      this.prometheusRules = (sc.prometheusRules || []).map(r => Object.assign({}, r));
+      this.grafanaDatasources = (sc.grafanaDatasources || []).map(d => Object.assign({}, d));
+      this.grafanaDashboards = (sc.grafanaDashboards || []).map(d => Object.assign({}, d));
       this.argoApps = (sc.argoApps || []).map(a => this._cloneArgoApp(a));
 
       this.helmRepos = (sc.helmRepos || []).slice();
@@ -505,6 +556,18 @@ export interface Scenario {
       if (!sc) return;
       Object.assign(this.files, sc.files || {});
       Object.assign(this.applyEffects, sc.applyEffects || {});
+      for (const s of sc.serviceMonitors || []) {
+        if (!this.serviceMonitors.some(x => x.name === s.name)) this.serviceMonitors.push(Object.assign({}, s));
+      }
+      for (const r of sc.prometheusRules || []) {
+        if (!this.prometheusRules.some(x => x.name === r.name)) this.prometheusRules.push(Object.assign({}, r));
+      }
+      for (const d of sc.grafanaDatasources || []) {
+        if (!this.grafanaDatasources.some(x => x.name === d.name)) this.grafanaDatasources.push(Object.assign({}, d));
+      }
+      for (const d of sc.grafanaDashboards || []) {
+        if (!this.grafanaDashboards.some(x => x.name === d.name)) this.grafanaDashboards.push(Object.assign({}, d));
+      }
       for (const a of sc.argoApps || []) {
         if (!this.argoApps.some(x => x.name === a.name)) this.argoApps.push(this._cloneArgoApp(a));
       }
@@ -571,6 +634,10 @@ export interface Scenario {
         configMaps: this.configMaps.map(c => ({ name: c.name, keys: c.keys.slice() })),
         files: Object.assign({}, this.files),
         applyEffects: JSON.parse(JSON.stringify(this.applyEffects)),
+        serviceMonitors: this.serviceMonitors.map(s => Object.assign({}, s)),
+        prometheusRules: this.prometheusRules.map(r => Object.assign({}, r)),
+        grafanaDatasources: this.grafanaDatasources.map(d => Object.assign({}, d)),
+        grafanaDashboards: this.grafanaDashboards.map(d => Object.assign({}, d)),
         argoApps: this.argoApps.map(a => this._cloneArgoApp(a)),
         helmRepos: this.helmRepos.slice(),
         releases: this.releases.map(r => ({
@@ -699,7 +766,7 @@ export interface Scenario {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
+        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|servicemonitors|prometheusrules|grafanadatasources|grafanadashboards|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | create configmap | scale | expose | delete | apply -f <datei>",
         "             logs [-f] [--previous] <pod> | top pods|nodes | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
@@ -977,8 +1044,32 @@ export interface Scenario {
           this.networkPolicies.map(n => [n.name, n.podSelector ? "app=" + n.podSelector : "<none>", this._age(n.created || 0)]));
       }
 
+      if (["servicemonitors", "servicemonitor", "smon"].includes(what)) {
+        if (this.serviceMonitors.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "SELECTOR", "ENDPOINT", "AGE"],
+          this.serviceMonitors.map(s => [s.name, "app=" + s.selector, s.port + " @ " + s.interval, this._age(s.created || 0)]));
+      }
+
+      if (["prometheusrules", "prometheusrule", "promrule", "promrules"].includes(what)) {
+        if (this.prometheusRules.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "ALERT", "SEVERITY", "AGE"],
+          this.prometheusRules.map(r => [r.name, r.alert, r.severity, this._age(r.created || 0)]));
+      }
+
+      if (["grafanadatasources", "grafanadatasource", "grafanadatasrc"].includes(what)) {
+        if (this.grafanaDatasources.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "TYPE", "AGE"],
+          this.grafanaDatasources.map(d => [d.name, d.dsType, this._age(d.created || 0)]));
+      }
+
+      if (["grafanadashboards", "grafanadashboard", "grafanadash"].includes(what)) {
+        if (this.grafanaDashboards.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "TITLE", "PANELS", "AGE"],
+          this.grafanaDashboards.map(d => [d.name, d.title, String(d.panels), this._age(d.created || 0)]));
+      }
+
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, secrets, configmaps oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, servicemonitors, prometheusrules, grafanadashboards, secrets, configmaps oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -1361,6 +1452,43 @@ export interface Scenario {
           } else {
             out.push("💡 Die App ist angelegt, aber noch OutOfSync. Zieh den Git-Soll mit 'argocd app sync " + app.name + "' in den Cluster.");
           }
+        }
+      }
+      // Observability-CRDs (#110): legen Monitoring-Objekte an, idempotent wie die übrigen.
+      const effSm = eff.serviceMonitor;
+      if (effSm) {
+        if (this.serviceMonitors.some(s => s.name === effSm.name)) {
+          out.push("servicemonitor.monitoring.coreos.com/" + effSm.name + " unchanged");
+        } else {
+          this.serviceMonitors.push({ name: effSm.name, selector: effSm.selector, port: effSm.port || "metrics", interval: effSm.interval || "30s", created: this.clock });
+          out.push("servicemonitor.monitoring.coreos.com/" + effSm.name + " created");
+        }
+      }
+      const effPr = eff.prometheusRule;
+      if (effPr) {
+        if (this.prometheusRules.some(r => r.name === effPr.name)) {
+          out.push("prometheusrule.monitoring.coreos.com/" + effPr.name + " unchanged");
+        } else {
+          this.prometheusRules.push({ name: effPr.name, alert: effPr.alert, expr: effPr.expr || "", forDuration: effPr.forDuration || "5m", severity: effPr.severity || "warning", created: this.clock });
+          out.push("prometheusrule.monitoring.coreos.com/" + effPr.name + " created");
+        }
+      }
+      const effDs = eff.grafanaDatasource;
+      if (effDs) {
+        if (this.grafanaDatasources.some(d => d.name === effDs.name)) {
+          out.push("grafanadatasource.grafana.integreatly.org/" + effDs.name + " unchanged");
+        } else {
+          this.grafanaDatasources.push({ name: effDs.name, dsType: effDs.dsType || "prometheus", url: effDs.url || "", created: this.clock });
+          out.push("grafanadatasource.grafana.integreatly.org/" + effDs.name + " created");
+        }
+      }
+      const effGd = eff.grafanaDashboard;
+      if (effGd) {
+        if (this.grafanaDashboards.some(d => d.name === effGd.name)) {
+          out.push("grafanadashboard.grafana.integreatly.org/" + effGd.name + " unchanged");
+        } else {
+          this.grafanaDashboards.push({ name: effGd.name, title: effGd.title, panels: effGd.panels || 0, created: this.clock });
+          out.push("grafanadashboard.grafana.integreatly.org/" + effGd.name + " created");
         }
       }
       return out.join("\n");

@@ -150,6 +150,82 @@ export const ARGO_APPLICATION_SELFHEAL_YAML = [
   "      selfHeal: true            # Drift zurücksetzen: Git gewinnt immer",
 ].join("\n");
 
+// ===== Monitoring-Leuchtturm (Phase 5) =====
+// Der Observability-Stack als Manifeste, analog zu den übrigen oben. Sie werden vom
+// Simulator per `kubectl apply -f` verstanden (#109/#110) und sind die Grundlage der
+// Prometheus-/Grafana-/Alert-Quests (#113–#116).
+
+// ServiceMonitor (Prometheus-Operator-CRD): sagt Prometheus, WELCHEN Service es scrapen
+// soll. `selector.matchLabels` wählt den Service, `endpoints` den Port + das Intervall.
+export const SERVICEMONITOR_YAML = [
+  "apiVersion: monitoring.coreos.com/v1", "kind: ServiceMonitor", "metadata:",
+  "  name: lager-monitor",
+  "  labels:",
+  "    release: prometheus        # über dieses Label findet Prometheus den ServiceMonitor",
+  "spec:",
+  "  selector:",
+  "    matchLabels:",
+  "      app: lager               # dieser Service wird gescrapt",
+  "  endpoints:",
+  "    - port: metrics            # benannter Port, unter dem /metrics liegt",
+  "      path: /metrics",
+  "      interval: 30s            # wie oft Prometheus scrapt",
+].join("\n");
+
+// PrometheusRule (Prometheus-Operator-CRD): eine Alert-Regel mit Schwelle. `expr` ist die
+// Bedingung (PromQL), `for` die Dauer, die sie anhalten muss, bevor der Alarm feuert.
+export const PROMETHEUSRULE_YAML = [
+  "apiVersion: monitoring.coreos.com/v1", "kind: PrometheusRule", "metadata:",
+  "  name: hafen-alarme",
+  "  labels:",
+  "    release: prometheus",
+  "spec:",
+  "  groups:",
+  "    - name: hafen.rules",
+  "      rules:",
+  "        - alert: HighPodCPU                                     # Name des Alarms",
+  "          expr: rate(container_cpu_usage_seconds_total[5m]) > 0.5   # Schwelle (PromQL)",
+  "          for: 5m                                               # erst nach 5 min Dauerlast feuern",
+  "          labels:",
+  "            severity: warning",
+  "          annotations:",
+  "            summary: \"Pod zieht ungewöhnlich viel CPU\"",
+].join("\n");
+
+// GrafanaDatasource (Grafana-Operator-CRD): woher Grafana seine Zahlen zieht – hier der
+// Prometheus im Cluster. Ohne Datenquelle bleiben die Dashboards leer.
+export const GRAFANA_DATASOURCE_YAML = [
+  "apiVersion: grafana.integreatly.org/v1beta1", "kind: GrafanaDatasource", "metadata:",
+  "  name: prometheus-quelle",
+  "spec:",
+  "  datasource:",
+  "    name: Prometheus",
+  "    type: prometheus",
+  "    access: proxy",
+  "    url: http://prometheus-server.monitoring.svc:9090   # die Prometheus-Adresse im Cluster",
+].join("\n");
+
+// GrafanaDashboard (Grafana-Operator-CRD): das Dashboard selbst steckt als JSON im `json`-Feld
+// (Grafana exportiert Dashboards genau so). Hier eine kleine Hafen-Übersicht mit drei Panels.
+export const GRAFANA_DASHBOARD_YAML = [
+  "apiVersion: grafana.integreatly.org/v1beta1", "kind: GrafanaDashboard", "metadata:",
+  "  name: hafen-uebersicht",
+  "spec:",
+  "  resyncPeriod: 30s",
+  "  datasources:",
+  "    - inputName: DS_PROMETHEUS",
+  "      datasourceName: Prometheus",
+  "  json: |",
+  "    {",
+  "      \"title\": \"Hafen-Übersicht\",",
+  "      \"panels\": [",
+  "        { \"title\": \"CPU pro Pod (kubectl top)\", \"type\": \"timeseries\" },",
+  "        { \"title\": \"Aktive Alerts\", \"type\": \"stat\" },",
+  "        { \"title\": \"Scrape-Targets up/down\", \"type\": \"table\" }",
+  "      ]",
+  "    }",
+].join("\n");
+
 // App-of-Apps: eine `Application`, die selbst keine Dienste ausrollt, sondern nur auf
 // einen Ordner voller weiterer `Application`s zeigt – eine „Flotte", die mit einem
 // einzigen Auftrag den ganzen Archipel verwaltet. So skaliert GitOps über viele Häfen.
