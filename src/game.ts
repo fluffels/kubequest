@@ -272,6 +272,14 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     reset() {
       SaveStore.remove();
       this.load();
+      // load() endet mit save(); läuft der Reset im laufenden Spiel (Menü → Zurücksetzen),
+      // lebt die WorldScene noch und save() schreibt über worldScene() die AKTUELLE
+      // Spielerposition in den frisch geladenen Default-Stand zurück (#295) – der Spieler
+      // bliebe also stehen, statt am Startpunkt (bei Ole, #288) zu spawnen. Darum die
+      // Position explizit auf den Default zwingen und neu sichern; der anschließende
+      // location.reload() (ui.resetGame) lädt dann sauber die Startposition.
+      this.state.player = { ...makeDefaultState().player };
+      SaveStore.writeState(this.state);
     },
 
     /* ---------- Spielstand als Datei sichern / laden ---------- */

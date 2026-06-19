@@ -10,6 +10,7 @@ import { test, expect, beforeAll, beforeEach } from "vitest";
 import { vi } from "vitest";
 import { KQContent } from "../src/content";
 import { NPC_SPAWNS, TILE, TALK_RANGE } from "../src/world";
+import { setWorldScene } from "../src/runtime";
 
 let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
@@ -54,6 +55,28 @@ test("load: kaputte/fremde audio-Werte fallen auf Defaults zurück bzw. werden g
   Game.importData(JSON.stringify({ v: 1, data: { audio: { music: false, sfx: "ja", musicVol: 5, sfxVol: -2 } } }));
   Game.load();
   expect(Game.state.audio).toEqual({ music: false, sfx: true, musicVol: 1, sfxVol: 0, track: "hafen" });
+});
+
+/* ---------- Reset: Spielerposition (#295) ---------- */
+
+test("reset: kehrt zur Default-Startposition zurück, auch wenn die WorldScene läuft", () => {
+  // Default-Startposition (Spawn bei Ole, #288) bei sauberem Reset ohne laufende Szene.
+  setWorldScene(null);
+  Game.reset();
+  const startPos = { ...Game.state.player };
+
+  // Jetzt das laufende Spiel simulieren: die WorldScene lebt und meldet eine andere
+  // Position (Spieler ist herumgelaufen, z.B. aufs Schiff). Beim echten Reset-Button
+  // ist genau diese Szene noch da, wenn Game.reset() läuft.
+  setWorldScene({ player: { x: 544, y: 496 }, nearestNpc: () => null, burstAtPlayer: () => {} });
+  Game.reset();
+  setWorldScene(null); // aufräumen für die übrigen Tests
+
+  // Der Reset muss zur Startposition zurückführen – NICHT die Live-Position behalten.
+  expect(Game.state.player).toEqual(startPos);
+  // Und der persistierte Stand ebenso, sonst holt der reload in ui.resetGame die alte Position zurück.
+  const saved = JSON.parse(SaveStore.read()!);
+  expect(saved.data.player).toEqual(startPos);
 });
 
 /* ---------- Spiel-Feel: Cozy-Modus (#71) ---------- */
