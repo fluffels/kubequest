@@ -390,10 +390,14 @@ export const QUESTS: Quest[] = [
         text: "Füge das Repo <code>bitnami</code> hinzu (URL: <code>https://charts.bitnami.com/bitnami</code>).",
         accept: [/^helm\s+repo\s+add\s+bitnami\s+https:\/\/charts\.bitnami\.com\/bitnami$/], solution: "helm repo add bitnami https://charts.bitnami.com/bitnami",
         hint: "Muster: helm repo add <name> <url>" } },
-      { type: "terminal", brief: "Stöbern", tasks: [
-        { id: "t-runa-1", text: "Aktualisiere die Repo-Infos mit <code>helm repo update</code>.", accept: [/^helm\s+repo\s+update$/], solution: "helm repo update", hint: "helm repo …" },
-        { id: "t-runa-2", text: "Suche mit <code>helm search repo nginx</code> nach einem Webserver-Chart.", accept: [/^helm\s+search\s+repo\s+nginx$/], solution: "helm search repo nginx", hint: "helm search repo <begriff>" },
-      ]},
+      { type: "teach", brief: "Repo aktualisieren", cmd: {
+        id: "t-repoupdate", intro: "🆕 Neuer Befehl: <code>helm repo update</code> – holt die aktuelle Chart-Liste aller hinzugefügten Repos (wie ein „Katalog aktualisieren“). Direkt nach <code>helm repo add</code> sinnvoll.",
+        text: "Aktualisiere die Repo-Infos mit <code>helm repo update</code>.",
+        accept: [/^helm\s+repo\s+update$/], solution: "helm repo update", hint: "helm repo …" } },
+      { type: "teach", brief: "Charts suchen", cmd: {
+        id: "t-reposearch", intro: "🆕 Neuer Befehl: <code>helm search repo &lt;begriff&gt;</code> – durchsucht die hinzugefügten Repos nach passenden Charts (statt blind den Namen zu raten).",
+        text: "Suche mit <code>helm search repo nginx</code> nach einem Webserver-Chart.",
+        accept: [/^helm\s+search\s+repo\s+nginx$/], solution: "helm search repo nginx", hint: "helm search repo <begriff>" } },
       { type: "choice", npc: "runa", reviewId: "q-ch5-1",
         q: "Einmal festnageln: Was IST Helm?",
         options: [
@@ -414,8 +418,11 @@ export const QUESTS: Quest[] = [
         text: "Installiere <code>bitnami/nginx</code> als Release <code>mein-web</code>. Flaggen-Blick zur Werft!",
         accept: [/^helm\s+install\s+mein-web\s+bitnami\/nginx$/], solution: "helm install mein-web bitnami/nginx",
         hint: "Muster: helm install <release-name> <repo>/<chart>" } },
+      { type: "teach", brief: "Releases auflisten", cmd: {
+        id: "t-helmlist", intro: "🆕 Neuer Befehl: <code>helm list</code> (kurz <code>helm ls</code>) – zeigt alle <b>Releases</b>, also die installierten Charts mit Name, Revision und Status.",
+        text: "Zeig die Releases mit <code>helm list</code>.",
+        accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." } },
       { type: "terminal", brief: "Was ist da passiert?", tasks: [
-        { id: "t-runa-3", text: "Zeig die Releases mit <code>helm list</code>.", accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." },
         { id: "t-runa-4", text: "Und jetzt der Aha-Moment: Schau mit <b>kubectl</b> nach den Pods – Helm hat ganz normale Kubernetes-Ressourcen gebaut!",
           accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => sim.releases.length > 0, solution: "kubectl get pods", hint: "Kennst du im Schlaf." },
       ]},
