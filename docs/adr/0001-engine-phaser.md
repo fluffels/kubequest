@@ -76,9 +76,15 @@ Diese Entscheidung wird neu aufgemacht, wenn **einer** dieser Fälle eintritt:
 - Der **Offline-eine-Datei-Wert** entfällt als Anforderung – dann öffnet sich
   der Optionsraum wieder.
 - Phaser 3 wird **nicht mehr gepflegt** / verliert den Web-Support.
+- Die **Content-Pipeline** (Schema-Validierung, Hot-Reload, Tooling für
+  Nicht-Entwickler) erfordert einen eigenen Backend- oder Server-Prozess, den
+  Phaser/Browser allein nicht mehr bedienen kann. Dieser Trigger tritt erst ein,
+  wenn Content-as-Data (#348) und Entity-Registry (#349) _trotz Umsetzung_ auf
+  Phaser-Grenzen stoßen – nicht vorher. Vorher ist es kein Phaser-Problem,
+  sondern ein fehlendes Fundament.
 
-Tritt ein Trigger ein: neues ADR (`0002-…`) mit aktualisierter Abwägung
-schreiben, dieses hier auf „abgelöst durch 0002" setzen.
+Tritt ein Trigger ein: neues ADR (`0005-…`) mit aktualisierter Abwägung
+schreiben, dieses hier auf „abgelöst durch 0005" setzen.
 
 ## Bestätigte Re-Evaluierung – 2026-06-19 (#291)
 
@@ -90,3 +96,5 @@ Alle vier Trigger geprüft – **kein Trigger erfüllt**, Entscheidung bestätig
 - **Phaser 3:** aktiv gepflegt, kein Wartungs-Risiko erkennbar.
 
 Nächste Re-Evaluierung: wenn einer der Trigger eintritt (kein Termin).
+
+ADR 0004 (2026-06-19) hält die Skalierungsstrategie fest, die Phaser 3 bis zum Content-Pipeline-Trigger trägt: Content-as-Data, Entity-Registry, IndexedDB. Solange diese Fundamente gebaut werden, ist kein Engine-Wechsel nötig.

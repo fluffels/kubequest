@@ -41,11 +41,13 @@ Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bünde
 
 **Warum kein Multiplayer/Co-op?** Bewusst festgehalten als ADR: [`docs/adr/0003-multiplayer-coop-out-of-scope.md`](docs/adr/0003-multiplayer-coop-out-of-scope.md). Kurz: KubeQuest bleibt Single-Player – Co-op erzwingt den Backend-Stack (Server/Netcode/DB), den wir bewusst nicht bauen (#85), und bricht den Offline-eine-Datei-Wert; der Lern-Kern ist solo. Architektur nicht dafür verbauen, aber auch nichts proaktiv dafür bauen. **Vor erneuter „Sollten wir Co-op machen?"-Diskussion bitte dorthin verweisen.**
 
+**Langfristige Skalierungsstrategie (Stardew-Scope)** festgehalten als ADR: [`docs/adr/0004-skalierungs-fundament.md`](docs/adr/0004-skalierungs-fundament.md). Das Ziel ist ein wirklich großes Spiel (100+ Quests, 50+ NPCs, viele Welten) – dafür fehlen drei Fundamente, die jetzt gebaut werden: **Content-as-Data** (#348 – Quests/Dialoge als JSON/YAML, nicht TS-Code), **Entity-Registry** (#349 – datenge­steuerter NPC/Objekt-Katalog), **IndexedDB** (#350 – kein localStorage-Limit mehr). Phaser bleibt die richtige Wahl, solange diese Fundamente vorhanden sind; der neue Re-Eval-Trigger steht in ADR 0001. **Kein neues Content-Ticket anlegen, das Quests/NPCs als TS-Objekt-Literal hard-codiert** – immer erst #348 vorziehen oder als Dependency markieren.
+
 **Schichtung** – pure Domäne ↔ Anwendung ↔ Präsentation, Persistenz entkoppelt. Leitidee: Die Spiellogik bleibt **Phaser-frei und damit im Node-Test prüfbar**; nur `scenes.ts`/`ui.ts` fassen Phaser bzw. das DOM an. Deshalb liegen z.B. Welt-Geometrie (`world.ts`), Deko-Platzierung (`decor.ts`) und HUD-Uhr (`clock.ts`) bewusst **außerhalb** von `scenes.ts`.
 
 - **pure Domäne** (kein Phaser, voll unit-testbar): `sim.ts` (Cluster-Simulator), `content.ts` (Fassade über `src/content/*`: Quests/Drills/Quiz/NPCs/Progression/Minispiel), `world.ts`, `decor.ts`, `clock.ts`, `pixelfont.ts` (Glyphen-Daten der In-Welt-Bitmap-Font, #188).
 - **Anwendung:** `game.ts` (Spielstand, XP, Wirtschaft, Spaced Repetition), `runtime.ts` (Laufzeit-Singletons statt globalem `window`-Shim, bricht Import-Zyklen).
-- **Persistenz:** `store.ts` (SaveStore über localStorage; Andockpunkt fürs spätere Backend).
+- **Persistenz:** `store.ts` (SaveStore über localStorage; geplante Migration auf IndexedDB → #350, um das 5-10 MB-Limit bei Stardew-Scale-Spielständen zu brechen).
 - **Präsentation** (Phaser/DOM): `scenes.ts`, `ui.ts`, `sfx.ts`.
 - **Einstieg/Assets:** `main.ts` (Start & Tastatur), `assets-data.ts` (Spritesheet-`import`s, im Single-File-Build als Data-URI inlinet).
 
@@ -67,7 +69,7 @@ Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator inkl. Troubleshooting)
   - **Hoch auflösen, dann ganzzahlig verkleinern:** große Objekte (Häuser, Bäume, Schiff) in hoher Auflösung generieren (PixelLab-Abo Tier 1 erlaubt große Bilder) statt klein erzeugen + hochskalieren, damit der Renderer scharf bleibt.
 
   **Voraussetzung für neue Optik-Tickets:** Vor jedem Optik-Ticket die **echte Stardew-Referenz** lesen, statt zu raten — [`docs/stardew-referenz.md`](docs/stardew-referenz.md) (Raster, Palette, Outlines, Gras/Boden, PixelLab-Prompt-Bausteine, „Ist es Stardew-Niveau?"-Checkliste; #106). Lebende Abweichungsliste (Audit gegen diese Messlatte, je Bereich): [`docs/art-direction-audit.md`](docs/art-direction-audit.md). PixelLab-Workflow (Ablegen/Einbinden) siehe oben + `assets/pixellab/README.md`.
-- **Spielstände** laufen über die SaveStore-Schicht (`store.ts`), localStorage + Auto-Save alle 5 s + JSON-Export/Import. Formatänderungen brauchen perspektivisch ein `version`-Feld + Migration.
+- **Spielstände** laufen über die SaveStore-Schicht (`store.ts`), localStorage + Auto-Save alle 5 s + JSON-Export/Import. Formatänderungen brauchen ein `version`-Feld + Migration. **Geplant (#350):** IndexedDB als Backend (kein Storage-Limit, asynchrone API – `store.ts`-API bleibt gleich, nur die Implementierung wird getauscht).
 
 ## Wo die TODOs leben
 
