@@ -6,6 +6,12 @@
 
 ## Das Wichtigste zuerst (harte Regeln)
 
+### ⭐ Oberste Regel — über allem, auch über den ADRs
+
+**Vor jeder Änderung und jeder Entscheidung die eine Frage stellen: „Ist das okay, wenn KubeQuest ein Spiel in Stardew-Valley-Größe wird?" — nur umsetzen, wenn die Antwort Ja ist.** Diese Frage steht **über** allen anderen Entscheidungs-Dokumenten (ADRs, allen Konventionen unten). Eine Lösung, die heute reicht, bei 10× Inhalt/NPCs/Welten aber dasselbe Problem reproduziert, ist keine Lösung — **Granularität und Struktur mitdenken, nicht nur das Format**. Im Zweifel recherchieren: Wie macht es ein Spiel dieser Größe als Best Practice? (Konkretes Beispiel dieser Regel in Aktion: #348 — Content nicht nur TS→JSON, sondern pro Region/NPC aufgeteilt + geordnet, weil ein Monolith bei Stardew-Scope wieder bricht.)
+
+**Was beim Entwickeln auffällt, aber gerade nicht dran ist → sofort als GitHub-Issue anlegen** (nicht inline mitfixen, nicht „im Kopf" behalten). Lieber ein Ticket zu viel als verlorenes Wissen.
+
 > 🚧 **Aktuell läuft der ADR-0004-Umbau (Skalierungs-Fundament) auf einem Sammel-Branch, NICHT auf `main`.** Die drei Fundament-Tickets **#348 (Content-as-Data), #349 (Entity-Registry), #350 (IndexedDB)** landen alle auf dem Branch **`umbau/skalierungs-fundament`** und werden dort gebündelt (Branch pushen ist ok), damit bestehende Spieler keine Zwischenstände abbekommen. Erst wenn die ganze Migration fertig + verifiziert ist, wird der Branch **einmal** nach `main` gemergt und die drei Issues geschlossen. Wer eins dieser drei Tickets bearbeitet: auf diesem Branch aufsetzen und dorthin mergen, **nicht** nach `main`, und das Issue **nicht** vor dem finalen main-Merge schließen. Für alle ANDEREN Tickets gilt der normale Ablauf unten (direkt nach `main`) unverändert.
 
 - **Git-Workflow (in kubequest freigegeben).** Hier — und **nur** hier — darf der Agent die komplette Kette selbst fahren: auf eigenem Feature-Branch/Worktree arbeiten → committen → nach `main` mergen → **`main` pushen** → Branch + Worktree aufräumen → Issue schließen. **Push ist hier freigegeben** (seit 2026-06-15) – die komplette Kette inkl. `git push origin main` darf der Agent selbst fahren. Commit-Nachricht trotzdem immer als kopierfertigen Einzeiler im Stil `feat(...): …` mitliefern. ⚠️ Push gilt **nur** für kubequest. ⚠️ In **allen anderen Projekten** bleibt committen/pushen/deployen strikt tabu.
