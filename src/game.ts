@@ -72,7 +72,13 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       xp: 0,
       coins: 40,
       character: null,
-      player: { x: 0, y: 0 },
+      // Erststart direkt neben Ole, dem Hafenmeister (#288): kein orientierungsloses
+      // Loslaufen mehr – man steht in Redeweite vor der Hafenmeisterei, der Begrüßungs-
+      // Dialog holt ab und der "!"-Marker/erste Auftrag ist sofort da. Ole steht auf
+      // Kachel (26; 14,6) -> Solid-Kachel (26;15); dieser Punkt liegt eine Kachel
+      // links davon (Pixel), begehbar und innerhalb der Redeweite (1,7 Kacheln).
+      // Returning-Spieler überschreiben das mit ihrer gespeicherten Position.
+      player: { x: 400, y: 248 },
       questIdx: 0,
       questStep: 0,
       taskIdx: 0,
@@ -84,6 +90,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       review: {},
       streak: { count: 0, lastDay: 0 },
       streakHintShown: false,
+      introSeen: false,
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
@@ -198,6 +205,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       review,
       streak: { count: safeCount(streak.count, 0), lastDay: safeCount(streak.lastDay, 0) },
       streakHintShown: typeof raw.streakHintShown === "boolean" ? raw.streakHintShown : def.streakHintShown,
+      introSeen: typeof raw.introSeen === "boolean" ? raw.introSeen : def.introSeen,
       stats,
       lastSeen: safeCount(raw.lastSeen, def.lastSeen),
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.

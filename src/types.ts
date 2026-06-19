@@ -26,6 +26,8 @@ export interface GameState {
   streak: { count: number; lastDay: number };
   /** Wurde der einmalige Erklär-Toast zum 🔥 Streak bereits gezeigt? */
   streakHintShown: boolean;
+  /** Wurde die einmalige Begrüßung/das Intro beim ersten Spielstart schon gezeigt? (#288) */
+  introSeen: boolean;
   stats: {
     commands: number;
     reviews: number;

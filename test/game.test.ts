@@ -9,6 +9,7 @@
 import { test, expect, beforeAll, beforeEach } from "vitest";
 import { vi } from "vitest";
 import { KQContent } from "../src/content";
+import { NPC_SPAWNS, TILE, TALK_RANGE } from "../src/world";
 
 let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
@@ -383,6 +384,33 @@ test("load: ein VOLLSTÄNDIG valider Stand überlebt unverändert (kein Over-San
   expect(Game.state.streakHintShown).toBe(true);
   expect(Game.state.stats.stackBest).toBe(30);
   expect(Game.state.stats.stormsFixed).toBe(3);            // dynamische Zusatz-Stat bleibt
+  expect(Game.state.introSeen).toBe(false);                // ohne Feld -> Default (Intro kommt noch)
+});
+
+test("introSeen (#288): Default ist false, valider Wert überlebt, kaputter fällt zurück", () => {
+  // Frischer Stand: Intro noch nicht gesehen.
+  Game.reset();
+  expect(Game.state.introSeen).toBe(false);
+
+  // Spieler hat das Intro gesehen -> bleibt true über Laden/Speichern.
+  Game.importData(JSON.stringify({ v: 1, data: { introSeen: true } }));
+  Game.load();
+  expect(Game.state.introSeen).toBe(true);
+
+  // Kaputter (nicht-boolescher) Wert fällt auf den Default false zurück.
+  Game.importData(JSON.stringify({ v: 1, data: { introSeen: "ja" } }));
+  Game.load();
+  expect(Game.state.introSeen).toBe(false);
+});
+
+test("Erststart-Spawn (#288): neuer Spielstand startet in Redeweite neben Ole", () => {
+  Game.reset();
+  const ole = NPC_SPAWNS.find(s => s.id === "ole")!;
+  // Anker wie in scenes.ts nearestNpc(): NPC-Kachel-Mitte (x*T+8, y*T+8).
+  const ax = ole.x * TILE + 8, ay = ole.y * TILE + 8;
+  const d = Math.hypot(ax - Game.state.player.x, ay - Game.state.player.y);
+  // In Redeweite -> der "!"-Marker/Prompt ist sofort da, der Erst-Dialog holt ab.
+  expect(d).toBeLessThan(TALK_RANGE);
 });
 
 test("Wiederholungs-Gate (#222): greift nur am Quest-Anfang, wenn Karten fällig sind", () => {

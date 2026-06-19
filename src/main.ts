@@ -104,9 +104,18 @@ import { keys, clearKeys } from "./runtime";
     UI.refreshHud();
     if (Game.state.character === null) {
       // Erster Start: fester Charakter, kein Auswahl-Dialog mehr (#45).
+      // Statt nur eines Toasts kommt jetzt die einmalige Begrüßung mit Steuerung
+      // und erstem Ziel "geh zu Ole" (#288); der Dialog setzt zugleich den
+      // "!"-Marker über Ole in Szene. introSeen verhindert eine Wiederholung.
       Game.state.character = FIXED_CHARACTER;
+      Game.state.introSeen = true;
       Game.save();
-      setTimeout(() => UI.toast("⚓ Willkommen in Port Kubernia! Folge dem <b>!</b> – Ole wartet vor der Hafenmeisterei."), 600);
+      setTimeout(() => UI.showIntro(), 600);
+    } else if (!Game.state.introSeen) {
+      // Bestandsspieler von vor #288 (Charakter schon gesetzt): das Intro nicht
+      // nachträglich aufdrängen – sie kennen das Spiel – nur als gesehen merken.
+      Game.state.introSeen = true;
+      Game.save();
     }
     if (Game.offlineEarnings > 0) {
       setTimeout(() => UI.toast("🌙 Während du weg warst, hat dein Hafen <b>+" + Game.offlineEarnings + " 🪙</b> verdient!"), 1200);
