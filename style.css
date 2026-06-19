@@ -343,6 +343,20 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 .quiz-options button { text-align: left; line-height: 1.35; }
 .quiz-options button.correct { background: rgba(111,220,140,0.25); border-color: var(--good); }
 .quiz-options button.wrong { background: rgba(255,123,123,0.25); border-color: var(--bad); }
+/* Tastatur-Auswahl (#258): markierte Option per ↑/↓, analog zu .dlg-choices button.sel */
+.quiz-options button.sel {
+  border-color: var(--accent);
+  background: rgba(255, 200, 87, 0.18);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+/* Zifferntasten-Hinweis (#258): zeigt, dass 1–4 die Optionen auswählen. */
+.quiz-options .qnum {
+  display: inline-block; min-width: 1.5em; margin-right: 8px;
+  text-align: center; font-weight: bold; color: var(--accent);
+  font-family: Consolas, monospace;
+}
+.quiz-options button.correct .qnum { color: var(--good); }
+.quiz-options button.wrong .qnum { color: var(--bad); }
 .quiz-explain {
   margin-top: 12px;
   padding: 10px 12px;

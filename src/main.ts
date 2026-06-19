@@ -32,6 +32,11 @@ import { keys, clearKeys } from "./runtime";
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
 
       if (k === "Escape") { if (UI.blocking()) UI.closeOverlays(); else UI.openMenu(); return; }
+      // Wissensrunde per Tastatur (#258): Quiz-Auswahl (1–n, ↑/↓+Enter) & „Weiter".
+      // Die Befehls-Eingabe (INPUT) ist oben schon abgefangen, landet hier nicht.
+      if (!$("overlay-review").classList.contains("hidden")) {
+        if (UI.reviewKey(k, e)) return;
+      }
       if (UI.dialogue) {
         if (UI.hasChoices()) {
           // Antwort-Auswahl per Tastatur: ↑/↓ (oder W/S) navigieren, Enter/E/Leer bestätigen, 1–4 direkt
