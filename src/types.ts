@@ -28,6 +28,8 @@ export interface GameState {
   streakHintShown: boolean;
   /** Wurde die einmalige Begrüßung/das Intro beim ersten Spielstart schon gezeigt? (#288) */
   introSeen: boolean;
+  /** Wurde das einmalige Bo-Onboarding zum Logbuch (Freischaltung nach Quest 1) schon gezeigt? (#326) */
+  questLogIntroShown: boolean;
   /** Freigeschaltete „verdiente Abkürzungen" (Kürzel-IDs, #287/#297). Leer = noch keine
    *  freigeschaltet. Der Sentinel `"*"` bedeutet „alle freigeschaltet" – damit werden
    *  Alt-Spielstände (von vor der Mechanik, mit Fortschritt) grandfathered, sodass kein

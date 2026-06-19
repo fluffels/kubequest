@@ -32,6 +32,8 @@ Spielstand speichert automatisch im Browser.
 | J | 📜 Logbuch (Questlog) |
 | Esc | Fenster schließen |
 
+Im 📜 **Logbuch (J)** blätterst du durch alle Quests: abgeschlossene zum **Nachlesen** (Dialoge & Hinweise), deine aktuelle Quest, und noch **gesperrte** als Vorschau (kein Vorausspringen). Es wird freigeschaltet, sobald du deine erste Quest abgeschlossen hast.
+
 ## Lernen in kleinen Schritten
 
 Jeder Befehl wird **einzeln** eingeführt und sofort geübt:
