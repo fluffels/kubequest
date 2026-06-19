@@ -81,7 +81,7 @@ function ensureArgoApp(sim: Sim, fresh = false): ArgoApp {
 /** Eine generierte Übungsaufgabe (Drill).
  *  `why` begründet bei falscher Eingabe das Prinzip (nicht nur die Musterlösung) –
  *  „verstehen statt auswendig" (#233). Pflichtfeld: jeder Drill trägt eine Begründung. */
-export type DrillTask = { text: string; accept: RegExp[]; solution: string; hint: string; why: string };
+export type DrillTask = { text: string; accept: RegExp[]; solution: string; hint: string; why: string; diag?: (input: string) => string | null };
 
 export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
   "docker-pull": sim => {
@@ -96,7 +96,20 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const img = pick(IMAGES);
     let name = pick(NAMES);
     while (sim.docker.containers.some(c => c.name === name && c.running)) name = pick(NAMES) + rnd(2, 99);
-    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+(?:-d|--detach))\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name &lt;name&gt; &lt;image&gt; (statt -d gilt auch --detach)", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt; -d hat auch die Langform --detach), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name &lt;name&gt; &lt;image&gt;." };
+    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+(?:-d|--detach))\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name &lt;name&gt; &lt;image&gt; (statt -d gilt auch --detach)", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt; -d hat auch die Langform --detach), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name &lt;name&gt; &lt;image&gt;.", diag: (input: string): string | null => {
+      const nameM = input.match(/--name\s+(\S+)/);
+      if (!nameM) return null; // kein --name → Strukturfehler, why passt
+      const givenName = nameM[1];
+      const parts = input.trim().split(/\s+/);
+      const givenImg = parts[parts.length - 1];
+      const baseGivenImg = givenImg.split(":")[0];
+      const nameMismatch = givenName !== name;
+      const imgMismatch = baseGivenImg !== img;
+      if (nameMismatch && !imgMismatch) return "Der Name stimmt nicht – erwartet <code>" + name + "</code>, getippt <code>" + givenName + "</code>. Tippfehler?";
+      if (imgMismatch && !nameMismatch) return "Das Image stimmt nicht – erwartet <code>" + img + "</code>, getippt <code>" + givenImg + "</code>. Tippfehler?";
+      if (nameMismatch && imgMismatch) return "Name und Image stimmen nicht – erwartet <code>--name " + name + " " + img + "</code>.";
+      return null; // Name und Image stimmen, anderer Grund → why passt
+    } };
   },
   "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker.", why: "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu." }),
   "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“.", why: "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten." }),

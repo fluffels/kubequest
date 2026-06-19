@@ -441,3 +441,53 @@ test("Red-Green: ein Drill mit roh-HTML-Platzhalter in why wird gemeldet", () =>
   const problems = drillsWithRawHtmlPlaceholders(kaputt as typeof KQContent.DRILLS);
   assert.ok(problems.some(p => p.includes("drill-roh")), "roher Platzhalter nicht erkannt: " + problems.join(", "));
 });
+
+test("docker-run-named: diag benennt falschen Namen gezielt, nicht Reihenfolge (#321)", () => {
+  const make = KQContent.DRILLS["docker-run-named"];
+  let tested = false;
+  for (let i = 0; i < 60; i++) {
+    const task = make(new KQSim({}));
+    assert.ok("diag" in task, "docker-run-named muss ein diag-Feld haben (#321)");
+    const m = task.solution.match(/^docker run -d --name (\S+) (\S+)$/);
+    if (!m) continue;
+    const [, name, img] = m;
+    const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+
+    // Musterlösung → diag schweigt (null)
+    assert.equal(task.diag!(norm(task.solution)), null, "Musterlösung darf keinen diag auslösen");
+
+    // Name falsch → diag nennt den richtigen Namen
+    const diagBadName = task.diag!(norm(`docker run -d --name x${name} ${img}`));
+    assert.ok(diagBadName, "Namen-Tippfehler → diag muss nicht-null sein");
+    assert.ok(diagBadName!.includes(name), `diag muss erwarteten Namen '${name}' nennen, war: ${diagBadName}`);
+    assert.ok(!diagBadName!.includes("Reihenfolge"), `diag darf nicht Reihenfolge erwähnen bei Name-Tippfehler, war: ${diagBadName}`);
+
+    // Kein --name → Strukturfehler, diag gibt null zurück (why greift)
+    assert.equal(task.diag!(norm(`docker run -d ${img}`)), null, "kein --name → diag muss null sein");
+
+    tested = true;
+    break;
+  }
+  assert.ok(tested, "Keine gültige docker-run-named-Instanz gefunden");
+});
+
+test("docker-run-named: diag benennt falsches Image gezielt (#321)", () => {
+  const make = KQContent.DRILLS["docker-run-named"];
+  let tested = false;
+  for (let i = 0; i < 60; i++) {
+    const task = make(new KQSim({}));
+    const m = task.solution.match(/^docker run -d --name (\S+) (\S+)$/);
+    if (!m) continue;
+    const [, name, img] = m;
+    const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+
+    // Image falsch → diag nennt das richtige Image
+    const diagBadImg = task.diag!(norm(`docker run -d --name ${name} wrong-image`));
+    assert.ok(diagBadImg, "Image-Tippfehler → diag muss nicht-null sein");
+    assert.ok(diagBadImg!.includes(img), `diag muss erwartetes Image '${img}' nennen, war: ${diagBadImg}`);
+
+    tested = true;
+    break;
+  }
+  assert.ok(tested, "Keine gültige docker-run-named-Instanz gefunden");
+});

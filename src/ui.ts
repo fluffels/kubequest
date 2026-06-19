@@ -762,11 +762,11 @@ import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
         } else if (fb) {
           // Aufgabe nicht gelöst → immer Begründung zeigen (#307: auch wenn der Befehl einen
           // Sim-Fehler warf; „Nie nur falsch, immer begründen" #233).
-          const tip = task.why
-            ? task.why
-            : /^docker\s+run\b/.test(norm)
+          const tip = (task.diag ? task.diag(norm) : null)
+            ?? task.why
+            ?? (/^docker\s+run\b/.test(norm)
               ? "Bei <code>docker run</code>: hinter <code>--name</code> steht dein Wunschname, das Image kommt ganz zuletzt – Muster <code>docker run -d --name &lt;name&gt; &lt;image&gt;</code>."
-              : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.";
+              : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.");
           const prefix = result.error
             ? "❌ "
             : "❌ Fast – der Befehl lief durch, erfüllt die Aufgabe aber noch nicht. ";
