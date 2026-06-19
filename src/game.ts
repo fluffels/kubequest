@@ -36,16 +36,24 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
   const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
+  // Hinweis: Baustein-Karten (#231, q-flag-*) hängen an genau der Quest, in der ihr
+  // Flag/Teil per teach-Schritt eingeführt wird – erst eingeführt, dann abgefragt (#227).
   const EXTRA_CARDS: Record<string, string[]> = {
-    q3: ["q-ch1-3", "q-ch1-5"],
+    q2: ["q-flag-ps-a"],                                  // docker ps -a (eingeführt in q2)
+    q3: ["q-ch1-3", "q-ch1-5", "q-flag-run-d", "q-flag-run-name"], // -d/--name (q3)
     q4: ["q-ch2-1", "q-ch2-4"],
+    q5: ["q-flag-kubectl-n"],                             // kubectl -n (q5)
     q7: ["q-ch3-2", "q-tools-ingress"],
-    q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3"],
+    q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3", "q-flag-apply-f"], // apply -f (q8)
     q10: ["q-ch5-3", "q-tools-stack", "q-tools-monitoring"],
+    q11: ["q-flag-helm-set"],                             // helm upgrade --set (q11)
     q13: ["q-ch6-1", "q-ch6-4"],
     q14: ["q-sec-2", "q-tools-keycloak"],
     q15: ["q-ts-4"],
     q16: ["q-ts-5"],
+    q18: ["q-flag-git-commit-m"],                         // git commit -m (q18)
+    q19: ["q-flag-git-checkout-b"],                       // git checkout -b (q19)
+    q20: ["q-flag-git-add-dot"],                          // git add . (q20)
   };
 
   function today() {

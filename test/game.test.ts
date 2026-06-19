@@ -270,6 +270,36 @@ test("registerQuestCards: hängt die EXTRA_CARDS des Kapitels in die Wiederholun
   expect(Game.state.review["q-tools-monitoring"]).toBeTruthy();
 });
 
+test("registerQuestCards: die Baustein-Karten (#231) landen an ihrer Einführungs-Quest", () => {
+  const cases: [string, string][] = [
+    ["q2", "q-flag-ps-a"], ["q3", "q-flag-run-d"], ["q3", "q-flag-run-name"],
+    ["q5", "q-flag-kubectl-n"], ["q8", "q-flag-apply-f"], ["q11", "q-flag-helm-set"],
+    ["q18", "q-flag-git-commit-m"], ["q19", "q-flag-git-checkout-b"], ["q20", "q-flag-git-add-dot"],
+  ];
+  for (const [quest, card] of cases) {
+    Game.reset();
+    Game.registerQuestCards(quest);
+    expect(Game.state.review[card], `${card} fehlt nach registerQuestCards(${quest})`).toBeTruthy();
+  }
+});
+
+test("jede über alle Quests freigeschaltete Wiederholungskarte löst zu echtem Inhalt auf (#231)", () => {
+  // Schaltet alles frei, was der Spieler im Lauf der Story je gesammelt hätte
+  // (Choice-reviewIds + Kapitel-CMD-Karten + EXTRA_CARDS). Jeder Eintrag MUSS
+  // eine echte Karte sein – sonst zeigt Kralle eine leere Karte. Fängt Tippfehler
+  // in EXTRA_CARDS/reviewId, bevor sie im Spiel auffallen.
+  for (const q of KQContent.QUESTS) Game.registerQuestCards(q.id);
+  const unbekannt = Object.keys(Game.state.review).filter(id => !Game.findReviewContent(id));
+  expect(unbekannt, "Wiederholungs-IDs ohne Inhalt: " + unbekannt.join(", ")).toEqual([]);
+});
+
+test("Red-Green: eine Wiederholungskarte ohne Inhalt wird erkannt", () => {
+  // Ein Check, der auch bei einer Geister-ID grün bliebe, wäre wertlos.
+  Game.ensureReviewItem("q-gibt-es-nicht");
+  const unbekannt = Object.keys(Game.state.review).filter(id => !Game.findReviewContent(id));
+  expect(unbekannt).toContain("q-gibt-es-nicht");
+});
+
 /* ---------- Defensive Validierung beim Laden (#61) ----------
  * Ein manipulierter Import oder ein über viele Versionen gewanderter Stand kann
  * kaputte/fremde Feldwerte tragen. load() muss daraus IMMER einen konsistenten
