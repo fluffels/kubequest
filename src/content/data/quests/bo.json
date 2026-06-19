@@ -1,0 +1,438 @@
+[
+  {
+    "id": "q1",
+    "title": "Die erste Kiste",
+    "giver": "bo",
+    "rewardXp": 25,
+    "rewardCoins": 20,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "BO. GRÜSST. NEUE CREW. <i>*knirsch*</i> Bo stapelt Fracht. Früher: Chaos – Säcke, Fässer, hundert Formen. Dann kam: <b>DER CONTAINER</b>. Genormte Box. Jeder Kran kann sie heben.",
+          "Software genauso: App + alles Drumherum in eine Box → läuft <b>überall gleich</b>. Werkzeug: <b>Docker</b>.",
+          "Erster Handgriff: Bauplan holen. Baupläne heißen <b>Images</b> und liegen im Kisten-Supermarkt, der <b>Registry</b>. Bo zeigt: <code>docker pull nginx</code>. Jetzt DU! (T drücken)"
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Bauplan holen",
+        "cmd": {
+          "id": "t-pull",
+          "intro": "🆕 Neuer Befehl: <code>docker pull</code> – lädt ein Image aus der Registry.",
+          "text": "Lade das Image <code>nginx</code> (ein kleiner Webserver) herunter.",
+          "accept": [
+            "^docker\\s+pull\\s+nginx(:\\S+)?$"
+          ],
+          "solution": "docker pull nginx",
+          "hint": "Muster: docker pull <image>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "GUT. Image ist da – das ist nur der <b>Bauplan</b>. Jetzt zum Leben erwecken: <code>docker run</code> baut daraus eine laufende Kiste – einen <b>Container</b>. Schau danach zum Dock!"
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Kiste starten",
+        "cmd": {
+          "id": "t-run",
+          "intro": "🆕 Neuer Befehl: <code>docker run</code> – startet einen Container aus einem Image.",
+          "text": "Starte einen Container aus dem Image <code>nginx</code>. (Einfachste Form, keine Extras!)",
+          "accept": [
+            "^docker\\s+run\\s+nginx(:\\S+)?$"
+          ],
+          "solution": "docker run nginx",
+          "hint": "Muster: docker run <image>"
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Bos Übungsrunde",
+        "pool": [
+          "docker-pull",
+          "docker-run"
+        ],
+        "count": 2,
+        "intro": "Übung macht den Golem! Zwei schnelle Wiederholungen mit anderen Images:"
+      },
+      {
+        "type": "choice",
+        "npc": "bo",
+        "reviewId": "q-ch1-2",
+        "q": "Bo testet: Image und Container – was ist was?",
+        "options": [
+          {
+            "t": "Image = Bauplan/Vorlage, Container = laufende Instanz davon.",
+            "ok": true,
+            "reply": "PERFEKT. Wie Tiefkühlpizza (Image) und Pizza im Ofen (Container). Bo hat jetzt Hunger."
+          },
+          {
+            "t": "Container = Vorlage, Image = das laufende Programm.",
+            "ok": false,
+            "reply": "ANDERSRUM. Image = Bauplan (pull). Container = läuft (run). Nochmal merken!"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Genug für heute. Bo-Regel: <b>Lieber zwei Befehle sicher als zehn halb.</b> Komm wieder, wenn du durchgeatmet hast – oder sprich Bo an und wähle „Üben“."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q2",
+    "title": "Den Überblick behalten",
+    "giver": "bo",
+    "rewardXp": 30,
+    "rewardCoins": 22,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "ZWEITE LEKTION. Kisten starten kannst du. Aber: Welche laufen gerade? Dafür gibt es <code>docker ps</code> – die Liste aller <b>laufenden</b> [[Container]]."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Kisten-Liste",
+        "cmd": {
+          "id": "t-ps",
+          "intro": "🆕 Neuer Befehl: <code>docker ps</code> – zeigt laufende Container.",
+          "text": "Zeig alle laufenden Container an. Die NAMES-Spalte rechts wird gleich wichtig!",
+          "accept": [
+            "^docker\\s+ps$"
+          ],
+          "solution": "docker ps",
+          "hint": "Nur zwei Buchstaben nach docker."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Siehst du die Namen in der NAMES-Spalte? Docker erfindet welche, wenn du keinen vergibst. Mit dem Namen kannst du eine Kiste gezielt <b>stoppen</b>: <code>docker stop &lt;name&gt;</code>.",
+          "Das kryptische Kürzel in der <b>CONTAINER ID</b>-Spalte ganz links? Das vergibt Docker selbst – ein <b>eindeutiger Stempel</b> pro Kiste, damit keine zwei verwechselt werden. Bo merkt sich sowas nie. Bo nimmt den Namen. Bo ist Stein."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Kiste stoppen",
+        "cmd": {
+          "id": "t-stop",
+          "intro": "🆕 Neuer Befehl: <code>docker stop</code> – hält einen Container an.",
+          "text": "Stoppe einen deiner laufenden Container. (Name aus <code>docker ps</code> abtippen!)",
+          "accept": [
+            "^docker\\s+stop\\s+\\S+$"
+          ],
+          "check": "q2/t-stop",
+          "solution": "docker stop <name aus docker ps>",
+          "hint": "Erst docker ps für den Namen, dann docker stop <name>."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps -a</code> zeigt ALLE – auch gestoppte. Das <code>-a</code> heißt „all“."
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "docker-ps-all",
+        "brief": "Alle Kisten sehen",
+        "cmd": {
+          "id": "t-ps-a",
+          "intro": "🆕 Neue Variante: <code>docker ps -a</code> – zeigt auch gestoppte Container.",
+          "text": "Zeig ALLE Container an. Dein gestoppter müsste mit „Exited“ auftauchen.",
+          "accept": [
+            "^docker\\s+ps\\s+(-a|--all)$"
+          ],
+          "solution": "docker ps -a",
+          "hint": "docker ps + Flag für „alle“."
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Bos Übungsrunde",
+        "pool": [
+          "docker-ps",
+          "docker-stop",
+          "docker-ps-a",
+          "docker-run"
+        ],
+        "count": 3,
+        "intro": "Drei Wiederholungen, dann sitzt es:"
+      },
+      {
+        "type": "choice",
+        "npc": "bo",
+        "reviewId": "q-ch1-4",
+        "q": "Was zeigt <code>docker ps</code> – ohne Extras?",
+        "options": [
+          {
+            "t": "Nur die gerade laufenden Container.",
+            "ok": true,
+            "reply": "RICHTIG. Für alle (auch gestoppte): docker ps -a. Bo nickt steinern."
+          },
+          {
+            "t": "Alle Container, die es je gab.",
+            "ok": false,
+            "reply": "FAST. Das macht docker ps -a. Ohne -a: nur die laufenden."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Bo hat noch eine Überraschung für dich, Landratte – ein <b>Minispiel</b>. Bo zeigt dir gleich, wie's geht. Bo verliert nie. Bo ist Stein."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q2b",
+    "title": "Bos Stapel-Spiel",
+    "giver": "bo",
+    "rewardXp": 15,
+    "rewardCoins": 10,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Jetzt das <b>Minispiel</b>! Damit lernst du, wie ein Image aus <b>Schichten</b> gebaut ist – die Basis ganz unten, dein eigener Code oben drauf. Und es macht Spaß.",
+          "So rufst du es auf: <b>Sprich Bo an</b> (Taste <b>E</b>), dann wähle im Menü <b>🎮 Stapel-Spiel</b> und spiel es einmal ganz durch. Danach geht's weiter – los, Landratte!"
+        ]
+      },
+      {
+        "type": "minigame",
+        "npc": "bo",
+        "game": "stack",
+        "brief": "Stapel-Spiel spielen"
+      }
+    ]
+  },
+  {
+    "id": "q3",
+    "title": "Namen und Hintergrund",
+    "giver": "bo",
+    "rewardXp": 35,
+    "rewardCoins": 25,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "LETZTE DOCKER-LEKTION. Profis geben Kisten <b>eigene Namen</b> (<code>--name</code>) und schicken sie mit <code>-d</code> in den <b>Hintergrund</b>.",
+          "<code>-d</code> heißt <b>„detached“</b> – abgekoppelt. OHNE <code>-d</code> klemmt sich dein <b>Funkgerät an die Kiste</b>: Du siehst ihre Ausgabe, aber die Leitung ist <b>blockiert</b>, bis die Kiste schließt – kein anderer Befehl geht durch. MIT <code>-d</code> läuft die Kiste <b>abgekoppelt im Hintergrund weiter</b>, und das Funkgerät ist sofort wieder frei für den nächsten Befehl. Bo lässt das Funkgerät NIE blockieren. Bo ist Stein.",
+          "Zusammen: <code>docker run -d --name webserver nginx</code>. Sieht lang aus – Bo zerlegt es Stück für Stück: <code>run</code> startet eine Kiste · <code>-d</code> ab in den Hintergrund · <code>--name webserver</code> = so soll <b>DEINE</b> Kiste heißen (<b>Wunschname, frei wählbar</b>) · <code>nginx</code> = das <b>[[Image]]</b>, der Bausatz, aus dem die Kiste entsteht (kommt von außen, NICHT frei erfunden).",
+          "Verwechsle die letzten zwei NIE: hinter <code>--name</code> steht dein eigener Name, ganz hinten steht das Image. <code>docker run -d --name <b>meine-kiste</b> nginx</code> ginge genauso – nur <code>nginx</code> muss als Bauplan existieren.",
+          "Noch eine Erleichterung: Die <b>Reihenfolge der Optionen ist frei</b> – <code>-d --name webserver</code> oder <code>--name webserver -d</code>, beides gilt. Bo-Regel: <b>erst alle Optionen, dann das Image</b> ganz zuletzt. Was NACH dem Image steht, hält die Kiste für einen eigenen Befehl. Du schaffst das."
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "docker-run-detach",
+        "brief": "Profi-Start",
+        "cmd": {
+          "id": "t-run-named",
+          "intro": "🆕 Neue Flags: <code>-d</code> (Hintergrund) und <code>--name</code> (eigener Name).",
+          "text": "Starte aus <code>nginx</code> einen Container im Hintergrund mit dem Namen <code>webserver</code>.",
+          "accept": [
+            "^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+webserver|--name\\s+webserver\\s+(?:-d|--detach))\\s+nginx(:\\S+)?$"
+          ],
+          "solution": "docker run -d --name webserver nginx",
+          "hint": "Muster: docker run -d --name <wunschname> <image>"
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Bos Übungsrunde",
+        "pool": [
+          "docker-run-named",
+          "docker-run-named",
+          "docker-stop"
+        ],
+        "count": 3,
+        "intro": "Das lange Muster üben wir extra gründlich:"
+      },
+      {
+        "type": "choice",
+        "npc": "bo",
+        "reviewId": "q-ch1-1",
+        "q": "Bos Abschlussfrage: WARUM das alles? Was ist der Kern-Vorteil von Containern?",
+        "options": [
+          {
+            "t": "Eine App läuft mit allem Drumherum überall gleich – Laptop, Server, Cloud.",
+            "ok": true,
+            "reply": "RICHTIG. „Bei mir läuft's aber!“ ist Geschichte. <i>*stolzes Steinknirschen*</i>"
+          },
+          {
+            "t": "Sie machen Apps automatisch schneller.",
+            "ok": false,
+            "reply": "NEIN. Nicht schneller – ÜBERALL GLEICH. Das ist der Schatz."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Bo erklärt dich zum <b>Kisten-Profi</b>. <i>*Golem-Applaus*</i> Aber eins fehlt noch: Bisher hast du nur <b>fertige</b> Baupläne aus der [[Registry]] geholt. Ein echter Profi baut auch seinen <b>eigenen</b>. Bleib noch einen Moment bei Bo!"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q3b",
+    "title": "Dein eigener Bauplan",
+    "giver": "bo",
+    "rewardXp": 40,
+    "rewardCoins": 30,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "scenario": {
+          "files": {
+            "Dockerfile": "FROM nginx:1.27\nCOPY site/ /usr/share/nginx/html\nEXPOSE 80"
+          }
+        },
+        "lines": [
+          "Erinnerst du dich ans <b>Stapel-Spiel</b>? Ein Image ist ein Stapel aus <b>Schichten</b>. Diesen Stapel beschreibst du in einer Datei: dem <b>Dockerfile</b>. Das ist DEIN Bauplan.",
+          "Kurz die <b>Terminal-Basics</b>, bevor wir loslegen – zwei winzige Linux-Befehle: <code>ls</code> zeigt, <b>was im aktuellen Ordner liegt</b> (ein Blick ins Frachtregal), und <code>cat &lt;datei&gt;</code> <b>schreibt den Inhalt einer Datei ins Terminal</b>. (In einer echten Shell wechselst du mit <code>cd</code> den Ordner und <code>pwd</code> zeigt, wo du gerade stehst – an deinem Funkgerät bleibst du immer im selben Ordner, die zwei brauchst du hier also nicht.)",
+          "Bo hat dir einen Bauplan hingelegt. Erst <code>ls</code> – dann lies ihn mit <code>cat Dockerfile</code>. Jede Zeile = eine Schicht. <code>FROM</code> ist die Grundschicht (ein fertiges Image), darauf legst du deine eigene App."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Bauplan lesen",
+        "tasks": [
+          {
+            "id": "t-ls-dockerfile",
+            "text": "Erst der Blick ins Regal: <code>ls</code> – was liegt hier?",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-cat-dockerfile",
+            "text": "Lies den Bauplan: <code>cat Dockerfile</code>. Siehst du das <code>FROM</code> ganz oben?",
+            "accept": [
+              "^cat\\s+Dockerfile$"
+            ],
+            "solution": "cat Dockerfile",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Jetzt machst du aus dem Bauplan ein echtes Image: <code>docker build</code>. Das <code>-t</code> (Langform <code>--tag</code>, beides geht) gibt deinem Image den ganzen <b>Namen</b> <code>name:tag</code> – sonst findest du es später nicht wieder. Der Teil hinter dem <code>:</code> ist der <b>Versions-Tag</b>. (Verwechsle das nicht mit dem eigenen Befehl <code>docker tag</code> – der kommt gleich und gibt einem fertigen Image nur einen Zweitnamen.) Der <b>Punkt</b> am Ende sagt: „Der Bauplan liegt HIER im aktuellen Ordner.“"
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "docker-build-tag",
+        "brief": "Eigenes Image bauen",
+        "cmd": {
+          "id": "t-build",
+          "intro": "🆕 Neuer Befehl: <code>docker build -t &lt;name&gt;:&lt;tag&gt; .</code> – baut aus dem Dockerfile ein eigenes Image. Gebaut wird in der <b>Docker-Engine</b> (eigenes Programm, das deine Ordner nicht sieht); der <b>Punkt</b> ist der Build-Kontext – der Ordner, den du ihr als Kiste mit Baumaterial rüberreichst (<code>.</code> = der aktuelle). Daraus liest Docker das Dockerfile und alles, was <code>COPY</code> holt. <code>-t</code> ist die Kurzform von <code>--tag</code> (beides geht) und vergibt den ganzen Namen <code>name:tag</code>.",
+          "text": "Bau aus dem Dockerfile ein Image mit dem Namen <code>hafenwache:1.0</code>. (Punkt am Ende nicht vergessen!)",
+          "accept": [
+            "^docker\\s+build\\s+(?:-t|--tag)\\s+hafenwache:1\\.0\\s+\\.$"
+          ],
+          "solution": "docker build -t hafenwache:1.0 .",
+          "hint": "Muster: docker build -t <name>:<tag> . (statt -t gilt auch die Langform --tag) – der Punkt ist der Build-Kontext: die Kiste (= aktueller Ordner), die du der Engine zum Bauen rüberreichst."
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Image-Liste",
+        "cmd": {
+          "id": "t-images",
+          "intro": "🆕 Neuer Befehl: <code>docker images</code> – zeigt alle Images, die lokal bereitliegen (gebaut oder gezogen).",
+          "text": "Zeig deine Images an. <code>hafenwache</code> mit Tag <code>1.0</code> müsste jetzt dabei sein!",
+          "accept": [
+            "^docker\\s+images$"
+          ],
+          "solution": "docker images",
+          "hint": "docker + Mehrzahl von „image“."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Ein Image kann <b>mehrere Namen</b> tragen – wie zwei Etiketten an <b>derselben</b> Kiste, nicht zwei Kisten. <code>docker tag</code> hängt nur einen <b>zweiten Namen</b> an dasselbe Image – es entsteht <b>kein neues</b> Image und kein anderer Stand. <code>hafenwache:1.0</code> und <code>hafenwache:latest</code> sind danach <b>dasselbe</b> Image.",
+          "Üblich ist der Zusatz-Name <code>:latest</code> – aber Vorsicht: das ist <b>nicht automatisch „die neueste Version“</b>, sondern nur ein <b>Konventions-Name</b>. Er zeigt auf das, was zuletzt als <code>:latest</code> getaggt wurde, damit andere das Image ohne Versionsnummer ziehen können. Ein Tag ist eben ein <b>Zeiger</b>, keine Kopie.",
+          "Und wie <b>liest</b> man so einen Befehl? <code>docker tag hafenwache:1.0 hafenwache:latest</code> hat vier Teile: <code>docker</code> = das <b>Programm</b>, <code>tag</code> = der <b>Unterbefehl</b> (die Aktion), <code>hafenwache:1.0</code> = die <b>Quelle</b> (das vorhandene Image) und <code>hafenwache:latest</code> = das <b>Ziel</b> (der neue Name).",
+          "Merk dir die Reihenfolge: <b>erst Quelle, dann Ziel</b> – „von wo → wohin“. Wie beim Umetikettieren: erst die vorhandene Kiste, dann das neue Schild. Dieses Muster steckt in vielen Befehlen – einmal kapiert, liest du sie alle leichter."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zweites Etikett",
+        "cmd": {
+          "id": "t-tag",
+          "intro": "🆕 Neuer Befehl: <code>docker tag &lt;quelle&gt; &lt;ziel&gt;</code> – hängt einem vorhandenen Image einen weiteren Namen an (kein neues Image, nur ein zweites Etikett an derselben Kiste). Lesart: <b>Programm</b> <code>docker</code> · <b>Unterbefehl</b> <code>tag</code> · dann <b>Quelle</b> → <b>Ziel</b>.",
+          "text": "Gib deinem <code>hafenwache:1.0</code> zusätzlich das Etikett <code>hafenwache:latest</code>.",
+          "accept": [
+            "^docker\\s+tag\\s+hafenwache:1\\.0\\s+hafenwache:latest$"
+          ],
+          "solution": "docker tag hafenwache:1.0 hafenwache:latest",
+          "hint": "Muster: docker tag <quelle> <ziel> – erst das vorhandene Image, dann der neue Name."
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Bos Bau-Übung",
+        "pool": [
+          "docker-build",
+          "docker-tag"
+        ],
+        "count": 3,
+        "intro": "Bauen und Etikettieren mit anderen Namen – drei Runden:"
+      },
+      {
+        "type": "choice",
+        "npc": "bo",
+        "reviewId": "q-ch1-6",
+        "q": "Was ist der Unterschied zwischen <code>docker pull</code> und <code>docker build</code>?",
+        "options": [
+          {
+            "t": "pull lädt ein FERTIGES [[Image]] aus der [[Registry]], build baut aus einem Dockerfile ein EIGENES.",
+            "ok": true,
+            "reply": "GENAU. Konsumieren vs. selbst herstellen. Mit [[build]] bist du nicht mehr auf fremde Baupläne angewiesen. <i>*anerkennendes Knirschen*</i>"
+          },
+          {
+            "t": "Kein Unterschied – beide laden ein Image herunter.",
+            "ok": false,
+            "reply": "NEIN. pull HOLT ein fertiges Image. build STELLT eines HER – aus deinem Dockerfile. Das ist der ganze Punkt!"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "bo",
+        "lines": [
+          "Jetzt bist du <b>echter</b> Kisten-Profi: holen, bauen, etikettieren. <i>*Golem-Applaus*</i> Später baut eine <b>Pipeline</b> deine Images ganz von allein – aber das zeigt dir Ada. Erst will Ole dich sprechen: der GROSSE Umbau wartet! Und wenn du üben willst: <b>Kralle</b> gibt dir Wiederholungen – damit setzt sich das Gelernte fest."
+        ]
+      }
+    ]
+  }
+]

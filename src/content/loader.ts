@@ -7,7 +7,12 @@
  *
  * Migriert sind hier:
  *  - **NPC-Stammdaten** (`./data/npcs.json`) + **Smalltalk** (`./data/smalltalk.json`)
- *  - **Quests** (`./data/quests.json`) – der komplette Story-/Lerninhalt (40 Quests).
+ *  - **Quests** – der komplette Story-/Lerninhalt, **pro Region/Geber aufgeteilt**
+ *    (`./data/quests/<giver>.json`) plus eine explizite Reihenfolge-Liste
+ *    (`./data/quest-order.json`). So teilt ein Stardew-großes Spiel Content auf
+ *    (pro Ort/NPC, kein Monolith): navigierbar, merge-isolation pro Region,
+ *    bereit für Lazy-Load pro Szene. Der Loader sammelt die Regionen-Dateien und
+ *    ordnet sie nach quest-order.json (die Reihenfolge ist load-bearing: `questIdx`).
  *
  * Quests sind zu ~90% reine Daten (Dialoge, Choices, Texte, Drill-Referenzen,
  * scenario-Zustände). Die zwei „Code"-Ränder werden sauber überbrückt, statt
@@ -43,7 +48,14 @@
  */
 import npcsData from "./data/npcs.json";
 import smalltalkData from "./data/smalltalk.json";
-import questsData from "./data/quests.json";
+import questOrder from "./data/quest-order.json";
+// Quests liegen pro Region/Geber in einer eigenen Datei (data/quests/<giver>.json) –
+// so wie ein Stardew-großes Spiel Content aufteilt (pro Ort/NPC, nicht ein Monolith):
+// navigierbar, merge-isolation pro Region, bereit für Lazy-Load pro Szene (#198).
+// Vite sammelt sie zur Build-Zeit (eager) und bündelt sie in beide Builds
+// (Host-Multi-File + Offline-Single-File). Die load-bearing Reihenfolge (questIdx!)
+// steht explizit in quest-order.json – die Datei-/Glob-Reihenfolge zählt NICHT.
+const questRegionModules = import.meta.glob<{ default: unknown }>("./data/quests/*.json", { eager: true });
 import { QUEST_CHECKS } from "./checks";
 import type { Sim } from "../sim";
 import type {
@@ -266,26 +278,72 @@ function reviveStep(v: unknown, path: string): QuestStep {
   }
 }
 
-/** Validiert rohe Quest-Daten gegen das Schema und gibt sie in der Laufzeit-Form
- *  (`accept` als RegExp, `check` als Funktion) zurück. Wirft `ContentValidationError`
- *  beim ersten Verstoß – kaputter Content fällt explizit auf, nicht still. */
-export function parseQuests(raw: unknown): Quest[] {
-  const arr = asArray(raw, "quests");
-  if (arr.length === 0) fail("quests", "mindestens eine Quest erwartet");
-  return arr.map((q, i) => {
-    const o = asRecord(q, `quests[${i}]`);
-    const id = asNonEmptyString(o.id, `quests[${i}].id`);
-    const path = `quest ${id}`;
-    return {
-      id,
-      title: asNonEmptyString(o.title, `${path}.title`),
-      giver: asNonEmptyString(o.giver, `${path}.giver`),
-      rewardXp: asInt(o.rewardXp, `${path}.rewardXp`),
-      rewardCoins: asInt(o.rewardCoins, `${path}.rewardCoins`),
-      steps: asArray(o.steps, `${path}.steps`).map((s, j) => reviveStep(s, `${path}.steps[${j}]`)),
-    };
-  });
+/** Validiert EINE rohe Quest und gibt sie in Laufzeit-Form zurück
+ *  (`accept` als RegExp, `check` als Funktion). */
+function parseOneQuest(q: unknown, where: string): Quest {
+  const o = asRecord(q, where);
+  const id = asNonEmptyString(o.id, `${where}.id`);
+  const path = `quest ${id}`;
+  return {
+    id,
+    title: asNonEmptyString(o.title, `${path}.title`),
+    giver: asNonEmptyString(o.giver, `${path}.giver`),
+    rewardXp: asInt(o.rewardXp, `${path}.rewardXp`),
+    rewardCoins: asInt(o.rewardCoins, `${path}.rewardCoins`),
+    steps: asArray(o.steps, `${path}.steps`).map((s, j) => reviveStep(s, `${path}.steps[${j}]`)),
+  };
 }
 
-/** Validierte Quests in Laufzeit-Form – Quelle: `./data/quests.json` + `./checks.ts`. */
-export const QUESTS: Quest[] = parseQuests(questsData);
+/** Validiert eine rohe Quest-Liste (eine Regionen-Datei) gegen das Schema und gibt
+ *  sie in Laufzeit-Form zurück. Wirft `ContentValidationError` beim ersten Verstoß. */
+export function parseQuests(raw: unknown, where = "quests"): Quest[] {
+  const arr = asArray(raw, where);
+  if (arr.length === 0) fail(where, "mindestens eine Quest erwartet");
+  return arr.map((q, i) => parseOneQuest(q, `${where}[${i}]`));
+}
+
+/** Die explizite, load-bearing Spielreihenfolge (quest-order.json) prüfen. */
+function parseOrder(raw: unknown): string[] {
+  const arr = asArray(raw, "quest-order");
+  if (arr.length === 0) fail("quest-order", "mindestens eine Quest-ID erwartet");
+  return arr.map((id, i) => asNonEmptyString(id, `quest-order[${i}]`));
+}
+
+/** Fügt die Regionen-Listen zur global geordneten Quest-Sequenz zusammen.
+ *  Die Reihenfolge kommt AUSSCHLIESSLICH aus `order` (nicht aus der Datei-/Glob-
+ *  Reihenfolge), weil `GameState.questIdx` ein Index in diese Sequenz ist.
+ *  Validiert referenziell und explizit:
+ *   - keine doppelte Quest-ID über die Regionen-Dateien hinweg,
+ *   - jede ID aus `order` existiert genau einmal,
+ *   - keine Quest fehlt in `order` (sonst wäre sie unerreichbar). */
+export function assembleQuests(regions: Quest[][], order: string[]): Quest[] {
+  const byId = new Map<string, Quest>();
+  for (const region of regions) {
+    for (const q of region) {
+      if (byId.has(q.id)) fail("quests", `doppelte Quest-ID „${q.id}" (über Regionen-Dateien hinweg)`);
+      byId.set(q.id, q);
+    }
+  }
+  const ordered: Quest[] = [];
+  const used = new Set<string>();
+  for (const id of order) {
+    const q = byId.get(id);
+    if (!q) fail("quest-order", `nennt unbekannte Quest-ID „${id}"`);
+    if (used.has(id)) fail("quest-order", `nennt „${id}" doppelt`);
+    used.add(id);
+    ordered.push(q);
+  }
+  for (const id of byId.keys()) {
+    if (!used.has(id)) fail("quest-order", `Quest „${id}" fehlt in quest-order.json (wäre unerreichbar)`);
+  }
+  return ordered;
+}
+
+/** Alle Regionen-Dateien geladen + validiert (deterministisch nach Pfad sortiert). */
+const QUEST_REGIONS: Quest[][] = Object.entries(questRegionModules)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, mod]) => parseQuests(mod.default, path));
+
+/** Validierte Quests in Laufzeit-Form, global geordnet – Quellen:
+ *  `./data/quests/<giver>.json` + `./data/quest-order.json` + `./checks.ts`. */
+export const QUESTS: Quest[] = assembleQuests(QUEST_REGIONS, parseOrder(questOrder));

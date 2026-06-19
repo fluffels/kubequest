@@ -1,0 +1,356 @@
+[
+  {
+    "id": "q36",
+    "title": "Stabile Lager: das StatefulSet",
+    "giver": "knut",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "knut",
+        "lines": [
+          "Willkommen am Kai, Kapitän. Ich bin Knut – ich verwalte hier, was <b>bleiben</b> muss. Kisten, die man stapelt und wegträgt, das ist Bos Geschäft. Bei mir geht es um <b>Daten</b>, die einen Sturm überstehen.",
+          "Ein <b>Deployment</b> behandelt seine Pods wie austauschbare Träger: stirbt einer, kommt ein <b>neuer mit neuem Namen</b> – ihm ist egal, was vorher drinstand. Für eine <b>Datenbank</b> wäre das eine Katastrophe.",
+          "Dafür gibt es das <b>StatefulSet</b>: jeder Pod bekommt eine <b>feste Nummer</b> (…-0, …-1, …) und über <code>volumeClaimTemplates</code> sein <b>eigenes, dauerhaftes Volume</b>. Stabile Identität, eigene Daten. Schau dir die Karten an, die ich hingelegt habe."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Karten lesen",
+        "scenario": {
+          "files": {
+            "headless-service.yaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: speicher-datenbank\nspec:\n  clusterIP: None              # headless: keine virtuelle IP -> ein DNS-Name je Pod\n  selector:\n    app: speicher-datenbank\n  ports:\n    - port: 5432\n      name: postgres",
+            "statefulset.yaml": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: speicher-datenbank\nspec:\n  serviceName: speicher-datenbank   # der headless Service für stabile Pod-DNS-Namen\n  replicas: 3\n  selector:\n    matchLabels:\n      app: speicher-datenbank\n  template:\n    metadata:\n      labels:\n        app: speicher-datenbank\n    spec:\n      containers:\n        - name: postgres\n          image: postgres:16\n          ports:\n            - containerPort: 5432\n              name: postgres\n          volumeMounts:\n            - name: daten\n              mountPath: /var/lib/postgresql/data\n  volumeClaimTemplates:               # jeder Pod erhält sein eigenes, dauerhaftes Volume\n    - metadata:\n        name: daten\n      spec:\n        accessModes:\n          - ReadWriteOnce\n        storageClassName: kai-ssd\n        resources:\n          requests:\n            storage: 10Gi"
+          },
+          "applyEffects": {
+            "headless-service.yaml": {
+              "service": {
+                "name": "speicher-datenbank",
+                "port": "5432"
+              }
+            },
+            "statefulset.yaml": {
+              "statefulSet": {
+                "name": "speicher-datenbank",
+                "image": "postgres:16",
+                "replicas": 3,
+                "serviceName": "speicher-datenbank",
+                "volumeClaimName": "daten",
+                "storage": "1Gi"
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-sts-ls",
+            "text": "Schau mit <code>ls</code>, was am Kai bereitliegt.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-sts-cat",
+            "text": "Lies <code>cat statefulset.yaml</code>. Findest du <code>serviceName</code> und ganz unten <code>volumeClaimTemplates</code> – das eigene Volume je Pod?",
+            "accept": [
+              "^cat\\s+statefulset\\.yaml$"
+            ],
+            "solution": "cat statefulset.yaml",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Headless-Service zuerst",
+        "cmd": {
+          "id": "t-sts-headless",
+          "intro": "🆕 Ein StatefulSet braucht einen <b>headless Service</b> (<code>clusterIP: None</code>): keine gemeinsame virtuelle IP, sondern ein <b>stabiler DNS-Name pro Pod</b>. So bleibt jede Kiste einzeln adressierbar.",
+          "text": "Wende zuerst den headless Service an: <code>kubectl apply -f headless-service.yaml</code>.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+headless-service\\.yaml$"
+          ],
+          "solution": "kubectl apply -f headless-service.yaml",
+          "hint": "kubectl apply -f <datei>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "StatefulSet ausrollen",
+        "cmd": {
+          "id": "t-sts-apply",
+          "intro": "🆕 Neuer Workload-Typ: das <b>StatefulSet</b>. Wie ein Deployment wendest du es mit dem vertrauten <code>kubectl apply -f</code> an – aber jeder Pod bekommt feste Identität und ein eigenes Volume.",
+          "text": "Rolle das StatefulSet aus: <code>kubectl apply -f statefulset.yaml</code> – und schau zum Kai!",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+statefulset\\.yaml$"
+          ],
+          "check": "q36/t-sts-apply",
+          "solution": "kubectl apply -f statefulset.yaml",
+          "hint": "kubectl apply -f <datei>"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Stabile Namen erkennen",
+        "tasks": [
+          {
+            "id": "t-sts-get",
+            "text": "Sieh das StatefulSet: <code>kubectl get statefulset</code> – Spalte READY zeigt <code>3/3</code>. (Kurzform <code>sts</code> geht auch.)",
+            "accept": [
+              "^kubectl\\s+get\\s+(statefulset|statefulsets|sts)$"
+            ],
+            "check": "q36/t-sts-get",
+            "solution": "kubectl get statefulset",
+            "hint": "kubectl get statefulset (oder sts)."
+          },
+          {
+            "id": "t-sts-pods",
+            "text": "Jetzt die Pods: <code>kubectl get pods</code>. Achte auf die Namen – sie enden auf <code>-0</code>, <code>-1</code>, <code>-2</code>: <b>durchnummeriert und stabil</b>, nicht zufällig wie beim Deployment.",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "q36/t-sts-pods",
+            "solution": "kubectl get pods",
+            "hint": "kubectl get pods"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Identität überlebt",
+        "cmd": {
+          "id": "t-sts-delete",
+          "intro": "🆕 Der Beweis: lösch einen StatefulSet-Pod. Anders als beim Deployment kommt er mit <b>exakt demselben Namen</b> und <b>demselben Volume</b> zurück – die Daten überleben.",
+          "text": "Lösch den ersten Pod: <code>kubectl delete pod speicher-datenbank-0</code>. Mit <code>kubectl get pods</code> siehst du danach: <code>speicher-datenbank-0</code> ist wieder da – gleiche Identität, gleiche Daten.",
+          "accept": [
+            "^kubectl\\s+delete\\s+pod\\s+speicher-datenbank-0$"
+          ],
+          "check": "q36/t-sts-delete",
+          "solution": "kubectl delete pod speicher-datenbank-0",
+          "hint": "kubectl delete pod <name> – nimm speicher-datenbank-0."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "knut",
+        "q": "Warum ein <b>StatefulSet</b> statt eines Deployments für eine Datenbank?",
+        "options": [
+          {
+            "t": "Stabile Identität (fester Name -0, -1 …) plus je Pod ein eigenes, dauerhaftes Volume – die Daten überleben Neustarts.",
+            "ok": true,
+            "reply": "Genau das. Feste Identität und eigener Speicher pro Pod: stirbt einer, kommt er als derselbe zurück und findet seine Daten wieder. Das ist der Kern stateful Workloads. 🗄️"
+          },
+          {
+            "t": "StatefulSets sind einfach schneller und sparen Speicher.",
+            "ok": false,
+            "reply": "Nein – Tempo oder Sparsamkeit ist nicht der Punkt. Ein StatefulSet ist eher aufwändiger; sein Wert ist die stabile Identität samt eigenem Volume."
+          },
+          {
+            "t": "Kein echter Unterschied – nur ein anderes Wort fürs Deployment.",
+            "ok": false,
+            "reply": "Doch, ein großer: das Deployment ersetzt Pods durch fremde mit neuem Namen ohne eigene Daten. Das StatefulSet bewahrt Name und Volume – darum geht es."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "knut",
+        "lines": [
+          "Sauber verstaut, Kapitän. Stabile Namen, eigene Volumes – so lagert man, was bleiben muss.",
+          "Als Nächstes zeige ich dir, <b>woher</b> der Speicher kommt: PersistentVolume, PVC und StorageClass. Aber das hebe ich mir für die nächste Schicht auf. 🪵"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q37",
+    "title": "Speicher anfordern: PVC, PV & StorageClass",
+    "giver": "knut",
+    "rewardXp": 55,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "knut",
+        "lines": [
+          "Zurück am Kai, Kapitän? Gut. Beim StatefulSet hast du gesehen, dass jeder Pod ein eigenes Volume bekommt. Heute zeige ich dir, <b>woher</b> dieser Speicher kommt.",
+          "Drei Begriffe, ein Bild aus meinem Lager: Die <b>StorageClass</b> ist das <b>Regal-System</b> (welche Sorte Platz, wie schnell, welche Cloud). Das <b>PersistentVolume (PV)</b> ist das <b>echte Regalfach</b>. Und das <b>PersistentVolumeClaim (PVC)</b> ist deine <b>Anforderung</b>: „Ich brauche 5 GB von dieser Sorte.“",
+          "Das Schöne: Du musst kein Fach von Hand bauen. Du reichst nur die Anforderung ein – die StorageClass <b>provisioniert</b> das Volume und bindet es. Schau dir die Karten an."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Karten lesen",
+        "scenario": {
+          "files": {
+            "storageclass.yaml": "apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: kai-ssd\nprovisioner: kubernetes.io/aws-ebs   # Beispiel-Provisioner (je nach Cloud/Cluster anders)\nparameters:\n  type: gp3                          # schnelle SSD-Klasse\nreclaimPolicy: Retain                # Volume nach dem Löschen der PVC behalten (Daten schützen)\nvolumeBindingMode: WaitForFirstConsumer   # erst binden, wenn ein Pod das Volume wirklich braucht",
+            "pvc.yaml": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: lager-daten\nspec:\n  accessModes:\n    - ReadWriteOnce            # von genau einem Node les-/schreibbar (typisch für eine DB)\n  storageClassName: kai-ssd    # welches Regal: verweist auf die StorageClass oben\n  resources:\n    requests:\n      storage: 5Gi             # so viel dauerhafter Platz wird angefordert"
+          },
+          "applyEffects": {
+            "storageclass.yaml": {
+              "storageClass": {
+                "name": "kai-ssd",
+                "provisioner": "kubernetes.io/aws-ebs",
+                "reclaimPolicy": "Retain",
+                "isDefault": false
+              }
+            },
+            "pvc.yaml": {
+              "pvc": {
+                "name": "lager-daten",
+                "storage": "5Gi",
+                "storageClass": "kai-ssd",
+                "accessModes": "RWO"
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-pvc-ls",
+            "text": "Schau mit <code>ls</code>, was am Kai bereitliegt.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-pvc-cat",
+            "text": "Lies <code>cat pvc.yaml</code>. Findest du <code>storageClassName</code> und unter <code>requests</code> die angeforderte <code>storage</code>-Größe?",
+            "accept": [
+              "^cat\\s+pvc\\.yaml$"
+            ],
+            "solution": "cat pvc.yaml",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Regal-System bereitstellen",
+        "cmd": {
+          "id": "t-sc-apply",
+          "intro": "🆕 Die <b>StorageClass</b> beschreibt, welche Sorte Speicher der Cluster auf Anforderung beschafft (Provisioner, Geschwindigkeit, reclaimPolicy). Sie ist die Vorlage – noch kein Speicher.",
+          "text": "Stell das Regal-System bereit: <code>kubectl apply -f storageclass.yaml</code>.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+storageclass\\.yaml$"
+          ],
+          "check": "q37/t-sc-apply",
+          "solution": "kubectl apply -f storageclass.yaml",
+          "hint": "kubectl apply -f <datei>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Speicher anfordern → Bound",
+        "cmd": {
+          "id": "t-pvc-apply",
+          "intro": "🆕 Das <b>PVC</b> ist die Anforderung. Wendest du es an, sucht (bzw. provisioniert) die StorageClass ein passendes <b>PV</b> und <b>bindet</b> beide: Status <code>Pending</code> → <code>Bound</code>. Gebunden heißt: dein Anspruch hat echten Speicher bekommen.",
+          "text": "Fordere den Speicher an: <code>kubectl apply -f pvc.yaml</code> – das PVC <code>lager-daten</code> wird <b>Bound</b>.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+pvc\\.yaml$"
+          ],
+          "check": "q37/t-pvc-apply",
+          "solution": "kubectl apply -f pvc.yaml",
+          "hint": "kubectl apply -f <datei>"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Lager lesen",
+        "tasks": [
+          {
+            "id": "t-pvc-get",
+            "text": "Sieh die Anforderung: <code>kubectl get pvc</code> – Spalte STATUS zeigt <b>Bound</b>, dazu CAPACITY (5Gi), ACCESS MODES und STORAGECLASS.",
+            "accept": [
+              "^kubectl\\s+get\\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$"
+            ],
+            "check": "q37/t-pvc-get",
+            "solution": "kubectl get pvc",
+            "hint": "kubectl get pvc"
+          },
+          {
+            "id": "t-pv-get",
+            "text": "Und das echte Regalfach: <code>kubectl get pv</code> – die StorageClass hat dynamisch ein PV provisioniert und an dein PVC gebunden (CLAIM zeigt <code>default/lager-daten</code>).",
+            "accept": [
+              "^kubectl\\s+get\\s+(pv|persistentvolume|persistentvolumes)$"
+            ],
+            "check": "q37/t-pv-get",
+            "solution": "kubectl get pv",
+            "hint": "kubectl get pv"
+          }
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Speicher überlebt den Workload",
+        "tasks": [
+          {
+            "id": "t-pvc-dep",
+            "text": "Stell einen Workload an den Speicher: <code>kubectl create deployment datenbank --image=postgres</code>.",
+            "accept": [
+              "^kubectl\\s+create\\s+deployment\\s+datenbank\\s+--image[=\\s]postgres(:\\S+)?$"
+            ],
+            "check": "q37/t-pvc-dep",
+            "solution": "kubectl create deployment datenbank --image=postgres",
+            "hint": "kubectl create deployment <name> --image=<image>"
+          },
+          {
+            "id": "t-pvc-del",
+            "text": "Jetzt der Beweis: reiß den Workload wieder ab – <code>kubectl delete deployment datenbank</code>.",
+            "accept": [
+              "^kubectl\\s+delete\\s+deployment\\s+datenbank$"
+            ],
+            "check": "q37/t-pvc-del",
+            "solution": "kubectl delete deployment datenbank",
+            "hint": "kubectl delete deployment <name>"
+          },
+          {
+            "id": "t-pvc-still",
+            "text": "Und nun <code>kubectl get pvc</code>: <code>lager-daten</code> ist <b>immer noch Bound</b>. Der Speicher ist ein eigenes, dauerhaftes Objekt – er hängt nicht am Pod. Pods kommen und gehen, die Daten bleiben.",
+            "accept": [
+              "^kubectl\\s+get\\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$"
+            ],
+            "check": "q37/t-pvc-still",
+            "solution": "kubectl get pvc",
+            "hint": "kubectl get pvc"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "knut",
+        "q": "PV, PVC, StorageClass – und was heißt <b>Bound</b>?",
+        "options": [
+          {
+            "t": "StorageClass = Regal-System (Vorlage), PV = echtes Regalfach, PVC = deine Anforderung; Bound = Anforderung und Fach sind verbunden, der Speicher steht bereit.",
+            "ok": true,
+            "reply": "Genau so. Du forderst über das PVC an, die StorageClass provisioniert das PV, und Bound heißt: beide sind verheiratet – dein Anspruch hat echten, dauerhaften Platz. 🗄️"
+          },
+          {
+            "t": "PV und PVC sind dasselbe; die StorageClass ist nur ein Label, und Bound heißt „gelöscht“.",
+            "ok": false,
+            "reply": "Nein – PV (das Fach) und PVC (die Anforderung) sind zwei Seiten. Die StorageClass beschafft das Fach. Bound ist das Gegenteil von gelöscht: verbunden und nutzbar."
+          },
+          {
+            "t": "Das PVC ist der Speicher selbst; ohne PVC gibt es keine StorageClass, und Bound heißt „wird gerade gesucht“.",
+            "ok": false,
+            "reply": "Fast nichts davon stimmt: Das PVC ist nur die Anforderung, nicht der Speicher. „Wird gesucht“ wäre Pending – Bound heißt, es ist schon gefunden und verbunden."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "knut",
+        "lines": [
+          "Jetzt kennst du den ganzen Weg: StorageClass beschafft, PV ist das Fach, PVC ist dein Anspruch – und Bound heißt, der Platz gehört dir.",
+          "Damit lagert im Hafen nichts mehr ins Leere. Gute Wacht am Kai, Kapitän! 🪵"
+        ]
+      }
+    ]
+  }
+]

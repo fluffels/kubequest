@@ -13,8 +13,13 @@ import {
   parseNpcs,
   parseSmalltalk,
   parseQuests,
+  assembleQuests,
   ContentValidationError,
 } from "../src/content/loader";
+import type { Quest } from "../src/types";
+
+/** Minimal-Quest für die Assembler-Tests (Inhalt egal, nur id/giver zählen). */
+const mkQuest = (id: string): Quest => ({ id, title: id, giver: "ole", rewardXp: 0, rewardCoins: 0, steps: [] });
 
 /* ---------- Echte Daten: vollständig & konsistent geladen ---------- */
 
@@ -216,4 +221,46 @@ test("parseQuests: wirft bei choice ohne wohlgeformte Optionen", () => {
     () => parseQuests([{ ...minimalQuest, steps: [{ type: "choice", npc: "ole", q: "?", options: [{ t: "A", ok: "ja", reply: "R" }] }] }]),
     ContentValidationError,
   );
+});
+
+/* ---------- assembleQuests: Regionen + explizite Reihenfolge zusammenführen ---------- */
+
+test("assembleQuests: ordnet nach order-Liste, NICHT nach Regionen-Reihenfolge", () => {
+  // Regionen liefern q3,q1 / q2,q0 – die order erzwingt q0..q3.
+  const regions = [[mkQuest("q3"), mkQuest("q1")], [mkQuest("q2"), mkQuest("q0")]];
+  const out = assembleQuests(regions, ["q0", "q1", "q2", "q3"]);
+  assert.deepEqual(out.map((q) => q.id), ["q0", "q1", "q2", "q3"]);
+});
+
+test("assembleQuests: wirft bei doppelter Quest-ID über Regionen hinweg", () => {
+  assert.throws(
+    () => assembleQuests([[mkQuest("q1")], [mkQuest("q1")]], ["q1"]),
+    (e: unknown) => e instanceof ContentValidationError && /doppelte Quest-ID/.test((e as Error).message),
+  );
+});
+
+test("assembleQuests: wirft bei order-Eintrag ohne passende Quest (Tippfehler)", () => {
+  assert.throws(
+    () => assembleQuests([[mkQuest("q1")]], ["q1", "q-tippfehler"]),
+    (e: unknown) => e instanceof ContentValidationError && /q-tippfehler/.test((e as Error).message),
+  );
+});
+
+test("assembleQuests: wirft, wenn eine Quest nicht in der order steht (unerreichbar)", () => {
+  assert.throws(
+    () => assembleQuests([[mkQuest("q1"), mkQuest("q2")]], ["q1"]),
+    (e: unknown) => e instanceof ContentValidationError && /q2.*fehlt in quest-order/.test((e as Error).message),
+  );
+});
+
+test("assembleQuests: wirft bei doppeltem Eintrag in der order", () => {
+  assert.throws(
+    () => assembleQuests([[mkQuest("q1")]], ["q1", "q1"]),
+    ContentValidationError,
+  );
+});
+
+test("loader: echte QUESTS sind eindeutig und beginnen mit q0 (Reihenfolge erhalten)", () => {
+  assert.equal(QUESTS.length, new Set(QUESTS.map((q) => q.id)).size, "doppelte Quest-IDs geladen");
+  assert.equal(QUESTS[0].id, "q0", "erste Quest sollte q0 sein (order-Reihenfolge)");
 });

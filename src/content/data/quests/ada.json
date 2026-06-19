@@ -1,0 +1,1061 @@
+[
+  {
+    "id": "q8",
+    "title": "Adas Seekarten",
+    "giver": "ada",
+    "rewardXp": 45,
+    "rewardCoins": 32,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Pssst! Hier wird nicht gebrüllt. Du rufst dem Cluster alles einzeln zu, hm? <code>create</code> hier, <code>scale</code> da … Das ist <b>imperativ</b>. Tssss.",
+          "Profis <b>zeichnen Karten</b>: den Wunschzustand in eine Datei. Das ist <b>deklarativ</b> – und die Datei kann in <b>Git</b> liegen! Diese Karten heißen <b>Manifeste</b>, geschrieben in <b>YAML</b>.",
+          "Vier Stammdaten hat jedes Manifest: <code>apiVersion</code>, <code>kind</code>, <code>metadata</code>, <code>spec</code>. Und: Einrückung mit <b>Leerzeichen, NIEMALS Tabs</b>. Ich habe dir drei Karten hingelegt – schau sie dir an!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Karten lesen",
+        "scenario": {
+          "files": {
+            "deployment.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: lager\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: lager\n  template:\n    metadata:\n      labels:\n        app: lager\n    spec:\n      containers:\n        - name: lager\n          image: redis:7\n          ports:\n            - containerPort: 6379",
+            "service.yaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: lager\nspec:\n  selector:\n    app: lager\n  ports:\n    - port: 6379",
+            "ingress.yaml": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: hafentor\nspec:\n  ingressClassName: nginx\n  rules:\n    - host: hafen.de\n      http:\n        paths:\n          - path: /lager\n            pathType: Prefix\n            backend:\n              service:\n                name: lager\n                port:\n                  number: 6379"
+          },
+          "applyEffects": {
+            "deployment.yaml": {
+              "deployment": {
+                "name": "lager",
+                "image": "redis:7",
+                "replicas": 2
+              }
+            },
+            "service.yaml": {
+              "service": {
+                "name": "lager",
+                "port": "6379"
+              }
+            },
+            "ingress.yaml": {
+              "ingress": {
+                "name": "hafentor",
+                "host": "hafen.de",
+                "path": "/lager",
+                "service": "lager",
+                "port": "6379",
+                "className": "nginx"
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-ada-1",
+            "text": "Schau mit <code>ls</code> nach, was Ada dir hingelegt hat.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-ada-2",
+            "text": "Lies <code>deployment.yaml</code> mit <code>cat</code>. Findest du <code>kind</code> und <code>replicas</code>?",
+            "accept": [
+              "^cat\\s+deployment\\.yaml$"
+            ],
+            "solution": "cat deployment.yaml",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "kubectl-filename",
+        "brief": "Karte anwenden",
+        "cmd": {
+          "id": "t-apply",
+          "intro": "🆕 Neuer Befehl: <code>kubectl apply -f</code> – „Stelle her, was in der Datei steht.“",
+          "text": "Wende <code>deployment.yaml</code> auf den Cluster an – und schau zum Dock!",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+deployment\\.yaml$"
+          ],
+          "solution": "kubectl apply -f deployment.yaml",
+          "hint": "kubectl apply -f <datei>"
+        }
+      },
+      {
+        "type": "terminal",
+        "unlockAbbrev": "kubectl-ingress",
+        "brief": "Adas Doppeltrick",
+        "tasks": [
+          {
+            "id": "t-ada-3",
+            "text": "Wende auch <code>service.yaml</code> an.",
+            "accept": [
+              "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+service\\.yaml$"
+            ],
+            "solution": "kubectl apply -f service.yaml",
+            "hint": "Gleicher Befehl, andere Datei."
+          },
+          {
+            "id": "t-ada-4",
+            "text": "Adas Lieblingstrick: Denselben apply <b>nochmal</b> – nichts passiert doppelt („unchanged“)!",
+            "accept": [
+              "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+deployment\\.yaml$"
+            ],
+            "solution": "kubectl apply -f deployment.yaml",
+            "hint": "Wirklich nochmal exakt derselbe Befehl."
+          },
+          {
+            "id": "t-ada-5",
+            "text": "Eine dritte Karte liegt bereit: <code>ingress.yaml</code> – das <b>Hafentor</b>, von dem Ole sprach. Wende es an und öffne den Weg vom offenen Meer zu <code>hafen.de/lager</code>.",
+            "accept": [
+              "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+ingress\\.yaml$"
+            ],
+            "solution": "kubectl apply -f ingress.yaml",
+            "hint": "Gleicher apply, Datei ingress.yaml."
+          },
+          {
+            "id": "t-ada-6",
+            "text": "Schau dir das frische Tor an: <code>kubectl get ingress</code> – Spalte HOSTS zeigt <code>hafen.de</code>.",
+            "accept": [
+              "^kubectl\\s+get\\s+(ingress|ingresses|ing)$"
+            ],
+            "check": "q8/t-ada-6",
+            "solution": "kubectl get ingress",
+            "hint": "Kurzform 'ing' geht auch."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-ch4-4",
+        "q": "Du wendest dieselbe Karte zweimal an. Was passiert beim zweiten Mal?",
+        "options": [
+          {
+            "t": "Nichts Schlimmes – „unchanged“, alles stimmt ja schon.",
+            "ok": true,
+            "reply": "Wunderbar! apply vergleicht Soll mit Ist und tut nur das Nötige. Das nennt man <b>idempotent</b>. Mein Lieblingswort."
+          },
+          {
+            "t": "Alles wird doppelt erstellt.",
+            "ok": false,
+            "reply": "Nein! apply gleicht Soll und Ist ab. Schon da? Dann: „unchanged“. Deshalb ist es so sicher."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Merke: <b>Wunschzustand aufschreiben, System stellt ihn her.</b> Das Prinzip kommt wieder – frag mal <b>Runa in der Werft</b>. Sie hat ein … Steuerrad-Problem. <i>*kichert*</i>"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q18",
+    "title": "Seekarten versionieren",
+    "giver": "ada",
+    "rewardXp": 45,
+    "rewardCoins": 32,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "scenario": {
+          "files": {
+            "seekarte.md": "# Seekarte Port Kubernia\nHafenbecken, drei Stege, Leuchtturm im Osten."
+          }
+        },
+        "lines": [
+          "Pssst. Komm näher. Sieh dir meine <b>Seekarten</b> an – ich ändere sie ständig. Neulich? Falsche Route eingezeichnet, gespeichert, alte Version <b>weg</b>. Eine Woche Arbeit. Futsch.",
+          "Nie wieder. Seitdem nutze ich <b>Git</b> – das Logbuch für Dateien. Es merkt sich <b>jede</b> Version, und du kommst immer zur alten zurück. Profis versionieren so ihren Code, ihre YAMLs, einfach alles.",
+          "Ich hab dir eine Karte hingelegt: <code>seekarte.md</code> (mit <code>ls</code> und <code>cat</code> ansehbar). Stellen wir sie unter Gits Schutz. Zuerst: aus diesem Ordner ein Repository machen."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Repo anlegen",
+        "cmd": {
+          "id": "t-git-init",
+          "intro": "🆕 Neuer Befehl: <code>git init</code> – macht aus dem Ordner ein Git-Repository (legt einen versteckten <code>.git</code>-Ordner an).",
+          "text": "Initialisiere hier ein Git-Repository.",
+          "accept": [
+            "^git\\s+init$"
+          ],
+          "solution": "git init",
+          "hint": "Wirklich nur: git init"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Git beobachtet jetzt den Ordner – hält aber nichts von allein fest. Du sagst ihm <b>wann</b>. Frag es zuerst, was es sieht: <code>git status</code> zeigt, welche Dateien noch <b>unversioniert</b> sind."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Stand prüfen",
+        "cmd": {
+          "id": "t-git-status",
+          "intro": "🆕 <code>git status</code> – zeigt den aktuellen Stand: welcher Branch, was ist neu / geändert / vorgemerkt.",
+          "text": "Lass dir den Status anzeigen. <code>seekarte.md</code> müsste als „unversioniert“ auftauchen.",
+          "accept": [
+            "^git\\s+status$"
+          ],
+          "solution": "git status",
+          "hint": "git + ein Wort für „Stand“."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Da ist sie, unter „Unversionierte Dateien“. Zwei Schritte bis zur sicheren Version: erst <b>vormerken</b> (<code>git add</code>), dann <b>festhalten</b> (<code>git commit</code>). Das Vormerken heißt <i>Staging</i> – du wählst aus, was in den nächsten Schnappschuss soll."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Vormerken",
+        "cmd": {
+          "id": "t-git-add",
+          "intro": "🆕 <code>git add &lt;datei&gt;</code> – merkt eine Datei für den nächsten Commit vor (Staging).",
+          "text": "Merke <code>seekarte.md</code> zum Commit vor.",
+          "accept": [
+            "^git\\s+add\\s+seekarte\\.md$"
+          ],
+          "solution": "git add seekarte.md",
+          "hint": "Muster: git add <datei>"
+        }
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "git-commit-message",
+        "brief": "Festhalten",
+        "cmd": {
+          "id": "t-git-commit",
+          "intro": "🆕 <code>git commit -m \"…\"</code> – hält die vorgemerkten Änderungen als Schnappschuss in der Historie fest, mit kurzer Nachricht.",
+          "text": "Halte die Karte fest – Commit-Nachricht z.B. <code>Erste Seekarte</code>.",
+          "accept": [
+            "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
+          ],
+          "solution": "git commit -m \"Erste Seekarte\"",
+          "hint": "Muster: git commit -m \"deine Nachricht\""
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "<b>Festgehalten!</b> Diese Version ist für immer sicher. Jede:r kann später nachlesen, was wann geändert wurde. Schau in die Historie: <code>git log</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Historie lesen",
+        "cmd": {
+          "id": "t-git-log",
+          "intro": "🆕 <code>git log</code> – zeigt die Liste aller Commits (die Versions-Historie).",
+          "text": "Zeig die Commit-Historie an.",
+          "accept": [
+            "^git\\s+log$"
+          ],
+          "solution": "git log",
+          "hint": "git + ein Wort für „Logbuch“."
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Adas Übungsrunde",
+        "pool": [
+          "git-status",
+          "git-add",
+          "git-commit"
+        ],
+        "count": 3,
+        "intro": "Der Dreiklang sitzt erst mit Übung: status → add → commit."
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-git-1",
+        "q": "Ada prüft: Was macht <code>git commit</code>?",
+        "options": [
+          {
+            "t": "Es hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht in der Historie fest.",
+            "ok": true,
+            "reply": "GENAU. Ein Commit ist ein Speicherpunkt, zu dem du immer zurückkannst."
+          },
+          {
+            "t": "Es lädt die Dateien sofort auf den Server hoch.",
+            "ok": false,
+            "reply": "Nein – das wäre git push. Ein Commit bleibt erstmal LOKAL."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-git-3",
+        "q": "Und der Unterschied zwischen <code>git add</code> und <code>git commit</code>?",
+        "options": [
+          {
+            "t": "add merkt Änderungen vor (Staging), commit hält die vorgemerkten dann dauerhaft fest.",
+            "ok": true,
+            "reply": "Richtig. Erst auswählen (add), dann einrahmen (commit) – zwei bewusste Schritte."
+          },
+          {
+            "t": "Kein Unterschied, beides speichert dasselbe.",
+            "ok": false,
+            "reply": "Doch! add = vormerken, commit = festhalten. Du kannst gezielt nur EINEN Teil committen."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Du hast den wichtigsten Rhythmus der Softwarewelt gelernt: <b>ändern → add → commit</b>. Komm wieder, dann zeig ich dir <b>Zweige</b> – wie man gefahrlos experimentiert. Üben kannst du bei mir jederzeit!"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q19",
+    "title": "Ein eigener Zweig",
+    "giver": "ada",
+    "rewardXp": 50,
+    "rewardCoins": 38,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "scenario": {
+          "files": {
+            "route-neu.md": "# Experimentelle Route\n(Entwurf – noch nicht sicher!)"
+          }
+        },
+        "lines": [
+          "Zurück! Heute das Mächtigste an Git: <b>Branches</b> (Zweige). Stell dir vor, du willst eine <b>riskante neue Route</b> ausprobieren – aber die geprüfte Hauptkarte (<code>main</code>) soll heil bleiben.",
+          "Lösung: ein eigener Zweig. Dort arbeitest du frei, und erst wenn es gut ist, führst du ihn mit <code>main</code> zusammen. Genau so arbeiten Teams – jede:r auf eigenem Branch, am Ende wird zusammengeführt (oft nach einem Review).",
+          "Ich hab dir <code>route-neu.md</code> hingelegt. Leg einen Zweig an und wechsle hinein – in einem Rutsch mit <code>git checkout -b</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zweig + wechseln",
+        "cmd": {
+          "id": "t-git-checkout-b",
+          "intro": "🆕 <code>git checkout -b &lt;name&gt;</code> – legt einen neuen Branch an UND wechselt direkt hinein.",
+          "text": "Leg den Branch <code>experiment-route</code> an und wechsle hinein.",
+          "accept": [
+            "^git\\s+checkout\\s+-b\\s+experiment-route$"
+          ],
+          "solution": "git checkout -b experiment-route",
+          "hint": "Muster: git checkout -b <name>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Du bist jetzt auf <code>experiment-route</code> – <code>main</code> bleibt unberührt. Mach hier deine Arbeit fest: <code>route-neu.md</code> vormerken und committen (wie gestern gelernt)."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Vormerken",
+        "cmd": {
+          "id": "t-git-add2",
+          "intro": "↩︎ Wiederholung: <code>git add</code> merkt die Datei vor.",
+          "text": "Merke <code>route-neu.md</code> vor.",
+          "accept": [
+            "^git\\s+add\\s+route-neu\\.md$"
+          ],
+          "solution": "git add route-neu.md",
+          "hint": "Muster: git add <datei>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Festhalten",
+        "cmd": {
+          "id": "t-git-commit2",
+          "intro": "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält es fest.",
+          "text": "Committe die neue Route, z.B. mit <code>Neue Route skizziert</code>.",
+          "accept": [
+            "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
+          ],
+          "solution": "git commit -m \"Neue Route skizziert\"",
+          "hint": "Muster: git commit -m \"Nachricht\""
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Die Route sitzt sicher im Zweig. Jetzt zurück zur Hauptkarte: wechsle nach <code>main</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zurück zu main",
+        "cmd": {
+          "id": "t-git-checkout-main",
+          "intro": "🆕 <code>git checkout &lt;name&gt;</code> (ohne -b) – wechselt auf einen bestehenden Branch.",
+          "text": "Wechsle zurück auf <code>main</code>.",
+          "accept": [
+            "^git\\s+checkout\\s+main$"
+          ],
+          "solution": "git checkout main",
+          "hint": "git checkout <branchname>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Auf <code>main</code> ist die neue Route noch nicht zu sehen – sie lebt im Zweig. Jetzt das Finale: <b>zusammenführen</b> mit <code>git merge</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zusammenführen",
+        "cmd": {
+          "id": "t-git-merge",
+          "intro": "🆕 <code>git merge &lt;branch&gt;</code> – holt die Arbeit aus einem anderen Branch in deinen aktuellen.",
+          "text": "Führe <code>experiment-route</code> in <code>main</code> zusammen.",
+          "accept": [
+            "^git\\s+merge\\s+experiment-route$"
+          ],
+          "solution": "git merge experiment-route",
+          "hint": "Muster: git merge <branch>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Vereint! Zum Schluss teilst du deine Arbeit mit dem Team: <code>git push</code> schiebt deine Commits auf den Server (z.B. GitLab). Erst dann sehen es die anderen."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Hochladen",
+        "cmd": {
+          "id": "t-git-push",
+          "intro": "🆕 <code>git push</code> – lädt deine lokalen Commits auf den entfernten Server (origin).",
+          "text": "Schiebe deine Arbeit zum Server hoch.",
+          "accept": [
+            "^git\\s+push$"
+          ],
+          "solution": "git push",
+          "hint": "Wirklich nur: git push"
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Adas Übungsrunde",
+        "pool": [
+          "git-branch",
+          "git-checkout",
+          "git-status"
+        ],
+        "count": 3,
+        "intro": "Branchen will geübt sein – ein paar Wiederholungen:"
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-git-2",
+        "q": "Wozu legt man einen eigenen Branch an?",
+        "options": [
+          {
+            "t": "Um Änderungen abseits von main auszuprobieren und erst später (oft nach Review) zusammenzuführen.",
+            "ok": true,
+            "reply": "Genau. main bleibt stabil, dein Experiment stört niemanden – bis du bereit bist."
+          },
+          {
+            "t": "Damit Git schneller läuft.",
+            "ok": false,
+            "reply": "Nein, mit Tempo hat das nichts zu tun. Es geht um sicheres, paralleles Arbeiten."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Du beherrschst jetzt den vollen Git-Kreis: <b>branch → commit → merge → push</b>. Genau dieser Ablauf treibt später auch die <b>Pipelines</b> an (ein push löst automatische Builds & Deployments aus – aber das ist eine andere Insel). Sauber gemacht, Kartograph:in! 🗺️"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q20",
+    "title": "Die Pipeline-Passage",
+    "giver": "ada",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "scenario": {
+          "files": {
+            ".gitlab-ci.yml": "stages:\n  - build\n  - test\n  - deploy\n\nbuild-image:        # baut aus dem Dockerfile ein Docker-Image\n  stage: build\n  script:\n    - docker build -t funkdienst:$CI_COMMIT_SHORT_SHA .\n\nunit-test:          # prueft den Code, BEVOR etwas live geht\n  stage: test\n  script:\n    - npm test\n\ndeploy-cluster:     # rollt automatisch in den Cluster aus\n  stage: deploy\n  script:\n    - kubectl apply -f deployment.yaml\n  only:\n    - main          # nur vom main-Branch wird wirklich deployt",
+            "Dockerfile": "FROM nginx:1.27\nCOPY site/ /usr/share/nginx/html\nEXPOSE 80"
+          },
+          "ciDeploy": {
+            "name": "funkdienst",
+            "image": "nginx",
+            "replicas": 2
+          }
+        },
+        "lines": [
+          "Du erinnerst dich: Ich sagte, ein <code>git push</code> treibt später <b>Pipelines</b> an. Willkommen in der <b>Pipeline-Passage</b> – hier wird aus „von Hand deployen“ endlich Automatik.",
+          "Auf dem Server (z.B. GitLab) sitzt ein <b>Runner</b> und wartet. Liegt im Repo eine Datei <code>.gitlab-ci.yml</code>, arbeitet er bei <b>jedem Push</b> automatisch eine <b>Pipeline</b> ab – eine Kette von Schritten, klassisch <b>build → test → deploy</b>.",
+          "Das ist <b>CI/CD</b>: <b>CI</b> (Continuous Integration) baut & testet jede Änderung sofort, <b>CD</b> (Continuous Delivery/Deployment) liefert sie automatisch aus. Ich hab dir eine <code>.gitlab-ci.yml</code> und ein <code>Dockerfile</code> hingelegt. Sieh dir die Pipeline-Definition an: <code>cat .gitlab-ci.yml</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Pipeline lesen",
+        "cmd": {
+          "id": "t-ci-cat",
+          "intro": "🆕 Die <code>.gitlab-ci.yml</code> beschreibt die Pipeline: welche <b>stages</b> es gibt und welche <b>Jobs</b> mit welchen <code>script</code>-Befehlen darin laufen.",
+          "text": "Lies die Pipeline-Definition <code>.gitlab-ci.yml</code>.",
+          "accept": [
+            "^cat\\s+\\.gitlab-ci\\.yml$"
+          ],
+          "solution": "cat .gitlab-ci.yml",
+          "hint": "cat <datei> – wie bei meiner Seekarte."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Siehst du die drei <b>stages</b>? <b>build</b> baut aus dem <code>Dockerfile</code> ein Docker-Image. <b>test</b> prüft den Code – <i>bevor</i> irgendwas live geht. <b>deploy</b> macht ein <code>kubectl apply</code> in den Cluster – also genau das, was du bei mir und Theo von Hand getippt hast, nur <b>automatisch</b>.",
+          "Und schau aufs <code>only: main</code> beim deploy: wirklich ausgerollt wird nur, was auf dem <b>main</b>-Branch landet. Feature-Branches werden gebaut & getestet, aber nicht deployt – ein Sicherheitsnetz.",
+          "Jetzt der Beweis. Nimm die neuen Dateien ins Repo auf – diesmal alle auf einmal mit <code>git add .</code> (der Punkt = „alles“)."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Alles vormerken",
+        "cmd": {
+          "id": "t-ci-addall",
+          "intro": "🆕 <code>git add .</code> – der Punkt merkt <b>alle</b> neuen/geänderten Dateien auf einmal vor, statt jede einzeln.",
+          "text": "Merke alle Änderungen auf einmal vor.",
+          "accept": [
+            "^git\\s+add\\s+\\.$"
+          ],
+          "solution": "git add .",
+          "hint": "git add + ein einzelner Punkt."
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Festhalten",
+        "cmd": {
+          "id": "t-ci-commit",
+          "intro": "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält die vorgemerkten Änderungen fest.",
+          "text": "Committe die Pipeline-Einrichtung, z.B. mit <code>CI-Pipeline eingerichtet</code>.",
+          "accept": [
+            "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
+          ],
+          "solution": "git commit -m \"CI-Pipeline eingerichtet\"",
+          "hint": "Muster: git commit -m \"Nachricht\""
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Push löst Pipeline aus",
+        "cmd": {
+          "id": "t-ci-push",
+          "intro": "🆕 Der entscheidende Moment: <code>git push</code> lädt nicht nur hoch – weil jetzt eine <code>.gitlab-ci.yml</code> im Repo liegt, <b>startet der Runner automatisch die Pipeline</b>.",
+          "text": "Schiebe deine Arbeit zum Server – und lass die erste Pipeline laufen.",
+          "accept": [
+            "^git\\s+push$"
+          ],
+          "solution": "git push",
+          "hint": "Wirklich nur: git push"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Spürst du das? Du hast nichts deployt – du hast nur <b>gepusht</b>. Den Rest macht die Pipeline. Schau ihr beim Arbeiten zu: <code>glab</code> ist das Kommandozeilen-Werkzeug für GitLab."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Pipeline-Status",
+        "cmd": {
+          "id": "t-ci-status",
+          "intro": "🆕 Neuer Befehl: <code>glab ci status</code> – zeigt die Pipeline des aktuellen Branches und ob ihre Stages durchgelaufen sind.",
+          "text": "Sieh nach, wie weit die Pipeline ist.",
+          "accept": [
+            "^glab\\s+ci\\s+status$"
+          ],
+          "solution": "glab ci status",
+          "hint": "glab ci <unterbefehl> fürs Nachschauen."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Alles grün ✅ – build, test, <b>deploy</b>. Und jetzt das Beste: der deploy-Stage hat den Dienst <b>funkdienst</b> ganz von allein in den Cluster gerollt. Kein <code>kubectl apply</code> von Hand. Überzeug dich: <code>kubectl get pods</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Beweis im Cluster",
+        "cmd": {
+          "id": "t-ci-getpods",
+          "intro": "↩︎ Beweis: die Pipeline hat <code>funkdienst</code> für dich deployt – ohne dass du den Cluster angefasst hast.",
+          "text": "Zeig die Pods – <code>funkdienst</code> müsste jetzt laufen.",
+          "accept": [
+            "^kubectl\\s+get\\s+(pods|pod|po)$"
+          ],
+          "solution": "kubectl get pods",
+          "hint": "kubectl get pods"
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-ci-1",
+        "q": "Ada prüft: Was löst die Pipeline aus?",
+        "options": [
+          {
+            "t": "Ein git push in ein Repo, das eine .gitlab-ci.yml enthält.",
+            "ok": true,
+            "reply": "Genau. Push → der Runner sieht die .gitlab-ci.yml → Pipeline läuft. Vollautomatisch."
+          },
+          {
+            "t": "Man muss sie jeden Morgen von Hand starten.",
+            "ok": false,
+            "reply": "Nein – das wäre ja keine Automatik. Der Push ist der Auslöser."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-ci-2",
+        "q": "Und in welcher Reihenfolge laufen die Stages?",
+        "options": [
+          {
+            "t": "build → test → deploy",
+            "ok": true,
+            "reply": "Richtig. Erst bauen, dann testen (bevor etwas live geht!), dann ausrollen. Fällt test durch, wird gar nicht erst deployt."
+          },
+          {
+            "t": "deploy → test → build",
+            "ok": false,
+            "reply": "Andersherum – du würdest Ungetestetes ausrollen und erst danach bauen. Genau das verhindert die Reihenfolge."
+          }
+        ]
+      },
+      {
+        "type": "drill",
+        "brief": "Adas Pipeline-Übung",
+        "pool": [
+          "git-add-all",
+          "ci-status"
+        ],
+        "count": 2,
+        "intro": "Der CI/CD-Reflex: alles vormerken, pushen, Status checken."
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Du hast die Pipeline-Passage gemeistert: <b>push → build → test → deploy</b>, vollautomatisch. So liefert ein Team hundertmal am Tag aus, ohne Angst – die Pipeline ist Bauanleitung, Prüfer und Auslieferer in einem.",
+          "Und es schließt den Kreis: deine Befehle von Bo (Docker-Build), von mir (Git) und von Ole (kubectl apply) – die Pipeline tippt sie jetzt für dich. Das ist das Herz von modernem DevOps. 🚢"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q25",
+    "title": "Zwei Karten, eine Linie",
+    "giver": "ada",
+    "rewardXp": 55,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Zurück, Kartograph:in! Bisher hast du allein an der Seekarte gearbeitet. Im echten Hafen sind aber <b>mehrere</b> dran – heute lernst du das, was Tag eins von Junioren am meisten frustriert: <b>zusammenarbeiten, ohne sich gegenseitig die Arbeit zu überschreiben.</b>",
+          "Mein Kollege <b>Lennart</b> hat über Nacht auch an der <code>seekarte.md</code> gearbeitet und seine Commits auf den Server (origin) geschoben. Goldene Regel: <b>erst holen, dann arbeiten.</b> Sieh zuerst nur nach, OB es Neues gibt – ohne dir gleich etwas reinzuziehen: <code>git fetch</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Erst nachsehen",
+        "scenario": {
+          "gitRemoteAhead": 2,
+          "gitConflict": {
+            "branch": "lennart-route",
+            "file": "seekarte.md",
+            "ours": "Nordpassage: dicht am Riff entlang – kurz, aber eng.",
+            "theirs": "Nordpassage: weiter Bogen ums Riff – sicher, etwas laenger."
+          }
+        },
+        "cmd": {
+          "id": "t-git-fetch",
+          "intro": "🆕 Neuer Befehl: <code>git fetch</code> – holt die Infos vom Server (origin), <b>ohne</b> sie in deine Arbeit einzufügen. Du siehst, was da wäre, riskierst aber nichts.",
+          "text": "Sieh nach, ob origin etwas Neues hat.",
+          "accept": [
+            "^git\\s+fetch$"
+          ],
+          "check": "q25/t-git-fetch",
+          "solution": "git fetch",
+          "hint": "git + ein Wort fürs „abholen, aber nicht einfügen“."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Zwei Commits warten auf origin. <code>git fetch</code> hat sie nur <b>heruntergeladen</b> – deine Karte ist noch unberührt. Jetzt zieh sie wirklich in deine Arbeit: <code>git pull</code> (das ist fetch + zusammenführen in einem)."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Holen + einfügen",
+        "cmd": {
+          "id": "t-git-pull",
+          "intro": "🆕 Neuer Befehl: <code>git pull</code> – holt die Commits vom Server UND führt sie in deinen aktuellen Branch zusammen (fetch + merge).",
+          "text": "Hol Lennarts Commits in deinen <code>main</code>.",
+          "accept": [
+            "^git\\s+pull$"
+          ],
+          "check": "q25/t-git-pull",
+          "solution": "git pull",
+          "hint": "git + ein Wort fürs „herziehen“."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Sauber, jetzt bist du auf dem Stand des Teams. <b>Merk dir:</b> erst <code>pull</code> (holen), dann erst deine <code>push</code> – sonst weist der Server deinen Push ab, weil du veraltet bist.",
+          "Aber Lennart hat noch einen <b>Experiment-Branch</b> dagelassen: <code>lennart-route</code>. Dummerweise hat er dort <b>dieselbe Zeile</b> der Seekarte geändert wie du. Führ ihn zusammen – und sieh, was passiert: <code>git merge lennart-route</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zusammenführen – Knall",
+        "cmd": {
+          "id": "t-git-merge-conflict",
+          "intro": "↩︎ <code>git merge &lt;branch&gt;</code> kennst du. Diesmal haben BEIDE Seiten dieselbe Stelle geändert – Git kann nicht entscheiden und meldet einen <b>Merge-Konflikt</b>. Das ist <b>normal</b>, kein Fehler von dir!",
+          "text": "Führe <code>lennart-route</code> in <code>main</code> zusammen.",
+          "accept": [
+            "^git\\s+merge\\s+lennart-route$"
+          ],
+          "check": "q25/t-git-merge-conflict",
+          "solution": "git merge lennart-route",
+          "hint": "Muster: git merge <branch>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Da ist er, der berüchtigte <b>CONFLICT</b>. Kein Grund zur Panik – Git hat einfach beide Versionen in die Datei geschrieben und fragt DICH, welche gilt. Schau rein: <code>cat seekarte.md</code>. Zwischen <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> und <code>=======</code> steht DEINE Zeile, darunter bis <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> Lennarts."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Konflikt lösen",
+        "tasks": [
+          {
+            "id": "t-conf-cat",
+            "text": "Schau dir den Konflikt in <code>seekarte.md</code> an (die Marker <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> / <code>=======</code> / <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>).",
+            "accept": [
+              "^cat\\s+seekarte\\.md$"
+            ],
+            "solution": "cat seekarte.md",
+            "hint": "cat <datei> – wie bei jeder Seekarte."
+          },
+          {
+            "id": "t-conf-status",
+            "text": "Frag Git nach dem Stand – es nennt dir die „nicht zusammengeführten Pfade“.",
+            "accept": [
+              "^git\\s+status$"
+            ],
+            "solution": "git status",
+            "hint": "Der vertraute Stand-Befehl."
+          },
+          {
+            "id": "t-conf-theirs",
+            "text": "Entscheide dich: Lennarts <b>sichere</b> Route ist besser. Übernimm die <b>hereinkommende</b> Version mit <code>git checkout --theirs seekarte.md</code>.",
+            "accept": [
+              "^git\\s+checkout\\s+--theirs\\s+seekarte\\.md$"
+            ],
+            "check": "q25/t-conf-theirs",
+            "solution": "git checkout --theirs seekarte.md",
+            "hint": "git checkout --theirs <datei> wählt die hereinkommende Seite (--ours wäre deine)."
+          },
+          {
+            "id": "t-conf-add",
+            "text": "Markiere den Konflikt als gelöst: merk die Datei vor mit <code>git add seekarte.md</code>.",
+            "accept": [
+              "^git\\s+add\\s+seekarte\\.md$"
+            ],
+            "check": "q25/t-conf-add",
+            "solution": "git add seekarte.md",
+            "hint": "Wie immer: git add <datei> – das sagt Git „erledigt“."
+          },
+          {
+            "id": "t-conf-commit",
+            "text": "Schließ den Merge ab mit einem Commit, z.B. <code>git commit -m \"Konflikt geloest: Lennarts Route\"</code>.",
+            "accept": [
+              "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
+            ],
+            "check": "q25/t-conf-commit",
+            "solution": "git commit -m \"Konflikt geloest: Lennarts Route\"",
+            "hint": "Muster: git commit -m \"Nachricht\""
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "<b>Gelöst!</b> Genau so läuft's im Alltag: Git markiert die Kollision, du wählst (oder mischst von Hand), <code>add</code>, <code>commit</code> – fertig. Jetzt darfst du teilen: <code>git push</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Jetzt teilen",
+        "cmd": {
+          "id": "t-git-push-resolved",
+          "intro": "↩︎ <code>git push</code> – jetzt gefahrlos, weil du vorher gepullt und den Konflikt gelöst hast.",
+          "text": "Schieb deinen gelösten Stand zum Server.",
+          "accept": [
+            "^git\\s+push$"
+          ],
+          "check": "q25/t-git-push-resolved",
+          "solution": "git push",
+          "hint": "Wirklich nur: git push"
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-git-4",
+        "q": "Du beginnst den Tag und willst deine gestrige Arbeit teilen. Womit fängst du an?",
+        "options": [
+          {
+            "t": "Erst git pull (holen), dann erst git push – sonst bin ich veraltet und der Server weist den Push ab.",
+            "ok": true,
+            "reply": "Genau. „Erst holen, dann pushen.“ Das erspart dir die meisten unnötigen Konflikte."
+          },
+          {
+            "t": "Sofort git push – meine Arbeit ist ja fertig.",
+            "ok": false,
+            "reply": "Riskant: hat das Team inzwischen gepusht, lehnt der Server ab (oder du überschreibst fremde Arbeit). Erst pull!"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-git-5",
+        "q": "Was bedeutet ein Merge-Konflikt eigentlich?",
+        "options": [
+          {
+            "t": "Zwei Seiten haben dieselbe Stelle unterschiedlich geändert – Git kann nicht entscheiden und lässt MICH wählen.",
+            "ok": true,
+            "reply": "Richtig. Ein Konflikt ist keine Katastrophe, sondern eine Rückfrage: „Welche Version gilt?“"
+          },
+          {
+            "t": "Git ist kaputt und das Repository ist verloren.",
+            "ok": false,
+            "reply": "Keineswegs! Nichts ist verloren – Git hat nur beide Versionen nebeneinandergelegt und wartet auf deine Entscheidung."
+          }
+        ]
+      },
+      {
+        "type": "drill",
+        "brief": "Adas Übungsrunde",
+        "pool": [
+          "git-pull",
+          "git-resolve"
+        ],
+        "count": 2,
+        "intro": "Holen und Lösen sitzen erst mit Übung: pull holt, --theirs/--ours wählt die Seite."
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Du hast den Team-Alltag drauf: <b>fetch</b> (nachsehen) → <b>pull</b> (holen) → arbeiten → Konflikt? <b>lösen</b> (Seite wählen, add, commit) → <b>push</b> (teilen). Damit überlebst du jeden ersten Arbeitstag. 🧭"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "q23",
+    "title": "Das verschlüsselte Hafentor",
+    "giver": "ada",
+    "rewardXp": 65,
+    "rewardCoins": 50,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Da bist du ja, Lotse! Unser <b>Hafentor</b> (der Ingress) lotst Besucher schon brav zu <code>hafen.de/lager</code> – aber alles reist noch <b>unverschlüsselt</b> über das offene Meer. Jeder Pirat mit Fernglas liest mit.",
+          "Höchste Zeit für ein <b>verschlüsseltes Tor</b>: <b>HTTPS</b> mit <b>TLS</b>. Der Trick heißt <b>TLS-Terminierung</b> – die Verschlüsselung <i>endet</i> am Hafentor: außen sicheres HTTPS, drinnen im Cluster ganz normales HTTP. Der Ingress-Controller macht das Auspacken.",
+          "Dafür braucht das Tor ein <b>Zertifikat</b>. Das legen wir als <b>TLS-Secret</b> ab (eine Karte mit <code>tls.crt</code> + <code>tls.key</code>) und verweisen im Ingress unter <code>spec.tls</code> darauf. Eins noch vorweg: <b>Wie</b> findet <code>hafen.de</code> überhaupt unser Tor? Über <b>DNS</b> – das Adressbuch löst den Namen zur Adresse des Controllers (<code>203.0.113.10</code>) auf. Los, bau das Zertifikat ein!"
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Zertifikat hinterlegen",
+        "cmd": {
+          "id": "t-secret-tls",
+          "intro": "🆕 Neuer Befehl: <code>kubectl create secret tls &lt;name&gt; --cert=&lt;datei&gt; --key=&lt;datei&gt;</code> – legt ein TLS-Zertifikat als Secret ab.",
+          "text": "Lege das Zertifikat <code>hafen-tls</code> aus <code>tls.crt</code> und <code>tls.key</code> an.",
+          "accept": [
+            "^kubectl\\s+create\\s+secret\\s+tls\\s+hafen-tls\\s+--cert[=\\s]\\S+\\s+--key[=\\s]\\S+$"
+          ],
+          "solution": "kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key",
+          "hint": "Muster: kubectl create secret tls hafen-tls --cert=tls.crt --key=tls.key"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "HTTPS aufschalten",
+        "scenario": {
+          "files": {
+            "ingress-tls.yaml": "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: hafentor\nspec:\n  ingressClassName: nginx\n  tls:\n    - hosts:\n        - hafen.de\n      secretName: hafen-tls\n  rules:\n    - host: hafen.de\n      http:\n        paths:\n          - path: /lager\n            pathType: Prefix\n            backend:\n              service:\n                name: lager\n                port:\n                  number: 6379"
+          },
+          "applyEffects": {
+            "ingress-tls.yaml": {
+              "ingress": {
+                "name": "hafentor",
+                "host": "hafen.de",
+                "path": "/lager",
+                "service": "lager",
+                "port": "6379",
+                "className": "nginx",
+                "tls": {
+                  "secretName": "hafen-tls"
+                }
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-ada-tls-1",
+            "text": "Schau dir die neue Karte an: <code>cat ingress-tls.yaml</code> – achte auf den frischen Block <code>spec.tls</code> mit <code>secretName: hafen-tls</code>.",
+            "accept": [
+              "^cat\\s+ingress-tls\\.yaml$"
+            ],
+            "solution": "cat ingress-tls.yaml",
+            "hint": "cat <datei>"
+          },
+          {
+            "id": "t-ada-tls-2",
+            "text": "Schalt HTTPS auf: wende <code>ingress-tls.yaml</code> an. Das Tor wird umkonfiguriert (<code>configured</code>) – ab jetzt verschlüsselt.",
+            "accept": [
+              "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+ingress-tls\\.yaml$"
+            ],
+            "solution": "kubectl apply -f ingress-tls.yaml",
+            "hint": "Gleicher apply wie immer, Datei ingress-tls.yaml."
+          },
+          {
+            "id": "t-ada-tls-3",
+            "text": "Prüf das Tor: <code>kubectl get ingress</code> – in der Spalte <b>PORTS</b> steht jetzt <code>80, 443</code> (443 = HTTPS).",
+            "accept": [
+              "^kubectl\\s+get\\s+(ingress|ingresses|ing)$"
+            ],
+            "check": "q23/t-ada-tls-3",
+            "solution": "kubectl get ingress",
+            "hint": "Kurzform 'ing' geht auch."
+          },
+          {
+            "id": "t-ada-tls-4",
+            "text": "Schau genau hin: <code>kubectl describe ingress hafentor</code> – die Zeile <b>TLS:</b> verrät, welches Secret welchen Host verschlüsselt.",
+            "accept": [
+              "^kubectl\\s+describe\\s+(ingress|ingresses|ing)\\s+hafentor$"
+            ],
+            "solution": "kubectl describe ingress hafentor",
+            "hint": "kubectl describe ingress <name>"
+          }
+        ]
+      },
+      {
+        "type": "drill",
+        "brief": "Adas TLS-Übung",
+        "pool": [
+          "k-secret-tls",
+          "k-get-ingress",
+          "k-get-secrets"
+        ],
+        "count": 3,
+        "intro": "Einmal die Kette üben: Zertifikat anlegen → Tor anschauen → Secrets zählen."
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-tls",
+        "q": "Was bedeutet <b>TLS-Terminierung</b> am Hafentor?",
+        "options": [
+          {
+            "t": "Die Verschlüsselung endet am Tor: außen HTTPS, drinnen reicht der Controller normales HTTP weiter.",
+            "ok": true,
+            "reply": "Genau! Das Zertifikat liegt einmal zentral am Tor (als TLS-Secret), die Services dahinter müssen sich um nichts kümmern. Sauber gelöst. 🔒"
+          },
+          {
+            "t": "Der Service wird abgeschaltet, sobald HTTPS aktiv ist.",
+            "ok": false,
+            "reply": "Nein – „terminieren“ meint hier <b>die TLS-Verbindung beenden/abwickeln</b>, nicht den Service stoppen. Außen HTTPS, drinnen HTTP."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "ada",
+        "reviewId": "q-dns",
+        "q": "Wie findet ein Besucher mit <code>hafen.de</code> überhaupt unser Hafentor?",
+        "options": [
+          {
+            "t": "DNS löst hafen.de zur Adresse des Ingress-Controllers auf; der wählt per host-Regel den richtigen Service.",
+            "ok": true,
+            "reply": "Richtig! DNS ist das Adressbuch: Name → IP des Controllers (bei uns 203.0.113.10). Am selben Tor können viele Hosts ankommen – die host-Regel sortiert sie. ⚓"
+          },
+          {
+            "t": "Der Ingress ruft den Browser des Besuchers von sich aus an.",
+            "ok": false,
+            "reply": "Andersrum: Der Besucher kommt zum Tor. Erst fragt sein Rechner per <b>DNS</b> nach der Adresse, dann klopft er dort an."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "ada",
+        "lines": [
+          "Merke: <b>Zertifikat als TLS-Secret ablegen, im Ingress unter spec.tls referenzieren – fertig ist HTTPS am Tor.</b> Die Verschlüsselung endet am Hafentor, dahinter bleibt's einfach. Und DNS sorgt dafür, dass der Name überhaupt bei uns ankommt. Hervorragende Arbeit, Lotse! 🔒⚓"
+        ]
+      }
+    ]
+  }
+]
