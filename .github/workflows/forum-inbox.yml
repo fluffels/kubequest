@@ -1,0 +1,66 @@
+name: Forum-Eingang
+
+# Flaggt jede neue Forum-Nachricht (GitHub Discussions) automatisch als prio:hoch-Issue,
+# damit im Board nichts durchrutscht. Diese Action ANTWORTET NICHT und legt KEIN echtes
+# Bug-/Feature-Ticket an – das ist bewusst der interaktive Teil (siehe /forum-Skill +
+# AGENTS.md > Forum-Eingang): die Maintainerin gibt Antwort + Triage frei.
+#
+# Damit discussion-Trigger feuern, muss diese Datei auf dem Default-Branch (main) liegen.
+
+on:
+  discussion:
+    types: [created]
+  discussion_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  inbox:
+    runs-on: ubuntu-latest
+    # Eigene Posts/Antworten des Repo-Owners (fluffels) nicht flaggen – sonst löst jede
+    # vom /forum-Skill geschriebene Antwort eine neue Inbox aus (Endlosschleife).
+    if: github.event.sender.login != github.repository_owner
+    steps:
+      - name: Inbox-Issue anlegen oder ergänzen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DISC_NUMBER: ${{ github.event.discussion.number }}
+          DISC_TITLE: ${{ github.event.discussion.title }}
+          DISC_URL: ${{ github.event.discussion.html_url }}
+          EVENT: ${{ github.event_name }}
+          SENDER: ${{ github.event.sender.login }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+        run: |
+          set -euo pipefail
+          marker="Forum #${DISC_NUMBER}:"
+          link="${COMMENT_URL:-$DISC_URL}"
+
+          # Gibt es schon ein OFFENES Inbox-Issue für genau diesen Thread?
+          # (Titel-Präfix-Match über alle offenen forum-Issues – robuster als die Suche.)
+          existing=$(gh issue list --repo "$REPO" --state open --label forum \
+            --json number,title \
+            --jq "[.[] | select(.title | startswith(\"$marker\"))][0].number // empty")
+
+          if [ -n "$existing" ]; then
+            echo "Bestehende Inbox #$existing für $marker – ergänze Kommentar."
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "🆕 Neue Forum-Aktivität von **${SENDER}** (\`${EVENT}\`): ${link}"
+          else
+            echo "Lege neue Inbox für $marker an."
+            body=$(printf '%s\n' \
+              "Automatisch aus dem Forum (GitHub Discussions) angelegt. **Noch nicht beantwortet.**" \
+              "" \
+              "- Thread: ${DISC_URL}" \
+              "- Letzte Aktivität: **${SENDER}** (\`${EVENT}\`) → ${link}" \
+              "" \
+              "➡️ Mit dem \`/forum\`-Skill bearbeiten: Nachricht lesen → Antwort entwerfen (Formulierung von der Maintainerin freigeben lassen) → als \`fluffels\` posten → passendes Ticket anlegen/zuordnen → dieses Issue schließen. Details in AGENTS.md › Forum-Eingang.")
+            gh issue create --repo "$REPO" \
+              --title "${marker} ${DISC_TITLE}" \
+              --label "prio:hoch" \
+              --label "forum" \
+              --body "$body"
+          fi
