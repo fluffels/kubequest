@@ -17,7 +17,6 @@
 // Kenney-Spritesheets (Tiny Town / Tiny Dungeon, CC0)
 import town from "../assets/town.png";
 import dungeon from "../assets/dungeon.png";
-import creatures from "../assets/creatures.png";
 
 // PixelLab Wang-Tilesets (water-sand = coast, sand-grass = meadow, grass-dirt = path, …)
 import coast from "../assets/pixellab/water-sand.png";
@@ -86,8 +85,6 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   // Spritesheets (werden in 16er-Frames geschnitten)
   { key: "town", src: town, kind: "sheet", cols: 12 },
   { key: "dungeon", src: dungeon, kind: "sheet", cols: 12 },
-  // Tiny Creatures (Clint Bellanger, CC0) ist 10 Spalten breit, nicht 12
-  { key: "creatures", src: creatures, kind: "sheet", cols: 10 },
   { key: "coast", src: coast, kind: "sheet", cols: 4 },
   { key: "meadow", src: meadow, kind: "sheet", cols: 4 },
   { key: "path", src: path, kind: "sheet", cols: 4 },
