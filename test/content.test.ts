@@ -7,6 +7,7 @@ import { KQContent } from "../src/content";
 import { validateContent, type ContentBundle } from "../src/content/validate";
 import { KQAssets } from "../src/assets-data";
 import { ARCHIPEL_NPC } from "../src/archipel";
+import { LIGHTHOUSE_NPC } from "../src/lighthouse";
 import { Sim as KQSim } from "../src/sim";
 
 /** Findet Befehls-Karten ohne nicht-leere Begründung (`explain`, #233) – sonst
@@ -343,6 +344,17 @@ test("der GitOps-Insel-NPC (#93) ist in der Registry verdrahtet, mit Sprite + Sm
   // Bis #94 die erste Quest einhängt, ist Smalltalk das, was Argo zu sagen hat.
   const lines = (KQContent.SMALLTALK as Record<string, string[]>)[ARCHIPEL_NPC.id];
   assert.ok(Array.isArray(lines) && lines.length > 0, "Insel-NPC ohne Smalltalk");
+});
+
+test("der Monitoring-Leuchtturm-NPC (#112) ist in der Registry verdrahtet, mit Sprite + Smalltalk", () => {
+  // lighthouse.ts reserviert den Standplatz mit fester id – die MUSS einem NPC der
+  // Registry entsprechen, sonst rendert die Klippe eine Figur ohne Daten.
+  const npc = (KQContent.NPCS as Record<string, { tex?: string }>)[LIGHTHOUSE_NPC.id];
+  assert.ok(npc, "Leuchtturm-NPC-Id '" + LIGHTHOUSE_NPC.id + "' fehlt in NPCS");
+  assert.ok(npc.tex && KQAssets[npc.tex], "Leuchtturm-NPC ohne Sprite-Asset");
+  // Bis die Phase-5-Quests (#113–116) andocken, ist Smalltalk das, was Lumi zu sagen hat.
+  const lines = (KQContent.SMALLTALK as Record<string, string[]>)[LIGHTHOUSE_NPC.id];
+  assert.ok(Array.isArray(lines) && lines.length > 0, "Leuchtturm-NPC ohne Smalltalk");
 });
 
 test("Red-Green: ein NPC mit fehlendem Sprite-Asset wird gemeldet", () => {
