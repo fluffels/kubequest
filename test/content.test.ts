@@ -8,6 +8,7 @@ import { validateContent, type ContentBundle } from "../src/content/validate";
 import { KQAssets } from "../src/assets-data";
 import { ARCHIPEL_NPC } from "../src/archipel";
 import { LIGHTHOUSE_NPC } from "../src/lighthouse";
+import { WAREHOUSE_NPC } from "../src/warehouse";
 import { Sim as KQSim } from "../src/sim";
 
 /** Findet Befehls-Karten ohne nicht-leere Begründung (`explain`, #233) – sonst
@@ -354,6 +355,17 @@ test("der Monitoring-Leuchtturm-NPC (#112) ist in der Registry verdrahtet, mit S
   assert.ok(npc.tex && KQAssets[npc.tex], "Leuchtturm-NPC ohne Sprite-Asset");
   const lines = (KQContent.SMALLTALK as Record<string, string[]>)[LIGHTHOUSE_NPC.id];
   assert.ok(Array.isArray(lines) && lines.length > 0, "Leuchtturm-NPC ohne Smalltalk");
+});
+
+test("der Lagerhallen-Viertel-NPC Knut (#125) ist in der Registry verdrahtet, mit Sprite + Smalltalk", () => {
+  // warehouse.ts reserviert den Standplatz mit fester id – die MUSS einem NPC der
+  // Registry entsprechen, sonst rendert der Kai eine Figur ohne Daten.
+  const npc = (KQContent.NPCS as Record<string, { name?: string; tex?: string }>)[WAREHOUSE_NPC.id];
+  assert.ok(npc, "Lager-NPC-Id '" + WAREHOUSE_NPC.id + "' fehlt in NPCS");
+  assert.equal(npc.name, "Knut", "der Lager-NPC heißt Knut");
+  assert.ok(npc.tex && KQAssets[npc.tex], "Lager-NPC ohne Sprite-Asset");
+  const lines = (KQContent.SMALLTALK as Record<string, string[]>)[WAREHOUSE_NPC.id];
+  assert.ok(Array.isArray(lines) && lines.length > 0, "Lager-NPC ohne Smalltalk");
 });
 
 test("Red-Green: ein NPC mit fehlendem Sprite-Asset wird gemeldet", () => {

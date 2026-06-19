@@ -72,6 +72,7 @@ import char_kralle from "../assets/pixellab/char_kralle.png";
 import char_juno from "../assets/pixellab/char_juno.png";
 import char_argos from "../assets/pixellab/char_argos.png";
 import char_lumi from "../assets/pixellab/char_lumi.png";
+import char_knut from "../assets/pixellab/char_knut.png";   // Speicher-Verwalter Knut (#125)
 
 // PixelLab-Shop-Haustiere
 import pet_ratte from "../assets/pixellab/pet_ratte.png";
@@ -143,6 +144,7 @@ export const ASSET_MANIFEST: readonly AssetEntry[] = [
   { key: "char_juno", src: char_juno, kind: "plain" },
   { key: "char_argos", src: char_argos, kind: "plain" },
   { key: "char_lumi", src: char_lumi, kind: "plain" },
+  { key: "char_knut", src: char_knut, kind: "plain" },   // Speicher-Verwalter Knut (#125)
 
   // PixelLab-Shop-Haustiere
   { key: "pet_ratte", src: pet_ratte, kind: "plain" },

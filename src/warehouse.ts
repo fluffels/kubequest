@@ -35,9 +35,10 @@ export const QX0 = 3, QX1 = 24, QY0 = 3, QY1 = 14;
 
 const CX = 14, CY = 8;   // Mitte der Quay-Fläche (Kontor-Platz mit NPC/Quest-Trigger)
 
-/** Reservierter Standplatz des Viertel-NPC (#125 setzt hier den Sprite + Smalltalk).
- *  Bis dahin steht am Trigger ein Schild als sichtbarer, bewusster Platzhalter. */
-export const WAREHOUSE_NPC = { id: "lagermeister", x: CX - 2, y: CY } as const;
+/** Standplatz des Viertel-NPC „Knut", Speicher-Verwalter (#125): Hüter der Daten/Volumes,
+ *  gibt ab den stateful-Quests (#127/#129) die Hands-on-Aufgaben aus. Die id entspricht
+ *  dem NPCS-/SMALLTALK-Schlüssel (analog "lumi" auf der Leuchtturm-Klippe). */
+export const WAREHOUSE_NPC = { id: "knut", x: CX - 2, y: CY } as const;
 
 /** Quest-Trigger = das Lager-Kontor. Hier docken die Phase-7-Quests an (#127/#129). */
 export const WAREHOUSE_QUEST_TRIGGER = { id: "lager-kontor", x: CX + 2, y: CY } as const;
