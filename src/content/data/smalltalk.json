@@ -1,0 +1,48 @@
+{
+  "ole": [
+    "Der Hafen läuft wie geschmiert – dank dir!",
+    "K8s spricht man übrigens „Kates“. Klingt wie ein Vorname, ich weiß."
+  ],
+  "bo": [
+    "BO. STAPELT. <i>*zufriedenes Knirschen*</i>",
+    "Bo-Weisheit: Image ist Bauplan. Container läuft. Bo verwechselt nie. Bo ist Stein."
+  ],
+  "ada": [
+    "Pssst. Ich katalogisiere gerade … alles.",
+    "Leerzeichen, keine Tabs. LEERZEICHEN. KEINE TABS."
+  ],
+  "runa": [
+    "Das Helm-Logo hängt über meinem Bett. Was? Es ist hübsch!",
+    "helm rollback hat mir mal ein Wochenende gerettet."
+  ],
+  "theo": [
+    "Ich vermesse gerade die Möglichkeiten. Sie sind … beachtlich.",
+    "terraform plan lesen. IMMER. Frag nicht, woher ich das weiß."
+  ],
+  "pelle": [
+    "Frische Ware, faire Preise! Na ja – Preise.",
+    "Die Kanone da drüben? Bestseller, seit die Piraten wieder da sind."
+  ],
+  "juno": [
+    "Ruhige See heute. ZU ruhig.",
+    "get pods → describe → logs. Träum es. Lebe es.",
+    "Der Leuchtturm hat 99,99% Uptime. Die fehlenden 0,01% verfolgen mich bis heute."
+  ],
+  "argo": [
+    "Die <b>Seekarte</b> im Git sagt, wie der Hafen aussehen soll – ich halte ihn nur auf Kurs.",
+    "Nicht <i>pushen</i>, Lotse. Der Cluster <b>zieht</b> sich den Soll-Zustand selbst. Pull-Prinzip!",
+    "Verstellt jemand heimlich was am Hafen? Beim nächsten Abgleich dreh ich's zurück. Git gewinnt immer."
+  ],
+  "lumi": [
+    "Erst messen, dann meckern – was du nicht <b>siehst</b>, kannst du nicht reparieren.",
+    "Halb drei Uhr nachts, vierter Kaffee, irgendwo feuert ein Alert. Nachtdienst auf dem Turm eben. <i>*nippt*</i>",
+    "Prometheus kratzt alle 15 Sekunden meine Metriken ab. Und mein Grafana glüht hübscher als jeder Sonnenuntergang.",
+    "Juno schwört auf die 99,99% Uptime. Ich sehe die fehlenden 0,01% – sie blinken rot auf meinem Dashboard."
+  ],
+  "knut": [
+    "Jede Kiste hat ein <b>Etikett</b>, jedes Volume seinen <b>Anspruch</b>. Ordnung ist keine Schikane – sie ist Buchhaltung.",
+    "Ein <b>Pod</b> kommt, ein Pod geht. Sein <code>PersistentVolumeClaim</code> bleibt. Daten überleben die Pods, die sie tragen – schreib dir das hinters Ohr.",
+    "Hier heißt keiner „web-7f9c-x2z9“. Im <b>StatefulSet</b> trägt jeder seine Nummer: <code>-0</code>, <code>-1</code>, <code>-2</code>. Stabile Namen, stabile Plätze. So muss das.",
+    "Container drei, Reihe zwei, ganz oben links. <i>*blättert im Logbuch*</i> … steht alles hier. Ich verlege nichts. Ich bin kein <code>emptyDir</code>."
+  ]
+}

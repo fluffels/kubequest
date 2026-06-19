@@ -5,10 +5,12 @@
  * Die Inhalte sind nach Domänen in `./content/` aufgeteilt; diese Datei
  * bündelt sie nur noch zum gewohnten `KQContent`-Objekt (öffentliche API).
  */
-import { RANKS, SHOP, NPCS } from "./content/progression";
+import { RANKS, SHOP } from "./content/progression";
+// NPCs + Smalltalk sind Content-as-Data (#348): als JSON in content/data/,
+// geladen & gegen ein Schema validiert vom Loader. Siehe content/loader.ts.
+import { NPCS, SMALLTALK } from "./content/loader";
 import { QUESTS } from "./content/quests";
 import { DRILLS, PRACTICE } from "./content/drills";
-import { SMALLTALK } from "./content/smalltalk";
 import { CRAB_QUIZ, CMD_CARDS } from "./content/quiz";
 import { STACK_ROUNDS, corruptImage } from "./content/minigame";
 import { GLOSSARY, applyGlossary } from "./content/glossary";
