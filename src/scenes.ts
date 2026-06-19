@@ -37,7 +37,7 @@ import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
 import { expandRect, cull, FrameSampler, type Cullable } from "./cull";
 import { parseTiledMap, collisionGrid, resolveTilesets, objectGroup } from "./tilemap";
-import { harborGeometry, PIER_XS } from "./harbormap";
+import { PIER_XS } from "./harbormap";
 import { ATLAS_CHARS, CELL_W, CELL_H, GLYPH_W, GLYPH_H, glyphMatrix, sanitize } from "./pixelfont";
 import { spreadLabelsVertically, type LayoutBox } from "./labellayout";
 // #193: Karten kommen über die Map-Registry (Map-ID → rohes .tmj + Metadaten)
@@ -271,11 +271,7 @@ import { getMapEntry } from "./mapregistry";
       this.makeFxTextures();   // weiche Schatten- & Glüh-Textur (#4)
       this.lampGlows = [];     // Laternen-Glühen, das nachts aufleuchtet (#4)
 
-      // #192: Mit ?tiledmap kommt die Hafenkarte aus assets/maps/harbor.tmj statt
-      // aus der prozeduralen buildMap() – pixelgleich (gleicher Renderer), nur die
-      // Geometrie-Quelle wechselt. buildMap() bleibt der Default.
-      this.tiledMap = params.has("tiledmap");
-      if (this.tiledMap) this.loadHarborMap(); else this.buildMap();
+      this.loadHarborMap();  // #196: buildMap() entfernt; Hafenkarte immer aus harbor.tmj
       this.renderGround();
       this.renderStatics();
       this.spawnFlowers();
@@ -387,29 +383,9 @@ import { getMapEntry } from "./mapregistry";
       this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY);
     }
 
-    /** Hafenkarte prozedural aufbauen (Default-Pfad). Die reine Boden-/Kollisions-
-     *  Geometrie liegt seit #192 Phaser-frei in harbormap.ts (harborGeometry) –
-     *  damit sie als assets/maps/harbor.tmj serialisiert und im Datenpfad
-     *  (loadHarborMap) wieder geladen werden kann. Die sichtbaren Objekte und die
-     *  davon abhängigen Felder setzt placeHarborObjects() – in BEIDEN Pfaden gleich. */
-    buildMap() {
-      const geo = harborGeometry(this.W, this.H);
-      this.ground = geo.ground;
-      this.solidGrid = Uint8Array.from(geo.solid);
-      // #194: Türen aus den Code-Eingängen (Default-Pfad). Der Datenpfad liest sie
-      // stattdessen aus dem Tiled-Objektlayer – beide füllen dasselbe this.doors.
-      this.doors = ENTRANCES.slice();
-      // #195: NPC-Standplätze aus der Code-Liste (Default-Pfad); der Datenpfad liest
-      // sie aus dem Tiled-Objektlayer – beide füllen dasselbe this.npcSpawns.
-      this.npcSpawns = NPC_SPAWNS.slice();
-      this.placeHarborObjects();
-    }
-
-    /** Datenpfad (#192, Epic #57): Boden + Kollision aus assets/maps/harbor.tmj
-     *  laden statt sie prozedural zu erzeugen, dann dieselben Objekte platzieren.
-     *  Ergebnis ist pixelgleich zu buildMap() (gleicher Renderer, gleiche
-     *  Geometrie), kommt aber aus der Datei – der Beweis, dass der Tiled-Loader die
-     *  echte Welt trägt. Erreichbar über ?tiledmap; buildMap() bleibt Default. */
+    /** (#192/#196, Epic #57): Boden + Kollision aus assets/maps/harbor.tmj laden;
+     *  einziger Pfad seit #196 (buildMap() entfernt). Türen + NPC-Standplätze kommen
+     *  datengetrieben aus dem Tiled-Objektlayer, Objekte setzt placeHarborObjects(). */
     loadHarborMap() {
       const entry = getMapEntry("harbor");
       const map = entry.parse(JSON.parse(entry.raw));
@@ -2469,14 +2445,12 @@ import { getMapEntry } from "./mapregistry";
     }
   }
 
-  /** #191 (Teil 1 von Epic #57): Grundgerüst für die spätere Tiled-Map-Migration.
-   *  Lädt EINE minimale .tmj über Phasers Tilemap-API – bewusst PARALLEL zur
-   *  prozeduralen buildMap() der WorldScene, die unangetastet bleibt. Erreichbar
-   *  über ?maptest in der URL. Beweist den ganzen Pfad an einem Stück: .tmj
-   *  parsen/validieren (tilemap.ts) → Tileset-Name auf ein ASSET_MANIFEST-Bild
-   *  mappen → Tile-Layer rendern → Kollisionslayer als solide markieren (das
-   *  Debug-Overlay macht den Kollisions-Ring sichtbar). Noch KEINE echte
-   *  Hafenkarte – die kommt in #192. */
+  /** #191 (Epic #57): Demonstriert die Tiled-Map-Infrastruktur anhand einer
+   *  minimalen test-map.tmj. Erreichbar über ?maptest. Beweist den ganzen Pfad:
+   *  .tmj parsen/validieren (tilemap.ts) → Tileset-Name auf ASSET_MANIFEST-Bild
+   *  mappen → Tile-Layer rendern → Kollisions-Ring im Debug-Overlay sichtbar.
+   *  Zweite Karte ohne neuen Karten-Code – Akzeptanzkriterium für #196/#57
+   *  (buildMap() ist entfernt; WorldScene lädt immer aus harbor.tmj). */
   class TilemapTestScene extends Phaser.Scene {
     [key: string]: any;
     constructor() { super("MapTest"); }
@@ -2522,7 +2496,7 @@ import { getMapEntry } from "./mapregistry";
       // Fixierte Beschriftung, damit klar ist: das ist die Tiled-Testszene (#191).
       const cw = cam.width, ch = cam.height;
       pixelText(this, cw / 2, 12, "🧭 Tiled-Loader-Test (#191)", { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
-      pixelText(this, cw / 2, ch - 16, "Boden-Layer + Kollisions-Ring (rot) aus assets/maps/test-map.tmj – parallel zu buildMap()", { color: "#cfe3ff", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 16, "Boden-Layer + Kollisions-Ring (rot) aus assets/maps/test-map.tmj", { color: "#cfe3ff", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
     }
   }
 
