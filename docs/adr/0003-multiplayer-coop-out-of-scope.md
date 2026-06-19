@@ -77,3 +77,12 @@ Diese Entscheidung wird neu aufgemacht, wenn **einer** dieser Fälle eintritt:
 Tritt ein Trigger ein: **eigenes Konzept-Ticket**, das Backend + DB + Netcode
 **zusammen** aufmacht (sie hängen aneinander), und ein neues ADR, das dieses hier
 ablöst. **Nicht** beiläufig im Rahmen eines anderen Features anfangen.
+
+## Bestätigte Re-Evaluierung – 2026-06-19 (#291)
+
+Beide Trigger geprüft – **kein Trigger erfüllt**, Entscheidung bestätigt:
+
+- **ADR 0002 (kein Backend) gefallen?** Nein – alle re-eval Trigger von ADR 0002 sind ebenfalls nicht erfüllt.
+- **Konkreter belegter Lern-Nutzen durch Co-op?** Nein.
+
+Nächste Re-Evaluierung: wenn ADR 0002 fällt (kein Termin).

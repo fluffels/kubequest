@@ -41,3 +41,15 @@ Diese Entscheidung wird **neu bewertet**, sobald eines davon zwingend wird:
 - **Multiplayer** (z. B. kooperatives Cluster-Troubleshooting über mehrere Spieler).
 
 Erst dann ist Backend + DB (und ggf. ein Service-Split) erneut zu prüfen – als bewusste, dokumentierte Neuentscheidung, nicht als schleichende Erweiterung.
+
+## Bestätigte Re-Evaluierung – 2026-06-19 (#291)
+
+Alle drei Trigger geprüft – **kein Trigger erfüllt**, Entscheidung bestätigt:
+
+- **Cloud-Saves / Accounts:** kein hartes Feature-Ziel. Tickets #158–#160 (Save-Sync-Backend) sind optionaler Zukunfts-Scope ohne konkreten Zeitdruck; JSON-Export/Import funktioniert als Workaround.
+- **Lern-Analytik:** kein Bedarf.
+- **Multiplayer:** durch ADR 0003 separat ausgeschlossen.
+
+**Klarstellung „Echter Modus" (#173–#178):** Diese Tickets beschreiben eine optionale lokale Proxy-Verbindung zu einem echten Cluster (kubectl/docker auf dem eigenen Rechner) – kein Cloud-Backend, keine Accounts, kein Online-Zwang. Sie widersprechen dieser ADR nicht und bleiben korrekt im Backlog als optionaler fortgeschrittener Scope.
+
+Nächste Re-Evaluierung: wenn einer der Trigger eintritt (kein Termin).

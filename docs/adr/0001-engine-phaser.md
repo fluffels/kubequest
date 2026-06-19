@@ -79,3 +79,14 @@ Diese Entscheidung wird neu aufgemacht, wenn **einer** dieser Fälle eintritt:
 
 Tritt ein Trigger ein: neues ADR (`0002-…`) mit aktualisierter Abwägung
 schreiben, dieses hier auf „abgelöst durch 0002" setzen.
+
+## Bestätigte Re-Evaluierung – 2026-06-19 (#291)
+
+Alle vier Trigger geprüft – **kein Trigger erfüllt**, Entscheidung bestätigt:
+
+- **3D:** kein Spielziel erfordert 3D; Scope bleibt 2D.
+- **Native Performance:** kein Blocker. Culling/FPS-Budget (#82) und Bundle-Splitting (#199) zeigen, dass Phaser die Wachstumskurve trägt. Die Domänen-Schicht (sim.ts, content.ts, world.ts, …) bleibt Phaser-frei und unit-testbar – ein Engine-Tausch wäre nur ein Präsentationsschicht-Austausch ohne zwingenden Grund.
+- **Offline-eine-Datei-Wert:** weiterhin Kern-Anforderung; `dist-offline/index.html` ist das primäre Verteilformat.
+- **Phaser 3:** aktiv gepflegt, kein Wartungs-Risiko erkennbar.
+
+Nächste Re-Evaluierung: wenn einer der Trigger eintritt (kein Termin).
