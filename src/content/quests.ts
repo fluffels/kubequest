@@ -395,6 +395,7 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "runa", lines: [
         "Ahoi! Runa, Werftchefin. Lass mich raten – bei <b>Helm</b> dachtest du an das Ding für den Kopf? HA! Helm ist Englisch für <b>Steuerrad</b> – und der <b>Paketmanager für Kubernetes</b>.",
         "Bei Ada: 2 Karten für eine Mini-App. Eine ECHTE App: 30 Manifeste, mal drei Umgebungen. 90 Dateien?! NIEMALS. Helm bündelt alles in ein <b>Chart</b> – ein Paket mit Drehknöpfen.",
+        "Und woher der Name <b>Chart</b>? Englisch für <b>Seekarte</b> – genau wie Adas Karten! Das fügt sich ins ganze Bild: <b>Kubernetes</b> = der Steuermann, <b>Helm</b> = sein Steuerrad, <b>Chart</b> = die Seekarte, nach der er navigiert. <i>(Nicht verwechseln mit „Chart“ als Diagramm/Balkengrafik – gleiches Wort, andere Bedeutung; bei Helm ist IMMER die Seekarte = das Paket gemeint.)</i>",
         "Charts liegen in <b>Repos</b> (wie Docker Hub für Images). Schritt eins: ein Repo hinzufügen.",
         "Was da alles drinliegt? Fast die ganze Werft: <b>nginx</b> (Webserver), <b>postgresql</b> (Datenbank), <b>redis</b> (schneller Zwischenspeicher), <b>keycloak</b> (Login & Rechte) und <b>prometheus</b> + <b>grafana</b> fürs Überwachen. Echte Tools – die siehst du im Job alle wieder.",
       ]},
@@ -418,6 +419,14 @@ export const QUESTS: Quest[] = [
             reply: "Genau! Wie ein App-Store für den Cluster. Morgen hissen wir die erste Flagge!" },
           { t: "Ein Kopfschutz für die Werft.", ok: false,
             reply: "HA! Reingefallen. Steuerrad! Paketmanager! Schau aufs Logo!" },
+        ]},
+      { type: "choice", npc: "runa", reviewId: "q-helm-chart-name",
+        q: "Und warum heißt das Paket ausgerechnet „Chart“?",
+        options: [
+          { t: "„chart“ = Seekarte – passt zu Steuermann (K8s) und Steuerrad (Helm).", ok: true,
+            reply: "Genau! Steuermann, Steuerrad, Seekarte – alles aus einem Guss. Nicht mit „Chart = Diagramm“ verwechseln." },
+          { t: "„chart“ = Balkendiagramm – es zeigt die App-Auslastung.", ok: false,
+            reply: "Nein – das ist dasselbe Wort in anderer Bedeutung. Bei Helm meint Chart die Seekarte = das Paket." },
         ]},
     ]},
 
