@@ -245,3 +245,85 @@ export const APP_OF_APPS_YAML = [
   "      prune: true",
   "      selfHeal: true",
 ].join("\n");
+
+// ===== Lagerhallen-Viertel (#123, Phase 7): stateful Workloads & Datendauerhaftigkeit =====
+// Vorlagen-Manifeste für die späteren Storage-Quests – reine Bausteine (keine Quests hier).
+
+// StorageClass: das „Regal-Typ"-Schild im Lager. Sie sagt, WIE Volumes bereitgestellt
+// werden (welcher Provisioner, welche Disk-Art). PVCs verweisen über storageClassName darauf.
+export const STORAGECLASS_YAML = [
+  "apiVersion: storage.k8s.io/v1", "kind: StorageClass", "metadata:",
+  "  name: kai-ssd",
+  "provisioner: kubernetes.io/aws-ebs   # Beispiel-Provisioner (je nach Cloud/Cluster anders)",
+  "parameters:",
+  "  type: gp3                          # schnelle SSD-Klasse",
+  "reclaimPolicy: Retain                # Volume nach dem Löschen der PVC behalten (Daten schützen)",
+  "volumeBindingMode: WaitForFirstConsumer   # erst binden, wenn ein Pod das Volume wirklich braucht",
+].join("\n");
+
+// PersistentVolumeClaim: die „Lager-Anforderung". Ein Pod sagt damit: ich brauche so viel
+// dauerhaften Platz, von dieser StorageClass. Kubernetes besorgt (provisioniert) das Volume.
+export const PVC_YAML = [
+  "apiVersion: v1", "kind: PersistentVolumeClaim", "metadata:",
+  "  name: lager-daten",
+  "spec:",
+  "  accessModes:",
+  "    - ReadWriteOnce            # von genau einem Node les-/schreibbar (typisch für eine DB)",
+  "  storageClassName: kai-ssd    # welches Regal: verweist auf die StorageClass oben",
+  "  resources:",
+  "    requests:",
+  "      storage: 5Gi             # so viel dauerhafter Platz wird angefordert",
+].join("\n");
+
+// headless Service (clusterIP: None): KEINE gemeinsame Cluster-IP, sondern stabile DNS-Namen
+// pro Pod (z.B. speicher-datenbank-0.speicher-datenbank). Genau das braucht ein StatefulSet,
+// damit jede Kiste einzeln und verlässlich adressierbar bleibt.
+export const HEADLESS_SERVICE_YAML = [
+  "apiVersion: v1", "kind: Service", "metadata:",
+  "  name: speicher-datenbank",
+  "spec:",
+  "  clusterIP: None              # headless: keine virtuelle IP -> ein DNS-Name je Pod",
+  "  selector:",
+  "    app: speicher-datenbank",
+  "  ports:",
+  "    - port: 5432",
+  "      name: postgres",
+].join("\n");
+
+// StatefulSet: wie ein Deployment, aber für Workloads mit IDENTITÄT & eigenen Daten (z.B. eine
+// Datenbank). Jeder Pod bekommt eine feste Nummer (…-0, …-1, …) und über volumeClaimTemplates
+// sein EIGENES dauerhaftes Volume; serviceName bindet den headless Service für stabile DNS-Namen.
+export const STATEFULSET_YAML = [
+  "apiVersion: apps/v1", "kind: StatefulSet", "metadata:",
+  "  name: speicher-datenbank",
+  "spec:",
+  "  serviceName: speicher-datenbank   # der headless Service für stabile Pod-DNS-Namen",
+  "  replicas: 3",
+  "  selector:",
+  "    matchLabels:",
+  "      app: speicher-datenbank",
+  "  template:",
+  "    metadata:",
+  "      labels:",
+  "        app: speicher-datenbank",
+  "    spec:",
+  "      containers:",
+  "        - name: postgres",
+  "          image: postgres:16",
+  "          ports:",
+  "            - containerPort: 5432",
+  "              name: postgres",
+  "          volumeMounts:",
+  "            - name: daten",
+  "              mountPath: /var/lib/postgresql/data",
+  "  volumeClaimTemplates:               # jeder Pod erhält sein eigenes, dauerhaftes Volume",
+  "    - metadata:",
+  "        name: daten",
+  "      spec:",
+  "        accessModes:",
+  "          - ReadWriteOnce",
+  "        storageClassName: kai-ssd",
+  "        resources:",
+  "          requests:",
+  "            storage: 10Gi",
+].join("\n");
