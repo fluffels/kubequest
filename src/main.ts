@@ -123,6 +123,11 @@ import { keys, clearKeys } from "./runtime";
         reset: () => { Game.reset(); location.reload(); },
       };
       console.info("🛠️ kqDev bereit: kqDev.roadmap() · kqDev.jump(idx) · kqDev.freshStart() · kqDev.reset()");
+      // Klickbares, passwortgegatetes Dev-Panel (#325) – die Komfortschicht auf
+      // der kqDev-API. Dynamisch importiert, damit das ganze Panel-Modul samt
+      // Passwort-Logik im Prod-/Offline-Build (import.meta.env.DEV === false)
+      // wegfällt (wie der Validate-Block oben).
+      import("./devpanel").then(({ mountDevPanel }) => mountDevPanel());
     }
 
     UI.refreshHud();

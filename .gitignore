@@ -1,6 +1,11 @@
 node_modules/
 dist/
 dist-offline/
+# Lokale Umgebungsvariablen (#325): der Dev-Panel-Passwort-WERT darf nie ins Repo.
+# Die Vorlage `.env.example` (nur Variablen-Namen) bleibt versioniert.
+.env
+.env.*.local
+!.env.example
 .claude/*
 !.claude/skills/
 .vscode/
