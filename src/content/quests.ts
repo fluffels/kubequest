@@ -157,13 +157,13 @@ export const QUESTS: Quest[] = [
           accept: [/^cat\s+Dockerfile$/], solution: "cat Dockerfile", hint: "cat <datei>" },
       ]},
       { type: "dialog", npc: "bo", lines: [
-        "Jetzt machst du aus dem Bauplan ein echtes Image: <code>docker build</code>. Das <code>-t</code> (wie „tag“) gibt deinem Image einen <b>Namen</b> – sonst findest du es später nicht wieder. Der <b>Punkt</b> am Ende sagt: „Der Bauplan liegt HIER im aktuellen Ordner.“",
+        "Jetzt machst du aus dem Bauplan ein echtes Image: <code>docker build</code>. Das <code>-t</code> (Langform <code>--tag</code>, beides geht) gibt deinem Image den ganzen <b>Namen</b> <code>name:tag</code> – sonst findest du es später nicht wieder. Der Teil hinter dem <code>:</code> ist der <b>Versions-Tag</b>. (Verwechsle das nicht mit dem eigenen Befehl <code>docker tag</code> – der kommt gleich und gibt einem fertigen Image nur einen Zweitnamen.) Der <b>Punkt</b> am Ende sagt: „Der Bauplan liegt HIER im aktuellen Ordner.“",
       ]},
       { type: "teach", brief: "Eigenes Image bauen", cmd: {
-        id: "t-build", intro: "🆕 Neuer Befehl: <code>docker build -t &lt;name&gt;:&lt;tag&gt; .</code> – baut aus dem Dockerfile ein eigenes Image. Gebaut wird in der <b>Docker-Engine</b> (eigenes Programm, das deine Ordner nicht sieht); der <b>Punkt</b> ist der Build-Kontext – der Ordner, den du ihr als Kiste mit Baumaterial rüberreichst (<code>.</code> = der aktuelle). Daraus liest Docker das Dockerfile und alles, was <code>COPY</code> holt.",
+        id: "t-build", intro: "🆕 Neuer Befehl: <code>docker build -t &lt;name&gt;:&lt;tag&gt; .</code> – baut aus dem Dockerfile ein eigenes Image. Gebaut wird in der <b>Docker-Engine</b> (eigenes Programm, das deine Ordner nicht sieht); der <b>Punkt</b> ist der Build-Kontext – der Ordner, den du ihr als Kiste mit Baumaterial rüberreichst (<code>.</code> = der aktuelle). Daraus liest Docker das Dockerfile und alles, was <code>COPY</code> holt. <code>-t</code> ist die Kurzform von <code>--tag</code> (beides geht) und vergibt den ganzen Namen <code>name:tag</code>.",
         text: "Bau aus dem Dockerfile ein Image mit dem Namen <code>hafenwache:1.0</code>. (Punkt am Ende nicht vergessen!)",
-        accept: [/^docker\s+build\s+-t\s+hafenwache:1\.0\s+\.$/], solution: "docker build -t hafenwache:1.0 .",
-        hint: "Muster: docker build -t <name>:<tag> . – der Punkt ist der Build-Kontext: die Kiste (= aktueller Ordner), die du der Engine zum Bauen rüberreichst." } },
+        accept: [/^docker\s+build\s+(?:-t|--tag)\s+hafenwache:1\.0\s+\.$/], solution: "docker build -t hafenwache:1.0 .",
+        hint: "Muster: docker build -t <name>:<tag> . (statt -t gilt auch die Langform --tag) – der Punkt ist der Build-Kontext: die Kiste (= aktueller Ordner), die du der Engine zum Bauen rüberreichst." } },
       { type: "teach", brief: "Image-Liste", cmd: {
         id: "t-images", intro: "🆕 Neuer Befehl: <code>docker images</code> – zeigt alle Images, die lokal bereitliegen (gebaut oder gezogen).",
         text: "Zeig deine Images an. <code>hafenwache</code> mit Tag <code>1.0</code> müsste jetzt dabei sein!",

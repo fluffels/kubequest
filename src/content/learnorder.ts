@@ -35,6 +35,7 @@ export const CONCEPT_INTRO: Record<string, string> = {
   "q-ch1-5": "q2",            // Image besteht aus Schichten (Stapel-Spiel bei Bo, q2)
   "q-flag-run-d": "q3",       // docker run -d (q3)
   "q-flag-run-name": "q3",    // docker run --name (q3)
+  "q-flag-build-t": "q3b",    // docker build -t/--tag, „tag“-Bedeutungen (q3b, #285)
   // ----- Kubernetes-Grundlagen -----
   "q-ch2-1": "q4",            // wofür Kubernetes (Hafen wird Cluster, q4)
   "q-ch2-4": "q7",            // Self-Healing wird erst in q7 bewiesen (war fälschlich an q4)

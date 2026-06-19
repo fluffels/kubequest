@@ -81,6 +81,49 @@ test("docker run: Flag-Reihenfolge ist frei – Drill & Karte akzeptieren -d/--n
   }
 });
 
+test("docker build: -t UND --tag gelten gleichwertig in Teach-Schritt, Karte & Drill; 'tag'-Bedeutungen entwirrt (#285)", () => {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+
+  // 1) Befehls-Karte c-ch1-5 (feste Werte hafenwache:1.0)
+  const card = KQContent.CMD_CARDS.find(c => c.id === "c-ch1-5");
+  assert.ok(card, "c-ch1-5 nicht gefunden");
+  const cardOk = (s: string) => card!.accept.some(re => re.test(norm(s)));
+  assert.ok(cardOk("docker build -t hafenwache:1.0 ."), "Karte: -t muss gelten");
+  assert.ok(cardOk("docker build --tag hafenwache:1.0 ."), "Karte: --tag muss GENAUSO gelten");
+  assert.ok(!cardOk("docker build hafenwache:1.0 ."), "Karte: ohne -t/--tag muss scheitern");
+  assert.ok(!cardOk("docker build -t hafenwache:1.0"), "Karte: ohne Build-Kontext (.) muss scheitern");
+
+  // 2) Drill docker-build (zufälliger Name/Tag) – über viele Ziehungen
+  const make = KQContent.DRILLS["docker-build"];
+  for (let i = 0; i < 40; i++) {
+    const task = make(new KQSim({}));
+    const m = norm(task.solution).match(/^docker build -t (\S+) \.$/);
+    assert.ok(m, "unerwartete Musterlösung: " + task.solution);
+    const nameTag = m![1];
+    const ok = (s: string) => task.accept.some(re => re.test(norm(s)));
+    assert.ok(ok(`docker build -t ${nameTag} .`), "Drill: -t muss gelten (" + task.solution + ")");
+    assert.ok(ok(`docker build --tag ${nameTag} .`), "Drill: --tag muss GENAUSO gelten (" + task.solution + ")");
+    assert.ok(!ok(`docker build ${nameTag} .`), "Drill: ohne -t/--tag muss scheitern (" + task.solution + ")");
+  }
+
+  // 3) Teach-Schritt t-build in q3b (erster Tipp-Ort) akzeptiert beide Formen
+  const q3b = KQContent.QUESTS.find(q => q.id === "q3b");
+  assert.ok(q3b, "q3b nicht gefunden");
+  const teach = (q3b!.steps as any[]).find(s => s.type === "teach" && s.cmd?.id === "t-build");
+  assert.ok(teach, "Teach-Schritt t-build nicht gefunden");
+  const teachOk = (s: string) => teach.cmd.accept.some((re: RegExp) => re.test(norm(s)));
+  assert.ok(teachOk("docker build -t hafenwache:1.0 ."), "Teach: -t muss gelten");
+  assert.ok(teachOk("docker build --tag hafenwache:1.0 ."), "Teach: --tag muss GENAUSO gelten");
+
+  // 4) Neue Entwirr-Karte existiert, ist wohlgeformt und nennt alle drei 'tag'-Bedeutungen
+  const flag = KQContent.CRAB_QUIZ.find((c: any) => c.id === "q-flag-build-t");
+  assert.ok(flag, "Entwirr-Karte q-flag-build-t fehlt");
+  assert.ok(Array.isArray(flag!.options) && flag!.options.length >= 2, "q-flag-build-t: zu wenige Optionen");
+  assert.ok(flag!.correct >= 0 && flag!.correct < flag!.options.length, "q-flag-build-t: correct-Index außerhalb");
+  assert.ok((flag!.options[flag!.correct] as string).trim().length > 0, "q-flag-build-t: richtige Option leer");
+  assert.ok(/docker tag/.test(flag!.explain) && /--tag/.test(flag!.explain), "q-flag-build-t: explain entwirrt nicht -t/--tag vs docker tag");
+});
+
 test("Drills & Karten lehnen ungelehrte Extras ab (Supersets), erlaubte Varianten bleiben gültig (#253)", () => {
   const norm = (s: string) => s.trim().replace(/\s+/g, " ");
   const drillOk = (id: string, build: (sol: string) => string, mustPass: boolean) => {
