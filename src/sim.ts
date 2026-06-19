@@ -44,6 +44,10 @@ export interface Deployment {
   /** Eingebundene Config/Geheimnisse (via `kubectl set env --from=…`).
    *  configMaps = harmlose Einstellungen, secrets = Vertrauliches. */
   envFrom: { configMaps: string[]; secrets: string[] };
+  /** Dauerlast-Markierung: die Pods dieses Deployments ziehen ungewöhnlich viel CPU
+   *  (Observability #109). Treibt `kubectl top` über die Schwelle und lässt den
+   *  HighPodCPU-Alert feuern – die Spiel-Ursache für „warum brennt mein Cluster?". */
+  cpuHeavy?: boolean;
 }
 export interface ServiceRes {
   name: string;
@@ -204,12 +208,41 @@ export interface PodStatus {
   restarts: number;
 }
 
+/* ---------- Observability (#109) ---------- */
+
+/** Momentane Ressourcen-Last eines Pods (Grundlage für `kubectl top` + Prometheus). */
+export interface PodMetrics {
+  cpuMilli: number; // CPU in Millicores (m)
+  memMi: number;    // Arbeitsspeicher in Mi
+}
+/** Aggregierte Node-Last inkl. Auslastung in Prozent der (vereinfachten) Kapazität. */
+export interface NodeMetrics {
+  name: string;
+  cpuMilli: number;
+  cpuPct: number;
+  memMi: number;
+  memPct: number;
+}
+/** Ein Prometheus-Scrape-Ziel: was abgegrast wird und ob es erreichbar ist. */
+export interface ScrapeTarget {
+  job: string;            // Prometheus-Job (z.B. "kubelet" oder ein Service-Name)
+  instance: string;       // konkrete Adresse, die gescrapt wird
+  health: "up" | "down";  // antwortet das Ziel?
+}
+/** Ein Alert aus dem (simulierten) Alertmanager. */
+export interface Alert {
+  name: string;                    // Regel-Name, z.B. "KubePodCrashLooping"
+  severity: "warning" | "critical";
+  state: "firing" | "resolved";    // brennt gerade / war mal an, Ursache behoben
+  summary: string;                 // kurze Erklärung fürs Spiel
+}
+
 /** Eingabe-Szenario einer Quest-Welt. Alle Felder optional – reset() füllt Defaults. */
 export interface Scenario {
   dockerImages?: string[];
   dockerContainers?: Container[];
   nodes?: ClusterNode[];
-  deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null; envFrom?: { configMaps: string[]; secrets: string[] } }>;
+  deployments?: Array<{ name: string; image: string; replicas: number; broken?: Broken | null; envFrom?: { configMaps: string[]; secrets: string[] }; cpuHeavy?: boolean }>;
   services?: ServiceRes[];
   ingresses?: IngressRes[];
   networkPolicies?: NetworkPolicyRes[];
@@ -265,6 +298,18 @@ export interface Scenario {
     return depName + "-" + randSuffix(9) + "-" + randSuffix(5);
   }
 
+  /** Stabiler kleiner Hash (FNV-1a-artig). Liefert aus einem Namen einen festen
+   *  Zahlenwert – Grundlage für deterministische Metrik-Werte (kein Math.random,
+   *  damit `kubectl top` über Aufrufe hinweg gleich bleibt und Tests reproduzierbar sind). */
+  function hashStr(s: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
   function pad(s: string | number, n: number) {
     const str = String(s);
     return str.length >= n ? str + "  " : str + " ".repeat(n - str.length);
@@ -305,6 +350,11 @@ export interface Scenario {
     ci!: { pipelines: Pipeline[]; deploy: CiDeploy | null };
     lastDeletedPod: string | null = null;
     lastError!: boolean;
+    // Alert-Verlauf der Sitzung (Observability #109). Wie memLimit ein reines
+    // Laufzeit-Feld: NICHT serialisiert – Alerts leiten sich aus dem Cluster-Zustand
+    // ab, nur der firing→resolved-Übergang braucht ein kurzes Gedächtnis.
+    _firingAlerts!: Set<string>;   // brennt gerade
+    _resolvedAlerts!: Set<string>; // war mal an, Ursache inzwischen behoben
 
     constructor(scenario: Scenario = {}) {
       this.scenario = scenario || {};
@@ -326,7 +376,7 @@ export interface Scenario {
         { name: "ahoi-worker-2", status: "Ready", roles: "<none>", version: "v1.30.2" },
       ]).map(n => Object.assign({}, n));
 
-      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom));
+      this.deployments = (sc.deployments || []).map(d => this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom, d.cpuHeavy));
       this.services = (sc.services || []).map(s => Object.assign({}, s));
       this.ingresses = (sc.ingresses || []).map(i => Object.assign({}, i));
       this.networkPolicies = (sc.networkPolicies || []).map(n => Object.assign({}, n));
@@ -375,12 +425,15 @@ export interface Scenario {
 
       this.lastDeletedPod = null;
       this.lastError = false;
+      this._firingAlerts = new Set();
+      this._resolvedAlerts = new Set();
     }
 
-    _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null, envFrom?: { configMaps: string[]; secrets: string[] }): Deployment {
+    _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null, envFrom?: { configMaps: string[]; secrets: string[] }, cpuHeavy?: boolean): Deployment {
       const d: Deployment = {
         name, image, replicas, created: this.clock, pods: [], broken: broken ? Object.assign({}, broken) : null,
         envFrom: { configMaps: (envFrom?.configMaps || []).slice(), secrets: (envFrom?.secrets || []).slice() },
+        cpuHeavy: !!cpuHeavy,
       };
       // OOMKilled startet mit einem zu knappen Limit – das ist ja die Ursache.
       if (d.broken && d.broken.type === "oomkilled") d.memLimit = 64;
@@ -461,7 +514,7 @@ export interface Scenario {
       }
       for (const d of sc.deployments || []) {
         if (!this.deployments.some(x => x.name === d.name)) {
-          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom));
+          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas, d.broken, d.envFrom, d.cpuHeavy));
         }
       }
       for (const cm of sc.configMaps || []) {
@@ -510,7 +563,7 @@ export interface Scenario {
         dockerImages: this.docker.pulled.slice(),
         dockerContainers: this.docker.containers.map(c => Object.assign({}, c)),
         nodes: this.nodes.map(n => Object.assign({}, n)),
-        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null, envFrom: { configMaps: d.envFrom.configMaps.slice(), secrets: d.envFrom.secrets.slice() } })),
+        deployments: this.deployments.map(d => ({ name: d.name, image: d.image, replicas: d.replicas, broken: d.broken ? Object.assign({}, d.broken) : null, envFrom: { configMaps: d.envFrom.configMaps.slice(), secrets: d.envFrom.secrets.slice() }, cpuHeavy: !!d.cpuHeavy })),
         services: this.services.map(s => Object.assign({}, s)),
         ingresses: this.ingresses.map(i => Object.assign({}, i)),
         networkPolicies: this.networkPolicies.map(n => Object.assign({}, n)),
@@ -555,6 +608,9 @@ export interface Scenario {
       // Argo CD reconciliert vor jeder Eingabe: Self-Heal-Apps drehen zwischenzeitlichen
       // Drift (z.B. ein `kubectl scale` aus dem letzten Befehl) von selbst auf den Git-Soll zurück.
       this._reconcileAutoSync();
+      // Alert-Regeln gegen den (ggf. gerade reconcilten) Zustand auswerten, damit der
+      // firing→resolved-Verlauf mitläuft, während gespielt wird (Observability #109).
+      this._evaluateAlerts();
       this.lastError = false;
       const raw = line.trim();
       if (!raw) return { output: "", error: false };
@@ -645,7 +701,7 @@ export interface Scenario {
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
         "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
         "             create deployment | create secret generic|tls | create configmap | scale | expose | delete | apply -f <datei>",
-        "             logs <pod> | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
+        "             logs [-f] [--previous] <pod> | top pods|nodes | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
         "  git        init | status | add <datei> | commit -m \"…\" | log | branch [<name>] | checkout [-b] <name> | merge <name> | push | fetch | pull",
@@ -822,6 +878,7 @@ export interface Scenario {
       if (sub === "delete") return this._kubectlDelete(t);
       if (sub === "apply") return this._kubectlApply(t);
       if (sub === "logs") return this._kubectlLogs(t);
+      if (sub === "top") return this._kubectlTop(t);
       if (sub === "set") return this._kubectlSet(t, raw);
       if (sub === "rollout") return this._kubectlRollout(t);
 
@@ -1310,43 +1367,204 @@ export interface Scenario {
     }
 
     _kubectlLogs(t: string[]) {
-      const name = t[2];
+      // Flags können vor oder hinter dem Pod-Namen stehen: -f/--follow (live folgen),
+      // -p/--previous (Logs des abgestürzten Vorgänger-Containers).
+      const args = t.slice(2);
+      const follow = args.includes("-f") || args.includes("--follow");
+      const previous = args.includes("-p") || args.includes("--previous");
+      const name = args.find(a => !a.startsWith("-"));
       if (!name) return this._err("kubectl logs: Welcher Pod?", "Pod-Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found');
       // Pod via _allPods() gefunden -> Deployment existiert garantiert.
       const dep = this._findDeploymentOfPod(name)!;
+      // Nie gestartete Container haben weder aktuelle noch vorherige Logs.
       if (dep.broken && dep.broken.type === "imagepull") {
         return this._err('Error from server (BadRequest): container "' + dep.name + '" in pod "' + name + '" is waiting to start: trying and failing to pull image',
           "Keine Logs ohne Image! Die Ursache steht in den Events: kubectl describe pod " + name);
       }
-      if (dep.broken && dep.broken.type === "crashloop") {
-        return [
-          "[start] Dienst " + dep.name + " startet …",
-          "[start] Lese Konfiguration …",
-          "FATAL: Secret '" + dep.broken.needsSecret + "' nicht gefunden – Dienst kann nicht starten!",
-          "[exit] Prozess beendet mit Code 1",
-        ].join("\n");
-      }
       if (dep.broken && dep.broken.type === "pending") {
         return this._err('Error from server (BadRequest): pod "' + name + '" is not scheduled yet', "Der Pod wartet auf einen freien Node. Schau in die Events: kubectl describe pod " + name);
       }
-      if (dep.broken && dep.broken.type === "oomkilled") {
-        // Tückisch: Die App-Logs sehen normal aus und brechen einfach ab – den OOM-Kill
-        // macht der Kernel von außen, die App schreibt dazu nichts. Die Wahrheit steht
-        // in 'kubectl describe pod' (Last State: Terminated, Reason: OOMKilled).
-        return [
-          "[start] Dienst " + dep.name + " startet …",
-          "[info]  Lade Datensätze in den Arbeitsspeicher …",
-          "[info]  Baue Index auf …",
-          "(Log endet hier abrupt – kein Fehler, kein Stacktrace.)",
-        ].join("\n");
+
+      const crashLog = [
+        "[start] Dienst " + dep.name + " startet …",
+        "[start] Lese Konfiguration …",
+        "FATAL: Secret '" + (dep.broken ? dep.broken.needsSecret : "") + "' nicht gefunden – Dienst kann nicht starten!",
+        "[exit] Prozess beendet mit Code 1",
+      ].join("\n");
+      // Tückisch: Die App-Logs sehen normal aus und brechen einfach ab – den OOM-Kill
+      // macht der Kernel von außen, die App schreibt dazu nichts. Die Wahrheit steht
+      // in 'kubectl describe pod' (Last State: Terminated, Reason: OOMKilled).
+      const oomLog = [
+        "[start] Dienst " + dep.name + " startet …",
+        "[info]  Lade Datensätze in den Arbeitsspeicher …",
+        "[info]  Baue Index auf …",
+        "(Log endet hier abrupt – kein Fehler, kein Stacktrace.)",
+      ].join("\n");
+
+      if (previous) {
+        // --previous zeigt die Logs des ABGESTÜRZTEN Vorgänger-Containers.
+        // Nur sinnvoll, wenn der Pod überhaupt schon neugestartet ist.
+        if (dep.broken && dep.broken.type === "crashloop") return crashLog;
+        if (dep.broken && dep.broken.type === "oomkilled") return oomLog;
+        return this._err('Error from server (BadRequest): previous terminated container "' + dep.name + '" in pod "' + name + '" not found',
+          "--previous zeigt den abgestürzten Vorgänger-Container – dieser Pod ist aber nie neugestartet.");
       }
-      return [
+
+      let out: string;
+      if (dep.broken && dep.broken.type === "crashloop") out = crashLog;
+      else if (dep.broken && dep.broken.type === "oomkilled") out = oomLog;
+      else out = [
         "10.244.1.1 - - [12/Jun/2026:09:14:02 +0000] \"GET / HTTP/1.1\" 200 615",
         "10.244.1.1 - - [12/Jun/2026:09:14:05 +0000] \"GET /gesundheit HTTP/1.1\" 200 2",
         "10.244.2.7 - - [12/Jun/2026:09:14:11 +0000] \"GET /favicon.ico HTTP/1.1\" 404 153",
       ].join("\n");
+      // -f würde im echten Cluster live weiterlaufen; im Simulator endet der Strom hier.
+      if (follow) out += "\n^C  (--follow würde live weiterlaufen; im Simulator endet der Stream hier.)";
+      return out;
+    }
+
+    /* ===================== kubectl top + Observability-Mechanik (#109) ===================== */
+
+    /** Momentane Ressourcen-Last eines Pods – oder null, wenn der Container gar nicht
+     *  läuft (ImagePull/Pending), dann gibt es schlicht keine Metriken. Deterministisch
+     *  aus dem Pod-Namen abgeleitet, damit `kubectl top` über Aufrufe hinweg stabil bleibt. */
+    _podMetric(d: Deployment, p: PodInstance): PodMetrics | null {
+      if (d.broken && (d.broken.type === "imagepull" || d.broken.type === "pending")) return null;
+      const h = hashStr(p.name);
+      let cpuMilli = 4 + (h % 36);          // 4..39m Grundlast
+      let memMi = 14 + ((h >>> 7) % 50);    // 14..63Mi Grundverbrauch
+      if (d.cpuHeavy) cpuMilli = 850 + (h % 200); // 850..1049m: weit über der HighCPU-Schwelle
+      if (d.broken && d.broken.type === "oomkilled") memMi = d.broken.memNeeded || 256; // klettert ans Limit
+      return { cpuMilli, memMi };
+    }
+
+    /** Metriken aller laufenden Pods (für `kubectl top pods` + Prometheus + Alerts). */
+    podMetrics(): Array<{ name: string; cpuMilli: number; memMi: number }> {
+      const out: Array<{ name: string; cpuMilli: number; memMi: number }> = [];
+      for (const d of this.deployments) {
+        for (const p of d.pods) {
+          const m = this._podMetric(d, p);
+          if (m) out.push({ name: p.name, cpuMilli: m.cpuMilli, memMi: m.memMi });
+        }
+      }
+      return out;
+    }
+
+    /** Aggregierte Node-Last: Grundlast (deterministisch aus dem Node-Namen) plus der
+     *  gleichmäßig verteilte Pod-Verbrauch – so hebt ein CPU-hungriger Pod auch die Node. */
+    nodeMetrics(): NodeMetrics[] {
+      const CPU_CAP = 2000, MEM_CAP = 4096; // pro Node vereinfacht: 2 Kerne, 4 GiB
+      const pods = this.podMetrics();
+      const n = this.nodes.length || 1;
+      const cpuShare = Math.round(pods.reduce((s, p) => s + p.cpuMilli, 0) / n);
+      const memShare = Math.round(pods.reduce((s, p) => s + p.memMi, 0) / n);
+      return this.nodes.map(nd => {
+        const h = hashStr(nd.name);
+        const ctrl = nd.roles.includes("control-plane");
+        const baseCpu = (ctrl ? 120 : 60) + (h % (ctrl ? 80 : 60));
+        const baseMem = (ctrl ? 900 : 500) + (h % 300);
+        const cpuMilli = Math.min(CPU_CAP, baseCpu + cpuShare);
+        const memMi = Math.min(MEM_CAP, baseMem + memShare);
+        return { name: nd.name, cpuMilli, cpuPct: Math.round(cpuMilli / CPU_CAP * 100), memMi, memPct: Math.round(memMi / MEM_CAP * 100) };
+      });
+    }
+
+    _kubectlTop(t: string[]) {
+      const what = (t[2] || "").toLowerCase();
+      const name = t[3] && !t[3].startsWith("-") ? t[3] : null;
+      this._reschedulePending();
+      this._recheckReadiness();
+
+      if (["pods", "pod", "po"].includes(what)) {
+        let rows = this.podMetrics();
+        if (name) {
+          rows = rows.filter(r => r.name === name);
+          if (rows.length === 0) {
+            const exists = this._allPods().some(p => p.name === name);
+            return exists
+              ? this._err("error: Metrics not available for pod default/" + name, "Metriken gibt es nur für laufende Pods – Status prüfen mit 'kubectl get pods'.")
+              : this._err('Error from server (NotFound): pods "' + name + '" not found', "Pod-Namen siehst du mit 'kubectl get pods'.");
+          }
+        }
+        if (rows.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "CPU(cores)", "MEMORY(bytes)"], rows.map(r => [r.name, r.cpuMilli + "m", r.memMi + "Mi"]));
+      }
+
+      if (["nodes", "node", "no"].includes(what)) {
+        let nodes = this.nodeMetrics();
+        if (name) {
+          nodes = nodes.filter(nd => nd.name === name);
+          if (nodes.length === 0) return this._err('Error from server (NotFound): nodes "' + name + '" not found', "Node-Namen siehst du mit 'kubectl get nodes'.");
+        }
+        return table(["NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"],
+          nodes.map(nd => [nd.name, nd.cpuMilli + "m", nd.cpuPct + "%", nd.memMi + "Mi", nd.memPct + "%"]));
+      }
+
+      if (!what) return this._err("kubectl top: pods oder nodes?", "z.B. 'kubectl top pods' oder 'kubectl top nodes'");
+      return this._err("kubectl top kennt nur 'pods' und 'nodes'.", "z.B. 'kubectl top nodes'");
+    }
+
+    /** Prometheus-Scrape-Ziele aus dem Cluster-Zustand abgeleitet (Grundgerüst #109):
+     *  Node-Targets (kubelet) sowie ein App-Target je Service – up/down je nach Erreichbarkeit. */
+    scrapeTargets(): ScrapeTarget[] {
+      const targets: ScrapeTarget[] = [];
+      for (const nd of this.nodes) {
+        targets.push({ job: "kubelet", instance: nd.name + ":10250", health: nd.status === "Ready" ? "up" : "down" });
+      }
+      for (const s of this.services) {
+        const dep = this.deployments.find(d => d.name === s.name);
+        const healthy = !!dep && this._podReady(dep);
+        targets.push({ job: s.name, instance: s.clusterIP + ":" + s.port, health: healthy ? "up" : "down" });
+      }
+      return targets;
+    }
+
+    /** Die Alert-Regeln samt aktueller Bedingung – die EINE Stelle, die festlegt,
+     *  was den simulierten Alertmanager auslöst (hohe CPU, CrashLoop, OOM, Node weg). */
+    _alertRules(): Array<{ name: string; severity: "warning" | "critical"; summary: string; firing: boolean }> {
+      const crash = this.deployments.some(d => d.broken && d.broken.type === "crashloop");
+      const oom = this.deployments.some(d => d.broken && d.broken.type === "oomkilled");
+      const hotPod = this.podMetrics().some(m => m.cpuMilli > 500);
+      const nodeDown = this.nodes.some(nd => nd.status !== "Ready");
+      return [
+        { name: "KubePodCrashLooping", severity: "critical", summary: "Ein Pod startet immer wieder neu (CrashLoopBackOff).", firing: crash },
+        { name: "KubePodOOMKilled", severity: "critical", summary: "Ein Pod sprengt sein Speicher-Limit und wird gekillt (OOMKilled).", firing: oom },
+        { name: "HighPodCPU", severity: "warning", summary: "Ein Pod verbraucht ungewöhnlich viel CPU (über 500m).", firing: hotPod },
+        { name: "KubeNodeNotReady", severity: "critical", summary: "Ein Node ist nicht mehr bereit (NotReady).", firing: nodeDown },
+      ];
+    }
+
+    /** Aktuellen Zustand gegen die Regeln prüfen und den firing→resolved-Verlauf fortschreiben. */
+    _evaluateAlerts() {
+      for (const r of this._alertRules()) {
+        if (r.firing) {
+          this._firingAlerts.add(r.name);
+          this._resolvedAlerts.delete(r.name);
+        } else if (this._firingAlerts.has(r.name)) {
+          // Bedingung weg, war aber an -> als resolved merken (verschwindet erst beim reset).
+          this._firingAlerts.delete(r.name);
+          this._resolvedAlerts.add(r.name);
+        }
+      }
+    }
+
+    /** Aktuelle Alerts (firing + resolved), nach Name sortiert. Wertet vorher neu aus,
+     *  damit auch eine direkte Abfrage ohne vorausgehenden Befehl stimmt. */
+    alerts(): Alert[] {
+      this._evaluateAlerts();
+      const meta = new Map(this._alertRules().map(r => [r.name, r]));
+      const out: Alert[] = [];
+      for (const name of this._firingAlerts) {
+        const r = meta.get(name)!;
+        out.push({ name, severity: r.severity, state: "firing", summary: r.summary });
+      }
+      for (const name of this._resolvedAlerts) {
+        const r = meta.get(name)!;
+        out.push({ name, severity: r.severity, state: "resolved", summary: r.summary });
+      }
+      return out.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     /** Verteiler für `kubectl set …` (image | env | resources). */
