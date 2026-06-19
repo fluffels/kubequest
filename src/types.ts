@@ -28,6 +28,12 @@ export interface GameState {
   streakHintShown: boolean;
   /** Wurde die einmalige Begrüßung/das Intro beim ersten Spielstart schon gezeigt? (#288) */
   introSeen: boolean;
+  /** Freigeschaltete „verdiente Abkürzungen" (Kürzel-IDs, #287/#297). Leer = noch keine
+   *  freigeschaltet. Der Sentinel `"*"` bedeutet „alle freigeschaltet" – damit werden
+   *  Alt-Spielstände (von vor der Mechanik, mit Fortschritt) grandfathered, sodass kein
+   *  bereits gelerntes Kürzel rückwirkend gesperrt wird. Das Gating kommt in #299, der
+   *  Katalog der IDs in #298. */
+  unlockedAbbrev: string[];
   stats: {
     commands: number;
     reviews: number;

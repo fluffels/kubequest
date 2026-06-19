@@ -58,6 +58,54 @@ test("load: kaputte/fremde audio-Werte fallen auf Defaults zurück bzw. werden g
   expect(Game.state.audio).toEqual({ music: false, sfx: true, musicVol: 1, sfxVol: 0, track: "hafen" });
 });
 
+/* ---------- „Verdiente Abkürzungen": Freischalt-Mechanik (#287/#297) ---------- */
+test("unlockedAbbrev: frischer Stand hat nichts freigeschaltet", () => {
+  expect(Game.state.unlockedAbbrev).toEqual([]);
+  expect(Game.isAbbrevUnlocked("-a")).toBe(false);
+});
+
+test("unlockAbbrev: schaltet gezielt frei, ist idempotent und persistiert über load()", () => {
+  Game.unlockAbbrev("-a");
+  expect(Game.isAbbrevUnlocked("-a")).toBe(true);
+  expect(Game.isAbbrevUnlocked("-n")).toBe(false);     // nur das eine, nicht alles
+  expect(Game.state.unlockedAbbrev).toEqual(["-a"]);
+  Game.unlockAbbrev("-a");                              // nochmal -> kein Duplikat
+  expect(Game.state.unlockedAbbrev).toEqual(["-a"]);
+  // persistiert: neu laden liest den gesicherten Stand zurück
+  Game.load();
+  expect(Game.isAbbrevUnlocked("-a")).toBe(true);
+});
+
+test("Migration: Alt-Stand MIT Fortschritt ohne unlockedAbbrev wird grandfathered (alles frei)", () => {
+  // Stand wie vor der Mechanik: Fortschritt vorhanden, Feld fehlt ganz.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 120, questIdx: 5, completedQuests: ["q1", "q2"] } }));
+  Game.load();
+  expect(Game.isAbbrevUnlocked("-a")).toBe(true);      // beliebige ID -> frei
+  expect(Game.isAbbrevUnlocked("--irgendwas")).toBe(true);
+  expect(Game.state.unlockedAbbrev).toEqual(["*"]);
+});
+
+test("Migration: Alt-Stand OHNE Fortschritt ohne unlockedAbbrev startet leer (kein Grandfather)", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { coins: 40 } }));   // coins=Default, kein echter Fortschritt
+  Game.load();
+  expect(Game.state.unlockedAbbrev).toEqual([]);
+  expect(Game.isAbbrevUnlocked("-a")).toBe(false);
+});
+
+test("Migration: vorhandenes unlockedAbbrev-Feld wird übernommen (kein Pauschal-Unlock)", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 50, unlockedAbbrev: ["-a"] } }));
+  Game.load();
+  expect(Game.isAbbrevUnlocked("-a")).toBe(true);
+  expect(Game.isAbbrevUnlocked("-n")).toBe(false);     // trotz Fortschritt NICHT grandfathered
+  expect(Game.state.unlockedAbbrev).toEqual(["-a"]);
+});
+
+test("Migration: kaputtes unlockedAbbrev (kein Array) fällt auf leer zurück", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 50, unlockedAbbrev: "alles" } }));
+  Game.load();
+  expect(Game.state.unlockedAbbrev).toEqual([]);
+});
+
 /* ---------- Reset: Spielerposition (#295) ---------- */
 
 test("reset: kehrt zur Default-Startposition zurück, auch wenn die WorldScene läuft", () => {
