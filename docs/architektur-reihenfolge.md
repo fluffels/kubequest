@@ -23,10 +23,23 @@ Diese Tickets sind **keine „bau-X"-Tickets**, sondern Entscheidungen, die man 
 
 Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
-1. Diese Liste von oben durchgehen, das **oberste noch offene** Ticket nehmen, das
+0. **Pre-Flight zuerst (Pflicht, immer): Stimmt diese Liste noch mit dem Live-Stand?** Bevor irgendein Ticket gegriffen wird, **einmal** den echten GitHub-Stand holen und gegen diese Liste abgleichen:
+   ```bash
+   gh issue list --label "area:architektur" --state open --limit 300 \
+     --json number,title,labels,assignees \
+     --jq '.[] | "#\(.number)\t\(([.labels[].name]|map(select(startswith("status:")))|join(","))//"-")\tassignee:\([.assignees[].login]|join(","))\t\(.title)"' | sort -n
+   ```
+   Drift einarbeiten, **bevor** gewählt wird:
+   - **In der Liste, aber geschlossen** → Zeile entfernen.
+   - **Jetzt `status:zurückgestellt`** → raus aus der Reihenfolge, runter in den Zurückgestellt-Block (überspringen).
+   - **Jetzt Assignee / offener Branch/Worktree** (`git worktree list` + `git branch -a`) → als „in Arbeit" überspringen, nächstes nehmen.
+   - **Neues offenes `area:architektur`-Issue, nicht in der Liste** → an dependency-passender Stelle einsortieren (nicht unten anhängen).
+   - **Reaktiviert** (zurückgestellt-Label weg) → einsortieren.
+   - **Driftet die Liste → erst die Doku fixen + committen** (eigener Worktree, Doku-only → kein Test-Lauf), Stand-Datum oben aktualisieren, **dann** wählen. Stimmt alles, ohne Commit weiter.
+1. Aus der (jetzt aktuellen) Liste das **oberste noch offene** Ticket nehmen, das
    - **nicht** `status:zurückgestellt` ist (die werden ignoriert, siehe unten), und
    - **kein** Assignee hat (Kollisionsschutz — siehe AGENTS.md, „Board-Workflow"), und
-   - keinen offenen Branch/Worktree hat (`git worktree list` + `git branch -a` gegenchecken).
+   - keinen offenen Branch/Worktree hat.
 2. Dieses Ticket mit dem normalen kubequest-Workflow abarbeiten (self-assignen → eigener Worktree → umsetzen → nach `main` → Issue schließen).
 3. **⚠️-Flags beachten** (siehe Liste): manche Tickets werden NICHT direkt umgesetzt (Epic zerlegen, Optik erst abstimmen, Umbau-Branch statt `main`) oder haben eine harte Voraussetzung.
 
