@@ -759,16 +759,18 @@ import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
           // nach mehreren Versuchen: zum Hinweis-Knopf lotsen
           this.failCount = 0;
           fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft – das ist keine Schande!</div>';
-        } else if (fb && !result.error) {
-          // Befehl lief fehlerfrei, erfüllt die Aufgabe aber (noch) nicht → SOFORT sanft rückmelden
-          // (sonst bleibt das Spiel stumm, obwohl im Terminal eine Erfolgs-ID steht – siehe Issue #17)
-          // „Nie nur falsch, immer begründen" (#233): Drills tragen ein why; sonst der generische Muster-Tipp.
+        } else if (fb) {
+          // Aufgabe nicht gelöst → immer Begründung zeigen (#307: auch wenn der Befehl einen
+          // Sim-Fehler warf; „Nie nur falsch, immer begründen" #233).
           const tip = task.why
             ? task.why
             : /^docker\s+run\b/.test(norm)
               ? "Bei <code>docker run</code>: hinter <code>--name</code> steht dein Wunschname, das Image kommt ganz zuletzt – Muster <code>docker run -d --name &lt;name&gt; &lt;image&gt;</code>."
               : "Vergleich ihn mit dem Muster oben – Reihenfolge und Namen genau prüfen.";
-          fb.innerHTML = '<div class="tt-feedback">❌ Fast – der Befehl lief durch, erfüllt die Aufgabe aber noch nicht. ' + tip + '</div>';
+          const prefix = result.error
+            ? "❌ "
+            : "❌ Fast – der Befehl lief durch, erfüllt die Aufgabe aber noch nicht. ";
+          fb.innerHTML = '<div class="tt-feedback">' + prefix + tip + '</div>';
         }
       }
     },
