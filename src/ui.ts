@@ -8,7 +8,7 @@ import { KQAssets } from "./assets-data";
 import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
 import { resolveOverlayKey } from "./overlaykbd";
-import { lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
+import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
   // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
@@ -811,6 +811,19 @@ import { lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
     },
 
     finishFunkStep() {
+      // Abkürzungs-Freischaltung vor dem Voranschreiten (#300): unlockAbbrev am fertigen
+      // Schritt → Game.unlockAbbrev + Toast, damit der Toast sichtbar bleibt während die
+      // Belohnungs-Anzeige erscheint.
+      const completedStep = Game.currentStep();
+      if (completedStep?.unlockAbbrev && !Game.isAbbrevUnlocked(completedStep.unlockAbbrev)) {
+        const id = completedStep.unlockAbbrev;
+        Game.unlockAbbrev(id);
+        const pair = ABBREVS.find(a => a.id === id);
+        if (pair) {
+          const shortForm = pair.short[pair.short.length - 1];
+          this.toast(`🔓 Profi-Abkürzung freigeschaltet: <code>${shortForm}</code> = <code>${pair.long}</code>`, "rankup");
+        }
+      }
       const result = Game.advanceStep() || {};
       this._drillTask = null;
       if (result.questDone) {

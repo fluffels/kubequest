@@ -186,3 +186,38 @@ describe("lockedAbbrevInInput – Regressionsfixes #308", () => {
     expect(lockedAbbrevInInput("kubectl get service", NICHTS_FREI)).toBeUndefined();
   });
 });
+
+/* #300: Lernpfad-Vollständigkeit – jede Abkürzung im Katalog muss über einen
+ * Quest-Schritt freigeschaltet werden (unlockAbbrev). Damit fliegt sofort auf,
+ * wenn eine neue AbbrevPair-ID hinzukommt, aber kein passender Teach-/Terminal-
+ * Schritt angelegt wird. */
+describe("unlockAbbrev-Lernpfad: jede Abkürzung wird in einem Quest-Schritt freigeschaltet (#300)", () => {
+  function allUnlockIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const quest of KQContent.QUESTS) {
+      for (const step of quest.steps as any[]) {
+        if (step.unlockAbbrev) ids.add(step.unlockAbbrev);
+      }
+    }
+    return ids;
+  }
+
+  test("jede ABBREVS-ID hat exakt einen freischaltenden Quest-Schritt", () => {
+    const unlocked = allUnlockIds();
+    const fehlend = ABBREVS.filter(a => !unlocked.has(a.id)).map(a => a.id);
+    assert.deepEqual(fehlend, [], "Abkürzungen ohne unlockAbbrev-Schritt:\n" + fehlend.join("\n"));
+  });
+
+  test("alle unlockAbbrev-Referenzen in Quests zeigen auf existierende ABBREVS-IDs", () => {
+    const validIds = new Set(ABBREVS.map(a => a.id));
+    const ungültig: string[] = [];
+    for (const quest of KQContent.QUESTS) {
+      for (const step of quest.steps as any[]) {
+        if (step.unlockAbbrev && !validIds.has(step.unlockAbbrev)) {
+          ungültig.push(`Quest ${quest.id}: unlockAbbrev="${step.unlockAbbrev}" nicht im Katalog`);
+        }
+      }
+    }
+    assert.deepEqual(ungültig, [], "Ungültige unlockAbbrev-Referenzen:\n" + ungültig.join("\n"));
+  });
+});

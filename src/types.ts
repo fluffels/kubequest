@@ -103,6 +103,10 @@ export interface StepBase {
   /** Bereitet die Welt vor (Dateien, kaputte Deployments, Pipelines …), bevor
    *  der Schritt läuft – kann an Dialog-, Teach- oder Terminal-Schritten hängen. */
   scenario?: Scenario;
+  /** Freischalt-ID einer verdienten Abkürzung (#300): Wenn dieser Schritt abgeschlossen
+   *  wird und die ID noch gesperrt ist, schaltet das UI die Abkürzung frei (Toast +
+   *  Game.unlockAbbrev). ID muss in ABBREVS.id existieren. */
+  unlockAbbrev?: string;
 }
 
 /** Gespräch: der NPC sagt mehrere Zeilen. */

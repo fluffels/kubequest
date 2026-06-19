@@ -1630,6 +1630,25 @@ export interface Scenario {
         return ["NAME: " + rel.name, "NAMESPACE: default", "STATUS: deployed", "REVISION: " + rel.revision].join("\n");
       }
 
+      if (sub === "dependency" || sub === "dep") {
+        const action = t[2];
+        const ref = t[3];
+        if (action === "update" || action === "build" || action === "up") {
+          if (!ref) return this._err("helm dependency " + action + ": Chart-Pfad fehlt.", "z.B. 'helm dependency update ./mein-chart'");
+          const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
+          if (!this.charts.some(c => c.name === name)) return this._err('Error: path "' + ref + '" not found', "Chart erst mit 'helm create " + name + "' anlegen.");
+          return [
+            "Hang tight while we grab the latest from your chart repositories...",
+            "Saving " + name + " to " + ref + "/charts",
+            "Deleting outdated charts",
+            "",
+            "Successfully got an update from your chart repositories.",
+            "Chart.lock updated.",
+          ].join("\n");
+        }
+        return this._err("helm dependency: unbekannte Aktion '" + (action || "") + "'", "Gültig: update, build, up");
+      }
+
       return this._err("helm: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
 

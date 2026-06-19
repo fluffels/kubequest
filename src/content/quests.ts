@@ -86,7 +86,7 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "bo", lines: [
         "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps -a</code> zeigt ALLE – auch gestoppte. Das <code>-a</code> heißt „all“.",
       ]},
-      { type: "teach", brief: "Alle Kisten sehen", cmd: {
+      { type: "teach", unlockAbbrev: "docker-ps-all", brief: "Alle Kisten sehen", cmd: {
         id: "t-ps-a", intro: "🆕 Neue Variante: <code>docker ps -a</code> – zeigt auch gestoppte Container.",
         text: "Zeig ALLE Container an. Dein gestoppter müsste mit „Exited“ auftauchen.",
         accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + Flag für „alle“." } },
@@ -121,7 +121,7 @@ export const QUESTS: Quest[] = [
         "Verwechsle die letzten zwei NIE: hinter <code>--name</code> steht dein eigener Name, ganz hinten steht das Image. <code>docker run -d --name <b>meine-kiste</b> nginx</code> ginge genauso – nur <code>nginx</code> muss als Bauplan existieren.",
         "Noch eine Erleichterung: Die <b>Reihenfolge der Optionen ist frei</b> – <code>-d --name webserver</code> oder <code>--name webserver -d</code>, beides gilt. Bo-Regel: <b>erst alle Optionen, dann das Image</b> ganz zuletzt. Was NACH dem Image steht, hält die Kiste für einen eigenen Befehl. Du schaffst das.",
       ]},
-      { type: "teach", brief: "Profi-Start", cmd: {
+      { type: "teach", unlockAbbrev: "docker-run-detach", brief: "Profi-Start", cmd: {
         id: "t-run-named", intro: "🆕 Neue Flags: <code>-d</code> (Hintergrund) und <code>--name</code> (eigener Name).",
         text: "Starte aus <code>nginx</code> einen Container im Hintergrund mit dem Namen <code>webserver</code>.",
         accept: [/^docker\s+run\s+(?:(?:-d|--detach)\s+--name\s+webserver|--name\s+webserver\s+(?:-d|--detach))\s+nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
@@ -159,7 +159,7 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "bo", lines: [
         "Jetzt machst du aus dem Bauplan ein echtes Image: <code>docker build</code>. Das <code>-t</code> (Langform <code>--tag</code>, beides geht) gibt deinem Image den ganzen <b>Namen</b> <code>name:tag</code> – sonst findest du es später nicht wieder. Der Teil hinter dem <code>:</code> ist der <b>Versions-Tag</b>. (Verwechsle das nicht mit dem eigenen Befehl <code>docker tag</code> – der kommt gleich und gibt einem fertigen Image nur einen Zweitnamen.) Der <b>Punkt</b> am Ende sagt: „Der Bauplan liegt HIER im aktuellen Ordner.“",
       ]},
-      { type: "teach", brief: "Eigenes Image bauen", cmd: {
+      { type: "teach", unlockAbbrev: "docker-build-tag", brief: "Eigenes Image bauen", cmd: {
         id: "t-build", intro: "🆕 Neuer Befehl: <code>docker build -t &lt;name&gt;:&lt;tag&gt; .</code> – baut aus dem Dockerfile ein eigenes Image. Gebaut wird in der <b>Docker-Engine</b> (eigenes Programm, das deine Ordner nicht sieht); der <b>Punkt</b> ist der Build-Kontext – der Ordner, den du ihr als Kiste mit Baumaterial rüberreichst (<code>.</code> = der aktuelle). Daraus liest Docker das Dockerfile und alles, was <code>COPY</code> holt. <code>-t</code> ist die Kurzform von <code>--tag</code> (beides geht) und vergibt den ganzen Namen <code>name:tag</code>.",
         text: "Bau aus dem Dockerfile ein Image mit dem Namen <code>hafenwache:1.0</code>. (Punkt am Ende nicht vergessen!)",
         accept: [/^docker\s+build\s+(?:-t|--tag)\s+hafenwache:1\.0\s+\.$/], solution: "docker build -t hafenwache:1.0 .",
@@ -201,14 +201,14 @@ export const QUESTS: Quest[] = [
         "Dafür gibt es <b>Kubernetes</b> – griechisch für „Steuermann“, kurz <b>K8s</b>. Schau zum Wasser: Unsere <b>drei Stege</b> sind die <b>Nodes</b> (Arbeits-Server). Alles zusammen: der <b>Cluster</b>.",
         "Dein Funkgerät spricht mit dem Cluster über <code>kubectl</code>. Erster Befehl, ganz harmlos: <code>kubectl get nodes</code> – zeig mir die Stege!",
       ]},
-      { type: "teach", brief: "Die Stege zählen", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-nodes", brief: "Die Stege zählen", cmd: {
         id: "t-nodes", intro: "🆕 Neuer Befehl: <code>kubectl get nodes</code> – zeigt die Server des Clusters.",
         text: "Zeig die Nodes deines Clusters an. Vergleich mit den Stegen draußen!",
         accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "Muster: kubectl get <ressourcentyp>" } },
       { type: "dialog", npc: "ole", lines: [
         "Drei Stege, drei Nodes – passt! Und die Fracht? Jede Kiste steht auf einem Liegeplatz namens <b>Pod</b> – der kleinsten Einheit von Kubernetes. Die Bord-Kantine läuft schon. Finde ihre Pods!",
       ]},
-      { type: "teach", brief: "Die Fracht finden",
+      { type: "teach", unlockAbbrev: "kubectl-pods", brief: "Die Fracht finden",
         scenario: { deployments: [{ name: "kantine", image: "nginx:1.27", replicas: 2 }] },
         cmd: {
         id: "t-pods", intro: "🆕 Neuer Befehl: <code>kubectl get pods</code> – zeigt alle Pods.",
@@ -246,7 +246,7 @@ export const QUESTS: Quest[] = [
         "Unten in den <b>Events</b> steht die Lebensgeschichte des Pods – Gold wert bei der Fehlersuche! <code>describe</code> ist die <b>Sicht von Kubernetes</b> auf den Pod: Zustand, Image, Ressourcen und vor allem das <b>Warum</b> – die Events. Was die <b>App</b> selbst ausgibt, zeigt es NICHT; dafür gibt es später bei Juno einen eigenen Befehl (<code>kubectl logs</code>).",
         "Eins noch: Kubernetes selbst läuft AUCH als Pods, versteckt im Namespace <code>kube-system</code>.",
       ]},
-      { type: "teach", brief: "Hinter die Kulissen", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-namespace", brief: "Hinter die Kulissen", cmd: {
         id: "t-ns", intro: "🆕 Neue Flag: <code>-n &lt;namespace&gt;</code> – in einen anderen Namespace schauen.",
         text: "Zeig die Pods im Namespace <code>kube-system</code> – das Maschinenherz von Kubernetes.",
         accept: [/^kubectl\s+get\s+(pods|pod|po)\s+(-n|--namespace)[=\s]?kube-system$/], solution: "kubectl get pods -n kube-system",
@@ -335,7 +335,7 @@ export const QUESTS: Quest[] = [
         text: "Stelle einen Service vor <code>kasse</code>, Port <b>80</b>. Draußen geht eine Laterne an!",
         accept: [/^kubectl\s+expose\s+deployment\s+kasse\s+--port[=\s]80$/], solution: "kubectl expose deployment kasse --port=80",
         hint: "Muster: kubectl expose deployment <name> --port=80" } },
-      { type: "teach", brief: "Service-Liste", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-services", brief: "Service-Liste", cmd: {
         id: "t-getsvc", intro: "🆕 Neuer Befehl: <code>kubectl get services</code> – alle festen Adressen.",
         text: "Zeig die Services an – deine <code>kasse</code> hat jetzt eine feste CLUSTER-IP.",
         accept: [/^kubectl\s+get\s+(services|service|svc)$/], check: (sim: Sim) => sim.services.some(s => s.name === "kasse"),
@@ -372,11 +372,11 @@ export const QUESTS: Quest[] = [
         { id: "t-ada-1", text: "Schau mit <code>ls</code> nach, was Ada dir hingelegt hat.", accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
         { id: "t-ada-2", text: "Lies <code>deployment.yaml</code> mit <code>cat</code>. Findest du <code>kind</code> und <code>replicas</code>?", accept: [/^cat\s+deployment\.yaml$/], solution: "cat deployment.yaml", hint: "cat <datei>" },
       ]},
-      { type: "teach", brief: "Karte anwenden", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-filename", brief: "Karte anwenden", cmd: {
         id: "t-apply", intro: "🆕 Neuer Befehl: <code>kubectl apply -f</code> – „Stelle her, was in der Datei steht.“",
         text: "Wende <code>deployment.yaml</code> auf den Cluster an – und schau zum Dock!",
         accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "kubectl apply -f <datei>" } },
-      { type: "terminal", brief: "Adas Doppeltrick", tasks: [
+      { type: "terminal", unlockAbbrev: "kubectl-ingress", brief: "Adas Doppeltrick", tasks: [
         { id: "t-ada-3", text: "Wende auch <code>service.yaml</code> an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+service\.yaml$/], solution: "kubectl apply -f service.yaml", hint: "Gleicher Befehl, andere Datei." },
         { id: "t-ada-4", text: "Adas Lieblingstrick: Denselben apply <b>nochmal</b> – nichts passiert doppelt („unchanged“)!",
           accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "Wirklich nochmal exakt derselbe Befehl." },
@@ -449,7 +449,7 @@ export const QUESTS: Quest[] = [
         text: "Installiere <code>bitnami/nginx</code> als Release <code>mein-web</code>. Flaggen-Blick zur Werft!",
         accept: [/^helm\s+install\s+mein-web\s+bitnami\/nginx$/], solution: "helm install mein-web bitnami/nginx",
         hint: "Muster: helm install <release-name> <repo>/<chart>" } },
-      { type: "teach", brief: "Releases auflisten", cmd: {
+      { type: "teach", unlockAbbrev: "helm-list", brief: "Releases auflisten", cmd: {
         id: "t-helmlist", intro: "🆕 Neuer Befehl: <code>helm list</code> (kurz <code>helm ls</code>) – zeigt alle <b>Releases</b>, also die installierten Charts mit Name, Revision und Status.",
         text: "Zeig die Releases mit <code>helm list</code>.",
         accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“." } },
@@ -598,7 +598,7 @@ export const QUESTS: Quest[] = [
         accept: [/^kubectl\s+create\s+secret\s+generic\s+db-zugang\s+--from-literal[=\s][\w.-]+=\S+$/],
         solution: "kubectl create secret generic db-zugang --from-literal=passwort=tintenfisch88",
         hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert" } },
-      { type: "teach", brief: "Truhen zählen", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-secrets", brief: "Truhen zählen", cmd: {
         id: "t-getsecrets", intro: "🆕 Neuer Befehl: <code>kubectl get secrets</code> – alle Schatztruhen anzeigen.",
         text: "Zeig die Secrets an. Beachte: Den INHALT zeigt die Liste nicht – genau das ist der Punkt!",
         accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …" } },
@@ -848,7 +848,7 @@ export const QUESTS: Quest[] = [
         id: "t-git-add", intro: "🆕 <code>git add &lt;datei&gt;</code> – merkt eine Datei für den nächsten Commit vor (Staging).",
         text: "Merke <code>seekarte.md</code> zum Commit vor.",
         accept: [/^git\s+add\s+seekarte\.md$/], solution: "git add seekarte.md", hint: "Muster: git add <datei>" } },
-      { type: "teach", brief: "Festhalten", cmd: {
+      { type: "teach", unlockAbbrev: "git-commit-message", brief: "Festhalten", cmd: {
         id: "t-git-commit", intro: "🆕 <code>git commit -m \"…\"</code> – hält die vorgemerkten Änderungen als Schnappschuss in der Historie fest, mit kurzer Nachricht.",
         text: "Halte die Karte fest – Commit-Nachricht z.B. <code>Erste Seekarte</code>.",
         accept: [/^git\s+commit\s+(?:-m|--message)\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"', hint: 'Muster: git commit -m "deine Nachricht"' } },
@@ -1138,6 +1138,18 @@ export const QUESTS: Quest[] = [
         "Die Subcharts liegen entweder <b>mit im Ordner</b> (unter <code>charts/</code> – „vendored“) oder werden per <code>repository:</code>-URL <b>aus einer Registry gezogen</b>: <code>helm dependency update</code> holt sie und zurrt sie in <code>Chart.lock</code> fest (reproduzierbar, überall gleich). Der Clou für viele Setups: einzelne Subcharts per <code>condition:</code> an-/abschalten (z.B. <code>condition: permit.enabled</code>) – Kunde mit Permit → an, ohne → aus, alles aus EINEM Chart.",
         "Und statt EINER <code>values.yaml</code> legst du mehrere übereinander: <code>helm install … -f base.yaml -f prod.yaml</code> – das spätere <code>-f</code> gewinnt. Gleiches Chart, andere Werte je Hafen (Test, Prod, je Region). Kralle drillt dich dazu ab! ⎈",
       ]},
+      { type: "teach", unlockAbbrev: "helm-values", brief: "Werte überschreiben", cmd: {
+        id: "t-upgrade-values", intro: "🆕 Flag <code>--values</code> (kurz <code>-f</code>): beim Upgrade eine eigene Werte-Datei mitgeben – überschreibt die Defaults aus <code>values.yaml</code>.",
+        text: "Upgrade <code>mein-funk</code> mit der Chart-eigenen Werte-Datei: <code>helm upgrade mein-funk ./funkdienst --values funkdienst/values.yaml</code>.",
+        accept: [/^helm\s+upgrade\s+mein-funk\s+\.\/funkdienst\s+(--values|-f)\s+funkdienst\/values\.yaml$/],
+        solution: "helm upgrade mein-funk ./funkdienst --values funkdienst/values.yaml",
+        hint: "Muster: helm upgrade <release> <chart> --values <datei>" } },
+      { type: "teach", unlockAbbrev: "helm-dependency", brief: "Subcharts holen", cmd: {
+        id: "t-helm-dep-update", intro: "🆕 Neuer Befehl: <code>helm dependency update</code> (kurz <code>dep</code>) – zieht alle in <code>Chart.yaml</code> deklarierten Subcharts und schreibt <code>Chart.lock</code>.",
+        text: "Hole die Abhängigkeiten von <code>funkdienst</code>: <code>helm dependency update funkdienst</code>.",
+        accept: [/^helm\s+(dependency|dep)\s+(update|up)\s+(\.\/)?funkdienst$/],
+        solution: "helm dependency update funkdienst",
+        hint: "Muster: helm dependency update <chart>" } },
     ]},
 
   { id: "q22", title: "Die Hafenmauer", giver: "juno", rewardXp: 60, rewardCoins: 45,
@@ -1147,7 +1159,7 @@ export const QUESTS: Quest[] = [
         "Das ist die unbequeme Wahrheit über Kubernetes: <b>standardmäßig ist alles offen</b>. Kein Zaun, keine Mauer. Schleicht sich ein böser Pod ein, klopft er ungestört an jeder Tür – auch beim <code>lager</code> mit den wertvollen Daten.",
         "Dagegen bauen wir eine <b>Hafenmauer</b>: eine <b>NetworkPolicy</b>. Sie wählt per Label Pods aus und sagt: <i>Zu DENEN darf nur, wen ich ausdrücklich erlaube</i> – alles andere prallt ab. Im Job nennt man das <b>default-deny</b>. Lass uns erst schauen, was schon steht.",
       ]},
-      { type: "teach", brief: "Mauern zählen", cmd: {
+      { type: "teach", unlockAbbrev: "kubectl-netpol", brief: "Mauern zählen", cmd: {
         id: "t-get-netpol", intro: "🆕 Neue Ressource: <code>kubectl get networkpolicies</code> (kurz <code>netpol</code>) – zeigt alle Hafenmauern.",
         text: "Schau nach, welche NetworkPolicies schon stehen – noch ist der Hafen schutzlos!",
         accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], solution: "kubectl get networkpolicies",
@@ -1439,7 +1451,7 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "argo", lines: [
         "Angelegt! Aber Achtung: Diese Seekarte hat <b>keine</b> automatische Sync-Politik. Argo <i>kennt</i> jetzt den Soll-Zustand, hat ihn aber noch <b>nicht</b> in den Cluster gesegelt. Lass uns nachschauen, was Argo über den Auftrag weiß.",
       ]},
-      { type: "terminal", brief: "Was sagt Argo?", tasks: [
+      { type: "terminal", unlockAbbrev: "argocd-app-list", brief: "Was sagt Argo?", tasks: [
         { id: "t-argo-list", text: "Verschaff dir den Überblick: <code>argocd app list</code>. In der Spalte SYNC STATUS steht <code>OutOfSync</code> – Ist und Soll klaffen noch auseinander.",
           accept: [/^argocd\s+app\s+(list|ls)$/], solution: "argocd app list", hint: "argocd app list (oder ls)." },
       ]},
