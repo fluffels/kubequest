@@ -96,7 +96,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const img = pick(IMAGES);
     let name = pick(NAMES);
     while (sim.docker.containers.some(c => c.name === name && c.running)) name = pick(NAMES) + rnd(2, 99);
-    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?=.*-d)(?=.*--name\\s+" + name + ").*" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Muster: docker run -d --name <name> <image>", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt), nur: erst alle Optionen, dann das Image ganz zuletzt – Muster: docker run -d --name <name> <image>." };
+    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:-d\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+-d)\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name <name> <image>", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name <name> <image>." };
   },
   "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker.", why: "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu." }),
   "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“.", why: "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten." }),
@@ -147,7 +147,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const d = ensureDeployment(sim);
     if (sim.services.some(s => s.name === d.name)) sim.exec("kubectl delete service " + d.name);
     const port = pick([80, 8080, 3000, 5432]);
-    return { text: "Stelle einen Service vor <code>" + d.name + "</code>, Port <b>" + port + "</b>.", accept: [new RegExp("^kubectl\\s+expose\\s+deployment\\s+" + d.name + "\\s+--port[=\\s]" + port + "(\\s.*)?$")], solution: "kubectl expose deployment " + d.name + " --port=" + port, hint: "Muster: kubectl expose deployment <name> --port=<port>", why: "expose stellt einen Service als feste Adresse vor das Deployment; --port ist der Port, unter dem er erreichbar ist – Muster: kubectl expose deployment <name> --port=<port>." };
+    return { text: "Stelle einen Service vor <code>" + d.name + "</code>, Port <b>" + port + "</b>.", accept: [new RegExp("^kubectl\\s+expose\\s+deployment\\s+" + d.name + "\\s+--port[=\\s]" + port + "$")], solution: "kubectl expose deployment " + d.name + " --port=" + port, hint: "Muster: kubectl expose deployment <name> --port=<port>", why: "expose stellt einen Service als feste Adresse vor das Deployment; --port ist der Port, unter dem er erreichbar ist – Muster: kubectl expose deployment <name> --port=<port>." };
   },
   "k-apply": sim => {
     sim.files["uebung.yaml"] = "# Übungs-Manifest\nkind: Deployment\n…";
@@ -214,7 +214,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
   "k-secret-tls": sim => {
     let name = pick(["hafen-tls", "kasse-tls", "lager-tls"]);
     while (sim.secrets.some(s => s.name === name)) name = "tor-tls-" + rnd(100, 9999);
-    return { text: "Lege ein TLS-Secret <code>" + name + "</code> aus <code>tls.crt</code> und <code>tls.key</code> an.", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+tls\\s+" + name + "\\s+(?=.*--cert[=\\s]\\S+)(?=.*--key[=\\s]\\S+).*$")], solution: "kubectl create secret tls " + name + " --cert=tls.crt --key=tls.key", hint: "Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key", why: "Ein TLS-Secret bündelt Zertifikat und Schlüssel; --cert zeigt auf die .crt-, --key auf die .key-Datei – Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key." };
+    return { text: "Lege ein TLS-Secret <code>" + name + "</code> aus <code>tls.crt</code> und <code>tls.key</code> an.", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+tls\\s+" + name + "\\s+(?:--cert[=\\s]\\S+\\s+--key[=\\s]\\S+|--key[=\\s]\\S+\\s+--cert[=\\s]\\S+)$")], solution: "kubectl create secret tls " + name + " --cert=tls.crt --key=tls.key", hint: "Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key", why: "Ein TLS-Secret bündelt Zertifikat und Schlüssel; --cert zeigt auf die .crt-, --key auf die .key-Datei – Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key." };
   },
   "k-get-ingress": () => ({ text: "Zeig alle Hafentore (Ingresses) an.", accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch.", why: "kubectl get ingress (Kurzform ing) zeigt die Hafentore – die Routen von außen ins Cluster." }),
   "k-logs": sim => {
@@ -230,7 +230,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const d = ensureDeployment(sim);
     const lim = pick([128, 256, 512]);
     const req = lim / 2;
-    return { text: "Setz dem Deployment <code>" + d.name + "</code> ein memory-Limit von <b>" + lim + "Mi</b> und einen Request von <b>" + req + "Mi</b>.", accept: [new RegExp("^kubectl\\s+set\\s+resources\\s+deployment[\\/\\s]" + d.name + "\\s+(?=.*--limits[=\\s][^\\s]*memory=" + lim + "Mi)(?=.*--requests[=\\s][^\\s]*memory=" + req + "Mi).*$")], solution: "kubectl set resources deployment/" + d.name + " --limits=memory=" + lim + "Mi --requests=memory=" + req + "Mi", hint: "Muster: kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi", why: "requests reservieren Platz auf dem Node, limits sind die Obergrenze im Betrieb (Speicher drüber → OOMKilled) – beide setzt du mit kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi." };
+    return { text: "Setz dem Deployment <code>" + d.name + "</code> ein memory-Limit von <b>" + lim + "Mi</b> und einen Request von <b>" + req + "Mi</b>.", accept: [new RegExp("^kubectl\\s+set\\s+resources\\s+deployment[\\/\\s]" + d.name + "\\s+(?:--limits[=\\s][^\\s]*memory=" + lim + "Mi\\s+--requests[=\\s][^\\s]*memory=" + req + "Mi|--requests[=\\s][^\\s]*memory=" + req + "Mi\\s+--limits[=\\s][^\\s]*memory=" + lim + "Mi)$")], solution: "kubectl set resources deployment/" + d.name + " --limits=memory=" + lim + "Mi --requests=memory=" + req + "Mi", hint: "Muster: kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi", why: "requests reservieren Platz auf dem Node, limits sind die Obergrenze im Betrieb (Speicher drüber → OOMKilled) – beide setzt du mit kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi." };
   },
   "git-status": sim => {
     ensureGit(sim);

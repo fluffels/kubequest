@@ -81,6 +81,72 @@ test("docker run: Flag-Reihenfolge ist frei – Drill & Karte akzeptieren -d/--n
   }
 });
 
+test("Drills & Karten lehnen ungelehrte Extras ab (Supersets), erlaubte Varianten bleiben gültig (#253)", () => {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const drillOk = (id: string, build: (sol: string) => string, mustPass: boolean) => {
+    const make = KQContent.DRILLS[id];
+    assert.ok(make, "Drill nicht gefunden: " + id);
+    for (let i = 0; i < 30; i++) {
+      const task = make(new KQSim({}));
+      const sol = norm(task.solution);
+      const input = norm(build(sol));
+      const accepted = task.accept.some(re => re.test(input));
+      assert.equal(accepted, mustPass,
+        `${id}: „${input}" sollte ${mustPass ? "akzeptiert" : "ABGELEHNT"} werden (Lösung: ${sol})`);
+    }
+  };
+
+  // 1) docker-run-named: -p (Port-Mapping, noch nicht gelehrt) als Extra → ablehnen.
+  //    Beide Flag-Reihenfolgen ohne Extra bleiben gültig (didaktisch gewollt).
+  drillOk("docker-run-named", sol => sol, true);                                  // Musterlösung gilt
+  drillOk("docker-run-named", sol => sol.replace(/^(docker run )(-d --name \S+)( \S+)$/, "$1$2 -p 8080:80$3"), false); // +Port → raus
+  drillOk("docker-run-named", sol => sol.replace(/^(docker run )(-d) (--name \S+)( \S+)$/, "$1$3 $2$4"), true);        // Reihenfolge --name -d gilt
+
+  // 2) k-expose: zusätzliches --type=NodePort (nicht gelehrt) → ablehnen.
+  drillOk("k-expose", sol => sol, true);
+  drillOk("k-expose", sol => sol + " --type=NodePort", false);
+
+  // 3) k-secret-tls: zusätzliches --namespace (nicht gelehrt) → ablehnen; --cert/--key-Reihenfolge frei.
+  drillOk("k-secret-tls", sol => sol, true);
+  drillOk("k-secret-tls", sol => sol + " --namespace=prod", false);
+  drillOk("k-secret-tls", sol => sol.replace(/(--cert\S+) (--key\S+)/, "$2 $1"), true);
+
+  // 4) k-set-resources: zusätzliches --requests=cpu (nicht gelehrt) → ablehnen; --limits/--requests-Reihenfolge frei.
+  drillOk("k-set-resources", sol => sol, true);
+  drillOk("k-set-resources", sol => sol + " --requests=cpu=1", false);
+  drillOk("k-set-resources", sol => sol.replace(/(--limits\S+) (--requests\S+)/, "$2 $1"), true);
+
+  // Befehls-Karten mit denselben Mustern (feste Werte) – Supersets ebenfalls ablehnen.
+  const cardOk = (id: string, input: string, mustPass: boolean) => {
+    const card = KQContent.CMD_CARDS.find(c => c.id === id);
+    assert.ok(card, "Karte nicht gefunden: " + id);
+    assert.equal(card!.accept.some(re => re.test(norm(input))), mustPass,
+      `${id}: „${input}" sollte ${mustPass ? "akzeptiert" : "ABGELEHNT"} werden`);
+  };
+  cardOk("c-ch1-4", "docker run -d --name webserver nginx", true);
+  cardOk("c-ch1-4", "docker run -d --name webserver -p 8080:80 nginx", false);
+  cardOk("c-ch3-3", "kubectl expose deployment shop --port=80", true);
+  cardOk("c-ch3-3", "kubectl expose deployment shop --port=80 --type=NodePort", false);
+  cardOk("c-res-1", "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi", true);
+  cardOk("c-res-1", "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi --requests=cpu=1", false);
+});
+
+test("kein accept-Muster nutzt das Superset-anfällige `.*` (Regressionswächter #253)", () => {
+  const lose: string[] = [];
+  const pruefe = (label: string, res: RegExp[]) => {
+    for (const re of res) if (re.source.includes(".*")) lose.push(`${label}: /${re.source}/`);
+  };
+  for (const card of KQContent.CMD_CARDS) pruefe("CMD " + card.id, card.accept);
+  for (const [id, make] of Object.entries(KQContent.DRILLS)) pruefe("Drill " + id, make(new KQSim({})).accept);
+  for (const quest of KQContent.QUESTS) {
+    for (const step of quest.steps as any[]) {
+      if (step.type === "teach") pruefe(`${quest.id}/${step.cmd.id}`, step.cmd.accept);
+      if (step.type === "terminal") for (const t of step.tasks) pruefe(`${quest.id}/${t.id}`, t.accept);
+    }
+  }
+  assert.deepEqual(lose, [], "accept-Muster mit `.*` (akzeptiert ungelehrte Extras):\n" + lose.join("\n"));
+});
+
 test("Befehls-Karten: jede trägt eine nicht-leere Begründung (explain, #233)", () => {
   const fehlend = cardsMissingExplain(KQContent.CMD_CARDS);
   assert.deepEqual(fehlend, [], "CMD-Karten ohne explain: " + fehlend.join(", "));

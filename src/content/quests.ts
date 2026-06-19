@@ -115,7 +115,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Profi-Start", cmd: {
         id: "t-run-named", intro: "🆕 Neue Flags: <code>-d</code> (Hintergrund) und <code>--name</code> (eigener Name).",
         text: "Starte aus <code>nginx</code> einen Container im Hintergrund mit dem Namen <code>webserver</code>.",
-        accept: [/^docker\s+run\s+(?=.*-d)(?=.*--name\s+webserver).*nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
+        accept: [/^docker\s+run\s+(?:-d\s+--name\s+webserver|--name\s+webserver\s+-d)\s+nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
         hint: "Muster: docker run -d --name <wunschname> <image>" } },
       { type: "drill", brief: "Bos Übungsrunde", pool: ["docker-run-named", "docker-run-named", "docker-stop"], count: 3,
         intro: "Das lange Muster üben wir extra gründlich:" },
@@ -311,7 +311,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Feste Adresse", cmd: {
         id: "t-expose", intro: "🆕 Neuer Befehl: <code>kubectl expose</code> – stellt einen Service vor ein Deployment.",
         text: "Stelle einen Service vor <code>kasse</code>, Port <b>80</b>. Draußen geht eine Laterne an!",
-        accept: [/^kubectl\s+expose\s+deployment\s+kasse\s+--port[=\s]80(\s.*)?$/], solution: "kubectl expose deployment kasse --port=80",
+        accept: [/^kubectl\s+expose\s+deployment\s+kasse\s+--port[=\s]80$/], solution: "kubectl expose deployment kasse --port=80",
         hint: "Muster: kubectl expose deployment <name> --port=80" } },
       { type: "teach", brief: "Service-Liste", cmd: {
         id: "t-getsvc", intro: "🆕 Neuer Befehl: <code>kubectl get services</code> – alle festen Adressen.",
@@ -1303,7 +1303,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Mehr Speicher geben", cmd: {
         id: "t-setresources", intro: "🆕 Neuer Befehl: <code>kubectl set resources deployment/&lt;name&gt; --limits=memory=&lt;X&gt; --requests=memory=&lt;Y&gt;</code> – setzt die Ressourcen-Grenzen.",
         text: "Gib dem <code>kartograf</code> ein <code>--limits=memory=256Mi</code> und ein <code>--requests=memory=128Mi</code>. Schau danach zum Dock!",
-        accept: [/^kubectl\s+set\s+resources\s+deployment\/kartograf\s+(?=.*--limits[=\s][^\s]*memory=256Mi)(?=.*--requests[=\s][^\s]*memory=128Mi).*$/],
+        accept: [/^kubectl\s+set\s+resources\s+deployment\/kartograf\s+(?:--limits[=\s][^\s]*memory=256Mi\s+--requests[=\s][^\s]*memory=128Mi|--requests[=\s][^\s]*memory=128Mi\s+--limits[=\s][^\s]*memory=256Mi)$/],
         solution: "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi",
         hint: "Muster: kubectl set resources deployment/<name> --limits=memory=256Mi --requests=memory=128Mi" } },
       { type: "terminal", brief: "Verifizieren", tasks: [
