@@ -13,7 +13,6 @@
  */
 import { parseTiledMap, type TiledMap } from "./tilemap";
 import { parseHarborMap, decodeHarborGround, HARBOR_W, HARBOR_H, WARP_LAYER, NPC_LAYER } from "./harbormap";
-import { SHIP } from "./world";
 import harborMapRaw from "../assets/maps/harbor.tmj?raw";
 import testMapRaw from "../assets/maps/test-map.tmj?raw";
 
@@ -67,9 +66,12 @@ export const MAP_REGISTRY: Readonly<Record<MapId, MapEntry>> = {
     collisionLayer: "Kollision",
     warpLayer: WARP_LAYER,
     npcLayer: NPC_LAYER,
-    // Default-Spawn = vorderes Deck des eigenen Schiffs (wie bisher in spawnPlayer
-    // aus SHIP abgeleitet, jetzt eine Quelle).
-    spawn: { x: SHIP.x + 4, y: SHIP.y + 2 },
+    // Default-Spawn der Karte = vor der Hafenmeisterei bei Ole (×TILE 16 = 400/248 px),
+    // konsistent zum Erststart-Default in game.ts (`player`) seit #288. Hinweis: für den
+    // Hafen ist dieser Fallback aktuell toter Code – spawnPlayer nimmt immer die (immer
+    // gesetzte) gespeicherte Position; er greift nur, falls dieser Guard je entfällt, und
+    // wirft den Spieler dann bewusst zu Ole statt aufs Schiff (#294).
+    spawn: { x: 25, y: 15.5 },
     parse: parseHarborMap,
     decodeGround: decodeHarborGround,
   },
