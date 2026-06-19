@@ -25,6 +25,13 @@ import {
   LIGHTHOUSE_QUEST_TRIGGER, LIGHTHOUSE_TOWER, LIGHTHOUSE_NPC,
   LIGHTHOUSE_GRAFANA, LIGHTHOUSE_BELL,
 } from "./lighthouse";
+import {
+  DOCK as WH_DOCK,
+  buildWarehouse,
+  WORLD_JETTY_WH, WORLD_TO_WAREHOUSE, WORLD_RETURN_WH,
+  WAREHOUSE_TO_WORLD, WAREHOUSE_ARRIVAL,
+  WAREHOUSE_NPC, WAREHOUSE_QUEST_TRIGGER, WAREHOUSE_CRANES, WAREHOUSE_CONTAINERS,
+} from "./warehouse";
 import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
@@ -241,6 +248,7 @@ import { getMapEntry } from "./mapregistry";
       this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
       this.archipelArmed = false;   // #92: Archipel-Warp erst nach Tasten-Loslassen scharf (kein Pingpong)
       this.lighthouseArmed = false; // #111: Leuchtturm-Aufgang ebenso erst nach Tasten-Loslassen scharf
+      this.warehouseArmed = false;  // #124: Lager-Anleger ebenso erst nach Tasten-Loslassen scharf
 
       // Performance-Budget (#82): Off-screen-Culling + Messung.
       // cullables = statische Deko (Blumen, Gras, Büsche, Steine, Bäume …), die
@@ -451,6 +459,18 @@ import { getMapEntry } from "./mapregistry";
       // Anleger zum GitOps-Archipel (#92): Schild am Steg ins offene Wasser.
       // Schild direkt über den Anker-Übergang am Steg-Ende, nicht oben am Steg-Anfang (#254).
       this.labels.push({ x: WORLD_TO_ARCHIPEL.tx, y: WORLD_TO_ARCHIPEL.ty - 0.7, text: "Zum Archipel", color: "#ffe9b0" });
+
+      // #124: Holz-Anleger am Westende des Hafenkais → Lagerhallen-Viertel. Wie beim
+      // Leuchtturm-Aufgang hier (nicht in harborGeometry) gesetzt: die Wasserkacheln des
+      // Stegs zu begehbaren Planken (PIER -10) machen, damit renderGround sie als „dock"
+      // malt und man hinauslaufen kann. So bleibt harbor.tmj unberührt.
+      for (let y = WORLD_JETTY_WH.y0; y <= WORLD_JETTY_WH.y1; y++) {
+        for (let x = WORLD_JETTY_WH.x; x < WORLD_JETTY_WH.x + WORLD_JETTY_WH.w; x++) {
+          this.ground[y * W + x] = WH_DOCK;
+          this.solidGrid[y * W + x] = 0;
+        }
+      }
+      this.labels.push({ x: WORLD_TO_WAREHOUSE.tx + 0.9, y: WORLD_TO_WAREHOUSE.ty - 0.7, text: "Zum Lager", color: "#ffe9b0" });
 
       // Marktplatz
       this.objDeco(28, 18, "well", 0.55, true);
@@ -890,6 +910,11 @@ import { getMapEntry } from "./mapregistry";
       const upArrow = this.add.text(ux, uy - 4, "⬆", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(uy + 20);
       this.tweens.add({ targets: upArrow, y: uy - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
+      // #124: Anker-Marker am Lager-Anleger (Westkai), pulsierend wie der Archipel-Anker.
+      const wx = WORLD_TO_WAREHOUSE.tx * T + 8, wy = WORLD_TO_WAREHOUSE.ty * T + 8;
+      const whAnchor = this.add.text(wx, wy - 4, "⚓", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(wy + 20);
+      this.tweens.add({ targets: whAnchor, y: wy - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
       this.dynGroup = this.add.group(); // Fässer, Flaggen, Laternen, Labels (werden neu gebaut)
     }
 
@@ -1009,6 +1034,20 @@ import { getMapEntry } from "./mapregistry";
       SFX.door();
       setInteriorOpen(true);
       this.scene.launch("Lighthouse");
+      this.scene.sleep();
+    }
+
+    /** #124: Ins Lagerhallen-Viertel übersetzen – analog zu enterArchipel/enterLighthouse.
+     *  Rücksetzen auf die Planken vor dem Anleger (WORLD_RETURN_WH), Gate disarmen. */
+    enterWarehouse() {
+      const pl = this.playerPos;
+      pl.x = WORLD_RETURN_WH.tx * T + 8;
+      pl.y = WORLD_RETURN_WH.ty * T + 8;
+      pl.face = "north"; pl.moving = false;
+      this.warehouseArmed = false;
+      SFX.door();
+      setInteriorOpen(true);
+      this.scene.launch("Warehouse");
       this.scene.sleep();
     }
 
@@ -1405,6 +1444,10 @@ import { getMapEntry } from "./mapregistry";
       const onLhWarp = warpAt(pl.x, pl.y, WORLD_TO_LIGHTHOUSE);
       if (!moveKeyDown && !onLhWarp) this.lighthouseArmed = true;
 
+      // #124: Lager-Anleger ebenso „scharf machen" (gleiches Anti-Pingpong-Gate).
+      const onWhWarp = warpAt(pl.x, pl.y, WORLD_TO_WAREHOUSE);
+      if (!moveKeyDown && !onWhWarp) this.warehouseArmed = true;
+
       // #6/#194: Auf einer Tür-Kachel? -> Haus/Schiff betreten (Rest dieses Frames
       // überspringen). this.doors kommt aus dem Tiled-Objektlayer (Datenpfad) bzw.
       // den Code-Eingängen (Default) – findDoorAt prüft generisch dagegen.
@@ -1413,6 +1456,7 @@ import { getMapEntry } from "./mapregistry";
         if (door) { this.enterInterior(door); return; }
         if (this.archipelArmed && onArchWarp) { this.enterArchipel(); return; }
         if (this.lighthouseArmed && onLhWarp) { this.enterLighthouse(); return; }
+        if (this.warehouseArmed && onWhWarp) { this.enterWarehouse(); return; }
       }
 
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
@@ -2216,6 +2260,219 @@ import { getMapEntry } from "./mapregistry";
     }
   }
 
+  /* ===== WarehouseScene (#124) – Lagerhallen-Viertel (Hafenkai) =====
+   * Eigener begehbarer Hafenkai, den man von Port Kubernia über den Holz-Anleger am
+   * Westende des Kais betritt (analog ArchipelScene/LighthouseScene, Phase 7 #24). Eine
+   * gepflasterte Quay-Fläche, von einer begehbaren Stein-Kai-Wand zum Meer gesäumt; oben
+   * am Wasser die Verladekräne, auf der Fläche stapeln sich Frachtcontainer (Daten-/Volume-
+   * Metapher der Phase) und Kisten/Fässer, dazu ein reservierter NPC-Standplatz (Sprite +
+   * Quests folgen in #125/#127/#129). Boden über dieselben Wang-Tiles wie die Hauptkarte
+   * (Stein-Kai + Holz-Steg); Geometrie/Kollision kommen pur aus warehouse.ts, Bewegung
+   * teilt sich resolveMove. */
+  class WarehouseScene extends Phaser.Scene {
+    [key: string]: any;
+    constructor() { super("Warehouse"); }
+
+    create() {
+      const m = buildWarehouse();
+      this.W = m.W; this.H = m.H; this.ground = m.ground; this.solid = m.solid;
+
+      this.renderGround();
+
+      // Verladekräne oben am Wasser (PixelLab, #124) – ragen über die Kaikante.
+      for (const c of WAREHOUSE_CRANES) this.objSprite(c.x, c.y, "crane", 0.34, 30, 10);
+      // Frachtcontainer-Stapel auf der Quay-Fläche.
+      for (const c of WAREHOUSE_CONTAINERS) this.objSprite(c.x, c.y, "container", 0.3, 26, 8);
+      // Lager-Güter (Kisten/Fässer) aus der puren Geometrie.
+      for (const g of m.goods) {
+        this.add.image(g.x * T + 8, (g.y + 1) * T, g.kind).setOrigin(0.5, 1).setScale(0.5).setDepth((g.y + 1) * T);
+      }
+
+      // Quest-Trigger = das Lager-Kontor (Schild als bewusster Platzhalter, bis die
+      // Phase-7-Quests #127/#129 hier andocken). Der NPC-Standplatz (#125) bleibt bis
+      // dahin frei – kein Sprite, damit nichts ins Leere zeigt.
+      this.makeSign(WAREHOUSE_QUEST_TRIGGER.x * T + 8, (WAREHOUSE_QUEST_TRIGGER.y + 1) * T, "Lager-Kontor");
+      this.npcs = [];
+
+      // Rück-Anleger im Süden sichtbar markieren (Abstiegs-Pfeil + Schild).
+      const rx = WAREHOUSE_TO_WORLD.tx * T + 8, ry = WAREHOUSE_TO_WORLD.ty * T + 8;
+      const down = this.add.text(rx, ry - 4, "⬇", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(ry + 20);
+      this.tweens.add({ targets: down, y: ry - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.makeSign(rx, (WAREHOUSE_TO_WORLD.ty - 1) * T, "Port Kubernia");
+
+      // Spieler am Ankunftspunkt (eine Kachel landwärts vom Anleger).
+      this.pl = { x: WAREHOUSE_ARRIVAL.tx * T + 8, y: WAREHOUSE_ARRIVAL.ty * T + 8, face: "north", moving: false };
+      this.bobT = 0;
+      this.pShadow = this.add.ellipse(this.pl.x, this.pl.y + 6, 10, 4, 0x000000, 0.26).setDepth(1.6);
+      this.pSprite = this.add.image(this.pl.x, this.pl.y + 6, "char_player").setOrigin(0.5, 0.81).setScale(0.6).setDepth(this.pl.y + 8);
+
+      const cam = this.cameras.main;
+      cam.setBounds(0, 0, this.W * T, this.H * T);
+      cam.setBackgroundColor(0x356dab);   // offenes Meer als Rand
+      cam.setZoom(window.innerWidth < 900 ? 2.4 : 3);
+      cam.startFollow(this.pSprite, true, 0.15, 0.15);
+      this.scale.on("resize", () => cam.setZoom(window.innerWidth < 900 ? 2.4 : 3));
+
+      const cw = cam.width, ch = cam.height;
+      pixelText(this, cw / 2, 12, "📦 Lagerhallen-Viertel", { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 22, "Steg hinab ⬇ – zurück nach Port Kubernia", { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
+
+      // Möwen für die Hafen-Atmosphäre (wie auf Insel/Klippe).
+      this.time.addEvent({ delay: 6500, loop: true, callback: () => { if (Math.random() < 0.6) this.spawnGull(); } });
+      this.spawnGull();
+
+      setWorldScene(this);
+      setInteriorOpen(false);
+
+      this.ePrev = true;
+      this.returnArmed = false;
+    }
+
+    /** Wang-Boden wie WorldScene.renderGround, MIT Stein-Kai (Quay-Wand) UND Holz-Steg:
+     *  Meer → (dock/kai/coast) → Stein/Gras → Pfad. */
+    renderGround() {
+      const rt = this.add.renderTexture(0, 0, this.W * T, this.H * T).setOrigin(0).setDepth(0);
+      const lv = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        const c = this.ground[iy * this.W + ix];
+        return c === A_WATER ? 0 : c === 25 ? 3 : 2;   // Wasser < Stein/Gras/Steg < Pfad
+      };
+      const rawAt = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        return this.ground[iy * this.W + ix];
+      };
+      const corners = (x: number, y: number, hi: number) =>
+        (((lv(x - 1, y - 1) >= hi ? 1 : 0) << 3) | ((lv(x, y - 1) >= hi ? 1 : 0) << 2) |
+         ((lv(x - 1, y) >= hi ? 1 : 0) << 1) | (lv(x, y) >= hi ? 1 : 0));
+      const has = (x: number, y: number, t: number) =>
+        lv(x - 1, y - 1) === t || lv(x, y - 1) === t || lv(x - 1, y) === t || lv(x, y) === t;
+      const isStone = (c: number) => c === 96 || c === 97 || c === 98;
+      const edgeSet = (x: number, y: number) => {
+        const cs = [rawAt(x - 1, y - 1), rawAt(x, y - 1), rawAt(x - 1, y), rawAt(x, y)];
+        if (cs.some((c) => c === WH_DOCK)) return "dock";   // Holz-Steg trifft Meer
+        if (cs.some(isStone)) return "kai";                 // Stein-Kai-Wand trifft Meer
+        return "coast";
+      };
+      for (let y = 0; y < this.H; y++) {
+        for (let x = 0; x < this.W; x++) {
+          const v = this.ground[y * this.W + x];
+          if (has(x, y, 0)) rt.drawFrame(edgeSet(x, y), WANG[corners(x, y, 1)], x * T, y * T);
+          else if (v === WH_DOCK) rt.drawFrame("dock", WANG[15], x * T, y * T);
+          else if (isStone(v)) rt.drawFrame("kai", WANG[15], x * T, y * T);
+          else if (has(x, y, 3)) rt.drawFrame("path", WANG[corners(x, y, 3)], x * T, y * T);
+          else rt.drawFrame("meadow", WANG[corners(x, y, 2)], x * T, y * T);
+        }
+      }
+      // Wellen-Glitzer auf dem Wasser
+      for (let i = 0; i < 40; i++) {
+        const x = Phaser.Math.Between(0, this.W - 1), y = Phaser.Math.Between(0, this.H - 1);
+        if (this.ground[y * this.W + x] !== A_WATER) continue;
+        const s = this.add.image(x * T + Phaser.Math.Between(2, 12), y * T + Phaser.Math.Between(3, 12), "px")
+          .setScale(2.5, 0.8).setTint(FOAM).setAlpha(0).setDepth(1);
+        this.tweens.add({ targets: s, alpha: { from: 0, to: 0.55 }, duration: Phaser.Math.Between(900, 1800), yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 2000) });
+      }
+    }
+
+    /** Map-Objekt an einer Kachel verankert (Origin Fußlinie) + weicher Schatten. */
+    objSprite(tx: number, ty: number, tex: string, scale: number, shw: number, shh: number) {
+      const cx = tx * T + 8, baseY = (ty + 1) * T;
+      this.add.ellipse(cx, baseY - 1, shw, shh, 0x000000, 0.24).setDepth(baseY - 1);
+      this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY + 4);
+    }
+
+    makeSign(x: number, y: number, text: string, depth?: number) {
+      buildSign(this, x, y, text, depth);
+    }
+
+    spawnGull() {
+      const y = Phaser.Math.Between(1, this.H - 4) * T;
+      const fromLeft = Math.random() < 0.5;
+      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
+      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
+      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
+      gull.add([w1, w2]);
+      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
+    }
+
+    isSolidAt(px: number, py: number) {
+      const tx = Math.floor(px / T), ty = Math.floor(py / T);
+      if (tx < 0 || ty < 0 || tx >= this.W || ty >= this.H) return true;
+      return !!this.solid[ty * this.W + tx];
+    }
+
+    nearestNpc() {
+      const pl = this.pl;
+      let best = null, bestD = 1.7 * T;
+      for (const n of this.npcs) {
+        const d = Math.hypot(n.x * T + 8 - pl.x, n.y * T + 8 - pl.y);
+        if (d < bestD) { bestD = d; best = n; }
+      }
+      return best;
+    }
+
+    burstAtPlayer(_kind: string) {
+      this.floatText(this.pl.x, this.pl.y - 8, "✨", "#ffe9b0");
+    }
+
+    floatText(x: number, y: number, str: string, color?: string) {
+      floatPixelText(this, x, y, str, color);
+    }
+
+    exitToWorld() {
+      SFX.door();
+      setWorldScene(this.scene.get("World") as unknown as WorldSceneRef);
+      setInteriorOpen(false);
+      this.scene.wake("World");
+      this.scene.stop();
+    }
+
+    update(_time: number, delta: number) {
+      const dt = Math.min(0.05, delta / 1000);
+      const pl = this.pl;
+      const blocked = UI.blocking();
+
+      let dx = 0, dy = 0;
+      if (!blocked) {
+        if (keys["w"] || keys["ArrowUp"]) dy -= 1;
+        if (keys["s"] || keys["ArrowDown"]) dy += 1;
+        if (keys["a"] || keys["ArrowLeft"]) dx -= 1;
+        if (keys["d"] || keys["ArrowRight"]) dx += 1;
+      }
+      pl.moving = dx !== 0 || dy !== 0;
+      if (pl.moving) {
+        const len = Math.hypot(dx, dy);
+        if (dx < 0) pl.face = "west";
+        else if (dx > 0) pl.face = "east";
+        else if (dy < 0) pl.face = "north";
+        else if (dy > 0) pl.face = "south";
+        const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt);
+        pl.x = next.x; pl.y = next.y;
+        this.bobT += dt * 12;
+      }
+      const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
+      const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
+      this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
+      this.pShadow.setPosition(pl.x, pl.y + 6);
+
+      for (const n of this.npcs) n.marker.setVisible(!blocked && UI.questMarkerFor(n.id));
+
+      UI.updatePrompt();
+
+      const onRet = warpAt(pl.x, pl.y, WAREHOUSE_TO_WORLD);
+      const moveKeyDown = !!(keys["w"] || keys["s"] || keys["a"] || keys["d"] ||
+        keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
+      if (!moveKeyDown && !onRet) this.returnArmed = true;
+      if (!blocked && this.returnArmed && onRet) { this.exitToWorld(); return; }
+      const e = !blocked && (!!keys["e"] || !!keys["Enter"]);
+      if (e && !this.ePrev && onRet) { this.exitToWorld(); return; }
+      this.ePrev = e;
+    }
+  }
+
   /** #191 (Teil 1 von Epic #57): Grundgerüst für die spätere Tiled-Map-Migration.
    *  Lädt EINE minimale .tmj über Phasers Tilemap-API – bewusst PARALLEL zur
    *  prozeduralen buildMap() der WorldScene, die unangetastet bleibt. Erreichbar
@@ -2273,4 +2530,4 @@ import { getMapEntry } from "./mapregistry";
     }
   }
 
-  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene, LighthouseScene, TilemapTestScene };
+  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene, LighthouseScene, WarehouseScene, TilemapTestScene };
