@@ -1834,4 +1834,89 @@ export const QUESTS: Quest[] = [
         "Das ist Observability: nicht raten, sondern <b>sehen</b>. Prometheus sammelt, Grafana zeigt – und du weißt sofort, wo der Hafen brennt. Meld dich wieder, wenn du die <b>Alerts</b> aufschalten willst – dann nicht nur sehen, sondern <i>benachrichtigt</i> werden. 🔦",
       ]},
     ]},
+
+  // ===== Phase 5: Monitoring-Leuchtturm – Quest 3: Logs lesen & Fehler finden (#115) =====
+  // Dritte Quest bei Lumi: kubectl logs als zweite Observability-Säule. Basis-Logs lesen,
+  // -f (follow) für live streams, --previous für den Absturz-Log. Fehlerursache aus einer
+  // FATAL-Zeile ablesen. Entspannt & belohnend (#52).
+  { id: "q34", title: "Was die App zu sagen hat: kubectl logs", giver: "lumi", rewardXp: 50, rewardCoins: 35,
+    steps: [
+      { type: "dialog", npc: "lumi", lines: [
+        "Schön, dass du wieder rauf auf die Klippe gestiegen bist! Metriken zeigen uns <i>Zahlen</i> – wie viel CPU, wie viele Fehler, wie oft. Aber manchmal reichen die Zahlen nicht: Du weißt, ein Pod ist abgestürzt. <i>Warum?</i> Die Metriken sagen nur: Er ist weg.",
+        "Hier kommen <b>Logs</b> ins Spiel – der zweite Pfeiler der Observability. Jede App schreibt ihren eigenen Text: Meldungen, Fehlermeldungen, Statuszeilen. Das ist ihr <b>Logbuch</b>, und <code>kubectl logs</code> ist der direkte Draht hinein.",
+      ]},
+      { type: "dialog", npc: "lumi",
+        scenario: { deployments: [{ name: "signalgeber", image: "nginx", replicas: 1 }] },
+        lines: [
+          "Wichtig: <code>kubectl logs</code> zeigt, was <b>die App selbst</b> ausgibt – ihr <code>stdout</code> und <code>stderr</code>. Das sind reine Text-Zeilen, die das Programm schreibt.",
+          "Das ist etwas anderes als <code>kubectl describe pod</code>: Describe zeigt die <b>Kubernetes-Sicht</b> (Zustand, Events, Scheduling). Logs zeigen die <b>App-Sicht</b>. Beides zusammen ergibt das vollständige Bild.",
+          "Unser <b>signalgeber</b>-Dienst läuft gerade. Lies seine Logs – sieh selbst, was er zu berichten hat.",
+        ] },
+      { type: "teach", brief: "Pod-Logs lesen", cmd: {
+        id: "t-logs-basic",
+        intro: "🆕 Neuer Befehl: <code>kubectl logs &lt;pod&gt;</code> – zeigt die Textausgaben (stdout/stderr) des Containers. Den Pod-Namen bekommst du mit <code>kubectl get pods</code>.",
+        text: "Lies die Logs des signalgeber-Pods: <code>kubectl logs &lt;pod-name&gt;</code>.",
+        accept: [/^kubectl\s+logs\s+(signalgeber|signalgeber-\S+)$/],
+        solution: "kubectl logs <signalgeber-pod>",
+        hint: "kubectl logs <pod-name> – den Namen siehst du mit kubectl get pods." } },
+      { type: "teach", brief: "Logs live verfolgen", cmd: {
+        id: "t-logs-follow",
+        intro: "🆕 Flag <code>-f</code> (<code>--follow</code>): Hält den Log-Stream offen – neue Zeilen erscheinen live. Ideal, um zu sehen, was gerade passiert. Mit <code>^C</code> beenden.",
+        text: "Folge den Logs live: <code>kubectl logs -f &lt;pod-name&gt;</code>.",
+        accept: [
+          /^kubectl\s+logs\s+(-f|--follow)\s+(signalgeber|signalgeber-\S+)$/,
+          /^kubectl\s+logs\s+(signalgeber|signalgeber-\S+)\s+(-f|--follow)$/,
+        ],
+        solution: "kubectl logs -f <signalgeber-pod>",
+        hint: "kubectl logs -f <pod-name> – das -f steht für follow." } },
+      { type: "choice", npc: "lumi", reviewId: "q-obs-logs-basic",
+        q: "Was zeigt dir <code>kubectl logs &lt;pod&gt;</code>?",
+        options: [
+          { t: "Die Textausgaben der App – stdout/stderr des laufenden Containers.", ok: true,
+            reply: "Genau! Logs zeigen, was die App selbst schreibt – Meldungen, Fehler, Statuszeilen. Die Kubernetes-Sicht (Scheduling, Events) zeigt dagegen kubectl describe. Beides zusammen ergibt das vollständige Bild. 🔦" },
+          { t: "Die Kubernetes-Events des Pods (Scheduling, ImagePull, Neustart).", ok: false,
+            reply: "Das zeigt kubectl describe pod. kubectl logs zeigt die App-Ausgabe – was das Programm selbst schreibt (stdout/stderr), nicht was Kubernetes darüber notiert." },
+          { t: "Die aktuelle CPU- und Speicher-Last des Pods.", ok: false,
+            reply: "Die Last zeigt kubectl top pods. kubectl logs zeigt Text: was die App als Ausgabe produziert – ihr Logbuch, Zeile für Zeile." },
+        ]},
+      { type: "dialog", npc: "lumi",
+        scenario: { deployments: [{ name: "bakenbote", image: "nginx", replicas: 1, broken: { type: "crashloop", needsSecret: "baken-config" } }] },
+        lines: [
+          "Jetzt der Ernst. Siehst du das rote Aufflackern am Hafen? Die <b>bakenbote</b> – unser Signaldienst – stürzt immer wieder ab. <b>CrashLoopBackOff</b>.",
+          "Bei einem CrashLoop sagt <code>kubectl describe pod</code> nur: <i>er stirbt, immer wieder</i>. Den echten Grund – was die App kurz vor dem Absturz geschrieben hat – zeigen nur die <b>Logs</b>.",
+        ] },
+      { type: "terminal", brief: "Status und Absturz-Logs lesen", tasks: [
+        { id: "t-logs-get-pods", text: "Schau dir den Status an: <code>kubectl get pods</code>. Wie viele Restarts hat die bakenbote bereits?",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods",
+          hint: "kubectl get pods – oder kurz: po." },
+        { id: "t-logs-crash", text: "Lies die Logs der bakenbote: <code>kubectl logs &lt;pod-name&gt;</code>. Schau dir die letzte Zeile an – was steht da?",
+          accept: [/^kubectl\s+logs\s+(bakenbote|bakenbote-\S+)$/],
+          solution: "kubectl logs <bakenbote-pod>",
+          hint: "kubectl logs <pod-name> – den Namen aus kubectl get pods kopieren." },
+      ]},
+      { type: "teach", brief: "Absturz-Log des Vorgängers lesen", cmd: {
+        id: "t-logs-previous",
+        intro: "🆕 Flag <code>--previous</code> (auch: <code>-p</code>): Zeigt die Logs des <b>letzten abgestürzten</b> Containers – genau das, was er kurz vor dem Exit ausgegeben hat. Nur sinnvoll, wenn der Pod schon neugestartet ist (also bei CrashLoop).",
+        text: "Lies den Absturz-Log: <code>kubectl logs --previous &lt;bakenbote-pod&gt;</code>.",
+        accept: [
+          /^kubectl\s+logs\s+(--previous|-p)\s+(bakenbote|bakenbote-\S+)$/,
+          /^kubectl\s+logs\s+(bakenbote|bakenbote-\S+)\s+(--previous|-p)$/,
+        ],
+        solution: "kubectl logs --previous <bakenbote-pod>",
+        hint: "kubectl logs --previous <pod-name> – oder: -p als Kurzform." } },
+      { type: "choice", npc: "lumi", reviewId: "q-obs-logs-previous",
+        q: "Die Logs der bakenbote zeigen: <code>FATAL: Secret 'baken-config' nicht gefunden – Dienst kann nicht starten!</code>. Was ist die Ursache des Absturzes?",
+        options: [
+          { t: "Das Secret <b>baken-config</b> fehlt im Cluster – die App bricht beim Lesen der Konfiguration ab.", ok: true,
+            reply: "Genau! Die FATAL-Zeile lügt nicht: Die App braucht das Secret baken-config, findet es nicht und beendet sich sauber mit Code 1. Jetzt weißt du, wo du ansetzen musst – Secret anlegen oder den Namen im Deployment korrigieren. 🔦" },
+          { t: "Das Container-Image existiert nicht – Kubernetes kann es nicht laden (ImagePullBackOff).", ok: false,
+            reply: "ImagePullBackOff bedeutet: das Image fehlt schon im Registry. Dann startet der Container gar nicht erst – keine Logs. Hier gibt es aber Logs mit einer klaren FATAL-Meldung: die App startet, liest die Konfiguration – und bricht dann ab." },
+          { t: "Der Pod hat zu wenig Speicher und wird vom Kernel abgewürgt (OOMKilled).", ok: false,
+            reply: "Bei OOMKilled endet das Log abrupt – kein Fehler, kein Stacktrace (der Kernel killt den Prozess von außen). Hier steht aber eine klare FATAL-Zeile: Die App findet ihr Secret nicht und beendet sich selbst." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Sieh an – Logs gelesen wie ein echter Wächter. Basis-Ausgabe, live folgen, Absturz-Log des Vorgängers: das Dreigespann trägt dich durch die meisten Nächte auf der Klippe.",
+        "Metriken zeigen <i>was</i>, Logs zeigen <i>warum</i>. Ein letztes Werkzeug fehlt noch: <b>Alerts</b> – damit der Cluster dich weckt, bevor du überhaupt auf das Dashboard schauen musst. Komm wieder hoch! 🔦",
+      ]},
+    ]},
 ];
