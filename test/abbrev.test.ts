@@ -10,7 +10,7 @@
  */
 import { test, expect, describe } from "vitest";
 import assert from "node:assert/strict";
-import { ABBREVS, findAbbrevByShort, type AbbrevPair } from "../src/content/abbrev";
+import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, type AbbrevPair } from "../src/content/abbrev";
 import { KQContent } from "../src/content";
 import { Sim as KQSim } from "../src/sim";
 
@@ -83,5 +83,67 @@ describe("findAbbrevByShort", () => {
     expect(findAbbrevByShort("--all")).toBeUndefined();
     expect(findAbbrevByShort("pods")).toBeUndefined();
     expect(findAbbrevByShort("gibtsnicht")).toBeUndefined();
+  });
+});
+
+/* #299: Akzeptanz-Gating – Kürzel erst nach Freischaltung, Langform immer. */
+describe("lockedAbbrevInInput – Gating der Eingabe-Akzeptanz (#299)", () => {
+  const NICHTS_FREI = (_id: string) => false;       // frischer Spielstand: alles gesperrt
+  const ALLES_FREI = (_id: string) => true;         // grandfathered / alles freigeschaltet
+  const nurFrei = (...ids: string[]) => (id: string) => ids.includes(id);
+
+  test("gesperrtes Kürzel wird erkannt (Paar + getipptes Token)", () => {
+    const hit = lockedAbbrevInInput("docker ps -a", NICHTS_FREI);
+    expect(hit?.pair.id).toBe("docker-ps-all");
+    expect(hit?.used).toBe("-a");
+  });
+
+  test("Langform löst NIE aus (gilt immer, auch bei allem gesperrt)", () => {
+    expect(lockedAbbrevInInput("docker ps --all", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("kubectl get pods", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("nach Freischaltung gilt das Kürzel (kein Treffer mehr)", () => {
+    expect(lockedAbbrevInInput("docker ps -a", nurFrei("docker-ps-all"))).toBeUndefined();
+    expect(lockedAbbrevInInput("docker ps -a", ALLES_FREI)).toBeUndefined();
+  });
+
+  test("token-genau: Langform „pods“ triggert nicht das Kürzel „pod“/„po“", () => {
+    expect(lockedAbbrevInInput("kubectl get pods", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("kubectl get po", NICHTS_FREI)?.pair.id).toBe("kubectl-pods");
+    expect(lockedAbbrevInInput("kubectl get po", NICHTS_FREI)?.used).toBe("po");
+  });
+
+  test("Kontext-Disambiguierung „-f“: kubectl vs. helm", () => {
+    // -f gehört zu zwei Einträgen – der getippte Befehl entscheidet.
+    expect(lockedAbbrevInInput("kubectl apply -f app.yaml", NICHTS_FREI)?.pair.id).toBe("kubectl-filename");
+    expect(lockedAbbrevInInput("helm install rel ./c -f values.yaml", NICHTS_FREI)?.pair.id).toBe("helm-values");
+  });
+
+  test("ein anderer Befehl mit gleichem Kürzel blockiert NICHT (Negativfall)", () => {
+    // helm-values gesperrt, kubectl-filename frei: ein kubectl -f darf nicht über helm-values stolpern.
+    expect(lockedAbbrevInInput("kubectl apply -f app.yaml", nurFrei("kubectl-filename"))).toBeUndefined();
+    // umgekehrt: helm -f bleibt frei, wenn nur kubectl-filename gesperrt ist.
+    expect(lockedAbbrevInInput("helm install rel ./c -f values.yaml", nurFrei("helm-values"))).toBeUndefined();
+  });
+
+  test("Kontext-Disambiguierung „ls“: helm vs. argocd", () => {
+    expect(lockedAbbrevInInput("helm ls", NICHTS_FREI)?.pair.id).toBe("helm-list");
+    expect(lockedAbbrevInInput("argocd app ls", NICHTS_FREI)?.pair.id).toBe("argocd-app-list");
+  });
+
+  test("leere Eingabe / fremder Befehl ohne Katalog-Kürzel → kein Treffer", () => {
+    expect(lockedAbbrevInInput("", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("   ", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("ls -a", NICHTS_FREI)).toBeUndefined();          // „ls" ist hier der Befehl, kein kubectl/helm
+    expect(lockedAbbrevInInput("kubectl get deployments", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("der Hinweis nennt das getippte Kürzel und die auszuschreibende Langform", () => {
+    const hit = lockedAbbrevInInput("kubectl get svc", NICHTS_FREI)!;
+    expect(hit.pair.id).toBe("kubectl-services");
+    const msg = abbrevLockHint(hit);
+    expect(msg).toContain("svc");        // das getippte Kürzel
+    expect(msg).toContain("services");   // die Langform
   });
 });

@@ -8,6 +8,7 @@ import { KQAssets } from "./assets-data";
 import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
 import { resolveOverlayKey } from "./overlaykbd";
+import { lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
   // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
@@ -735,6 +736,17 @@ import { resolveOverlayKey } from "./overlaykbd";
       const cmdOk = task.accept.some((re: RegExp) => re.test(norm));
       const checkOk = !task.check || task.check(Game.sim);
 
+      // #299: Der Befehl trifft zwar die Lösung, nutzt aber ein noch nicht
+      // freigeschaltetes Profi-Kürzel → freundlicher Hinweis (Langform schreiben)
+      // statt es als gelöst zu werten. Die Langform gilt immer; nach Freischaltung
+      // (Game.unlockAbbrev, #300) zählen beide Formen.
+      const lockedHit = cmdOk ? lockedAbbrevInInput(norm, (id) => Game.isAbbrevUnlocked(id)) : undefined;
+      if (lockedHit) {
+        const fb = $("tt-feedback");
+        if (fb) fb.innerHTML = '<div class="tt-feedback">' + abbrevLockHint(lockedHit) + '</div>';
+        return;
+      }
+
       if (cmdOk && !result.error && checkOk) {
         this.failCount = 0;
         SFX.success();
@@ -1279,6 +1291,15 @@ import { resolveOverlayKey } from "./overlaykbd";
       if (!line) return;
       const card = r.current.content.card;
       const correct = card.accept.some((re: RegExp) => re.test(line));
+      // #299: richtige Lösung, aber per noch gesperrtem Kürzel → sanfter Hinweis,
+      // erneut tippen lassen (NICHT als Fehlversuch zählen, sonst würde nach
+      // CMD_MAX_ATTEMPTS die Kürzel-Lösung verraten). Langform gilt immer.
+      const lockedHit = correct ? lockedAbbrevInInput(line, (id) => Game.isAbbrevUnlocked(id)) : undefined;
+      if (lockedHit) {
+        $("review-explain").innerHTML = `<div class="quiz-explain">${abbrevLockHint(lockedHit)}</div>`;
+        ev.target.disabled = false; ev.target.focus(); ev.target.select();
+        return;
+      }
       if (correct) {
         // Beim 1. Versuch richtig zählt voll; erst nach Retry richtig = "mit Hilfe gelöst" (#234).
         const assisted = r.current.attempts > 0;
