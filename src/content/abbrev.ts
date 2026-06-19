@@ -27,6 +27,12 @@ export interface AbbrevPair {
   readonly long: string;
   /** Die Abkürzung(en) – gleichwertig, aber Tipp-Ersparnis für Wissende. */
   readonly short: readonly string[];
+  /** Unterbefehl-Tokens, bei deren Vorkommen VOR dem Alias-Token das Gating
+   *  ausgesetzt wird — weil das Token dort literaler Unterbefehl ist, kein
+   *  Ressourcen-Alias. Nur für `kind: "alias"` sinnvoll. Beispiel: `["create"]`
+   *  für kubectl-secrets verhindert, dass `kubectl create secret generic …`
+   *  blockiert wird, obwohl `secret` hier kein Kürzel für `secrets` ist (#308). */
+  readonly excludeVerbs?: readonly string[];
 }
 
 /** Der Katalog. Reihenfolge ~ Lernpfad (Docker → kubectl → helm → git/argocd). */
@@ -41,10 +47,14 @@ export const ABBREVS: readonly AbbrevPair[] = [
   { id: "git-commit-message", context: "git commit",                    kind: "flag", long: "--message",   short: ["-m"] },
 
   // ---- Ressourcen-/Unterbefehl-Kürzel (kubectl/helm/argocd) ----
-  { id: "kubectl-pods",       context: "kubectl get pods",              kind: "alias", long: "pods",            short: ["pod", "po"] },
-  { id: "kubectl-nodes",      context: "kubectl get nodes",             kind: "alias", long: "nodes",           short: ["node", "no"] },
-  { id: "kubectl-services",   context: "kubectl get services",          kind: "alias", long: "services",        short: ["service", "svc"] },
-  { id: "kubectl-secrets",    context: "kubectl get secrets",           kind: "alias", long: "secrets",         short: ["secret"] },
+  // Nur ECHTE Profi-Kürzel stehen in `short` — Singular-Formen (pod/node/service)
+  // sind genauso kanonisch wie Plural und gehören nicht ins Gating (#308).
+  { id: "kubectl-pods",       context: "kubectl get pods",              kind: "alias", long: "pods",            short: ["po"] },
+  { id: "kubectl-nodes",      context: "kubectl get nodes",             kind: "alias", long: "nodes",           short: ["no"] },
+  { id: "kubectl-services",   context: "kubectl get services",          kind: "alias", long: "services",        short: ["svc"] },
+  // `secret` ist in `get/describe/delete` ein Alias für `secrets`, aber nach
+  // `create` ein literaler Unterbefehl → Gating dort aussetzen (#308).
+  { id: "kubectl-secrets",    context: "kubectl get secrets",           kind: "alias", long: "secrets",         short: ["secret"], excludeVerbs: ["create"] },
   { id: "kubectl-ingress",    context: "kubectl get ingress",           kind: "alias", long: "ingress",         short: ["ingresses", "ing"] },
   { id: "kubectl-netpol",     context: "kubectl get/describe/delete networkpolicies", kind: "alias", long: "networkpolicies", short: ["networkpolicy", "netpol", "netpols"] },
   { id: "helm-list",          context: "helm list",                     kind: "alias", long: "list",            short: ["ls"] },
@@ -97,7 +107,15 @@ export function lockedAbbrevInInput(input: string, isUnlocked: (id: string) => b
     if (abbrevCommand(a) !== cmd) continue;     // nur Einträge dieses Befehls
     if (isUnlocked(a.id)) continue;             // freigeschaltet → beide Formen gelten
     const used = a.short.find(s => tokens.includes(s));
-    if (used) return { pair: a, used };         // gesperrtes Kürzel getippt
+    if (!used) continue;
+    // Unterbefehl-Ausnahme (#308): steht ein excludeVerb VOR dem Alias-Token,
+    // wird das Token dort als literaler Unterbefehl benutzt — kein Gating.
+    if (a.excludeVerbs) {
+      const aliasIdx = tokens.indexOf(used);
+      const tokensBefore = tokens.slice(0, aliasIdx);
+      if (a.excludeVerbs.some(v => tokensBefore.includes(v))) continue;
+    }
+    return { pair: a, used };                   // gesperrtes Kürzel getippt
   }
   return undefined;
 }

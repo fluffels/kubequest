@@ -147,3 +147,42 @@ describe("lockedAbbrevInInput – Gating der Eingabe-Akzeptanz (#299)", () => {
     expect(msg).toContain("services");   // die Langform
   });
 });
+
+/* #308: Gating-Regression — gültige Musterlösungen dürfen nicht geblockt werden. */
+describe("lockedAbbrevInInput – Regressionsfixes #308", () => {
+  const NICHTS_FREI = (_id: string) => false;
+
+  test("kubectl create secret generic … darf NICHT geblockt werden (secret ist Unterbefehl von create, kein Alias)", () => {
+    expect(lockedAbbrevInInput("kubectl create secret generic db-zugang --from-literal=pass=secret123", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("kubectl create secret generic webapp-credentials --from-literal=user=admin", NICHTS_FREI)).toBeUndefined();
+    expect(lockedAbbrevInInput("kubectl create secret tls my-tls --cert=tls.crt --key=tls.key", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("kubectl get secret (Singular) blockiert weiterhin — echter Alias für secrets", () => {
+    const hit = lockedAbbrevInInput("kubectl get secret", NICHTS_FREI);
+    expect(hit?.pair.id).toBe("kubectl-secrets");
+    expect(hit?.used).toBe("secret");
+  });
+
+  test("kubectl describe pod <name> darf NICHT geblockt werden — Singular ist kanonisch, kein Profi-Kürzel", () => {
+    expect(lockedAbbrevInInput("kubectl describe pod my-pod", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("kubectl delete pod <name> darf NICHT geblockt werden — Singular ist kanonisch", () => {
+    expect(lockedAbbrevInInput("kubectl delete pod my-pod", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("kubectl get po blockiert weiterhin — po ist echter Profi-Shortcut für pods", () => {
+    const hit = lockedAbbrevInInput("kubectl get po", NICHTS_FREI);
+    expect(hit?.pair.id).toBe("kubectl-pods");
+    expect(hit?.used).toBe("po");
+  });
+
+  test("kubectl get node darf NICHT geblockt werden — Singular ist kanonisch", () => {
+    expect(lockedAbbrevInInput("kubectl get node", NICHTS_FREI)).toBeUndefined();
+  });
+
+  test("kubectl get service darf NICHT geblockt werden — Singular ist kanonisch", () => {
+    expect(lockedAbbrevInInput("kubectl get service", NICHTS_FREI)).toBeUndefined();
+  });
+});
