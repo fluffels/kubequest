@@ -352,7 +352,6 @@ test("der Monitoring-Leuchtturm-NPC (#112) ist in der Registry verdrahtet, mit S
   const npc = (KQContent.NPCS as Record<string, { tex?: string }>)[LIGHTHOUSE_NPC.id];
   assert.ok(npc, "Leuchtturm-NPC-Id '" + LIGHTHOUSE_NPC.id + "' fehlt in NPCS");
   assert.ok(npc.tex && KQAssets[npc.tex], "Leuchtturm-NPC ohne Sprite-Asset");
-  // Bis die Phase-5-Quests (#113–116) andocken, ist Smalltalk das, was Lumi zu sagen hat.
   const lines = (KQContent.SMALLTALK as Record<string, string[]>)[LIGHTHOUSE_NPC.id];
   assert.ok(Array.isArray(lines) && lines.length > 0, "Leuchtturm-NPC ohne Smalltalk");
 });
@@ -599,4 +598,111 @@ test("#101 GitOps-Quests (q28–q31): Belohnungen gesetzt und ansteigend", () =>
   }
   // Letzte Quest bringt mehr als erste
   assert.ok(quests[3].rewardXp > quests[0].rewardXp, "q31 muss mehr XP bringen als q28");
+});
+
+/* ===== Monitoring-Leuchtturm: False-Positive-Schutz (#120) =====
+ * Die accept-Regexes der Observability-Quests (q32–q35) müssen falsche Eingaben
+ * zuverlässig ablehnen – ein zu breiter Regex würde das Lernziel aushebeln. */
+
+function obsTask(questId: string, taskId: string) {
+  const q = KQContent.QUESTS.find(x => x.id === questId);
+  assert.ok(q, "Quest " + questId + " nicht gefunden");
+  for (const step of q!.steps) {
+    if (step.type === "terminal") {
+      const t = step.tasks.find(t => t.id === taskId);
+      if (t) return t;
+    } else if (step.type === "teach" && step.cmd.id === taskId) {
+      return step.cmd;
+    }
+  }
+  throw new Error(questId + "/" + taskId + " nicht gefunden");
+}
+
+test("#120 q32: kubectl top pods akzeptiert po-Kürzel, lehnt 'kubectl top' ohne Ressource und 'get pods' ab", () => {
+  const task = obsTask("q32", "t-top-pods");
+  assert.ok(accepts(task, "kubectl top pods"),  "kubectl top pods muss gelten");
+  assert.ok(accepts(task, "kubectl top pod"),   "kubectl top pod muss gelten");
+  assert.ok(accepts(task, "kubectl top po"),    "kubectl top po (Kurzform) muss gelten");
+  assert.ok(!accepts(task, "kubectl top"),      "'kubectl top' ohne Ressource muss scheitern");
+  assert.ok(!accepts(task, "kubectl get pods"), "'get pods' statt 'top pods' muss scheitern");
+  assert.ok(!accepts(task, "kubectl top nodes"),"'top nodes' statt 'top pods' muss scheitern");
+});
+
+test("#120 q32: kubectl top nodes lehnt 'top pods' und bloßes 'top' ab", () => {
+  const task = obsTask("q32", "t-top-nodes");
+  assert.ok(accepts(task, "kubectl top nodes"), "kubectl top nodes muss gelten");
+  assert.ok(accepts(task, "kubectl top node"),  "kubectl top node muss gelten");
+  assert.ok(accepts(task, "kubectl top no"),    "kubectl top no (Kurzform) muss gelten");
+  assert.ok(!accepts(task, "kubectl top pods"), "'top pods' statt 'top nodes' muss scheitern");
+  assert.ok(!accepts(task, "kubectl top"),      "bloßes 'kubectl top' muss scheitern");
+});
+
+test("#120 q32: kubectl apply -f servicemonitor.yaml lehnt falsche Datei und fehlendes -f ab", () => {
+  const task = obsTask("q32", "t-sm-apply");
+  assert.ok(accepts(task, "kubectl apply -f servicemonitor.yaml"),         "kurze Form -f muss gelten");
+  assert.ok(accepts(task, "kubectl apply --filename servicemonitor.yaml"), "--filename muss gelten");
+  assert.ok(!accepts(task, "kubectl apply servicemonitor.yaml"),           "ohne -f/--filename muss scheitern");
+  assert.ok(!accepts(task, "kubectl apply -f grafanadatasource.yaml"),     "falsche Datei muss scheitern");
+  assert.ok(!accepts(task, "kubectl apply -f servicemonitor"),             "ohne .yaml-Endung muss scheitern");
+});
+
+test("#120 q32: kubectl get servicemonitors akzeptiert Kurzform smon, lehnt andere Ressourcen ab", () => {
+  const task = obsTask("q32", "t-sm-get");
+  assert.ok(accepts(task, "kubectl get servicemonitors"),  "kubectl get servicemonitors muss gelten");
+  assert.ok(accepts(task, "kubectl get servicemonitor"),   "kubectl get servicemonitor (Singular) muss gelten");
+  assert.ok(accepts(task, "kubectl get smon"),             "kubectl get smon (Kurzform) muss gelten");
+  assert.ok(!accepts(task, "kubectl get pods"),            "'get pods' muss scheitern");
+  assert.ok(!accepts(task, "kubectl describe servicemonitors"), "'describe' statt 'get' muss scheitern");
+});
+
+test("#120 q35: kubectl get alerts akzeptiert nur 'alerts' (Plural), lehnt Singular und anderen Verb ab", () => {
+  const taskFiring   = obsTask("q35", "t-alerts-get");
+  const taskResolved = obsTask("q35", "t-alerts-resolved");
+  for (const task of [taskFiring, taskResolved]) {
+    assert.ok(accepts(task, "kubectl get alerts"),          "kubectl get alerts muss gelten");
+    assert.ok(!accepts(task, "kubectl get alert"),          "'alert' (Singular) muss scheitern");
+    assert.ok(!accepts(task, "kubectl describe alerts"),    "'describe' statt 'get' muss scheitern");
+    assert.ok(!accepts(task, "kubectl get all"),            "'get all' statt 'get alerts' muss scheitern");
+  }
+});
+
+test("#120 q35: kubectl scale deployment rechenknecht --replicas=0 lehnt anderen Replicas-Wert und fehlendes Deployment ab", () => {
+  const task = obsTask("q35", "t-scale-zero");
+  assert.ok(accepts(task, "kubectl scale deployment rechenknecht --replicas=0"),  "--replicas=0 muss gelten");
+  assert.ok(accepts(task, "kubectl scale deployment rechenknecht --replicas 0"),  "--replicas 0 (Leerzeichen) muss gelten");
+  assert.ok(!accepts(task, "kubectl scale deployment rechenknecht --replicas=1"), "replicas=1 (falscher Wert) muss scheitern");
+  assert.ok(!accepts(task, "kubectl scale deployment rechenknecht --replicas=10"),"replicas=10 muss scheitern");
+  assert.ok(!accepts(task, "kubectl scale rechenknecht --replicas=0"),            "ohne 'deployment' muss scheitern");
+  assert.ok(!accepts(task, "kubectl scale deployment dampfwinde --replicas=0"),   "falscher Deployment-Name muss scheitern");
+});
+
+test("#120 q34: kubectl logs akzeptiert Pod-Präfix signalgeber, lehnt -f-Variante als Basis-Log ab", () => {
+  const taskBasic = obsTask("q34", "t-logs-basic");
+  assert.ok(accepts(taskBasic, "kubectl logs signalgeber"),         "exakter Deployment-Name muss gelten");
+  assert.ok(accepts(taskBasic, "kubectl logs signalgeber-abc12"),   "voller Pod-Name muss gelten");
+  assert.ok(!accepts(taskBasic, "kubectl logs -f signalgeber"),     "'-f signalgeber' passt nicht zum Basis-Log-Schritt");
+  assert.ok(!accepts(taskBasic, "kubectl log signalgeber"),         "Tippfehler 'log' statt 'logs' muss scheitern");
+});
+
+test("#120 q34: kubectl logs -f verlangt explizit -f oder --follow, lehnt bloßes 'logs' ab", () => {
+  const taskFollow = obsTask("q34", "t-logs-follow");
+  assert.ok(accepts(taskFollow, "kubectl logs -f signalgeber"),          "'-f' vor Pod-Name muss gelten");
+  assert.ok(accepts(taskFollow, "kubectl logs signalgeber -f"),          "'-f' nach Pod-Name muss gelten");
+  assert.ok(accepts(taskFollow, "kubectl logs --follow signalgeber"),    "'--follow' muss gelten");
+  assert.ok(!accepts(taskFollow, "kubectl logs signalgeber"),            "ohne -f/-follow muss scheitern");
+});
+
+test("#120 Phase-5-Quests (q32–q35): Belohnungen gesetzt und ansteigend", () => {
+  const ids = ["q32", "q33", "q34", "q35"];
+  const quests = ids.map(id => {
+    const q = KQContent.QUESTS.find(x => x.id === id);
+    assert.ok(q, id + " fehlt in QUESTS");
+    return q!;
+  });
+  for (const q of quests) {
+    assert.ok(q.rewardXp > 0,    q.id + ": rewardXp muss > 0 sein");
+    assert.ok(q.rewardCoins > 0, q.id + ": rewardCoins muss > 0 sein");
+    assert.ok(q.giver === "lumi", q.id + ": Giver muss 'lumi' sein");
+  }
+  assert.ok(quests[3].rewardXp >= quests[0].rewardXp, "q35 soll mindestens so viel XP bringen wie q32");
 });
