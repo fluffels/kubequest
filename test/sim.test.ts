@@ -501,6 +501,22 @@ test("set resources: Gi wird zu Mi umgerechnet, Unsinn wird abgelehnt (Negativfa
   assert.match(sim.exec("kubectl set resources deployment/gibtsnicht --limits=memory=128Mi").output!, /NotFound/);
 });
 
+test("set resources: CPU-Limit unter Schwelle räumt cpuHeavy aus und löst HighPodCPU-Alert auf", () => {
+  sim.mergeScenario({ deployments: [{ name: "containergrill", image: "nginx", replicas: 1, cpuHeavy: true }] });
+  // Alert muss initial feuern
+  const firingBefore = sim.alerts().some(a => a.name === "HighPodCPU" && a.state === "firing");
+  assert.ok(firingBefore, "HighPodCPU-Alert soll feuern, bevor das Limit gesetzt ist");
+  // CPU-Limit setzen -> cpuHeavy wird gelöscht
+  const r = sim.exec("kubectl set resources deployment/containergrill --limits=cpu=200m");
+  assert.ok(!r.error, "set resources --limits=cpu=200m soll kein Fehler sein");
+  assert.ok(!sim.deployments[0].cpuHeavy, "cpuHeavy muss nach CPU-Limit-Setzung falsch sein");
+  // Alert muss jetzt resolved sein
+  const resolvedAfter = sim.alerts().some(a => a.name === "HighPodCPU" && a.state === "resolved");
+  assert.ok(resolvedAfter, "HighPodCPU-Alert soll resolved sein, nachdem CPU unter die Schwelle fällt");
+  // kein Limit/Request überhaupt -> Fehler (auch ohne cpu-Flag)
+  assert.ok(sim.exec("kubectl set resources deployment/containergrill").error, "kein Limit -> Fehler");
+});
+
 test("troubleshooting: Pending heilt durch neue Nodes (Terraform)", () => {
   sim.mergeScenario({
     deployments: [{ name: "app", image: "nginx", replicas: 1, broken: { type: "pending" } }],
