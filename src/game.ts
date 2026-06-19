@@ -285,10 +285,16 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       this.save();
     },
 
-    save() {
+    /** Sichert den Stand. `syncFromScene` (Default true) übernimmt dabei die
+     *  aktuelle Spielerposition aus der laufenden WorldScene – das ist im normalen
+     *  Spiel richtig (der 5-s-Auto-Save soll dem Spieler folgen). Wer die Position
+     *  aber GERADE BEWUSST gesetzt hat (Sprung/Reset), ruft `save(false)`: sonst
+     *  überschreibt die noch lebende Szene die frische Position sofort wieder und
+     *  der reload landet am alten Ort (#335 / Reset-Position-Falle #295/#296). */
+    save(syncFromScene = true) {
       if (this.sim) this.state.clusterSnapshot = this.sim.snapshot();
       const ws = worldScene();
-      if (ws && ws.player) {
+      if (syncFromScene && ws && ws.player) {
         this.state.player = { x: ws.player.x, y: ws.player.y };
       }
       this.state.lastSeen = Date.now();
@@ -547,7 +553,10 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       }
 
       this.spawnAtQuestGiver(questIdx);
-      this.save();
+      // save(false): die gerade gesetzte Giver-Position NICHT von der noch
+      // lebenden WorldScene überschreiben lassen (#335) – sonst spawnt man nach
+      // dem reload wieder am alten Ort statt beim Quest-Giver.
+      this.save(false);
       return true;
     },
 
