@@ -120,6 +120,33 @@ import { getMapEntry } from "./mapregistry";
     return t;
   }
 
+  // --- Orts-Schild (#254) -------------------------------------------------
+  // Die 9-Slice-Ränder des Holzbretts (sign.png, 75×30): links/rechts/oben/unten.
+  // Vertikal fressen Rahmen oben+unten 8+6=14px, horizontal 8+8=16px – das helle
+  // Innenfeld ist nur der gestreckte Rest. Das Padding MUSS diese Ränder einrechnen
+  // (früherer Bug: +7/+10 < Rahmenbreite → Schrift lief auf den dunklen Rahmen).
+  const SIGN_BORDER = { l: 8, r: 8, t: 8, b: 6 };
+  const SIGN_PAD = 2;       // Luft zwischen Schrift und Innenfeld-Rand
+  const SIGN_FONT = 6;      // kleiner als der HUD-Standard (8) → Schrift bleibt im Feld
+  const SIGN_SCALE = 0.45;  // ganzes Schild verkleinert (#254); Schrift skaliert mit
+
+  /** Baut ein Orts-Schild (Welt + Archipel identisch, #254): kleine eingravierte
+   *  Pixelschrift, sicher im hellen Innenfeld des 9-Slice-Bretts. Gibt Container +
+   *  Maße zurück, damit WorldScene daraus die Tag-Ausweich-Box ableiten kann. */
+  function buildSign(scene: Phaser.Scene, x: number, y: number, text: string) {
+    // Eingravierte Pixelschrift (#188): heller Drop-Shadow nach unten = Gravur-Effekt.
+    const txt = pixelText(scene, 0, 0, text, { color: "#3a2410", origin: 0.5, size: SIGN_FONT });
+    txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
+    const w = Math.max(30, Math.ceil(txt.width) + SIGN_BORDER.l + SIGN_BORDER.r + SIGN_PAD * 2);
+    const h = Math.max(22, Math.ceil(txt.height) + SIGN_BORDER.t + SIGN_BORDER.b + SIGN_PAD * 2);
+    const board = scene.add.nineslice(0, 0, "sign", undefined, w, h, SIGN_BORDER.l, SIGN_BORDER.r, SIGN_BORDER.t, SIGN_BORDER.b).setOrigin(0.5);
+    board.y = -h / 2;
+    // Schrift ins Innenfeld zentrieren: Rahmen oben (8) ≠ unten (6) → 1px tiefer als Brettmitte.
+    txt.y = -h / 2 + (SIGN_BORDER.t - SIGN_BORDER.b) / 2;
+    const cont = scene.add.container(x, y, [board, txt]).setScale(SIGN_SCALE).setDepth(y);
+    return { cont, w, h };
+  }
+
   /** Schwebender Belohnungs-/Effekt-Text (#188): Pixelschrift + Pixel-Münz-Icon statt
    *  🪙-Emoji. Reine Emoji-Floats (z.B. ✨) bleiben System-Text – die Bitmap-Font hat
    *  dafür keine Glyphe. Beides steigt auf und blendet aus. */
@@ -410,7 +437,8 @@ import { getMapEntry } from "./mapregistry";
       this.labels.push({ x: this.ship.x + 4.5, y: this.ship.y - 0.6, text: "Dein Schiff", color: "#ffffff" });
 
       // Anleger zum GitOps-Archipel (#92): Schild am Steg ins offene Wasser.
-      this.labels.push({ x: WORLD_JETTY.x + WORLD_JETTY.w / 2, y: WORLD_JETTY.y0 - 0.7, text: "Zum Archipel", color: "#ffe9b0" });
+      // Schild direkt über den Anker-Übergang am Steg-Ende, nicht oben am Steg-Anfang (#254).
+      this.labels.push({ x: WORLD_TO_ARCHIPEL.tx, y: WORLD_TO_ARCHIPEL.ty - 0.7, text: "Zum Archipel", color: "#ffe9b0" });
 
       // Marktplatz
       this.objDeco(28, 18, "well", 0.55, true);
@@ -550,20 +578,14 @@ import { getMapEntry } from "./mapregistry";
      *  Am 16px-Maßstab orientiert (knappes Padding + leicht runterskaliert) und per
      *  y-Tiefe in die Welt einsortiert, damit es Fässer/Pod-Kisten/Tech-Tags nicht verdeckt. */
     makeSign(x: number, y: number, text: string) {
-      // Eingravierte Pixelschrift (#188): heller Drop-Shadow nach unten = Gravur-Effekt.
-      const txt = pixelText(this, 0, 0, text, { color: "#3a2410", origin: 0.5 });
-      txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
-      const w = Math.max(18, Math.ceil(txt.width) + 10);
-      const h = Math.max(13, Math.ceil(txt.height) + 7);
-      const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
-      board.y = -h / 2; txt.y = -h / 2;   // unten am Bezugspunkt verankert (wie altes origin 0.5,1)
+      const { cont, w, h } = buildSign(this, x, y, text);
       // Schild-Rechteck als festes Hindernis fürs Tag-Entzerren merken (#207): Container
-      // ist um 0.8 skaliert, das Brett sitzt oberhalb des Bezugspunkts (board.y=-h/2,
-      // Höhe h) → Welt-Box [y-0.8h, y]. Cluster-Tags weichen diesen Boxen aus.
-      if (this.signBoxes) this.signBoxes.push({ x, y: y - 0.4 * h, w: 0.8 * w, h: 0.8 * h, movable: false });
+      // ist um SIGN_SCALE skaliert, das Brett sitzt oberhalb des Bezugspunkts (board.y=-h/2,
+      // Höhe h) → Welt-Box [y-SIGN_SCALE·h, y]. Cluster-Tags weichen diesen Boxen aus.
+      if (this.signBoxes) this.signBoxes.push({ x, y: y - SIGN_SCALE / 2 * h, w: SIGN_SCALE * w, h: SIGN_SCALE * h, movable: false });
       // Tiefe = Welt-y (wie Bäume/Fässer/Krabben): Objekte derselben/näheren Reihe liegen davor
       // statt darunter; Tech-Tags sind y-sortiert (#207) und überlagern die Figuren nicht mehr.
-      return this.add.container(x, y, [board, txt]).setScale(0.8).setDepth(y);
+      return cont;
     }
 
     /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
@@ -1748,14 +1770,9 @@ import { getMapEntry } from "./mapregistry";
       this.add.image(cx, baseY, "dungeon", DEVICE).setOrigin(0.5, 1).setScale(1.1).setDepth(baseY);
     }
 
-    /** Holz-Wegweiser (9-Slice) wie auf der Hauptkarte. */
+    /** Holz-Wegweiser (9-Slice) wie auf der Hauptkarte – gemeinsamer Aufbau (#254). */
     makeSign(x: number, y: number, text: string) {
-      const txt = pixelText(this, 0, 0, text, { color: "#3a2410", origin: 0.5 });
-      txt.setDropShadow(0, 1, 0xfff3d6, 0.5);
-      const w = Math.max(18, Math.ceil(txt.width) + 10), h = Math.max(13, Math.ceil(txt.height) + 7);
-      const board = this.add.nineslice(0, 0, "sign", undefined, w, h, 8, 8, 8, 6).setOrigin(0.5);
-      board.y = -h / 2; txt.y = -h / 2;
-      this.add.container(x, y, [board, txt]).setScale(0.8).setDepth(y);
+      buildSign(this, x, y, text);
     }
 
     spawnGull() {
