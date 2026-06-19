@@ -60,3 +60,52 @@ export const ABBREVS: readonly AbbrevPair[] = [
 export function findAbbrevByShort(token: string): AbbrevPair | undefined {
   return ABBREVS.find(a => a.short.includes(token));
 }
+
+/** Der Befehl (erstes Wort des Kontexts) eines Eintrags – „docker", „kubectl",
+ *  „helm", „git", „argocd". Disambiguiert mehrdeutige Kürzel anhand des getippten
+ *  Befehls (`-f` = kubectl `--filename` ODER helm `--values`; `ls` = helm ODER
+ *  argocd). Der Kontext-String ist die SSOT dafür; das erste Wort ist immer der
+ *  CLI-Befehl. */
+function abbrevCommand(a: AbbrevPair): string {
+  return a.context.trim().toLowerCase().split(/\s+/)[0];
+}
+
+/** Treffer des Gatings: das gesperrte Paar + das konkret getippte Kürzel-Token. */
+export interface LockedAbbrev {
+  readonly pair: AbbrevPair;
+  readonly used: string;
+}
+
+/** Akzeptanz-Gating (#299): Nutzt die Eingabe ein Kürzel, das für IHREN Befehl
+ *  gilt, aber noch nicht freigeschaltet ist? Dann liefert die Funktion das
+ *  gesperrte Paar + das getippte Kürzel (für den Hinweis), sonst `undefined`.
+ *
+ *  - Die Langform gilt IMMER (steht nie in `short`, löst also nie aus).
+ *  - Der Befehl (erstes Token der Eingabe) muss zum Eintrag passen – so wird
+ *    `helm install -f` NICHT von `kubectl --filename` und `argocd app ls` NICHT
+ *    von `helm list` blockiert.
+ *  - Token-genau (`pods` triggert nicht das Kürzel `pod`/`po`).
+ *
+ *  Pur: `isUnlocked` wird injiziert (keine Game-Kopplung) → im Node-Test prüfbar.
+ *  Das UI ruft das VOR der Erfolgswertung auf und ersetzt einen Treffer durch
+ *  einen freundlichen Hinweis statt eines harten „Falsch". */
+export function lockedAbbrevInInput(input: string, isUnlocked: (id: string) => boolean): LockedAbbrev | undefined {
+  const tokens = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return undefined;
+  const cmd = tokens[0];
+  for (const a of ABBREVS) {
+    if (abbrevCommand(a) !== cmd) continue;     // nur Einträge dieses Befehls
+    if (isUnlocked(a.id)) continue;             // freigeschaltet → beide Formen gelten
+    const used = a.short.find(s => tokens.includes(s));
+    if (used) return { pair: a, used };         // gesperrtes Kürzel getippt
+  }
+  return undefined;
+}
+
+/** Freundlicher Hinweis fürs Gating (#299): nennt das getippte Kürzel und die
+ *  jetzt zu verwendende Langform. Enthält `<code>` passend zu den übrigen
+ *  Eingabe-Rückmeldungen, die per innerHTML gerendert werden. */
+export function abbrevLockHint(hit: LockedAbbrev): string {
+  return `🔒 <code>${hit.used}</code> ist eine Profi-Abkürzung, die du <b>später freischaltest</b>. `
+    + `Schreib sie vorerst aus: <code>${hit.pair.long}</code>.`;
+}
