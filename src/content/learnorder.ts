@@ -51,6 +51,12 @@ export const CONCEPT_INTRO: Record<string, string> = {
   "q-tools-stack": "q9",      // PostgreSQL/Redis (Werft-Aufzählung im q9-Dialog)
   "q-tools-monitoring": "q9", // Prometheus/Grafana (q9-Dialog)
   "q-flag-helm-set": "q11",   // helm upgrade --set (q11)
+  // Umbrella-/Bundle-Charts (#264): im q21-Schluss-Dialog (Runa) erklärt
+  "q-helm-deps": "q21",            // Umbrella-Chart = Eltern-Chart mit dependencies:
+  "q-helm-lock": "q21",            // helm dependency update / Chart.lock
+  "q-helm-umbrella-term": "q21",   // „Umbrella“ ist inoffizieller Begriff
+  "q-helm-condition": "q21",       // condition:-Toggle für Subcharts
+  "q-helm-subchart-source": "q21", // vendored vs. aus Registry
   // ----- Terraform -----
   "q-ch6-1": "q12",           // Infrastructure as Code (Theos Neuland, q12)
   "q-ch6-4": "q13",           // Kubernetes vs. Terraform (q13)

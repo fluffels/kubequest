@@ -56,6 +56,9 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     q18: ["q-flag-git-commit-m"],                         // git commit -m (q18)
     q19: ["q-flag-git-checkout-b"],                       // git checkout -b (q19)
     q20: ["q-flag-git-add-dot"],                          // git add . (q20)
+    // Umbrella-/Bundle-Charts (#264): in q21 im Schluss-Dialog erklärt (dependencies,
+    // inoffizieller Begriff, vendored vs. Registry, condition:-Toggle) – hier drillt Kralle nach.
+    q21: ["q-helm-deps", "q-helm-lock", "q-helm-umbrella-term", "q-helm-condition", "q-helm-subchart-source"],
   };
 
   function today() {
