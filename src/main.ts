@@ -6,6 +6,7 @@ import { Game } from "./game";
 import { UI } from "./ui";
 import { KQScenes } from "./scenes";
 import { SFX } from "./sfx";
+import { SaveStore } from "./store";
 import { keys, clearKeys } from "./runtime";
 
   // Wie in ui.ts: die DOM-Knoten liegen fest in index.html, darum nicht-nullbar.
@@ -102,7 +103,27 @@ import { keys, clearKeys } from "./runtime";
     // Dev-Affordance: die laufende Phaser-Instanz fürs manuelle Verifizieren im
     // Browser greifbar machen (Szenen-Wechsel/Teleport testen). Im Prod-Build fällt
     // der ganze Block weg (import.meta.env.DEV === false), kein Gameplay-Einfluss.
-    if (import.meta.env.DEV) (window as unknown as { kqGame: Phaser.Game }).kqGame = game;
+    if (import.meta.env.DEV) {
+      const dev = window as unknown as { kqGame: Phaser.Game; kqDev: unknown };
+      dev.kqGame = game;
+      // Dev-/Test-Sprung (#329): zu beliebigem Quest-Stand springen + Erststart/
+      // Reset gezielt herstellen, ohne sich von vorn durchzuspielen. Konsolen-Tool;
+      // das klickbare, passwortgated Panel kommt in #325. Fällt im Prod-Build weg.
+      dev.kqDev = {
+        /** Roadmap aller Quests als Tabelle in die Konsole (idx → Quest). */
+        roadmap: () => { console.table(Game.getQuestRoadmap()); return Game.getQuestRoadmap(); },
+        /** An den Anfang von Quest `idx` springen (Stand + Cluster + Spawn) und neu laden. */
+        jump: (idx: number) => {
+          if (Game.jumpToQuest(idx)) location.reload();
+          else console.warn(`kqDev.jump: ungültiger Quest-Index ${idx} (0…${Game.getQuestRoadmap().length})`);
+        },
+        /** Echter Erststart: Save löschen + neu laden → frischer Stand inkl. Intro. */
+        freshStart: () => { SaveStore.remove(); location.reload(); },
+        /** Bestehender Reset-Pfad (wie Menü → Zurücksetzen) + neu laden. */
+        reset: () => { Game.reset(); location.reload(); },
+      };
+      console.info("🛠️ kqDev bereit: kqDev.roadmap() · kqDev.jump(idx) · kqDev.freshStart() · kqDev.reset()");
+    }
 
     UI.refreshHud();
     if (Game.state.character === null) {

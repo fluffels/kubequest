@@ -548,3 +548,71 @@ test("#323 Quest-Count-Gate: feuert NICHT wenn review-Dict leer (gar nichts gele
   Game.state.review = {};
   expect(Game.shouldReviewGate()).toBe(false);
 });
+
+/* ---------- Dev-/Test-Sprung: jumpToQuest / getQuestRoadmap (#329) ----------
+ * Grundlage fürs Dev-Panel (#325): zu einem beliebigen Quest-Stand springen,
+ * statt sich von vorn durchzuspielen. Granularität pro Quest (questStep 0). */
+
+test("getQuestRoadmap: leitet ALLE Quests aus dem Content ab, mit den erwarteten Feldern", () => {
+  const roadmap = Game.getQuestRoadmap();
+  expect(roadmap.length).toBe(KQContent.QUESTS.length); // abgeleitet, nicht handgepflegt
+  roadmap.forEach((entry, i) => {
+    const q = KQContent.QUESTS[i];
+    expect(entry).toMatchObject({ idx: i, id: q.id, title: q.title, giver: q.giver, steps: q.steps.length });
+    expect(typeof entry.giverName).toBe("string");
+  });
+});
+
+test("getQuestRoadmap: completed spiegelt den Spielstand (vorher nichts, nach Sprung die vorherigen)", () => {
+  expect(Game.getQuestRoadmap().every(e => !e.completed)).toBe(true); // frischer Stand
+  Game.jumpToQuest(3); // Sprung an den Anfang von Quest 3 -> Quests 0..2 erledigt
+  const roadmap = Game.getQuestRoadmap();
+  expect(roadmap.slice(0, 3).every(e => e.completed)).toBe(true);
+  expect(roadmap[3].completed).toBe(false);
+});
+
+test("jumpToQuest: gültiger Index setzt Quest-Stand + completedQuests + Spawn beim Giver", () => {
+  setWorldScene(null); // sonst überschreibt save() die gesetzte Spielerposition
+  expect(Game.jumpToQuest(3)).toBe(true);
+  expect(Game.state.questIdx).toBe(3);
+  expect(Game.state.questStep).toBe(0);
+  expect(Game.state.taskIdx).toBe(0);
+  // genau die Quests VOR dem Ziel gelten als erledigt
+  expect(Game.state.completedQuests).toEqual(KQContent.QUESTS.slice(0, 3).map(q => q.id));
+  // Figur steht beim Giver der Zielquest (sofern fester Standplatz existiert)
+  const spawn = NPC_SPAWNS.find(s => s.id === KQContent.QUESTS[3].giver);
+  if (spawn) expect(Game.state.player).toEqual({ x: spawn.x * TILE, y: spawn.y * TILE });
+});
+
+test("jumpToQuest(0): leerer Stand, keine Quest erledigt", () => {
+  Game.jumpToQuest(5);                       // erst woanders hin
+  expect(Game.jumpToQuest(0)).toBe(true);
+  expect(Game.state.questIdx).toBe(0);
+  expect(Game.state.completedQuests).toEqual([]);
+});
+
+test("jumpToQuest(QUESTS.length): erlaubter Endzustand -> allQuestsDone, alle erledigt", () => {
+  const end = KQContent.QUESTS.length;
+  expect(Game.jumpToQuest(end)).toBe(true);
+  expect(Game.state.questIdx).toBe(end);
+  expect(Game.allQuestsDone()).toBe(true);
+  expect(Game.currentQuest()).toBeNull();
+  expect(Game.state.completedQuests.length).toBe(end);
+});
+
+test("jumpToQuest: ungültiger Index -> false, Stand bleibt unverändert", () => {
+  Game.jumpToQuest(2);                       // bekannter Ausgangsstand
+  const before = JSON.stringify(Game.state);
+  for (const bad of [-1, KQContent.QUESTS.length + 1, 1.5, NaN, Infinity]) {
+    expect(Game.jumpToQuest(bad)).toBe(false);
+  }
+  expect(JSON.stringify(Game.state)).toBe(before); // nichts angefasst
+});
+
+test("jumpToQuest: Sprung persistiert (load() liest denselben Quest-Stand zurück)", () => {
+  setWorldScene(null);
+  Game.jumpToQuest(4);
+  Game.load();
+  expect(Game.state.questIdx).toBe(4);
+  expect(Game.state.completedQuests).toEqual(KQContent.QUESTS.slice(0, 4).map(q => q.id));
+});
