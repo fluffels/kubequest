@@ -56,6 +56,9 @@ import { keys, clearKeys } from "./runtime";
         e.preventDefault();
         return;
       }
+      // Generische Tastatur-Bedienung blockierender Modals ohne eigene Navigation (#283):
+      // Stapel-Spiel, Shop, Logbuch, Menü per ↑/↓ + Enter/Leer steuern (Primär-Button als Default).
+      if (UI.overlayKey(k, e)) return;
       if (!UI.blocking() && (k === "e" || k === "Enter" || k === " ")) { UI.interact(); e.preventDefault(); }
     });
     window.addEventListener("keyup", e => {

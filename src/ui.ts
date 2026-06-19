@@ -7,6 +7,7 @@ import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
+import { resolveOverlayKey } from "./overlaykbd";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
   // nicht-nullbares HTMLElement zurück (Migrations-Shim, wie window.* in vite-env.d.ts).
@@ -170,6 +171,32 @@ import { worldScene, interiorOpen } from "./runtime";
     closeOverlays() {
       ["overlay-terminal", "overlay-quest", "overlay-shop", "overlay-review", "overlay-stack", "overlay-menu"].forEach(id => $(id).classList.add("hidden"));
       if (this.practice && this.practice.idx >= this.practice.drills.length) this.practice = null;
+    },
+
+    /* ---------- Generische Tastatur-Bedienung einfacher Modals (#283) ----------
+     * Blockierende Overlays ohne eigene Navigation (Stapel-Spiel, Shop, Logbuch,
+     * Menü) ganz ohne Maus bedienbar machen: ↑/↓ (w/s) wandert über die Buttons,
+     * Enter/Leer/E löst den markierten – sonst den Primär-Button – aus. Dialog,
+     * Wissensrunde (reviewKey) und Terminal (Eingabefeld) haben eigene Handler und
+     * sind hier bewusst NICHT gelistet. Die Entscheidung selbst liegt im puren,
+     * unit-getesteten `overlaykbd.ts`; hier nur die DOM-Anbindung. */
+    overlayKey(k: string, ev: KeyboardEvent): boolean {
+      const ids = ["overlay-stack", "overlay-shop", "overlay-quest", "overlay-menu"];
+      const ov = ids.map($).find(el => !el.classList.contains("hidden"));
+      if (!ov) return false;
+      const btns = Array.from(ov.querySelectorAll("button")) as HTMLButtonElement[];
+      if (!btns.length) return false;
+      const current = btns.findIndex(b => b.classList.contains("sel"));
+      const res = resolveOverlayKey(btns.map(b => ({ disabled: b.disabled, primary: b.classList.contains("primary") })), current, k);
+      if (!res) return false;
+      ev.preventDefault();
+      if (res.kind === "nav") {
+        btns.forEach((b, i) => b.classList.toggle("sel", i === res.sel));
+        btns[res.sel].focus();
+      } else {
+        btns[res.index].click();
+      }
+      return true;
     },
 
     /* ========== Menü / Pause ========== */

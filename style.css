@@ -255,6 +255,13 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
 }
 .dlg-choices button.sel::before { content: "▶ "; color: var(--accent); font-weight: bold; }
 
+/* Tastatur-Markierung in einfachen Modals (#283): per ↑/↓ gewählter Panel-Button,
+   damit auch ohne Maus sichtbar ist, was Enter/Leer auslöst (analog .dlg-choices). */
+.panel button.sel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
 /* ===== Panels (Terminal, Logbuch, Shop, Krabbe) ===== */
 .panel {
   position: fixed;
