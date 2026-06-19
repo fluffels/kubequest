@@ -1,0 +1,56 @@
+# Architektur-Reihenfolge
+
+> **Stand: 2026-06-20.** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
+> Diese Liste **überschreibt** für Architektur-Tickets die generische Board-Auswahl (Prio→Nummer aus AGENTS.md):
+> Die Reihenfolge hier ist **abhängigkeitsbewusst** sortiert, nicht nur nach Prio-Label.
+
+## Was „nächstes Architektur" heißt
+
+Sagt die Maintainerin **„nächstes Architektur"**, dann:
+
+1. Diese Liste von oben durchgehen, das **oberste noch offene** Ticket nehmen, das
+   - **nicht** `status:zurückgestellt` ist (die werden ignoriert, siehe unten), und
+   - **kein** Assignee hat (Kollisionsschutz — siehe AGENTS.md, „Board-Workflow"), und
+   - keinen offenen Branch/Worktree hat (`git worktree list` + `git branch -a` gegenchecken).
+2. Dieses Ticket mit dem normalen kubequest-Workflow abarbeiten (self-assignen → eigener Worktree → umsetzen → nach `main` → Issue schließen).
+3. **⚠️-Flags beachten** (siehe Liste): manche Tickets werden NICHT direkt umgesetzt (Epic zerlegen, Optik erst abstimmen, Umbau-Branch statt `main`) oder haben eine harte Voraussetzung.
+
+> Erledigte Tickets werden hier **nicht durchgestrichen, sondern entfernt** (GitHub-Issue-Status ist die SSOT für „erledigt"). Diese Datei führt nur die noch offenen Architektur-Tickets in Reihenfolge.
+
+## Reihenfolge
+
+Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Stardew-Scope und ist voll abschließbar), dann die **großen Refactors** (vom Architektur-Wächter abgesichert), dann **Welt/Tiles**, dann **UX-Komfort**, zuletzt die **Sonderfälle** (Umbau-gekoppelt, Epic, Optik, anlegendes Review).
+
+| # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
+|---|--------|--------------|---------------------------|
+| 1 | **#344** | `game.ts → sfx.ts` Schichtverletzung beheben | Klein, voll abschließbar. **Voraussetzung für #347** (Wächter startet nur grün, wenn diese Verletzung weg ist). |
+| 2 | **#347** | Architektur-Wächter (`dependency-cruiser`) in CI | Sichert die Schichtung dauerhaft ab → hoher Stardew-Scope-Wert, schützt alle folgenden Refactors. Braucht **#344 vorher**. |
+| 3 | **#353** | Spielstand: aktuelle Quest per **ID** statt Zahl-Index (prio:mittel) | Save-Robustheit: Quests einschieben/umsortieren bricht keine Spielstände mehr — Kern-Stardew-Scope. Fundament für #354 und #332. |
+| 4 | **#354** | Sprechende Quest-IDs (`harbor-first-crate` statt `q2b`) | Repo-weiter Rename + Save-Migration. Setzt auf die **ID-basierte Save** aus #353 auf → danach. |
+| 5 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. |
+| 6 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347) abgesichert. ~500 sim-Tests: Red-Green beachten. |
+| 7 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
+| 8 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
+| 9 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
+| 10 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
+| 11 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
+| 12 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen → **nach #353** sauberer. |
+| 13 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → erst wenn Save-Format (#353) sitzt. |
+| 14 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 15 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`) und **darf nicht vor dem finalen main-Merge** des Umbaus geschlossen werden (#348/#349/#350 noch offen). Deshalb nicht als sauber-abschließbarer „nächster" Pick vorne — erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
+| 16 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 17 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 18 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+
+## Zurückgestellt — werden ignoriert
+
+Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, 23 Stück): u.a. der ganze „Echter Modus"-Bogen (#173–#178), Phase-10-Save-Sync (#158/#159/#160), die Expeditions-Flotte/Wachturm-Inseln (#130/#146–#148/#156), Storage-Lernpfad (#240/#241), Self-Hosting (#221), Tasten-Umbelegung (#232), Lazy-Asset-Loading (#198), Sprite-Atlas (#339), Schiff-Szene (#257), Enter/Leertaste-Dialoge (#312).
+
+Wird eins davon reaktiviert (Label `status:zurückgestellt` entfernt), gehört es hier einsortiert.
+
+## Pflege dieser Liste
+
+- **Erledigtes Ticket** → Zeile entfernen (Issue-Status ist die SSOT).
+- **Neues `area:architektur`-Ticket** → an der dependency-passenden Stelle einsortieren, nicht einfach unten anhängen.
+- **Reaktiviertes Ticket** (zurückgestellt-Label weg) → einsortieren.
+- Bei Unklarheit über die Position: „Ist das okay, wenn KubeQuest Stardew-groß wird?" (oberste Regel, AGENTS.md) entscheidet vor Prio-Label.
