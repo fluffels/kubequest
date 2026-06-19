@@ -11,6 +11,7 @@ import {
   DEPLOYMENT_YAML, SERVICE_YAML, INGRESS_YAML, INGRESS_TLS_YAML, NETPOL_YAML, BOESE_CONFIG_YAML,
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
   ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML, SERVICEMONITOR_YAML,
+  GRAFANA_DATASOURCE_YAML, GRAFANA_DASHBOARD_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -1730,6 +1731,107 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "lumi", lines: [
         "Sieh an – du misst, statt zu raten. <code>top</code> für den schnellen Blick, ein <b>ServiceMonitor</b>, damit Prometheus dauerhaft dranbleibt. Das Fundament steht.",
         "Beim nächsten Mal machen wir die Zahlen <b>hübsch</b>: ein <b>Grafana</b>-Dashboard, das den Hafen auf einen Blick zeigt – schöner als jeder Sonnenuntergang. Komm wieder hoch auf die Klippe! 🔦",
+      ]},
+    ]},
+
+  // ===== Phase 5: Monitoring-Leuchtturm – Quest 2: Grafana-Dashboard bauen & lesen (#114) =====
+  // Zweite Quest bei Lumi: Grafana als Datasource an Prometheus anbinden (GrafanaDatasource-CRD),
+  // dann ein deklaratives Dashboard anlegen (GrafanaDashboard-CRD), drei Panels lesen und aus
+  // den Zahlen die richtige Schlussfolgerung ziehen. Entspannt & belohnend (#52).
+  { id: "q33", title: "Zahlen in Bilder: das Grafana-Dashboard", giver: "lumi", rewardXp: 55, rewardCoins: 40,
+    steps: [
+      { type: "dialog", npc: "lumi", lines: [
+        "Willkommen zurück auf der Klippe! Prometheus sammelt fleißig Zahlen – aber ein endloser Strom aus Messwerten ist wie ein Logbuch ohne Schaubilder: informativ, aber schwer zu lesen.",
+        "Genau hier kommt <b>Grafana</b> ins Spiel. Grafana ist unser Kartentisch: Es nimmt die Rohdaten aus Prometheus und verwandelt sie in <b>Dashboards</b> – Bildschirmseiten mit Graphen, Tabellen und Ampeln, die du auf einen Blick ablesen kannst.",
+        "Bevor Grafana aber überhaupt eine Zahl anzeigen kann, muss es wissen, <i>woher</i> es die Daten holt. Diese Verbindung nennt sich <b>Datasource</b> – die Datenquelle. Ohne Datasource: leere Graphen.",
+      ]},
+      { type: "dialog", npc: "lumi",
+        scenario: {
+          files: { "grafanadatasource.yaml": GRAFANA_DATASOURCE_YAML },
+          applyEffects: {
+            "grafanadatasource.yaml": { grafanaDatasource: { name: "prometheus-quelle", dsType: "prometheus", url: "http://prometheus-server.monitoring.svc:9090" } },
+          },
+        },
+        lines: [
+          "Ich habe dir eine <code>grafanadatasource.yaml</code> vorbereitet. Sie beschreibt eine <b>GrafanaDatasource</b> – eine CRD des Grafana-Operators. Darin steht: <i>Typ Prometheus, Adresse im Cluster, Zugriff über Proxy</i>.",
+          "Sobald du das Manifest anwendest, weiß Grafana: „Meine Datenquelle heißt <b>Prometheus</b>, und ich finde sie unter <code>prometheus-server.monitoring.svc:9090</code>.“ Dann kann jedes Dashboard darauf zugreifen.",
+        ] },
+      { type: "terminal", brief: "Datasource-Manifest lesen", tasks: [
+        { id: "t-ds-ls", text: "Was liegt hier? <code>ls</code>.",
+          accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-ds-cat", text: "Lies die Datenquelle: <code>cat grafanadatasource.yaml</code>. Findest du <code>kind: GrafanaDatasource</code>, den <code>type: prometheus</code> und die Cluster-URL?",
+          accept: [/^cat\s+grafanadatasource\.yaml$/], solution: "cat grafanadatasource.yaml", hint: "cat grafanadatasource.yaml" },
+      ]},
+      { type: "teach", brief: "Datasource anbinden", cmd: {
+        id: "t-ds-apply",
+        intro: "🆕 Neuer Befehl: <code>kubectl apply -f grafanadatasource.yaml</code> – wie alle Manifeste, nur dass hier eine CRD des Grafana-Operators entsteht. Ab jetzt hat Grafana eine Datenquelle.",
+        text: "Bind die Datenquelle an: wende <code>grafanadatasource.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+grafanadatasource\.yaml$/],
+        check: (sim: Sim) => sim.grafanaDatasources.some(d => d.name === "prometheus-quelle"),
+        solution: "kubectl apply -f grafanadatasource.yaml",
+        hint: "kubectl apply -f <datei> – der vertraute Befehl." } },
+      { type: "terminal", brief: "Datasource prüfen", tasks: [
+        { id: "t-ds-get", text: "Prüf, dass Grafana die Quelle kennt: <code>kubectl get grafanadatasources</code>. Deine <code>prometheus-quelle</code> taucht jetzt auf.",
+          accept: [/^kubectl\s+get\s+(grafanadatasources|grafanadatasource|grafanadatasrc)$/],
+          check: (sim: Sim) => sim.grafanaDatasources.some(d => d.name === "prometheus-quelle"),
+          solution: "kubectl get grafanadatasources", hint: "kubectl get grafanadatasources (Kurzform: grafanadatasrc)." },
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-datasource",
+        q: "Wozu braucht Grafana eine <b>GrafanaDatasource</b>?",
+        options: [
+          { t: "Sie sagt Grafana, <b>woher</b> es die Metriken holt – Typ (Prometheus), Adresse im Cluster und Zugriffsweg.", ok: true,
+            reply: "Genau! Die Datasource ist die Brücke: Grafana weiß jetzt, unter welcher Adresse es Prometheus findet und wie es anfragen soll. Ohne sie: leere Graphen. 🔦" },
+          { t: "Sie startet Prometheus und sorgt dafür, dass es Metriken scrapt.", ok: false,
+            reply: "Nein – Prometheus läuft bereits. Die GrafanaDatasource konfiguriert nur Grafana: <i>wo</i> es seine Daten abholt. Das Scrapen macht weiterhin Prometheus selbst." },
+          { t: "Sie legt fest, welche Dashboards angezeigt werden und wie viele Panels sie haben.", ok: false,
+            reply: "Das ist die Aufgabe der GrafanaDashboard-CRD. Die GrafanaDatasource kümmert sich nur um die <i>Datenquelle</i> – die Frage, woher die Zahlen kommen." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Datasource steht – Grafana hat jetzt einen Draht zu Prometheus. Jetzt bauen wir das <b>Dashboard</b> selbst.",
+        "Ein <b>GrafanaDashboard</b> ist wieder eine CRD: Das eigentliche Dashboard-JSON (das Grafana sonst per Hand über die Oberfläche speichern würde) steckt direkt im Manifest. Deklarativ, versionierbar, reproduzierbar – genau wie alles andere im Cluster.",
+        "Unser <b>Hafen-Übersicht</b>-Dashboard hat drei Panels: <b>CPU pro Pod</b> (Zeitreihe), <b>Aktive Alerts</b> (Zahl) und <b>Scrape-Targets up/down</b> (Tabelle). Kurz, aber alles, was du auf der Klippe brauchst.",
+      ]},
+      { type: "dialog", npc: "lumi",
+        scenario: {
+          files: { "grafanadashboard.yaml": GRAFANA_DASHBOARD_YAML },
+          applyEffects: {
+            "grafanadashboard.yaml": { grafanaDashboard: { name: "hafen-uebersicht", title: "Hafen-Übersicht", panels: 3 } },
+          },
+        },
+        lines: [
+          "Hier liegt <code>grafanadashboard.yaml</code>. Schau sie dir an – du findest darin den <code>title</code> und die <code>panels</code>-Liste. Dann wenden wir das Dashboard an.",
+        ] },
+      { type: "terminal", brief: "Dashboard-Manifest lesen", tasks: [
+        { id: "t-gd-cat", text: "Lies das Dashboard: <code>cat grafanadashboard.yaml</code>. Findest du <code>kind: GrafanaDashboard</code>, den <code>title</code> und die drei Panel-Titel?",
+          accept: [/^cat\s+grafanadashboard\.yaml$/], solution: "cat grafanadashboard.yaml", hint: "cat grafanadashboard.yaml" },
+      ]},
+      { type: "teach", brief: "Dashboard anlegen", cmd: {
+        id: "t-gd-apply",
+        intro: "🆕 Neuer Befehl: <code>kubectl apply -f grafanadashboard.yaml</code> – legt das Dashboard deklarativ an. Grafana liest das JSON aus dem Manifest und zeigt es sofort in seiner Oberfläche.",
+        text: "Leg das Dashboard an: wende <code>grafanadashboard.yaml</code> an.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+grafanadashboard\.yaml$/],
+        check: (sim: Sim) => sim.grafanaDashboards.some(d => d.name === "hafen-uebersicht"),
+        solution: "kubectl apply -f grafanadashboard.yaml",
+        hint: "kubectl apply -f <datei> – wie immer." } },
+      { type: "terminal", brief: "Dashboard prüfen", tasks: [
+        { id: "t-gd-get", text: "Prüf, dass das Dashboard registriert ist: <code>kubectl get grafanadashboards</code>. Du siehst <code>hafen-uebersicht</code> mit Titel und Panel-Anzahl.",
+          accept: [/^kubectl\s+get\s+(grafanadashboards|grafanadashboard|grafanadash)$/],
+          check: (sim: Sim) => sim.grafanaDashboards.some(d => d.name === "hafen-uebersicht"),
+          solution: "kubectl get grafanadashboards", hint: "kubectl get grafanadashboards (Kurzform: grafanadash)." },
+      ]},
+      { type: "choice", npc: "lumi", reviewId: "q-obs-dashboard-panel",
+        q: "Im Panel <b>Scrape-Targets up/down</b> siehst du plötzlich ein Target auf <code>down</code>. Was bedeutet das – und was ist dein nächster Schritt?",
+        options: [
+          { t: "Der betroffene Dienst antwortet nicht auf <code>/metrics</code> – Prometheus kann ihn nicht scrapen. Nächster Schritt: <code>kubectl get pods</code>, um den Pod-Status zu prüfen.", ok: true,
+            reply: "Genau! Ein <code>down</code>-Target heißt: Prometheus hat beim Scrapen keine Antwort bekommen. Der Pod läuft vielleicht nicht, horcht am falschen Port oder hat einen Fehler. <code>kubectl get pods</code> + <code>kubectl describe pod</code> sind dein Einstieg. 🔦" },
+          { t: "Grafana hat die Verbindung zur Datasource verloren. Nächster Schritt: <code>kubectl apply -f grafanadatasource.yaml</code> erneut ausführen.", ok: false,
+            reply: "Nicht ganz. Wenn die Datasource fehlen würde, wären <i>alle</i> Panels leer oder fehlerhaft – nicht nur ein Target in der Tabelle. Ein einzelnes <code>down</code>-Target zeigt ein Problem beim <i>Dienst</i> selbst, nicht bei Grafana." },
+          { t: "Das Target wurde bewusst deaktiviert. Es muss kein Handlungsbedarf bestehen.", ok: false,
+            reply: "Im Zweifel lieber nachschauen als ignorieren! Ein <code>down</code>-Target ist immer ein Warnsignal: Prometheus bekommt keine Metriken mehr. Der Dienst könnte abgestürzt sein oder am falschen Port horchen." },
+        ]},
+      { type: "dialog", npc: "lumi", lines: [
+        "Sieh an – du liest Dashboards wie Seekarten. Datasource verknüpft, Dashboard angelegt, Panels verstanden.",
+        "Das ist Observability: nicht raten, sondern <b>sehen</b>. Prometheus sammelt, Grafana zeigt – und du weißt sofort, wo der Hafen brennt. Meld dich wieder, wenn du die <b>Alerts</b> aufschalten willst – dann nicht nur sehen, sondern <i>benachrichtigt</i> werden. 🔦",
       ]},
     ]},
 ];
