@@ -35,6 +35,11 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
 
   const BOX_INTERVALS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
+  /** Sentinel in `unlockedAbbrev`: „alle Abkürzungen freigeschaltet". Für Alt-Spielstände
+   *  von vor der Freischalt-Mechanik (#287/#297) – so erlebt niemand einen Rückschritt,
+   *  wenn das Gating (#299) aktiv wird. Neue Spiele starten mit leerem Array. */
+  export const ALL_ABBREV_UNLOCKED = "*";
+
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
   // Hinweis: Baustein-Karten (#231, q-flag-*) hängen an genau der Quest, in der ihr
   // Flag/Teil per teach-Schritt eingeführt wird – erst eingeführt, dann abgefragt (#227).
@@ -92,6 +97,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       streak: { count: 0, lastDay: 0 },
       streakHintShown: false,
       introSeen: false,
+      unlockedAbbrev: [],
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
@@ -190,6 +196,20 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     const player = isPlainObject(raw.player) ? raw.player : {};
     const streak = isPlainObject(raw.streak) ? raw.streak : {};
 
+    // „Verdiente Abkürzungen" (#297): vorhandenes Feld einfach übernehmen. Fehlt es ganz,
+    // stammt der Stand von VOR dieser Mechanik – wer schon Fortschritt hat, wird per
+    // Sentinel "*" grandfathered (alles frei), damit das spätere Gating (#299) kein bereits
+    // gelerntes Kürzel rückwirkend sperrt. Ein frischer Stand ohne Fortschritt startet leer
+    // und verdient die Kürzel regulär.
+    let unlockedAbbrev: string[];
+    if (raw.unlockedAbbrev !== undefined) {
+      unlockedAbbrev = safeStrArray(raw.unlockedAbbrev);
+    } else {
+      const hatFortschritt = safeCount(raw.xp, 0) > 0 || safeCount(raw.questIdx, 0) > 0 ||
+        (Array.isArray(raw.completedQuests) && raw.completedQuests.length > 0);
+      unlockedAbbrev = hatFortschritt ? [ALL_ABBREV_UNLOCKED] : [];
+    }
+
     return {
       xp: safeCount(raw.xp, def.xp),
       coins: safeCount(raw.coins, def.coins),
@@ -207,6 +227,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       streak: { count: safeCount(streak.count, 0), lastDay: safeCount(streak.lastDay, 0) },
       streakHintShown: typeof raw.streakHintShown === "boolean" ? raw.streakHintShown : def.streakHintShown,
       introSeen: typeof raw.introSeen === "boolean" ? raw.introSeen : def.introSeen,
+      unlockedAbbrev,
       stats,
       lastSeen: safeCount(raw.lastSeen, def.lastSeen),
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
@@ -280,6 +301,22 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       // location.reload() (ui.resetGame) lädt dann sauber die Startposition.
       this.state.player = { ...makeDefaultState().player };
       SaveStore.writeState(this.state);
+    },
+
+    /* ---------- „Verdiente Abkürzungen" (#287/#297) ---------- */
+    /** Ist die Abkürzung mit dieser ID freigeschaltet? true, sobald sie einzeln
+     *  freigeschaltet wurde ODER der Stand grandfathered ist (Sentinel "*").
+     *  Das eigentliche Gating der Eingabe-Akzeptanz baut darauf auf (#299). */
+    isAbbrevUnlocked(id: string): boolean {
+      return this.state.unlockedAbbrev.includes(ALL_ABBREV_UNLOCKED) || this.state.unlockedAbbrev.includes(id);
+    },
+
+    /** Schaltet eine Abkürzung frei (idempotent, speichert sofort). Aufgerufen vom
+     *  Freischalt-Moment im Lernpfad (#300). Bei bereits grandfathertem Stand No-op. */
+    unlockAbbrev(id: string) {
+      if (this.isAbbrevUnlocked(id)) return;
+      this.state.unlockedAbbrev.push(id);
+      this.save();
     },
 
     /* ---------- Spielstand als Datei sichern / laden ---------- */
