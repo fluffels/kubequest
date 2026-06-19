@@ -252,6 +252,18 @@ export const QUESTS: Quest[] = [
           { t: "Ein besonders großer Pod.", ok: false,
             reply: "Nein – andersrum wird's richtig: Auf einem Node (Steg) stehen viele Pods (Liegeplätze)." },
         ]},
+      { type: "dialog", npc: "ole", lines: [
+        "Damit du die zwei <b>nie</b> verwechselst, merk dir die Wörter selbst: Ein <b>Pod</b> ist wörtlich eine <b>Schote/Hülse</b> – wie die Erbsenschote, die ihre Erbsen umschließt (und wie der „Pod“ einer Walschule – passt bestens zum Docker-Wal und zum Containerschiff). Drin steckt die Fracht: der Container.",
+        "Ein <b>Node</b> ist ein <b>Knoten</b> im Netz – ein fester Punkt, der etwas trägt; im Hafenbild der <b>Steg</b>. Kurz: Der <b>Node</b> (Maschine/Steg) bleibt stehen, die <b>Pods</b> (Schoten/Liegeplätze) darauf sind vergänglich und kommen & gehen – fällt einer aus, schiebt Kubernetes Ersatz einfach auf einen freien Steg.",
+      ]},
+      { type: "choice", npc: "ole", reviewId: "q-ch2-podnode",
+        q: "Auf den Punkt: Wie hängen Pod und Node zusammen?",
+        options: [
+          { t: "Der Node ist die Maschine (Steg), der Pod die kleinste laufende Einheit darauf – ein Node trägt viele Pods.", ok: true,
+            reply: "Genau! Maschine trägt laufende Einheit. Pods sind vergänglich, Nodes bleiben – fällt etwas aus, verteilt der Scheduler neu." },
+          { t: "Der Pod ist die Maschine, der Node läuft als Einheit darauf.", ok: false,
+            reply: "Andersrum: Der Node (Steg) ist die Maschine, die Pods (Liegeplätze) liegen darauf." },
+        ]},
     ]},
 
   { id: "q6", title: "Der Dauerauftrag", giver: "ole", rewardXp: 35, rewardCoins: 25,
