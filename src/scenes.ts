@@ -341,12 +341,8 @@ import { getMapEntry } from "./mapregistry";
     spawnGull() {
       const y = Phaser.Math.Between(2, 22) * T;
       const fromLeft = Math.random() < 0.5;
-      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
-      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
-      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
-      gull.add([w1, w2]);
-      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const gull = this.add.image(fromLeft ? -20 : this.W * T + 20, y, "seagull")
+        .setDepth(11000).setScale(0.35).setFlipX(!fromLeft);
       this.tweens.add({ targets: gull, y: y + Phaser.Math.Between(-30, 30), duration: 4000, yoyo: true, repeat: -1, ease: "Sine.inOut" });
       this.tweens.add({
         targets: gull, x: fromLeft ? this.W * T + 30 : -30,
@@ -1886,12 +1882,8 @@ import { getMapEntry } from "./mapregistry";
     spawnGull() {
       const y = Phaser.Math.Between(1, this.H - 4) * T;
       const fromLeft = Math.random() < 0.5;
-      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
-      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
-      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
-      gull.add([w1, w2]);
-      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const gull = this.add.image(fromLeft ? -20 : this.W * T + 20, y, "seagull")
+        .setDepth(11000).setScale(0.35).setFlipX(!fromLeft);
       this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
     }
 
@@ -2169,12 +2161,8 @@ import { getMapEntry } from "./mapregistry";
     spawnGull() {
       const y = Phaser.Math.Between(1, this.H - 4) * T;
       const fromLeft = Math.random() < 0.5;
-      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
-      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
-      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
-      gull.add([w1, w2]);
-      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const gull = this.add.image(fromLeft ? -20 : this.W * T + 20, y, "seagull")
+        .setDepth(11000).setScale(0.35).setFlipX(!fromLeft);
       this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
     }
 
@@ -2401,12 +2389,8 @@ import { getMapEntry } from "./mapregistry";
     spawnGull() {
       const y = Phaser.Math.Between(1, this.H - 4) * T;
       const fromLeft = Math.random() < 0.5;
-      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
-      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
-      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
-      gull.add([w1, w2]);
-      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const gull = this.add.image(fromLeft ? -20 : this.W * T + 20, y, "seagull")
+        .setDepth(11000).setScale(0.35).setFlipX(!fromLeft);
       this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
     }
 
