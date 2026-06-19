@@ -193,7 +193,7 @@ export interface ArgoApp {
 }
 /** Wirkung eines `kubectl apply -f <datei>` (was die Datei im Cluster erzeugt). */
 export interface ApplyEffect {
-  deployment?: { name: string; image: string; replicas: number };
+  deployment?: { name: string; image: string; replicas: number; securityContext?: SecurityContext };
   service?: { name: string; type?: string; port: string | number };
   ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string; tls?: { secretName: string } };
   networkPolicy?: { name: string; podSelector?: string; allowFrom?: string };
@@ -292,6 +292,49 @@ export interface StorageClassRes {
   isDefault: boolean;          // greift, wenn ein PVC keine StorageClass nennt
   created: number;
 }
+/* === Wachturm-Quartier: RBAC / ServiceAccounts / Pod-Security (#126) === */
+/** ServiceAccount: die Identität, unter der ein Pod im Cluster auftritt. Jeder
+ *  Namespace hat von Haus aus die "default"-SA; eigene legt man für Least-Privilege an. */
+export interface ServiceAccountRes {
+  name: string;
+  created: number;
+}
+/** Eine Berechtigungs-Regel: welche `verbs` auf welche `resources` (je `*` = alles). */
+export interface PolicyRule {
+  verbs: string[];
+  resources: string[];
+}
+/** Role (namespaced) bzw. ClusterRole (cluster-weit) – ein Bündel von Regeln.
+ *  `cluster=true` markiert die ClusterRole; ausgewertet werden beide gleich. */
+export interface RoleRes {
+  name: string;
+  cluster: boolean;
+  rules: PolicyRule[];
+  created: number;
+}
+/** Subjekt einer Bindung – wer die Rechte bekommt (User oder ServiceAccount). */
+export interface RbacSubject {
+  kind: "User" | "ServiceAccount";
+  name: string;
+  namespace?: string;   // nur bei ServiceAccount
+}
+/** RoleBinding / ClusterRoleBinding: verbindet ein/mehrere Subjekte mit genau einer Rolle. */
+export interface RoleBindingRes {
+  name: string;
+  cluster: boolean;     // true = ClusterRoleBinding
+  roleRef: { kind: "Role" | "ClusterRole"; name: string };
+  subjects: RbacSubject[];
+  created: number;
+}
+/** securityContext eines Pods – die für die Pod-Security-Admission relevanten Felder. */
+export interface SecurityContext {
+  runAsNonRoot?: boolean;
+  privileged?: boolean;
+  readOnlyRootFilesystem?: boolean;
+  allowPrivilegeEscalation?: boolean;
+}
+/** Durchgesetzte Pod-Security-Standards-Stufe (Namespace-Label `pod-security.kubernetes.io/enforce`). */
+export type PodSecurityLevel = "privileged" | "baseline" | "restricted";
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
   status: string;
@@ -351,6 +394,12 @@ export interface Scenario {
   pvcs?: Array<{ name: string; storage?: string; capacity?: string; storageClass?: string; accessModes?: string; status?: "Pending" | "Bound"; volume?: string }>;
   pvs?: Array<{ name: string; capacity?: string; storageClass?: string; accessModes?: string; reclaimPolicy?: string; status?: "Available" | "Bound" | "Released"; claim?: string }>;
   storageClasses?: Array<{ name: string; provisioner?: string; reclaimPolicy?: string; isDefault?: boolean }>;
+  // RBAC / ServiceAccounts / Pod-Security (#126). Strukturiert vorgegeben –
+  // die imperativen `kubectl create …`-Handler bauen zur Laufzeit dieselben Formen.
+  serviceAccounts?: string[];
+  roles?: Array<{ name: string; cluster?: boolean; rules: PolicyRule[] }>;
+  roleBindings?: Array<{ name: string; cluster?: boolean; roleRef: { kind: "Role" | "ClusterRole"; name: string }; subjects: RbacSubject[] }>;
+  podSecurity?: PodSecurityLevel;
   argoApps?: ArgoApp[];
   helmRepos?: string[];
   releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
@@ -450,6 +499,11 @@ export interface Scenario {
     pvcs!: PvcRes[];
     pvs!: PvRes[];
     storageClasses!: StorageClassRes[];
+    // RBAC / ServiceAccounts / Pod-Security (#126)
+    serviceAccounts!: ServiceAccountRes[];
+    roles!: RoleRes[];                 // Roles UND ClusterRoles (per .cluster unterschieden)
+    roleBindings!: RoleBindingRes[];   // RoleBindings UND ClusterRoleBindings (per .cluster)
+    podSecurity!: PodSecurityLevel;    // durchgesetzte Pod-Security-Stufe des default-Namespace
     argoApps!: ArgoApp[];
     helmRepos!: string[];
     releases!: Release[];
@@ -515,6 +569,17 @@ export interface Scenario {
         }
       }
       this.statefulSets = (sc.statefulSets || []).map(s => this._makeStatefulSet(s));
+
+      // RBAC / ServiceAccounts / Pod-Security (#126). Jeder Namespace hat von Haus
+      // aus die "default"-SA; weitere kommen aus dem Szenario oder per `kubectl create`.
+      this.serviceAccounts = [{ name: "default", created: 0 }];
+      for (const name of sc.serviceAccounts || []) {
+        if (!this.serviceAccounts.some(s => s.name === name)) this.serviceAccounts.push({ name, created: 0 });
+      }
+      this.roles = (sc.roles || []).map(r => ({ name: r.name, cluster: !!r.cluster, rules: r.rules.map(rule => ({ verbs: rule.verbs.slice(), resources: rule.resources.slice() })), created: 0 }));
+      this.roleBindings = (sc.roleBindings || []).map(b => ({ name: b.name, cluster: !!b.cluster, roleRef: { kind: b.roleRef.kind, name: b.roleRef.name }, subjects: b.subjects.map(s => Object.assign({}, s)), created: 0 }));
+      // Ohne Vorgabe ist die Admission "privileged" (keine Einschränkung) – wie ein frischer Cluster.
+      this.podSecurity = sc.podSecurity || "privileged";
 
       this.argoApps = (sc.argoApps || []).map(a => this._cloneArgoApp(a));
 
@@ -733,6 +798,18 @@ export interface Scenario {
       for (const s of sc.statefulSets || []) {
         if (!this.statefulSets.some(x => x.name === s.name)) this.statefulSets.push(this._makeStatefulSet(s));
       }
+      // RBAC / ServiceAccounts / Pod-Security (#126) – additiv, ohne Doppler.
+      for (const name of sc.serviceAccounts || []) {
+        if (!this.serviceAccounts.some(x => x.name === name)) this.serviceAccounts.push({ name, created: this.clock });
+      }
+      for (const r of sc.roles || []) {
+        if (!this.roles.some(x => x.name === r.name && x.cluster === !!r.cluster)) this.roles.push({ name: r.name, cluster: !!r.cluster, rules: r.rules.map(rule => ({ verbs: rule.verbs.slice(), resources: rule.resources.slice() })), created: this.clock });
+      }
+      for (const b of sc.roleBindings || []) {
+        if (!this.roleBindings.some(x => x.name === b.name && x.cluster === !!b.cluster)) this.roleBindings.push({ name: b.name, cluster: !!b.cluster, roleRef: { kind: b.roleRef.kind, name: b.roleRef.name }, subjects: b.subjects.map(s => Object.assign({}, s)), created: this.clock });
+      }
+      // Höhere enforce-Stufe gewinnt nicht automatisch – eine explizit gesetzte Stufe übernehmen.
+      if (sc.podSecurity) this.podSecurity = sc.podSecurity;
       for (const a of sc.argoApps || []) {
         if (!this.argoApps.some(x => x.name === a.name)) this.argoApps.push(this._cloneArgoApp(a));
       }
@@ -810,6 +887,12 @@ export interface Scenario {
         pvs: this.pvs.map(p => Object.assign({}, p)),
         pvcs: this.pvcs.map(p => ({ name: p.name, storage: p.capacity, status: p.status, volume: p.volume, storageClass: p.storageClass, accessModes: p.accessModes })),
         statefulSets: this.statefulSets.map(s => ({ name: s.name, image: s.image, replicas: s.replicas, serviceName: s.serviceName, volumeClaimName: s.volumeClaimName, storage: s.storage, storageClass: s.storageClass })),
+        // RBAC / ServiceAccounts / Pod-Security (#126). Die "default"-SA legt reset()
+        // ohnehin wieder an – nur die selbst erstellten serialisieren.
+        serviceAccounts: this.serviceAccounts.filter(s => s.name !== "default").map(s => s.name),
+        roles: this.roles.map(r => ({ name: r.name, cluster: r.cluster, rules: r.rules.map(rule => ({ verbs: rule.verbs.slice(), resources: rule.resources.slice() })) })),
+        roleBindings: this.roleBindings.map(b => ({ name: b.name, cluster: b.cluster, roleRef: { kind: b.roleRef.kind, name: b.roleRef.name }, subjects: b.subjects.map(s => Object.assign({}, s)) })),
+        podSecurity: this.podSecurity,
         argoApps: this.argoApps.map(a => this._cloneArgoApp(a)),
         helmRepos: this.helmRepos.slice(),
         releases: this.releases.map(r => ({
@@ -934,12 +1017,25 @@ export interface Scenario {
       return null;
     }
 
+    /** Alle Werte eines (wiederholbaren UND kommagetrennten) Flags einsammeln, z.B.
+     *  `--verb=get,list --verb=watch` → ["get","list","watch"]. Für RBAC-Befehle (#126). */
+    _multiFlag(raw: string, flag: string): string[] {
+      const re = new RegExp("--" + flag + "[=\\s]([^\\s]+)", "g");
+      const out: string[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(raw)) !== null) {
+        for (const part of m[1].split(",")) if (part) out.push(part);
+      }
+      return out;
+    }
+
     _help() {
       return [
         "Verfügbare Befehle im Simulator:",
         "  docker     pull | build -t <name> . | tag <quelle> <ziel> | run | ps [-a] | images | stop | rm",
-        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|servicemonitors|prometheusrules|grafanadatasources|grafanadashboards|alerts|nodes|secrets|configmaps | describe pod|ingress|networkpolicy <name>",
-        "             create deployment | create secret generic|tls | create configmap | scale | expose | delete | apply -f <datei>",
+        "  kubectl    get pods|deployments|services|endpoints|ingress|networkpolicies|servicemonitors|prometheusrules|grafanadatasources|grafanadashboards|alerts|nodes|secrets|configmaps|serviceaccounts|roles|rolebindings | describe pod|ingress|networkpolicy|role|serviceaccount <name>",
+        "             create deployment | create secret generic|tls | create configmap | create serviceaccount|role|clusterrole|rolebinding|clusterrolebinding | scale | expose | delete | apply -f <datei>",
+        "             auth can-i <verb> <resource> [--as=…] | label namespace <ns> pod-security.kubernetes.io/enforce=<stufe>",
         "             logs [-f] [--previous] <pod> | top pods|nodes | set image deployment/<n> <c>=<img> | set env deployment/<n> --from=configmap|secret/<n> | set resources deployment/<n> --limits=memory=256Mi | rollout restart deployment <n>",
         "  helm       repo add|update | search repo | create | lint | package | install | list | upgrade | rollback | uninstall | status",
         "  terraform  init | plan | apply | destroy | state list",
@@ -1120,6 +1216,8 @@ export interface Scenario {
       if (sub === "top") return this._kubectlTop(t);
       if (sub === "set") return this._kubectlSet(t, raw);
       if (sub === "rollout") return this._kubectlRollout(t);
+      if (sub === "auth") return this._kubectlAuth(t, raw);
+      if (sub === "label") return this._kubectlLabel(t, raw);
 
       return this._err("kubectl: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
@@ -1268,6 +1366,35 @@ export interface Scenario {
           this.storageClasses.map(s => [s.name + (s.isDefault ? " (default)" : ""), s.provisioner, s.reclaimPolicy, this._age(s.created)]));
       }
 
+      if (["serviceaccounts", "serviceaccount", "sa"].includes(what)) {
+        return table(["NAME", "SECRETS", "AGE"],
+          this.serviceAccounts.map(s => [s.name, "0", this._age(s.created)]));
+      }
+
+      if (["roles", "role"].includes(what)) {
+        const rs = this.roles.filter(r => !r.cluster);
+        if (rs.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "AGE"], rs.map(r => [r.name, this._age(r.created)]));
+      }
+
+      if (["clusterroles", "clusterrole"].includes(what)) {
+        const rs = this.roles.filter(r => r.cluster);
+        if (rs.length === 0) return "No resources found.";
+        return table(["NAME", "AGE"], rs.map(r => [r.name, this._age(r.created)]));
+      }
+
+      if (["rolebindings", "rolebinding", "rb"].includes(what)) {
+        const bs = this.roleBindings.filter(b => !b.cluster);
+        if (bs.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "ROLE", "AGE"], bs.map(b => [b.name, b.roleRef.kind + "/" + b.roleRef.name, this._age(b.created)]));
+      }
+
+      if (["clusterrolebindings", "clusterrolebinding", "crb"].includes(what)) {
+        const bs = this.roleBindings.filter(b => b.cluster);
+        if (bs.length === 0) return "No resources found.";
+        return table(["NAME", "ROLE", "AGE"], bs.map(b => [b.name, b.roleRef.kind + "/" + b.roleRef.name, this._age(b.created)]));
+      }
+
       if (["alerts", "alert"].includes(what)) {
         const active = this.alerts();
         if (active.length === 0) return "No alerts firing.";
@@ -1276,7 +1403,7 @@ export interface Scenario {
       }
 
       if (!what) return this._err("kubectl get: Was möchtest du sehen?", "z.B. 'kubectl get pods' oder 'kubectl get nodes'");
-      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, servicemonitors, prometheusrules, grafanadashboards, alerts, secrets, configmaps oder nodes?");
+      return this._err('error: the server doesn\'t have a resource type "' + what + '"', "Gemeint war vielleicht: pods, deployments, services, endpoints, ingress, networkpolicies, servicemonitors, prometheusrules, grafanadashboards, alerts, secrets, configmaps, serviceaccounts, roles, rolebindings oder nodes?");
     }
 
     _kubectlDescribe(t: string[]) {
@@ -1320,7 +1447,28 @@ export interface Scenario {
             : "  <none> (default-deny: niemand darf rein, bis du eine Quelle erlaubst)",
         ].join("\n");
       }
-      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod <name>', 'kubectl describe ingress <name>' und 'kubectl describe networkpolicy <name>'.");
+      if (["role", "clusterrole"].includes(what)) {
+        const cluster = what === "clusterrole";
+        if (!name) return this._err("kubectl describe " + what + ": Welche Rolle?", "Die Namen siehst du mit 'kubectl get " + what + "s'.");
+        const role = this.roles.find(r => r.name === name && r.cluster === cluster);
+        if (!role) return this._err('Error from server (NotFound): ' + what + 's.rbac.authorization.k8s.io "' + name + '" not found', "Tipp: Namen aus 'kubectl get " + what + "s' kopieren.");
+        const lines = [
+          "Name:         " + role.name,
+          ...(cluster ? [] : ["Namespace:    default"]),
+          "PolicyRule:",
+          "  Resources  Verbs",
+          "  ---------  -----",
+        ];
+        for (const rule of role.rules) lines.push("  " + rule.resources.join(",") + "  [" + rule.verbs.join(" ") + "]");
+        return lines.join("\n");
+      }
+      if (["serviceaccount", "serviceaccounts", "sa"].includes(what)) {
+        if (!name) return this._err("kubectl describe serviceaccount: Welche SA?", "Die Namen siehst du mit 'kubectl get sa'.");
+        const acc = this.serviceAccounts.find(s => s.name === name);
+        if (!acc) return this._err('Error from server (NotFound): serviceaccounts "' + name + '" not found', "Tipp: Namen aus 'kubectl get sa' kopieren.");
+        return ["Name:         " + acc.name, "Namespace:    default", "Mountable secrets:  <none>"].join("\n");
+      }
+      if (!["pod", "pods"].includes(what)) return this._err("Der Simulator kann nur 'kubectl describe pod|ingress|networkpolicy|role|clusterrole|serviceaccount <name>'.");
       if (!name) return this._err("kubectl describe pod: Welcher Pod?", "Die Namen siehst du mit 'kubectl get pods'.");
       const pod = this._allPods().find(p => p.name === name);
       if (!pod) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Tipp: Pod-Namen kannst du aus 'kubectl get pods' kopieren.");
@@ -1414,14 +1562,141 @@ export interface Scenario {
         this.configMaps.push({ name, keys: literals, created: this.clock });
         return "configmap/" + name + " created";
       }
-      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment …', 'kubectl create secret generic …' und 'kubectl create configmap …'.");
+      if (t[2] === "serviceaccount" || t[2] === "sa") {
+        const name = t[3];
+        if (!name || name.startsWith("--")) return this._err("kubectl create serviceaccount: Der Name fehlt.", "Muster: kubectl create serviceaccount <name>");
+        if (this.serviceAccounts.some(s => s.name === name)) return this._err('error: serviceaccounts "' + name + '" already exists');
+        this.serviceAccounts.push({ name, created: this.clock });
+        return "serviceaccount/" + name + " created";
+      }
+      if (t[2] === "role" || t[2] === "clusterrole") {
+        const cluster = t[2] === "clusterrole";
+        const name = t[3];
+        if (!name || name.startsWith("--")) return this._err("kubectl create " + t[2] + ": Der Name fehlt.", "Muster: kubectl create " + t[2] + " <name> --verb=get,list --resource=pods");
+        const verbs = this._multiFlag(raw, "verb");
+        const resources = this._multiFlag(raw, "resource");
+        if (verbs.length === 0) return this._err("error: at least one --verb must be specified", "Häng z.B. '--verb=get,list' an.");
+        if (resources.length === 0) return this._err("error: at least one --resource must be specified", "Häng z.B. '--resource=pods' an.");
+        const kind = cluster ? "clusterrole" : "role";
+        if (this.roles.some(r => r.cluster === cluster && r.name === name)) return this._err('error: ' + kind + 's.rbac.authorization.k8s.io "' + name + '" already exists');
+        this.roles.push({ name, cluster, rules: [{ verbs, resources }], created: this.clock });
+        return kind + ".rbac.authorization.k8s.io/" + name + " created";
+      }
+      if (t[2] === "rolebinding" || t[2] === "clusterrolebinding") {
+        const cluster = t[2] === "clusterrolebinding";
+        const name = t[3];
+        if (!name || name.startsWith("--")) return this._err("kubectl create " + t[2] + ": Der Name fehlt.", "Muster: kubectl create " + t[2] + " <name> --role=<rolle> --serviceaccount=<ns>:<sa>");
+        const roleName = this._flagValue(t, "--role");
+        const clusterRoleName = this._flagValue(t, "--clusterrole");
+        // ClusterRoleBinding kann sich nur auf eine ClusterRole beziehen.
+        if (cluster && roleName) return this._err("error: a ClusterRoleBinding can only reference a ClusterRole", "Nutze '--clusterrole=<name>' statt '--role'.");
+        if (!roleName && !clusterRoleName) return this._err("error: exactly one of --role or --clusterrole must be specified", cluster ? "Häng '--clusterrole=<name>' an." : "Häng '--role=<name>' oder '--clusterrole=<name>' an.");
+        const roleRef = clusterRoleName ? { kind: "ClusterRole" as const, name: clusterRoleName } : { kind: "Role" as const, name: roleName! };
+        const subjects: RbacSubject[] = [];
+        for (const u of this._multiFlag(raw, "user")) subjects.push({ kind: "User", name: u });
+        for (const sa of this._multiFlag(raw, "serviceaccount")) {
+          const [ns, n] = sa.includes(":") ? sa.split(":") : ["default", sa];
+          subjects.push({ kind: "ServiceAccount", name: n, namespace: ns });
+        }
+        if (subjects.length === 0) return this._err("error: at least one of --user or --serviceaccount must be specified", "Muster: '--serviceaccount=default:deploy-bot' oder '--user=alice'.");
+        const kind = cluster ? "clusterrolebinding" : "rolebinding";
+        if (this.roleBindings.some(b => b.cluster === cluster && b.name === name)) return this._err('error: ' + kind + 's.rbac.authorization.k8s.io "' + name + '" already exists');
+        this.roleBindings.push({ name, cluster, roleRef, subjects, created: this.clock });
+        return kind + ".rbac.authorization.k8s.io/" + name + " created";
+      }
+      if (t[2] !== "deployment") return this._err("Der Simulator kann nur 'kubectl create deployment|serviceaccount|role|clusterrole|rolebinding|clusterrolebinding …', 'kubectl create secret generic|tls …' und 'kubectl create configmap …'.");
       const name = t[3];
       const imgMatch = raw.match(/--image[=\s]+(\S+)/);
       if (!name || name.startsWith("--")) return this._err("kubectl create deployment: Der Name fehlt.", "z.B. 'kubectl create deployment kasse --image=nginx'");
       if (!imgMatch) return this._err("error: required flag(s) \"image\" not set", "Häng '--image=nginx' an.");
       if (this.deployments.some(d => d.name === name)) return this._err('error: deployment "' + name + '" already exists');
+      // Pod-Security-Admission: ein imperativ erzeugtes Deployment hat keinen securityContext.
+      // Unter baseline/restricted wird es deshalb abgelehnt (privileged = keine Prüfung).
+      const denied = this._admitPod(name, undefined);
+      if (denied) return this._err(denied, "Setz die Stufe mit 'kubectl label namespace default pod-security.kubernetes.io/enforce=privileged' herab oder liefere einen passenden securityContext per Manifest.");
       this.deployments.push(this._makeDeployment(name, imgMatch[1], 1));
       return "deployment.apps/" + name + " created";
+    }
+
+    /* ---- RBAC-Auswertung (#126) ---- */
+
+    /** Subjekt → stabiler Schlüssel, damit Bindungs-Subjekt und `--as`-Anfrage vergleichbar sind.
+     *  User → "user:<name>", ServiceAccount → "sa:<ns>:<name>". */
+    _subjectKey(s: RbacSubject): string {
+      return s.kind === "ServiceAccount" ? "sa:" + (s.namespace || "default") + ":" + s.name : "user:" + s.name;
+    }
+
+    /** `--as`-Wert (oder null) in einen Subjekt-Schlüssel übersetzen.
+     *  Akzeptiert "system:serviceaccount:<ns>:<sa>" (SA) und sonst "<user>" (User). */
+    _asKey(as: string | null): string | null {
+      if (!as) return null;
+      const m = as.match(/^system:serviceaccount:([^:]+):(.+)$/);
+      if (m) return "sa:" + m[1] + ":" + m[2];
+      return "user:" + as;
+    }
+
+    /** Darf das Subjekt (Schlüssel) `verb` auf `resource`? null = Admin (kein --as) → alles erlaubt. */
+    _canI(verb: string, resource: string, subjectKey: string | null): boolean {
+      if (subjectKey === null) return true; // ohne --as fragt man die eigenen (Admin-)Rechte ab
+      for (const b of this.roleBindings) {
+        if (!b.subjects.some(s => this._subjectKey(s) === subjectKey)) continue;
+        const role = this.roles.find(r => r.name === b.roleRef.name && r.cluster === (b.roleRef.kind === "ClusterRole"));
+        if (!role) continue; // baumelnde Referenz: gewährt nichts
+        for (const rule of role.rules) {
+          const verbOk = rule.verbs.includes("*") || rule.verbs.includes(verb);
+          const resOk = rule.resources.includes("*") || rule.resources.includes(resource);
+          if (verbOk && resOk) return true;
+        }
+      }
+      return false;
+    }
+
+    _kubectlAuth(t: string[], raw: string) {
+      if (t[2] !== "can-i") return this._err("Der Simulator kann nur 'kubectl auth can-i <verb> <resource> [--as=…]'.");
+      // can-i <verb> <resource>; --as ignorieren wir bei der Positions-Suche.
+      const positional = t.slice(3).filter(tok => !tok.startsWith("-"));
+      const verb = positional[0];
+      const resource = positional[1];
+      if (!verb || !resource) return this._err("kubectl auth can-i: Es fehlt verb oder resource.", "Muster: kubectl auth can-i get pods --as=system:serviceaccount:default:deploy-bot");
+      const subjectKey = this._asKey(this._flagValue(t, "--as"));
+      return this._canI(verb, resource, subjectKey) ? "yes" : "no";
+    }
+
+    /* ---- Pod-Security-Admission (#126) ---- */
+
+    /** Setzt die durchgesetzte Stufe per Namespace-Label, z.B.
+     *  `kubectl label namespace default pod-security.kubernetes.io/enforce=restricted`. */
+    _kubectlLabel(t: string[], raw: string) {
+      if (t[2] !== "namespace" && t[2] !== "ns") return this._err("Der Simulator kann nur 'kubectl label namespace <ns> pod-security.kubernetes.io/enforce=<stufe>'.");
+      const nsName = t[3];
+      if (!nsName || nsName.startsWith("-")) return this._err("kubectl label namespace: Welcher Namespace?", "Muster: kubectl label namespace default pod-security.kubernetes.io/enforce=restricted");
+      const m = raw.match(/pod-security\.kubernetes\.io\/enforce=(\S+)/);
+      if (!m) return this._err("Der Simulator versteht hier nur das Label 'pod-security.kubernetes.io/enforce=<stufe>'.", "z.B. '…/enforce=baseline' oder '…/enforce=restricted'.");
+      const level = m[1];
+      if (level !== "privileged" && level !== "baseline" && level !== "restricted") {
+        return this._err('error: unbekannte Pod-Security-Stufe "' + level + '"', "Erlaubt sind: privileged, baseline, restricted.");
+      }
+      this.podSecurity = level;
+      return "namespace/" + nsName + " labeled";
+    }
+
+    /** Prüft einen Pod gegen die durchgesetzte Stufe. Rückgabe: null = zugelassen,
+     *  sonst die (deutsche) Ablehnungs-Begründung. privileged = nie ablehnen. */
+    _admitPod(name: string, sc: SecurityContext | undefined): string | null {
+      const level = this.podSecurity;
+      if (level === "privileged") return null;
+      const ctx = sc || {};
+      const violations: string[] = [];
+      // baseline UND restricted: keine privilegierten Container.
+      if (ctx.privileged === true) violations.push("privileged=true ist verboten");
+      if (level === "restricted") {
+        // restricted verlangt zusätzlich nicht-root + keine Rechte-Eskalation.
+        if (ctx.runAsNonRoot !== true) violations.push("runAsNonRoot muss true sein");
+        if (ctx.allowPrivilegeEscalation !== false) violations.push("allowPrivilegeEscalation muss false sein");
+      }
+      if (violations.length === 0) return null;
+      return 'Error from server (Forbidden): admission webhook "pod-security" denied the request: '
+        + "Pod '" + name + "' verletzt die Pod-Security-Stufe '" + level + "': " + violations.join(", ") + ".";
     }
 
     _kubectlScale(t: string[], raw: string) {
@@ -1627,6 +1902,10 @@ export interface Scenario {
         if (existing) {
           out.push("deployment.apps/" + effDep.name + " unchanged");
         } else {
+          // Pod-Security-Admission (#126): unsichere Pods werden unter baseline/restricted
+          // schon beim Anlegen abgewiesen – der Rest des Manifests wird nicht angewandt.
+          const denied = this._admitPod(effDep.name, effDep.securityContext);
+          if (denied) return this._err(denied, "Ergänze im Manifest einen passenden securityContext (z.B. runAsNonRoot: true) oder senke die enforce-Stufe.");
           this.deployments.push(this._makeDeployment(effDep.name, effDep.image, effDep.replicas));
           out.push("deployment.apps/" + effDep.name + " created");
         }
