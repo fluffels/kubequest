@@ -74,6 +74,25 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
     build: {
       outDir: devpanel ? "dist-devpanel" : offline ? "dist-offline" : "dist",
       emptyOutDir: true,
+      // #199: Phaser (~1,9 MB) in einen eigenen langlebigen Vendor-Chunk auslagern.
+      // Im Single-File-Modus (offline/devpanel) ist Code-Splitting sinnlos – dort
+      // inline alles viteSingleFile sowieso in eine Datei. Für den regulären
+      // Host-Build trennt manualChunks Phaser vom Spielcode: Phaser ändert sich
+      // selten → Browser cachet den Vendor-Chunk dauerhaft; Spielcode-Änderungen
+      // invalidieren nur den kleinen Spielchunk. Der Vendor-Chunk selbst ist
+      // bewusst >500 kB (Phaser ist eine Game-Engine), daher chunkSizeWarningLimit
+      // hochgesetzt – ein unerwartetes Wachstum des Spielcode-Chunks würde trotzdem
+      // auffallen, weil er deutlich unter dem Limit bleibt.
+      ...(singleFile
+        ? {}
+        : {
+            chunkSizeWarningLimit: 2200,
+            rollupOptions: {
+              output: {
+                manualChunks: { vendor: ["phaser"] },
+              },
+            },
+          }),
     },
     test: {
       // Die Unit-Tests (sim/content) brauchen kein DOM – laufen schnell auf Node.
