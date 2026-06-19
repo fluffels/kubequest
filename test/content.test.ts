@@ -491,3 +491,100 @@ test("docker-run-named: diag benennt falsches Image gezielt (#321)", () => {
   }
   assert.ok(tested, "Keine gültige docker-run-named-Instanz gefunden");
 });
+
+/* ===== GitOps-Archipel: False-Positive-Schutz (#101) =====
+ * Die accept-Regexes der GitOps-Quests (q29–q31) müssen falsche Eingaben
+ * zuverlässig ablehnen – ein zu breiter Regex würde das Lernziel aushebeln. */
+
+function gitopsTask(questId: string, taskId: string) {
+  const q = KQContent.QUESTS.find(x => x.id === questId);
+  assert.ok(q, "Quest " + questId + " nicht gefunden");
+  for (const step of q!.steps) {
+    if (step.type === "terminal") {
+      const t = step.tasks.find(t => t.id === taskId);
+      if (t) return t;
+    } else if (step.type === "teach" && step.cmd.id === taskId) {
+      return step.cmd;
+    }
+  }
+  throw new Error(questId + "/" + taskId + " nicht gefunden");
+}
+
+function accepts(task: { accept: RegExp[] }, input: string): boolean {
+  const norm = input.trim().replace(/\s+/g, " ");
+  return task.accept.some(re => re.test(norm));
+}
+
+test("#101 q29: argocd app list akzeptiert 'ls'-Alias, lehnt falschen Subcommand ab", () => {
+  const task = gitopsTask("q29", "t-argo-list");
+  assert.ok(accepts(task, "argocd app list"), "argocd app list muss gelten");
+  assert.ok(accepts(task, "argocd app ls"),   "argocd app ls (Alias) muss GENAUSO gelten");
+  assert.ok(!accepts(task, "argocd app get hafen-lager"), "'get' statt 'list' muss scheitern");
+  assert.ok(!accepts(task, "kubectl get pods"),           "kubectl-Befehl muss scheitern");
+  assert.ok(!accepts(task, "argocd app list hafen-lager"), "extra Argument muss scheitern");
+});
+
+test("#101 q29: argocd app get hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
+  const task = gitopsTask("q29", "t-argo-get");
+  assert.ok(accepts(task, "argocd app get hafen-lager"), "korrekte Eingabe muss gelten");
+  assert.ok(!accepts(task, "argocd app get"),              "fehlender Name muss scheitern");
+  assert.ok(!accepts(task, "argocd app get hafen-funk"),   "falscher App-Name muss scheitern");
+});
+
+test("#101 q29: argocd app sync hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
+  const task = gitopsTask("q29", "t-argo-sync");
+  assert.ok(accepts(task, "argocd app sync hafen-lager"), "korrekte Eingabe muss gelten");
+  assert.ok(!accepts(task, "argocd app sync"),             "fehlender Name muss scheitern");
+  assert.ok(!accepts(task, "argocd app sync hafen-flotte"), "falscher App-Name muss scheitern");
+});
+
+test("#101 q29: kubectl apply -f application.yaml akzeptiert --filename, lehnt falsche Datei ab", () => {
+  const task = gitopsTask("q29", "t-argo-apply");
+  assert.ok(accepts(task, "kubectl apply -f application.yaml"),         "kurze Form -f muss gelten");
+  assert.ok(accepts(task, "kubectl apply --filename application.yaml"), "--filename muss GENAUSO gelten");
+  assert.ok(!accepts(task, "kubectl apply application.yaml"),           "ohne -f/--filename muss scheitern");
+  assert.ok(!accepts(task, "kubectl apply -f app.yaml"),                "falscher Dateiname muss scheitern");
+});
+
+test("#101 q30: kubectl apply -f application-selfheal.yaml lehnt die alte Datei ab", () => {
+  const task = gitopsTask("q30", "t-sh-apply");
+  assert.ok(accepts(task, "kubectl apply -f application-selfheal.yaml"), "korrekte Eingabe muss gelten");
+  assert.ok(!accepts(task, "kubectl apply -f application.yaml"),         "alte Datei (ohne -selfheal) muss scheitern");
+});
+
+test("#101 q30: kubectl scale auf 0 lehnt andere --replicas-Werte ab", () => {
+  const task = gitopsTask("q30", "t-sh-scale");
+  assert.ok(accepts(task, "kubectl scale deployment hafen-lager --replicas=0"),   "--replicas=0 muss gelten");
+  assert.ok(accepts(task, "kubectl scale deployment/hafen-lager --replicas=0"),   "deployment/-Schreibweise muss gelten");
+  assert.ok(!accepts(task, "kubectl scale deployment hafen-lager --replicas=1"),  "replicas=1 (falscher Wert) muss scheitern");
+  assert.ok(!accepts(task, "kubectl scale hafen-lager --replicas=0"),             "ohne 'deployment' muss scheitern");
+});
+
+test("#101 q31: argocd app get hafen-flotte lehnt anderen App-Namen ab", () => {
+  const task = gitopsTask("q31", "t-aoa-get");
+  assert.ok(accepts(task, "argocd app get hafen-flotte"),    "korrekte Eingabe muss gelten");
+  assert.ok(!accepts(task, "argocd app get hafen-lager"),    "hafen-lager (falsche App) muss scheitern");
+  assert.ok(!accepts(task, "argocd app get hafen-flotte2"),  "ähnlicher Name muss scheitern");
+});
+
+test("#101 q31: kubectl apply -f app-of-apps.yaml lehnt andere yaml-Datei ab", () => {
+  const task = gitopsTask("q31", "t-aoa-apply");
+  assert.ok(accepts(task, "kubectl apply -f app-of-apps.yaml"),         "korrekte Eingabe muss gelten");
+  assert.ok(!accepts(task, "kubectl apply -f application.yaml"),         "falsche Datei muss scheitern");
+  assert.ok(!accepts(task, "kubectl apply -f app-of-apps"),              "ohne .yaml-Endung muss scheitern");
+});
+
+test("#101 GitOps-Quests (q28–q31): Belohnungen gesetzt und ansteigend", () => {
+  const ids = ["q28", "q29", "q30", "q31"];
+  const quests = ids.map(id => {
+    const q = KQContent.QUESTS.find(x => x.id === id);
+    assert.ok(q, id + " fehlt in QUESTS");
+    return q!;
+  });
+  for (const q of quests) {
+    assert.ok(q.rewardXp > 0, q.id + ": rewardXp muss > 0 sein");
+    assert.ok(q.rewardCoins > 0, q.id + ": rewardCoins muss > 0 sein");
+  }
+  // Letzte Quest bringt mehr als erste
+  assert.ok(quests[3].rewardXp > quests[0].rewardXp, "q31 muss mehr XP bringen als q28");
+});
