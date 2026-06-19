@@ -17,6 +17,14 @@ import {
   WORLD_JETTY, WORLD_TO_ARCHIPEL, WORLD_RETURN,
   ARCHIPEL_TO_WORLD, ARCHIPEL_ARRIVAL, ARCHIPEL_NPC, ARCHIPEL_QUEST_TRIGGER,
 } from "./archipel";
+import {
+  PATH as L_PATH,
+  buildLighthouse,
+  WORLD_TO_LIGHTHOUSE, WORLD_RETURN_LH,
+  LIGHTHOUSE_TO_WORLD, LIGHTHOUSE_ARRIVAL,
+  LIGHTHOUSE_QUEST_TRIGGER, LIGHTHOUSE_TOWER,
+  LIGHTHOUSE_GRAFANA, LIGHTHOUSE_BELL,
+} from "./lighthouse";
 import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
 import { gameClock } from "./clock";
@@ -232,6 +240,7 @@ import { getMapEntry } from "./mapregistry";
       this.dynamic = { barrelsSig: "", flagsSig: "", svcSig: "", depSig: "" };
       this.events = { nextPirate: 0, pirate: null, nextKraken: 0, kraken: null, nextStorm: 0, storm: null, stormFlash: null };
       this.archipelArmed = false;   // #92: Archipel-Warp erst nach Tasten-Loslassen scharf (kein Pingpong)
+      this.lighthouseArmed = false; // #111: Leuchtturm-Aufgang ebenso erst nach Tasten-Loslassen scharf
 
       // Performance-Budget (#82): Off-screen-Culling + Messung.
       // cullables = statische Deko (Blumen, Gras, Büsche, Steine, Bäume …), die
@@ -473,6 +482,16 @@ import { getMapEntry } from "./mapregistry";
       this.lighthouse = { x: 48, y: 24 };
       for (const [lx, ly] of [[47, 23], [48, 23], [47, 24], [48, 24]]) this.solidGrid[ly * W + lx] = 1;
       this.labels.push({ x: 48, y: 21.2, text: "Leuchtturm", color: "#ffffff" });
+
+      // #111: Stufen-Aufgang am Turmfuß → Monitoring-Leuchtturm-Klippe. Ein kurzer
+      // Erd-Pfad südlich des Turms zur Warp-Kachel (WORLD_TO_LIGHTHOUSE). Als Erde
+      // (DIRT) gesetzt + begehbar geräumt: bleibt so auch von der späteren Deko-
+      // Streuung verschont (scatter platziert nur auf Gras/Sand, nicht auf Erde).
+      for (const [px, py] of [[WORLD_TO_LIGHTHOUSE.tx, WORLD_TO_LIGHTHOUSE.ty], [WORLD_RETURN_LH.tx, WORLD_RETURN_LH.ty], [48, 27]]) {
+        this.ground[py * W + px] = DIRT;
+        this.solidGrid[py * W + px] = 0;
+      }
+      this.labels.push({ x: WORLD_TO_LIGHTHOUSE.tx + 1.4, y: WORLD_TO_LIGHTHOUSE.ty, text: "↑ Klippe", color: "#ffe9b0" });
 
       const spots = [[5, 5], [7, 3], [15, 4], [20, 6], [33, 5], [36, 4], [44, 5], [47, 8], [47, 13], [36, 15], [20, 12], [5, 17], [3, 21], [8, 20], [18, 16], [34, 9], [30, 7], [45, 15], [37, 22], [6, 22], [21, 21]];
       spots.forEach(([x, y]) => this.tree(x, y));
@@ -866,6 +885,11 @@ import { getMapEntry } from "./mapregistry";
       const anchor = this.add.text(ax, ay - 4, "⚓", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(ay + 20);
       this.tweens.add({ targets: anchor, y: ay - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
 
+      // #111: Aufstiegs-Marker am Leuchtturm-Fuß, pulsierend, damit der Klippen-Warp sichtbar ist.
+      const ux = WORLD_TO_LIGHTHOUSE.tx * T + 8, uy = WORLD_TO_LIGHTHOUSE.ty * T + 8;
+      const upArrow = this.add.text(ux, uy - 4, "⬆", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(uy + 20);
+      this.tweens.add({ targets: upArrow, y: uy - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
       this.dynGroup = this.add.group(); // Fässer, Flaggen, Laternen, Labels (werden neu gebaut)
     }
 
@@ -969,6 +993,22 @@ import { getMapEntry } from "./mapregistry";
       SFX.door();
       setInteriorOpen(true);
       this.scene.launch("Archipel");
+      this.scene.sleep();
+    }
+
+    /** #111: Zur Monitoring-Leuchtturm-Klippe hinaufsteigen – analog zu enterArchipel.
+     *  Der Spieler wird vorher auf die Kachel unter dem Aufgang zurückgesetzt
+     *  (WORLD_RETURN_LH), damit er bei der Rückkehr symmetrisch dort ankommt und der
+     *  Warp NICHT sofort erneut triggert; das Gate wird disarmt bis zum Loslassen. */
+    enterLighthouse() {
+      const pl = this.playerPos;
+      pl.x = WORLD_RETURN_LH.tx * T + 8;
+      pl.y = WORLD_RETURN_LH.ty * T + 8;
+      pl.face = "north"; pl.moving = false;
+      this.lighthouseArmed = false;
+      SFX.door();
+      setInteriorOpen(true);
+      this.scene.launch("Lighthouse");
       this.scene.sleep();
     }
 
@@ -1359,6 +1399,12 @@ import { getMapEntry } from "./mapregistry";
         keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
       if (!moveKeyDown && !onArchWarp) this.archipelArmed = true;
 
+      // #111: Leuchtturm-Aufgang ebenso „scharf machen" (gleiches Anti-Pingpong-Gate
+      // wie der Archipel-Anleger): erst auslösbar, wenn die Lauftaste losgelassen wurde
+      // und man nicht schon auf der Warp-Kachel steht.
+      const onLhWarp = warpAt(pl.x, pl.y, WORLD_TO_LIGHTHOUSE);
+      if (!moveKeyDown && !onLhWarp) this.lighthouseArmed = true;
+
       // #6/#194: Auf einer Tür-Kachel? -> Haus/Schiff betreten (Rest dieses Frames
       // überspringen). this.doors kommt aus dem Tiled-Objektlayer (Datenpfad) bzw.
       // den Code-Eingängen (Default) – findDoorAt prüft generisch dagegen.
@@ -1366,6 +1412,7 @@ import { getMapEntry } from "./mapregistry";
         const door = findDoorAt(this.doors as Door[], pl.x, pl.y);
         if (door) { this.enterInterior(door); return; }
         if (this.archipelArmed && onArchWarp) { this.enterArchipel(); return; }
+        if (this.lighthouseArmed && onLhWarp) { this.enterLighthouse(); return; }
       }
 
       const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
@@ -1895,6 +1942,254 @@ import { getMapEntry } from "./mapregistry";
     }
   }
 
+  /* ===== LighthouseScene (#111) – Monitoring-Leuchtturm-Klippe =====
+   * Eigener begehbarer Höhen-Bereich, den man von Port Kubernia über den Aufgang am
+   * Turmfuß betritt (analog ArchipelScene). Eine Gras-Hochebene, von einem begehbaren
+   * Stein-Klippenrand gesäumt; oben der große Leuchtturm, die Monitoring-Station
+   * (Grafana-Tafel + Alarm-Glocke = Quest-Trigger, Phase 5 #22) und ein reservierter
+   * NPC-Standplatz (Sprite + Quests folgen in einem Kinderticket, analog #93). Boden
+   * über dieselben Wang-Tiles wie die Hauptkarte (inkl. Stein-Kai für die Klippe);
+   * Geometrie/Kollision kommen pur aus lighthouse.ts, Bewegung teilt sich resolveMove. */
+  class LighthouseScene extends Phaser.Scene {
+    [key: string]: any;
+    constructor() { super("Lighthouse"); }
+
+    create() {
+      const m = buildLighthouse();
+      this.W = m.W; this.H = m.H; this.ground = m.ground; this.solid = m.solid;
+
+      this.renderGround();
+
+      // Felsbrocken am Klippenrand – deterministisch aus der puren Geometrie.
+      for (const r of m.rocks) {
+        this.add.image(r.x * T + 8, (r.y + 1) * T, "rock").setOrigin(0.5, 1).setScale(0.5).setDepth((r.y + 1) * T);
+      }
+      // Etwas Gras-Deko auf der Hochebene (begehbar) – deterministisch gestreut.
+      this.scatterDecor();
+
+      // === Großer Leuchtturm oben auf der Klippe (PixelLab-Turm + rotierender Lichtkegel) ===
+      const lx = LIGHTHOUSE_TOWER.x * T + 8, lyB = (LIGHTHOUSE_TOWER.y + 1) * T;
+      const lhSc = 0.6;
+      this.add.ellipse(lx, lyB - 1, 32, 10, 0x5a6470).setDepth(lyB - 2);   // Felsen-Sockel
+      this.add.image(lx, lyB, "lighthouse").setOrigin(0.5, 1).setScale(lhSc).setDepth(lyB + 4);
+      const lampY = lyB - Math.round(100 * lhSc) + 9;
+      if (!this.textures.exists("lhbeam")) {
+        const bw = 84, bh = 34, bg = this.make.graphics({ add: false } as any);
+        bg.fillStyle(0xffe9a0, 1); bg.fillTriangle(0, bh / 2, bw, 0, bw, bh);
+        bg.generateTexture("lhbeam", bw, bh); bg.destroy();
+      }
+      const beam = this.add.image(lx, lampY, "lhbeam").setOrigin(0, 0.5)
+        .setAlpha(0.13).setBlendMode(Phaser.BlendModes.ADD).setDepth(lyB + 3);
+      this.tweens.add({ targets: beam, angle: 360, duration: 4600, repeat: -1, ease: "Linear" });
+      const lamp = this.add.image(lx, lampY, "px").setScale(4.5, 2.5).setTint(0xffe28a).setDepth(lyB + 5);
+      this.tweens.add({ targets: lamp, alpha: { from: 0.5, to: 1 }, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+
+      // === Monitoring-Station: Grafana-Dashboard-Tafel + Alarm-Glocke (#111) ===
+      this.objSprite(LIGHTHOUSE_GRAFANA.x, LIGHTHOUSE_GRAFANA.y, "grafana_board", 0.32, 26, 9);
+      this.objSprite(LIGHTHOUSE_BELL.x, LIGHTHOUSE_BELL.y, "alert_bell", 0.32, 18, 7);
+      this.makeSign(LIGHTHOUSE_QUEST_TRIGGER.x * T + 8, (LIGHTHOUSE_QUEST_TRIGGER.y + 1) * T, "Monitoring");
+
+      // Reservierter NPC-Standplatz (Observability-Lotsin): bis das Kinderticket den
+      // Sprite + die Phase-5-Quests setzt (analog #93/#94–97), bleibt der Platz frei.
+      this.npcs = [];
+
+      // Rück-Warp am südlichen Klippenrand sichtbar markieren (Abstiegs-Pfeil + Schild).
+      const rx = LIGHTHOUSE_TO_WORLD.tx * T + 8, ry = LIGHTHOUSE_TO_WORLD.ty * T + 8;
+      const down = this.add.text(rx, ry - 4, "⬇", { fontSize: "11px", resolution: 6 }).setOrigin(0.5).setDepth(ry + 20);
+      this.tweens.add({ targets: down, y: ry - 8, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.makeSign(rx, (LIGHTHOUSE_TO_WORLD.ty - 1) * T, "Port Kubernia");
+
+      // Spieler am Ankunftspunkt (eine Kachel landwärts vom Abstieg).
+      this.pl = { x: LIGHTHOUSE_ARRIVAL.tx * T + 8, y: LIGHTHOUSE_ARRIVAL.ty * T + 8, face: "north", moving: false };
+      this.bobT = 0;
+      this.pShadow = this.add.ellipse(this.pl.x, this.pl.y + 6, 10, 4, 0x000000, 0.26).setDepth(1.6);
+      this.pSprite = this.add.image(this.pl.x, this.pl.y + 6, "char_player").setOrigin(0.5, 0.81).setScale(0.6).setDepth(this.pl.y + 8);
+
+      const cam = this.cameras.main;
+      cam.setBounds(0, 0, this.W * T, this.H * T);
+      cam.setBackgroundColor(0x356dab);   // offenes Meer als Rand
+      cam.setZoom(window.innerWidth < 900 ? 2.4 : 3);
+      cam.startFollow(this.pSprite, true, 0.15, 0.15);
+      this.scale.on("resize", () => cam.setZoom(window.innerWidth < 900 ? 2.4 : 3));
+
+      const cw = cam.width, ch = cam.height;
+      pixelText(this, cw / 2, 12, "🔭 Monitoring-Leuchtturm", { color: "#ffe9b0", size: 16, origin: [0.5, 0], depth: 20000, shadow: true }).setScrollFactor(0);
+      pixelText(this, cw / 2, ch - 22, "Pfad hinab ⬇ – zurück nach Port Kubernia", { color: "#ffd97a", size: 12, origin: [0.5, 1], depth: 20000, shadow: true }).setScrollFactor(0);
+
+      // Möwen für die Hafen-Atmosphäre (wie auf der Insel).
+      this.time.addEvent({ delay: 6500, loop: true, callback: () => { if (Math.random() < 0.6) this.spawnGull(); } });
+      this.spawnGull();
+
+      // Ab jetzt ist die Klippe die aktive „WorldScene": exitToWorld() stellt das zurück.
+      setWorldScene(this);
+      setInteriorOpen(false);
+
+      this.ePrev = true;
+      this.returnArmed = false;
+    }
+
+    /** Wang-Boden wie WorldScene.renderGround, hier ohne Holz-Steg, aber MIT Stein-Kai
+     *  für den felsigen Klippenrand: Meer → (kai/coast) → Stein/Gras → Pfad. */
+    renderGround() {
+      const rt = this.add.renderTexture(0, 0, this.W * T, this.H * T).setOrigin(0).setDepth(0);
+      const lv = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        const c = this.ground[iy * this.W + ix];
+        return c === A_WATER ? 0 : c === L_PATH ? 3 : 2;   // Wasser < Stein/Gras < Pfad
+      };
+      const rawAt = (cx: number, cy: number) => {
+        const ix = cx < 0 ? 0 : cx >= this.W ? this.W - 1 : cx;
+        const iy = cy < 0 ? 0 : cy >= this.H ? this.H - 1 : cy;
+        return this.ground[iy * this.W + ix];
+      };
+      const corners = (x: number, y: number, hi: number) =>
+        (((lv(x - 1, y - 1) >= hi ? 1 : 0) << 3) | ((lv(x, y - 1) >= hi ? 1 : 0) << 2) |
+         ((lv(x - 1, y) >= hi ? 1 : 0) << 1) | (lv(x, y) >= hi ? 1 : 0));
+      const has = (x: number, y: number, t: number) =>
+        lv(x - 1, y - 1) === t || lv(x, y - 1) === t || lv(x - 1, y) === t || lv(x, y) === t;
+      const isStone = (c: number) => c === 96 || c === 97 || c === 98;
+      const edgeSet = (x: number, y: number) => {
+        const cs = [rawAt(x - 1, y - 1), rawAt(x, y - 1), rawAt(x - 1, y), rawAt(x, y)];
+        return cs.some(isStone) ? "kai" : "coast";   // Stein-Klippe trifft Meer als Kai-Kante
+      };
+      for (let y = 0; y < this.H; y++) {
+        for (let x = 0; x < this.W; x++) {
+          const v = this.ground[y * this.W + x];
+          if (has(x, y, 0)) rt.drawFrame(edgeSet(x, y), WANG[corners(x, y, 1)], x * T, y * T);
+          else if (isStone(v)) rt.drawFrame("kai", WANG[15], x * T, y * T);
+          else if (has(x, y, 3)) rt.drawFrame("path", WANG[corners(x, y, 3)], x * T, y * T);
+          else rt.drawFrame("meadow", WANG[corners(x, y, 2)], x * T, y * T);
+        }
+      }
+      // Wellen-Glitzer auf dem Wasser
+      for (let i = 0; i < 40; i++) {
+        const x = Phaser.Math.Between(0, this.W - 1), y = Phaser.Math.Between(0, this.H - 1);
+        if (this.ground[y * this.W + x] !== A_WATER) continue;
+        const s = this.add.image(x * T + Phaser.Math.Between(2, 12), y * T + Phaser.Math.Between(3, 12), "px")
+          .setScale(2.5, 0.8).setTint(FOAM).setAlpha(0).setDepth(1);
+        this.tweens.add({ targets: s, alpha: { from: 0, to: 0.55 }, duration: Phaser.Math.Between(900, 1800), yoyo: true, repeat: -1, delay: Phaser.Math.Between(0, 2000) });
+      }
+    }
+
+    /** Deterministische Bodendeko (Blumen/Büsche) auf dem Gras der Hochebene – nie auf
+     *  Pfad/Stein/Reserviert (Turm, Station, NPC-Standplatz, Deko, Ankunft, Warp). */
+    scatterDecor() {
+      const reserved = new Set([
+        LIGHTHOUSE_QUEST_TRIGGER.y * this.W + LIGHTHOUSE_QUEST_TRIGGER.x,
+        LIGHTHOUSE_ARRIVAL.ty * this.W + LIGHTHOUSE_ARRIVAL.tx,
+      ]);
+      for (let y = 1; y < this.H - 1; y++) {
+        for (let x = 1; x < this.W - 1; x++) {
+          const i = y * this.W + x;
+          const v = this.ground[i];
+          if (v !== 0 && v !== 1 && v !== 2) continue;   // nur Gras
+          if (this.solid[i]) continue;                   // kein Solid drunter
+          if (reserved.has(i)) continue;
+          const h = (((x * 374761393) ^ (y * 668265263)) >>> 0) % 100;
+          if (h < 5) {                                   // Busch (solide)
+            this.add.image(x * T + 8, (y + 1) * T, "bush").setOrigin(0.5, 1).setScale(0.5).setDepth((y + 1) * T);
+            this.solid[i] = 1;
+          } else if (h < 14) {                           // Blume (begehbar)
+            this.add.image(x * T + 8, y * T + 10, "flowers").setScale(0.5).setDepth(y * T + 6);
+          }
+        }
+      }
+    }
+
+    /** Map-Objekt an einer Kachel verankert (Origin Fußlinie) + weicher Schatten. */
+    objSprite(tx: number, ty: number, tex: string, scale: number, shw: number, shh: number) {
+      const cx = tx * T + 8, baseY = (ty + 1) * T;
+      this.add.ellipse(cx, baseY - 1, shw, shh, 0x000000, 0.24).setDepth(baseY - 1);
+      this.add.image(cx, baseY, tex).setOrigin(0.5, 1).setScale(scale).setDepth(baseY + 4);
+    }
+
+    /** Holz-Schild (9-Slice) wie auf der Hauptkarte – gemeinsamer Aufbau (#254). */
+    makeSign(x: number, y: number, text: string, depth?: number) {
+      buildSign(this, x, y, text, depth);
+    }
+
+    spawnGull() {
+      const y = Phaser.Math.Between(1, this.H - 4) * T;
+      const fromLeft = Math.random() < 0.5;
+      const gull = this.add.container(fromLeft ? -20 : this.W * T + 20, y).setDepth(11000);
+      const w1 = this.add.rectangle(-0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(1, 0.5).setAngle(-18);
+      const w2 = this.add.rectangle(0.5, 0, 4, 1.3, 0xf5f7fa).setOrigin(0, 0.5).setAngle(18);
+      gull.add([w1, w2]);
+      this.tweens.add({ targets: w1, angle: -42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: w2, angle: 42, duration: 240, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
+    }
+
+    isSolidAt(px: number, py: number) {
+      const tx = Math.floor(px / T), ty = Math.floor(py / T);
+      if (tx < 0 || ty < 0 || tx >= this.W || ty >= this.H) return true;
+      return !!this.solid[ty * this.W + tx];
+    }
+
+    /** Kein NPC auf der Klippe (noch) – ui.ts ruft das trotzdem über worldScene() auf. */
+    nearestNpc() { return null; }
+
+    burstAtPlayer(_kind: string) {
+      this.floatText(this.pl.x, this.pl.y - 8, "✨", "#ffe9b0");
+    }
+
+    floatText(x: number, y: number, str: string, color?: string) {
+      floatPixelText(this, x, y, str, color);
+    }
+
+    exitToWorld() {
+      SFX.door();
+      setWorldScene(this.scene.get("World") as unknown as WorldSceneRef);
+      setInteriorOpen(false);
+      this.scene.wake("World");
+      this.scene.stop();
+    }
+
+    update(_time: number, delta: number) {
+      const dt = Math.min(0.05, delta / 1000);
+      const pl = this.pl;
+      const blocked = UI.blocking();
+
+      let dx = 0, dy = 0;
+      if (!blocked) {
+        if (keys["w"] || keys["ArrowUp"]) dy -= 1;
+        if (keys["s"] || keys["ArrowDown"]) dy += 1;
+        if (keys["a"] || keys["ArrowLeft"]) dx -= 1;
+        if (keys["d"] || keys["ArrowRight"]) dx += 1;
+      }
+      pl.moving = dx !== 0 || dy !== 0;
+      if (pl.moving) {
+        const len = Math.hypot(dx, dy);
+        if (dx < 0) pl.face = "west";
+        else if (dx > 0) pl.face = "east";
+        else if (dy < 0) pl.face = "north";
+        else if (dy > 0) pl.face = "south";
+        const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt);
+        pl.x = next.x; pl.y = next.y;
+        this.bobT += dt * 12;
+      }
+      const bob = pl.moving ? Math.abs(Math.sin(this.bobT)) * 1.6 : 0;
+      const faceTex = pl.face === "south" ? "char_player" : "char_player_" + pl.face;
+      this.pSprite.setTexture(faceTex).setPosition(pl.x, pl.y + 6 - bob).setDepth(pl.y + 8);
+      this.pShadow.setPosition(pl.x, pl.y + 6);
+
+      UI.updatePrompt();
+
+      // Abstieg betreten? -> zurück nach Port Kubernia (gleiches Anti-Pingpong-Gate
+      // wie auf der Insel: erst scharf nach Loslassen + nicht schon auf der Kachel).
+      const onRet = warpAt(pl.x, pl.y, LIGHTHOUSE_TO_WORLD);
+      const moveKeyDown = !!(keys["w"] || keys["s"] || keys["a"] || keys["d"] ||
+        keys["ArrowUp"] || keys["ArrowDown"] || keys["ArrowLeft"] || keys["ArrowRight"]);
+      if (!moveKeyDown && !onRet) this.returnArmed = true;
+      if (!blocked && this.returnArmed && onRet) { this.exitToWorld(); return; }
+      // Notausgang per E/Enter, falls man am Klippenrand feststeht.
+      const e = !blocked && (!!keys["e"] || !!keys["Enter"]);
+      if (e && !this.ePrev && onRet) { this.exitToWorld(); return; }
+      this.ePrev = e;
+    }
+  }
+
   /** #191 (Teil 1 von Epic #57): Grundgerüst für die spätere Tiled-Map-Migration.
    *  Lädt EINE minimale .tmj über Phasers Tilemap-API – bewusst PARALLEL zur
    *  prozeduralen buildMap() der WorldScene, die unangetastet bleibt. Erreichbar
@@ -1952,4 +2247,4 @@ import { getMapEntry } from "./mapregistry";
     }
   }
 
-  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene, TilemapTestScene };
+  export const KQScenes = { BootScene, WorldScene, InteriorScene, ArchipelScene, LighthouseScene, TilemapTestScene };

@@ -97,7 +97,7 @@ import { keys, clearKeys } from "./runtime";
       backgroundColor: "#356dab",
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-      scene: [KQScenes.BootScene, KQScenes.WorldScene, KQScenes.InteriorScene, KQScenes.ArchipelScene, KQScenes.TilemapTestScene],
+      scene: [KQScenes.BootScene, KQScenes.WorldScene, KQScenes.InteriorScene, KQScenes.ArchipelScene, KQScenes.LighthouseScene, KQScenes.TilemapTestScene],
     });
 
     // Dev-Affordance: die laufende Phaser-Instanz fürs manuelle Verifizieren im
