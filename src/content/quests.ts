@@ -687,14 +687,17 @@ export const QUESTS: Quest[] = [
         "Siehst du die <b>funkboje</b> da draußen flackern? Der Pod startet, stürzt ab, startet, stürzt ab … Das nennt sich <b>CrashLoopBackOff</b> – der Klassiker unter den Cluster-Fehlern.",
         "Das Tückische: Das Image ist OK, der Node ist OK – die <b>App selbst</b> stirbt beim Start. Und warum sie stirbt, verrät nur eines: <b>die Logs.</b> Dritte Stufe des Mantras!",
       ]},
-      { type: "terminal", brief: "Logs lesen",
+      { type: "terminal", brief: "Überblick verschaffen",
         scenario: { deployments: [{ name: "funkboje", image: "nginx", replicas: 1, broken: { type: "crashloop", needsSecret: "funk-schluessel" } }] },
         tasks: [
         { id: "t-j16-1", text: "Verschaff dir den Überblick: get pods. Beachte auch die RESTARTS-Spalte!",
           accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Wie immer zuerst." },
-        { id: "t-j16-2", text: "Jetzt die Wahrheit: Lies die <b>Logs</b> des funkboje-Pods!",
-          accept: [/^kubectl\s+logs\s+funkboje-\S+$/], solution: "kubectl logs <funkboje-pod>", hint: "kubectl logs <pod-name>" },
       ]},
+      { type: "teach", brief: "Logs lesen", cmd: {
+        id: "t-logs", intro: "🆕 Neuer Befehl: <code>kubectl logs &lt;pod&gt;</code> – zeigt, was die <b>App selbst</b> ausgegeben hat (stdout/stderr): ihre Meldungen, Fehler, Stacktraces. Das ist die <b>dritte Stufe</b> des Mantras <code>get pods → describe → logs</code>. Merke den Unterschied: <code>describe</code> zeigt die <b>Kubernetes-Sicht</b> (Zustand + Events, das <i>Warum</i>), <code>logs</code> die <b>App-Ausgabe</b> selbst.",
+        text: "Jetzt die Wahrheit: Lies die <b>Logs</b> des <code>funkboje</code>-Pods!",
+        accept: [/^kubectl\s+logs\s+funkboje-\S+$/], solution: "kubectl logs <funkboje-pod>",
+        hint: "Muster: kubectl logs <pod-name> – Namen aus der Liste oben abtippen." } },
       { type: "choice", npc: "juno", reviewId: "q-ts-1",
         q: "Das Log sagt: FATAL: Secret 'funk-schluessel' nicht gefunden. Was ist der Plan?",
         options: [
