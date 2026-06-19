@@ -290,11 +290,16 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "ole", lines: [
         "Heute beweise ich dir das <b>Self-Healing</b>. Dein Auftrag klingt verrückt: <b>Versenke eine deiner eigenen Kassen-Kisten.</b> Im Ernst! Und schau dabei zum Dock.",
       ]},
-      { type: "terminal", brief: "Der Sturm-Test", tasks: [
+      { type: "terminal", brief: "Pods finden", tasks: [
         { id: "t-storm-1", text: "Hol dir mit <code>kubectl get pods</code> die Namen der <code>kasse</code>-Pods.",
           accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "Kennst du längst!" },
-        { id: "t-storm-2", text: "💥 Lösche einen <code>kasse</code>-Pod – Dock im Blick behalten!",
-          accept: [/^kubectl\s+delete\s+pods?\s+kasse-\S+$/], solution: "kubectl delete pod <kasse-pod-name>", hint: "kubectl delete pod <name>" },
+      ]},
+      { type: "teach", brief: "Eine Kiste versenken", cmd: {
+        id: "t-delete", intro: "🆕 Neuer Befehl: <code>kubectl delete pod &lt;name&gt;</code> – löscht einen Pod sofort. Achtung, das ist <b>zustandsändernd</b>: Bisher hast du nur <i>geguckt</i> (<code>get</code>, <code>describe</code>) – <code>delete</code> greift wirklich ein und „versenkt“ den Pod. Genau das brauchen wir für den Self-Healing-Test.",
+        text: "💥 Versenke jetzt einen <code>kasse</code>-Pod – und behalte dabei das Dock im Blick!",
+        accept: [/^kubectl\s+delete\s+pods?\s+kasse-\S+$/], solution: "kubectl delete pod <kasse-pod-name>",
+        hint: "Muster: kubectl delete pod <name> – Namen aus der Liste oben abtippen." } },
+      { type: "terminal", brief: "Self-Healing prüfen", tasks: [
         { id: "t-storm-3", text: "Platsch – und der Kran war schneller! Prüfe: Es müssten wieder 3 sein, einer ganz frisch (kleines AGE).",
           accept: [/^kubectl\s+get\s+(pods|pod|po)$/], check: (sim: Sim) => sim.lastDeletedPod !== null, solution: "kubectl get pods", hint: "Nochmal die Pod-Liste." },
       ]},
