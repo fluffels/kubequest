@@ -91,7 +91,8 @@ Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (voll 
 ## Lizenzen
 
 - **Phaser 3** – MIT-Lizenz (kostenlos, auch kommerziell): https://phaser.io
-- **Grafiken** – „Tiny Town" & „Tiny Dungeon" von [Kenney](https://kenney.nl), **CC0** (public domain). Danke, Kenney! 💛
+- **Grafiken (eigener Pixel-Art-Stil)** – mit **[PixelLab AI](https://pixellab.ai)** im Stardew-angelehnten Look erzeugt; sie ersetzen nach und nach die ursprünglichen Platzhalter. Asset-Liste, IDs & Workflow: [`assets/pixellab/README.md`](assets/pixellab/README.md).
+- **Grafiken (Platzhalter)** – „Tiny Town" & „Tiny Dungeon" von [Kenney](https://kenney.nl), **CC0** (public domain), noch für einzelne Tiles im Einsatz, bis der PixelLab-Ersatz steht. Danke, Kenney! 💛
 - Sounds werden zur Laufzeit synthetisiert (WebAudio) – keine Audio-Dateien nötig.
 
 ## Spielstand
