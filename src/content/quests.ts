@@ -12,6 +12,7 @@ import {
   RESOURCES_YAML, MAIN_TF, GITLAB_CI_YML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML,
   ARGO_APPLICATION_SELFHEAL_YAML, APP_OF_APPS_YAML, SERVICEMONITOR_YAML,
   GRAFANA_DATASOURCE_YAML, GRAFANA_DASHBOARD_YAML, PROMETHEUSRULE_YAML,
+  HEADLESS_SERVICE_YAML, STATEFULSET_YAML,
 } from "./manifests";
 
 export const QUESTS: Quest[] = [
@@ -2015,6 +2016,71 @@ export const QUESTS: Quest[] = [
       { type: "dialog", npc: "lumi", lines: [
         "Metriken, Dashboards, Logs, Alerts – du hast alle vier Werkzeuge in der Hand. Jetzt wacht der Cluster selbst und ruft dich, wenn etwas brennt. Das ist echte Observability.",
         "Du bist bereit für alles, was der Hafen dir schickt. Viel Wind in den Segeln – und gute Wacht! 🔦",
+      ]},
+    ]},
+
+  // Phase 7 – Lagerhallen-Viertel (#24): stateful Workloads & Datendauerhaftigkeit.
+  // Speicher-Verwalter Knut (#125). Diese Quest: StatefulSet & stabile Identität (#127).
+  { id: "q36", title: "Stabile Lager: das StatefulSet", giver: "knut", rewardXp: 60, rewardCoins: 45,
+    steps: [
+      { type: "dialog", npc: "knut", lines: [
+        "Willkommen am Kai, Kapitän. Ich bin Knut – ich verwalte hier, was <b>bleiben</b> muss. Kisten, die man stapelt und wegträgt, das ist Bos Geschäft. Bei mir geht es um <b>Daten</b>, die einen Sturm überstehen.",
+        "Ein <b>Deployment</b> behandelt seine Pods wie austauschbare Träger: stirbt einer, kommt ein <b>neuer mit neuem Namen</b> – ihm ist egal, was vorher drinstand. Für eine <b>Datenbank</b> wäre das eine Katastrophe.",
+        "Dafür gibt es das <b>StatefulSet</b>: jeder Pod bekommt eine <b>feste Nummer</b> (…-0, …-1, …) und über <code>volumeClaimTemplates</code> sein <b>eigenes, dauerhaftes Volume</b>. Stabile Identität, eigene Daten. Schau dir die Karten an, die ich hingelegt habe.",
+      ]},
+      { type: "terminal", brief: "Karten lesen",
+        scenario: {
+          files: { "headless-service.yaml": HEADLESS_SERVICE_YAML, "statefulset.yaml": STATEFULSET_YAML },
+          applyEffects: {
+            "headless-service.yaml": { service: { name: "speicher-datenbank", port: "5432" } },
+            "statefulset.yaml": { statefulSet: { name: "speicher-datenbank", image: "postgres:16", replicas: 3, serviceName: "speicher-datenbank", volumeClaimName: "daten", storage: "1Gi" } },
+          },
+        },
+        tasks: [
+        { id: "t-sts-ls", text: "Schau mit <code>ls</code>, was am Kai bereitliegt.", accept: [/^ls$/], solution: "ls", hint: "Zwei Buchstaben." },
+        { id: "t-sts-cat", text: "Lies <code>cat statefulset.yaml</code>. Findest du <code>serviceName</code> und ganz unten <code>volumeClaimTemplates</code> – das eigene Volume je Pod?",
+          accept: [/^cat\s+statefulset\.yaml$/], solution: "cat statefulset.yaml", hint: "cat <datei>" },
+      ]},
+      { type: "teach", brief: "Headless-Service zuerst", cmd: {
+        id: "t-sts-headless", intro: "🆕 Ein StatefulSet braucht einen <b>headless Service</b> (<code>clusterIP: None</code>): keine gemeinsame virtuelle IP, sondern ein <b>stabiler DNS-Name pro Pod</b>. So bleibt jede Kiste einzeln adressierbar.",
+        text: "Wende zuerst den headless Service an: <code>kubectl apply -f headless-service.yaml</code>.",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+headless-service\.yaml$/],
+        solution: "kubectl apply -f headless-service.yaml", hint: "kubectl apply -f <datei>" } },
+      { type: "teach", brief: "StatefulSet ausrollen", cmd: {
+        id: "t-sts-apply", intro: "🆕 Neuer Workload-Typ: das <b>StatefulSet</b>. Wie ein Deployment wendest du es mit dem vertrauten <code>kubectl apply -f</code> an – aber jeder Pod bekommt feste Identität und ein eigenes Volume.",
+        text: "Rolle das StatefulSet aus: <code>kubectl apply -f statefulset.yaml</code> – und schau zum Kai!",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+statefulset\.yaml$/],
+        check: (sim: Sim) => sim.statefulSets.some(s => s.name === "speicher-datenbank"),
+        solution: "kubectl apply -f statefulset.yaml", hint: "kubectl apply -f <datei>" } },
+      { type: "terminal", brief: "Stabile Namen erkennen", tasks: [
+        { id: "t-sts-get", text: "Sieh das StatefulSet: <code>kubectl get statefulset</code> – Spalte READY zeigt <code>3/3</code>. (Kurzform <code>sts</code> geht auch.)",
+          accept: [/^kubectl\s+get\s+(statefulset|statefulsets|sts)$/],
+          check: (sim: Sim) => sim.statefulSets.some(s => s.name === "speicher-datenbank"),
+          solution: "kubectl get statefulset", hint: "kubectl get statefulset (oder sts)." },
+        { id: "t-sts-pods", text: "Jetzt die Pods: <code>kubectl get pods</code>. Achte auf die Namen – sie enden auf <code>-0</code>, <code>-1</code>, <code>-2</code>: <b>durchnummeriert und stabil</b>, nicht zufällig wie beim Deployment.",
+          accept: [/^kubectl\s+get\s+(pods|pod|po)$/],
+          check: (sim: Sim) => { const s = sim.statefulSets.find(x => x.name === "speicher-datenbank"); return !!s && s.pods.some(p => p.name === "speicher-datenbank-0"); },
+          solution: "kubectl get pods", hint: "kubectl get pods" },
+      ]},
+      { type: "teach", brief: "Identität überlebt", cmd: {
+        id: "t-sts-delete", intro: "🆕 Der Beweis: lösch einen StatefulSet-Pod. Anders als beim Deployment kommt er mit <b>exakt demselben Namen</b> und <b>demselben Volume</b> zurück – die Daten überleben.",
+        text: "Lösch den ersten Pod: <code>kubectl delete pod speicher-datenbank-0</code>. Mit <code>kubectl get pods</code> siehst du danach: <code>speicher-datenbank-0</code> ist wieder da – gleiche Identität, gleiche Daten.",
+        accept: [/^kubectl\s+delete\s+pod\s+speicher-datenbank-0$/],
+        check: (sim: Sim) => { const s = sim.statefulSets.find(x => x.name === "speicher-datenbank"); return !!s && s.pods.some(p => p.name === "speicher-datenbank-0"); },
+        solution: "kubectl delete pod speicher-datenbank-0", hint: "kubectl delete pod <name> – nimm speicher-datenbank-0." } },
+      { type: "choice", npc: "knut",
+        q: "Warum ein <b>StatefulSet</b> statt eines Deployments für eine Datenbank?",
+        options: [
+          { t: "Stabile Identität (fester Name -0, -1 …) plus je Pod ein eigenes, dauerhaftes Volume – die Daten überleben Neustarts.", ok: true,
+            reply: "Genau das. Feste Identität und eigener Speicher pro Pod: stirbt einer, kommt er als derselbe zurück und findet seine Daten wieder. Das ist der Kern stateful Workloads. 🗄️" },
+          { t: "StatefulSets sind einfach schneller und sparen Speicher.", ok: false,
+            reply: "Nein – Tempo oder Sparsamkeit ist nicht der Punkt. Ein StatefulSet ist eher aufwändiger; sein Wert ist die stabile Identität samt eigenem Volume." },
+          { t: "Kein echter Unterschied – nur ein anderes Wort fürs Deployment.", ok: false,
+            reply: "Doch, ein großer: das Deployment ersetzt Pods durch fremde mit neuem Namen ohne eigene Daten. Das StatefulSet bewahrt Name und Volume – darum geht es." },
+        ]},
+      { type: "dialog", npc: "knut", lines: [
+        "Sauber verstaut, Kapitän. Stabile Namen, eigene Volumes – so lagert man, was bleiben muss.",
+        "Als Nächstes zeige ich dir, <b>woher</b> der Speicher kommt: PersistentVolume, PVC und StorageClass. Aber das hebe ich mir für die nächste Schicht auf. 🪵",
       ]},
     ]},
 ];
