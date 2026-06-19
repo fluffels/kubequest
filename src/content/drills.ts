@@ -4,7 +4,7 @@
  */
 import type { Sim, Deployment, NetworkPolicyRes, ArgoApp } from "../sim";
 import { pick, rnd } from "./util";
-import { NETPOL_YAML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML } from "./manifests";
+import { NETPOL_YAML, DOCKERFILE, ARGO_APPLICATION_MANUAL_YAML, SERVICEMONITOR_YAML, PROMETHEUSRULE_YAML } from "./manifests";
 
 const IMAGES = ["redis", "httpd", "busybox", "postgres", "rabbitmq"];
 const NAMES = ["leuchtfeuer", "fischtheke", "lotsenfunk", "ankerwinde", "kombuese", "seekiste"];
@@ -351,6 +351,55 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const app = ensureArgoApp(sim, true); // garantiert OutOfSync: es gibt echt etwas zu ziehen
     return { text: "Die Application <code>" + app.name + "</code> ist <b>OutOfSync</b>. Zieh den im Git deklarierten Soll-Zustand in den Cluster (Pull-Prinzip).", accept: [new RegExp("^argocd\\s+app\\s+sync\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app sync " + app.name, hint: "Muster: argocd app sync &lt;name&gt;", why: "OutOfSync heißt: Cluster-Ist und Git-Soll klaffen auseinander. sync zieht den im Git deklarierten Stand per Pull in den Cluster – Muster: argocd app sync &lt;name&gt;." };
   },
+  // Monitoring-Leuchtturm (#117, Phase 5): Observability üben – Metriken (top), Scrape-Aufträge
+  // (ServiceMonitor), Logs (--previous), Alert-Status & Alert-Regeln (PrometheusRule). NPC: lumi.
+  "obs-top-pods": sim => {
+    ensureDeployment(sim); // damit es laufende Pods mit Last gibt
+    return { text: "Wirf den schnellen Blick auf den Verbrauch: zeig CPU und Speicher aller laufenden Pods.", accept: [/^kubectl\s+top\s+(pods|pod|po)$/], solution: "kubectl top pods", hint: "kubectl top pods (Kurzform po).", why: "top pods ist der Live-Blick auf den Verbrauch je laufendem Pod (CPU in m, Speicher in Mi) – ideal, um den heißen Pod zu finden. Den Status zeigt get pods, die Logs logs." };
+  },
+  "obs-top-nodes": () => ({ text: "Zeig die Auslastung der Nodes (Server) des Clusters.", accept: [/^kubectl\s+top\s+(nodes|node|no)$/], solution: "kubectl top nodes", hint: "kubectl top nodes (Kurzform no).", why: "top nodes zeigt CPU- und Speicher-Auslastung je Node – so siehst du, ob ein ganzer Server an die Grenze kommt, nicht nur ein einzelner Pod." }),
+  "obs-sm-apply": sim => {
+    let name = pick(["lager-monitor", "kasse-monitor", "funk-monitor", "lotsen-monitor"]);
+    while (sim.serviceMonitors.some(s => s.name === name)) name = "monitor-" + rnd(100, 9999);
+    const file = "drill-servicemonitor.yaml";
+    sim.files[file] = SERVICEMONITOR_YAML;
+    sim.applyEffects[file] = { serviceMonitor: { name, selector: pick(["lager", "kasse", "funkdienst", "lotsen"]), port: "metrics", interval: "30s" } };
+    return { text: "Ein <b>ServiceMonitor</b> ist ein ganz normales Manifest: wende <code>" + file + "</code> deklarativ an, damit Prometheus den Service scrapt.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-servicemonitor\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f &lt;datei&gt;", why: "Ein ServiceMonitor ist der deklarative Scrape-Auftrag für Prometheus – mit dem vertrauten kubectl apply -f &lt;datei&gt; angewandt; selector wählt den Service, endpoints legen Port und Intervall fest." };
+  },
+  "obs-sm-get": sim => {
+    if (sim.serviceMonitors.length === 0) {
+      const file = "ensure-sm.yaml";
+      sim.files[file] = SERVICEMONITOR_YAML;
+      sim.applyEffects[file] = { serviceMonitor: { name: "lager-monitor", selector: "lager" } };
+      sim.exec("kubectl apply -f " + file);
+    }
+    return { text: "Zeig alle <b>ServiceMonitors</b> – welche Services grast Prometheus ab?", accept: [/^kubectl\s+get\s+(servicemonitors|servicemonitor|smon)$/], solution: "kubectl get servicemonitors", hint: "Kurzform smon geht auch.", why: "kubectl get servicemonitors (Kurzform smon) listet die Scrape-Aufträge – welchen Service Prometheus mit welchem Intervall abgrast." };
+  },
+  "obs-logs-previous": sim => {
+    let name = pick(["bakenbote", "signalgeber", "funkfeuer", "nebelhorn"]);
+    while (sim.deployments.some(d => d.name === name)) name = name + rnd(2, 99);
+    sim.mergeScenario({ deployments: [{ name, image: "nginx", replicas: 1, broken: { type: "crashloop", needsSecret: "config" } }] });
+    const dep = sim.deployments.find(d => d.name === name)!;
+    const pod = dep.pods[0].name;
+    return { text: "Der Dienst <code>" + name + "</code> ist im <b>CrashLoop</b>. Lies den Absturz-Log des Vorgängers: <code>kubectl logs --previous &lt;pod&gt;</code>.", accept: [new RegExp("^kubectl\\s+logs\\s+(?:--previous|-p)\\s+" + pod.replace(/[-]/g, "\\-") + "$"), new RegExp("^kubectl\\s+logs\\s+" + pod.replace(/[-]/g, "\\-") + "\\s+(?:--previous|-p)$")], solution: "kubectl logs --previous " + pod, hint: "kubectl logs --previous &lt;pod&gt; – oder -p als Kurzform.", why: "--previous (Kurzform -p) zeigt die Logs des zuletzt abgestürzten Containers – genau das, was er kurz vor dem Crash ausgegeben hat. Ohne das Flag siehst du nur den frisch gestarteten (oft noch leeren) Container." };
+  },
+  "obs-alerts": sim => {
+    // Für einen sichtbaren Alert sorgen: ein CPU-hungriger Dienst lässt HighPodCPU feuern.
+    if (!sim.alerts().some(a => a.state === "firing")) {
+      let name = pick(["rechenknecht", "mahlwerk", "dampfwinde", "kesseltreiber"]);
+      while (sim.deployments.some(d => d.name === name)) name = name + rnd(2, 99);
+      sim.mergeScenario({ deployments: [{ name, image: "python", replicas: 1, cpuHeavy: true }] });
+    }
+    return { text: "Was brennt gerade? Zeig alle aktiven <b>Alerts</b> mit ihrem Status (firing/resolved).", accept: [/^kubectl\s+get\s+alerts$/], solution: "kubectl get alerts", hint: "kubectl get alerts", why: "kubectl get alerts zeigt, welche Alert-Regeln gerade feuern (firing) oder schon wieder gelöst sind (resolved) – der schnelle Blick, ob der Cluster ruft." };
+  },
+  "obs-pr-apply": sim => {
+    let name = pick(["hafen-alarme", "klippen-regeln", "sturm-warnung", "wacht-regeln"]);
+    while (sim.prometheusRules.some(r => r.name === name)) name = "alarme-" + rnd(100, 9999);
+    const file = "drill-prometheusrule.yaml";
+    sim.files[file] = PROMETHEUSRULE_YAML;
+    sim.applyEffects[file] = { prometheusRule: { name, alert: "HighPodCPU", expr: "rate(container_cpu_usage_seconds_total[5m]) > 0.5", forDuration: "5m", severity: "warning" } };
+    return { text: "Eine <b>PrometheusRule</b> ist ein ganz normales Manifest: wende <code>" + file + "</code> an, damit Prometheus die Alert-Regel prüft.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-prometheusrule\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f &lt;datei&gt;", why: "Eine PrometheusRule deklariert eine Alert-Regel (expr als Bedingung, for als Wartezeit) – mit dem vertrauten kubectl apply -f &lt;datei&gt; bringt Prometheus sie in Kraft." };
+  },
 };
 
 /* Übungs-Pools pro NPC: freigeschaltet nach bestimmter Quest */
@@ -362,4 +411,5 @@ export const PRACTICE: Record<string, { drill: string; after: string }[]> = {
   theo: [{ drill: "tf-plan", after: "q12" }, { drill: "tf-state", after: "q13" }],
   juno: [{ drill: "k-logs", after: "q16" }, { drill: "k-describe", after: "q15" }, { drill: "k-rollout", after: "q16" }, { drill: "k-apply-netpol", after: "q22" }, { drill: "k-get-netpol", after: "q22" }, { drill: "k-describe-netpol", after: "q22" }, { drill: "k-delete-netpol", after: "q22" }, { drill: "k-set-resources", after: "q27" }],
   argo: [{ drill: "argo-apply", after: "q29" }, { drill: "argo-app-list", after: "q29" }, { drill: "argo-app-get", after: "q29" }, { drill: "argo-app-sync", after: "q29" }],
+  lumi: [{ drill: "obs-top-pods", after: "q32" }, { drill: "obs-top-nodes", after: "q32" }, { drill: "obs-sm-apply", after: "q32" }, { drill: "obs-sm-get", after: "q32" }, { drill: "k-logs", after: "q34" }, { drill: "obs-logs-previous", after: "q34" }, { drill: "obs-alerts", after: "q35" }, { drill: "obs-pr-apply", after: "q35" }],
 };
