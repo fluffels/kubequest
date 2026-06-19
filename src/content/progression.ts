@@ -52,4 +52,6 @@ export const NPCS = {
   argo:   { name: "Argo",          title: "GitOps-Lotsin",   sprite: 84,  tex: "char_argos" },
   // Monitoring-Leuchtturm-Wärterin (Standplatz: lighthouse.ts LIGHTHOUSE_NPC, id "lumi"; #112).
   lumi:   { name: "Lumi",          title: "Leuchtturmwärterin", sprite: 97, tex: "char_lumi" },
+  // Lagerhallen-Viertel-Speicher-Verwalter (Standplatz: warehouse.ts WAREHOUSE_NPC, id "knut"; #125).
+  knut:   { name: "Knut",          title: "Speicher-Verwalter", sprite: 100, tex: "char_knut" },
 };

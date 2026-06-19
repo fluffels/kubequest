@@ -2288,11 +2288,23 @@ import { getMapEntry } from "./mapregistry";
         this.add.image(g.x * T + 8, (g.y + 1) * T, g.kind).setOrigin(0.5, 1).setScale(0.5).setDepth((g.y + 1) * T);
       }
 
-      // Quest-Trigger = das Lager-Kontor (Schild als bewusster Platzhalter, bis die
-      // Phase-7-Quests #127/#129 hier andocken). Der NPC-Standplatz (#125) bleibt bis
-      // dahin frei – kein Sprite, damit nichts ins Leere zeigt.
+      // Quest-Trigger = das Lager-Kontor (Schild; die Phase-7-Quests #127/#129 docken hier an).
       this.makeSign(WAREHOUSE_QUEST_TRIGGER.x * T + 8, (WAREHOUSE_QUEST_TRIGGER.y + 1) * T, "Lager-Kontor");
-      this.npcs = [];
+
+      // Speicher-Verwalter „Knut" (#125): steht am reservierten Standplatz und gibt ab den
+      // stateful-Quests die Hands-on-Aufgaben aus. Gleiches Render-Schema wie Lumi/Argo
+      // (tex-Figur am Schatten verankert, Origin 0.81 = Fußlinie, „!"-Marker). Reden läuft
+      // über E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt er Smalltalk.
+      const knutMeta = KQContent.NPCS.knut;
+      const knx = WAREHOUSE_NPC.x * T + 8, knBaseY = WAREHOUSE_NPC.y * T + 15;
+      this.solid[WAREHOUSE_NPC.y * this.W + WAREHOUSE_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.add.ellipse(knx, knBaseY, 12, 5, 0x000000, 0.26).setDepth(knBaseY - 1);
+      const knutSpr = this.add.image(knx, knBaseY, knutMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(WAREHOUSE_NPC.y * T + T);
+      this.tweens.add({ targets: knutSpr, y: knBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      const knutMarker = pixelText(this, knx, WAREHOUSE_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
+      knutMarker.setVisible(false);
+      this.tweens.add({ targets: knutMarker, y: WAREHOUSE_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+      this.npcs = [{ id: WAREHOUSE_NPC.id, x: WAREHOUSE_NPC.x, y: WAREHOUSE_NPC.y, sprite: knutSpr, marker: knutMarker }];
 
       // Rück-Anleger im Süden sichtbar markieren (Abstiegs-Pfeil + Schild).
       const rx = WAREHOUSE_TO_WORLD.tx * T + 8, ry = WAREHOUSE_TO_WORLD.ty * T + 8;
