@@ -39,6 +39,22 @@ export function interiorEAction(opts: { eFlank: boolean; onExit: boolean; nearNp
   return "none";
 }
 
+/** #305: Flanken-Buchführung der E-Taste im Innenraum.
+ *  `eFlank` (frischer E-Druck) braucht eine steigende Flanke gegenüber dem
+ *  letzten Frame (`ePrev`). Der Knackpunkt: solange ein Dialog/Overlay offen ist
+ *  (`blocked`), gehört E dem Dialog – und derselbe Tastendruck, der den Dialog
+ *  schließt, darf im nächsten Frame NICHT als neue Flanke ein Reden/Hinausgehen
+ *  auslösen (sonst öffnet sich der Dialog sofort wieder → man kam aus dem
+ *  Haus-Dialog nicht mehr raus). Lösung: während `blocked` gilt E als „weiter
+ *  gedrückt" (`ePrev = true`), sodass erst ein echtes Loslassen + Neudrücken
+ *  nach dem Schließen wieder eine Flanke ergibt. Liefert die Flanke fürs
+ *  `interiorEAction` UND den nächsten `ePrev`-Zustand. Pur → im Node-Test
+ *  prüfbar; die InteriorScene in scenes.ts hält nur `ePrev` und ruft das auf. */
+export function interiorEFlank(opts: { ePhys: boolean; ePrev: boolean; blocked: boolean }): { eFlank: boolean; ePrev: boolean } {
+  if (opts.blocked) return { eFlank: false, ePrev: true };
+  return { eFlank: opts.ePhys && !opts.ePrev, ePrev: opts.ePhys };
+}
+
 /* ===== Türen / betretbare Häuser (#6) =====
  * Jede Tür ist eine begehbare Kachel im vorderen Mittelbau eines Gebäudes
  * (die zugehörige Solid-Kachel wird in scenes.ts wieder freigeräumt). Läuft

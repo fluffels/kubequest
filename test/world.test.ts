@@ -6,7 +6,7 @@
  * Bewusst auch Grenz-/Negativfälle: out-of-bounds, doppelte Kacheln, Erreichbarkeit.
  */
 import { test, expect } from "vitest";
-import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, SHIP_DECK, SHIP_KRALLE, onShipDeck, shipTile, interiorEAction, type Door, type Spawn } from "../src/world";
+import { NPC_SPAWNS, TILE, TALK_RANGE, npcTile, npcSolidIndices, footprintSolid, resolveMove, DOORS, doorAt, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, ENTRANCES, SHIP, SHIP_DOOR, SHIP_PIER, SHIP_DECK, SHIP_KRALLE, onShipDeck, shipTile, interiorEAction, interiorEFlank, type Door, type Spawn } from "../src/world";
 import type { TiledObjectGroup } from "../src/tilemap";
 
 const W = 52, H = 40; // wie WorldScene.create()
@@ -417,4 +417,45 @@ test("#201 weder Tastendruck noch Schwelle noch NPC-Nähe → nichts tun", () =>
 test("#201 reden hat Vorrang vor hinausgehen, wenn beides zuträfe", () => {
   // Falls eFlank+nearNpc+onExit zusammenkämen, gewinnt 'talk' (man will reden).
   expect(interiorEAction({ eFlank: true, onExit: true, nearNpc: true })).toBe("talk");
+});
+
+/* ===== #305: E-Flanken-Buchführung im Innenraum (interiorEFlank) =====
+ * Regression: Im Haus kam man aus dem NPC-Dialog nicht mehr raus, weil der
+ * E-Druck, der den Dialog schloss, im nächsten Frame als frische Flanke ein
+ * neues Reden auslöste. interiorEFlank muss E während eines offenen Dialogs als
+ * „gedrückt" halten und erst nach echtem Loslassen wieder eine Flanke liefern. */
+
+test("#305 frischer E-Druck (steigende Flanke) → eFlank, ePrev gemerkt", () => {
+  expect(interiorEFlank({ ePhys: true, ePrev: false, blocked: false })).toEqual({ eFlank: true, ePrev: true });
+});
+
+test("#305 E gehalten (keine steigende Flanke) → keine Flanke (Negativfall)", () => {
+  expect(interiorEFlank({ ePhys: true, ePrev: true, blocked: false })).toEqual({ eFlank: false, ePrev: true });
+});
+
+test("#305 während offenem Dialog gehört E dem Dialog → keine Flanke, ePrev=true (gilt als gedrückt)", () => {
+  // Egal ob E physisch gedrückt ist oder nicht: solange blocked, nie eine Flanke,
+  // und ePrev bleibt true, damit der schließende Druck danach nicht zündet.
+  expect(interiorEFlank({ ePhys: true, ePrev: false, blocked: true })).toEqual({ eFlank: false, ePrev: true });
+  expect(interiorEFlank({ ePhys: false, ePrev: false, blocked: true })).toEqual({ eFlank: false, ePrev: true });
+});
+
+test("#305 Regression: der E-Druck, der den Dialog schließt, öffnet ihn NICHT sofort wieder", () => {
+  // Frame 1: am NPC, frischer E-Druck → Flanke → reden (Dialog öffnet).
+  let s = interiorEFlank({ ePhys: true, ePrev: false, blocked: false });
+  expect(s.eFlank).toBe(true);
+  // Frame 2..n: Dialog offen, E noch gehalten → blocked, ePrev bleibt true.
+  s = interiorEFlank({ ePhys: true, ePrev: s.ePrev, blocked: true });
+  expect(s.ePrev).toBe(true);
+  // Frame X: Spieler drückt E → main.ts schließt den Dialog. Direkt danach läuft
+  // update() wieder unblockiert, E ist (noch) gedrückt. Dank ePrev=true KEINE
+  // Flanke → interiorEAction bekommt eFlank=false → kein erneutes Reden.
+  s = interiorEFlank({ ePhys: true, ePrev: s.ePrev, blocked: false });
+  expect(s.eFlank).toBe(false);
+  expect(interiorEAction({ eFlank: s.eFlank, onExit: false, nearNpc: true })).toBe("none");
+  // Erst Loslassen + Neudrücken ergibt wieder eine echte Flanke (gewolltes Reden).
+  s = interiorEFlank({ ePhys: false, ePrev: s.ePrev, blocked: false }); // loslassen
+  expect(s.ePrev).toBe(false);
+  s = interiorEFlank({ ePhys: true, ePrev: s.ePrev, blocked: false });  // neu drücken
+  expect(s.eFlank).toBe(true);
 });
