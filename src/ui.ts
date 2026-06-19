@@ -499,6 +499,22 @@ import { worldScene, interiorOpen } from "./runtime";
       }
     },
 
+    /* ========== Begrüßung / Intro (#288) ========== */
+    /** Einmalige Begrüßung beim allerersten Spielstart: Wer bin ich, wie steuere
+     *  ich, was ist mein erstes Ziel (zu Ole). Läuft über den normalen Dialog
+     *  (Ole als Sprecher) – das setzt zugleich den "!"-Quest-Marker über Ole in
+     *  Szene. Gezeigt wird das genau einmal; main.ts merkt sich das per
+     *  Game.state.introSeen. */
+    showIntro() {
+      this.showDialogue("ole", [
+        "⚓ Ahoi und herzlich willkommen in <b>Port Kubernia</b>! Ich bin Ole, der Hafenmeister – schön, dass du anheuerst.",
+        "Hier wird dein Hafen Stück für Stück zu einem echten Cluster: Du lernst Docker, Kubernetes &amp; Co., indem du den Betrieb am Laufen hältst. Aber der Reihe nach – kurz zur Steuerung:",
+        "🕹️ <b>Laufen:</b> Pfeiltasten oder <b>WASD</b>. <b>Reden &amp; bestätigen:</b> <b>E</b> (oder Enter/Leertaste), sobald jemand in der Nähe ist.",
+        "📻 <b>T</b> öffnet dein Funkgerät (deine Kommandozeile), 📜 <b>J</b> das Logbuch mit deiner aktuellen Aufgabe, <b>Esc</b> das Menü.",
+        "Du stehst ja schon vor meiner <b>Hafenmeisterei</b> – wunderbar! Sprich mich einfach an (drück <b>E</b>), dann gebe ich dir deinen ersten Auftrag. Auf geht's! ⚓",
+      ]);
+    },
+
     /* ========== Dialog ========== */
     showDialogue(npcId: string, lines: string[], onDone?: () => void) {
       const npc = NPCS[npcId];
