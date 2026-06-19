@@ -41,9 +41,11 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
   const EXTRA_CARDS: Record<string, string[]> = {
     q2: ["q-flag-ps-a"],                                  // docker ps -a (eingeführt in q2)
     q3: ["q-ch1-3", "q-ch1-5", "q-flag-run-d", "q-flag-run-name"], // -d/--name (q3)
-    q4: ["q-ch2-1", "q-ch2-4"],
+    q4: ["q-ch2-1"],
     q5: ["q-flag-kubectl-n"],                             // kubectl -n (q5)
-    q7: ["q-ch3-2", "q-tools-ingress"],
+    // q-ch2-4 (Self-Healing) bewusst erst ab q7: bewiesen wird Self-Healing dort,
+    // nicht schon in q4 – Lernreihenfolge-Wächter #235 (siehe content/learnorder.ts).
+    q7: ["q-ch2-4", "q-ch3-2", "q-tools-ingress"],
     q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3", "q-flag-apply-f"], // apply -f (q8)
     q10: ["q-ch5-3", "q-tools-stack", "q-tools-monitoring"],
     q11: ["q-flag-helm-set"],                             // helm upgrade --set (q11)
