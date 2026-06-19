@@ -404,3 +404,40 @@ test("Red-Green: CMD-Karte mit unbekanntem chapter und nicht matchender Lösung 
   assert.ok(errors.some(e => e.includes("c-bad") && e.includes("q-existiert-nicht")), "unbekanntes chapter nicht gemeldet:\n" + errors.join("\n"));
   assert.ok(errors.some(e => e.includes("c-bad") && e.includes("accept")), "nicht matchende Musterlösung nicht gemeldet:\n" + errors.join("\n"));
 });
+
+/** Findet Drills, deren `why`- oder `hint`-Text bare HTML-Platzhalter enthält
+ *  (z.B. `<name>`, `<image>`), die im Browser via innerHTML unsichtbar werden.
+ *  Erlaubt: echte HTML-Elemente wie <code>, <b>. (#320) */
+function drillsWithRawHtmlPlaceholders(drills: typeof KQContent.DRILLS): string[] {
+  const SAFE_TAGS = new Set(["code", "b", "i", "em", "strong", "br", "span", "div"]);
+  const bareTag = /<([a-zA-Z][a-zA-Z0-9äöüÄÖÜ\-/]*)>/g;
+  const out: string[] = [];
+  for (const [id, make] of Object.entries(drills)) {
+    const task = make(new KQSim({}));
+    for (const field of ["why", "hint"] as const) {
+      bareTag.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = bareTag.exec(task[field])) !== null) {
+        if (!SAFE_TAGS.has(m[1].toLowerCase())) {
+          out.push(`${id}.${field}: ${m[0]}`);
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+test("Drills: why/hint enthalten keine rohen HTML-Platzhalter, die innerHTML verschluckt (#320)", () => {
+  const problems = drillsWithRawHtmlPlaceholders(KQContent.DRILLS);
+  assert.deepEqual(problems, [], "Drill-Felder mit unescapten <placeholder>-Tags (werden im Browser unsichtbar):\n" + problems.join("\n"));
+});
+
+test("Red-Green: ein Drill mit roh-HTML-Platzhalter in why wird gemeldet", () => {
+  const kaputt = {
+    ...KQContent.DRILLS,
+    "drill-roh": (_sim: KQSim) => ({ text: "x", accept: [/^x$/], solution: "x", hint: "x", why: "Muster: docker run <name> <image>." }),
+  };
+  const problems = drillsWithRawHtmlPlaceholders(kaputt as typeof KQContent.DRILLS);
+  assert.ok(problems.some(p => p.includes("drill-roh")), "roher Platzhalter nicht erkannt: " + problems.join(", "));
+});

@@ -86,88 +86,88 @@ export type DrillTask = { text: string; accept: RegExp[]; solution: string; hint
 export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
   "docker-pull": sim => {
     const img = pick(IMAGES);
-    return { text: "Lade das Image <code>" + img + "</code> aus der Registry.", accept: [new RegExp("^docker\\s+pull\\s+" + img + "(:\\S+)?$")], solution: "docker pull " + img, hint: "Muster: docker pull <image>", why: "pull holt ein fertiges Image aus der Registry auf deinen Rechner – Muster: docker pull <image>." };
+    return { text: "Lade das Image <code>" + img + "</code> aus der Registry.", accept: [new RegExp("^docker\\s+pull\\s+" + img + "(:\\S+)?$")], solution: "docker pull " + img, hint: "Muster: docker pull &lt;image&gt;", why: "pull holt ein fertiges Image aus der Registry auf deinen Rechner – Muster: docker pull &lt;image&gt;." };
   },
   "docker-run": sim => {
     const img = pick(IMAGES);
-    return { text: "Starte einen Container aus dem Image <code>" + img + "</code> (ohne Extras).", accept: [new RegExp("^docker\\s+run\\s+" + img + "(:\\S+)?$")], solution: "docker run " + img, hint: "Muster: docker run <image>", why: "run startet aus einem Image einen laufenden Container – Muster: docker run <image>." };
+    return { text: "Starte einen Container aus dem Image <code>" + img + "</code> (ohne Extras).", accept: [new RegExp("^docker\\s+run\\s+" + img + "(:\\S+)?$")], solution: "docker run " + img, hint: "Muster: docker run &lt;image&gt;", why: "run startet aus einem Image einen laufenden Container – Muster: docker run &lt;image&gt;." };
   },
   "docker-run-named": sim => {
     const img = pick(IMAGES);
     let name = pick(NAMES);
     while (sim.docker.containers.some(c => c.name === name && c.running)) name = pick(NAMES) + rnd(2, 99);
-    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+(?:-d|--detach))\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name <name> <image> (statt -d gilt auch --detach)", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt; -d hat auch die Langform --detach), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name <name> <image>." };
+    return { text: "Starte aus <code>" + img + "</code> einen Container im Hintergrund mit dem Namen <code>" + name + "</code>.", accept: [new RegExp("^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+" + name + "|--name\\s+" + name + "\\s+(?:-d|--detach))\\s+" + img + "(:\\S+)?$")], solution: "docker run -d --name " + name + " " + img, hint: "Genau dieser Befehl, keine weiteren Optionen (die kommen später) – Muster: docker run -d --name &lt;name&gt; &lt;image&gt; (statt -d gilt auch --detach)", why: "Die Reihenfolge der Optionen ist frei (-d --name oder --name -d, beides gilt; -d hat auch die Langform --detach), nur: erst alle Optionen, dann das Image ganz zuletzt – und KEINE zusätzlichen Flags, hier zählt nur der gefragte Befehl. Muster: docker run -d --name &lt;name&gt; &lt;image&gt;." };
   },
   "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker.", why: "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu." }),
   "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“.", why: "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten." }),
   "docker-stop": sim => {
     let c = sim.docker.containers.find(c => c.running);
     if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name)!; }
-    return { text: "Stoppe den Container <code>" + c.name + "</code>.", accept: [new RegExp("^docker\\s+stop\\s+" + c.name + "$")], solution: "docker stop " + c.name, hint: "Muster: docker stop <name>", why: "stop hält einen laufenden Container an seinem Namen an – Muster: docker stop <name>." };
+    return { text: "Stoppe den Container <code>" + c.name + "</code>.", accept: [new RegExp("^docker\\s+stop\\s+" + c.name + "$")], solution: "docker stop " + c.name, hint: "Muster: docker stop &lt;name&gt;", why: "stop hält einen laufenden Container an seinem Namen an – Muster: docker stop &lt;name&gt;." };
   },
   "docker-build": sim => {
     ensureDockerfile(sim);
     const name = pick(BUILD_NAMES);
     const tag = pick(["1.0", "2.0", "0.1", "dev", "stable"]);
-    return { text: "Bau aus dem <code>Dockerfile</code> ein eigenes Image <code>" + name + ":" + tag + "</code> (Punkt am Ende!).", accept: [new RegExp("^docker\\s+build\\s+(?:-t|--tag)\\s+" + name + ":" + tag.replace(/\./g, "\\.") + "\\s+\\.$")], solution: "docker build -t " + name + ":" + tag + " .", hint: "Muster: docker build -t <name>:<tag> . (statt -t gilt auch die Langform --tag)", why: "build schichtet aus dem Dockerfile ein Image – aber nicht im Terminal, sondern in der <b>Docker-Engine</b>, die deine Ordner nicht sieht. Der Punkt ist der <b>Build-Kontext</b>: der Ordner (<code>.</code> = der aktuelle), den du der Engine als Paket übergibst – die <b>Kiste mit Baumaterial</b> für die Werft. Docker sucht darin das Dockerfile; alles, was <code>COPY</code> holt, muss drin liegen. <code>-t</code> (Langform <code>--tag</code>, beides gilt) vergibt den ganzen Namen <code>name:tag</code> – der Teil hinter dem <code>:</code> ist der Versions-Tag, und <code>docker tag</code> ist nochmal ein eigener Befehl für einen nachträglichen Zweitnamen." };
+    return { text: "Bau aus dem <code>Dockerfile</code> ein eigenes Image <code>" + name + ":" + tag + "</code> (Punkt am Ende!).", accept: [new RegExp("^docker\\s+build\\s+(?:-t|--tag)\\s+" + name + ":" + tag.replace(/\./g, "\\.") + "\\s+\\.$")], solution: "docker build -t " + name + ":" + tag + " .", hint: "Muster: docker build -t &lt;name&gt;:&lt;tag&gt; . (statt -t gilt auch die Langform --tag)", why: "build schichtet aus dem Dockerfile ein Image – aber nicht im Terminal, sondern in der <b>Docker-Engine</b>, die deine Ordner nicht sieht. Der Punkt ist der <b>Build-Kontext</b>: der Ordner (<code>.</code> = der aktuelle), den du der Engine als Paket übergibst – die <b>Kiste mit Baumaterial</b> für die Werft. Docker sucht darin das Dockerfile; alles, was <code>COPY</code> holt, muss drin liegen. <code>-t</code> (Langform <code>--tag</code>, beides gilt) vergibt den ganzen Namen <code>name:tag</code> – der Teil hinter dem <code>:</code> ist der Versions-Tag, und <code>docker tag</code> ist nochmal ein eigener Befehl für einen nachträglichen Zweitnamen." };
   },
   "docker-tag": sim => {
     ensureDockerfile(sim);
     const name = pick(BUILD_NAMES);
     sim.exec("docker build -t " + name + ":1.0 ."); // sorgt für ein vorhandenes Quell-Image
     const newTag = pick(["latest", "stable", "prod", "v2"]);
-    return { text: "Gib deinem Image <code>" + name + ":1.0</code> zusätzlich das Etikett <code>" + name + ":" + newTag + "</code>.", accept: [new RegExp("^docker\\s+tag\\s+" + name + ":1\\.0\\s+" + name + ":" + newTag + "$")], solution: "docker tag " + name + ":1.0 " + name + ":" + newTag, hint: "Muster: docker tag <quelle> <ziel>", why: "tag hängt einem vorhandenen Image einen zweiten Namen an. Reihenfolge ist Quelle → Ziel – wie beim Umetikettieren: erst die vorhandene Kiste (" + name + ":1.0), dann das neue Schild (" + name + ":" + newTag + ")." };
+    return { text: "Gib deinem Image <code>" + name + ":1.0</code> zusätzlich das Etikett <code>" + name + ":" + newTag + "</code>.", accept: [new RegExp("^docker\\s+tag\\s+" + name + ":1\\.0\\s+" + name + ":" + newTag + "$")], solution: "docker tag " + name + ":1.0 " + name + ":" + newTag, hint: "Muster: docker tag &lt;quelle&gt; &lt;ziel&gt;", why: "tag hängt einem vorhandenen Image einen zweiten Namen an. Reihenfolge ist Quelle → Ziel – wie beim Umetikettieren: erst die vorhandene Kiste (" + name + ":1.0), dann das neue Schild (" + name + ":" + newTag + ")." };
   },
-  "k-get-nodes": () => ({ text: "Zeig die Nodes des Clusters.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "kubectl get <ressourcentyp>", why: "get listet Ressourcen eines Typs – Muster: kubectl get <ressourcentyp>, hier die Nodes (Server) des Clusters." }),
-  "k-get-pods": () => ({ text: "Zeig alle Pods.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "kubectl get <ressourcentyp>", why: "Gleiches Muster wie bei nodes: kubectl get pods listet alle Pods." }),
+  "k-get-nodes": () => ({ text: "Zeig die Nodes des Clusters.", accept: [/^kubectl\s+get\s+(nodes|node|no)$/], solution: "kubectl get nodes", hint: "kubectl get &lt;ressourcentyp&gt;", why: "get listet Ressourcen eines Typs – Muster: kubectl get &lt;ressourcentyp&gt;, hier die Nodes (Server) des Clusters." }),
+  "k-get-pods": () => ({ text: "Zeig alle Pods.", accept: [/^kubectl\s+get\s+(pods|pod|po)$/], solution: "kubectl get pods", hint: "kubectl get &lt;ressourcentyp&gt;", why: "Gleiches Muster wie bei nodes: kubectl get pods listet alle Pods." }),
   "k-get-svc": () => ({ text: "Zeig alle Services.", accept: [/^kubectl\s+get\s+(services|service|svc)$/], solution: "kubectl get services", hint: "Kurzform svc geht auch.", why: "kubectl get services (Kurzform svc) listet die Services – die festen Adressen vor den Pods." }),
   "k-describe": sim => {
     const d = ensureDeployment(sim);
     const pod = d.pods[0].name;
-    return { text: "Beschreibe den Pod <code>" + pod + "</code> im Detail.", accept: [new RegExp("^kubectl\\s+describe\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe pod " + pod, hint: "kubectl describe pod <name> – den Namen kannst du abtippen.", why: "describe zeigt die Detail-Akte eines Objekts inkl. Events – Muster: kubectl describe pod <name>." };
+    return { text: "Beschreibe den Pod <code>" + pod + "</code> im Detail.", accept: [new RegExp("^kubectl\\s+describe\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe pod " + pod, hint: "kubectl describe pod &lt;name&gt; – den Namen kannst du abtippen.", why: "describe zeigt die Detail-Akte eines Objekts inkl. Events – Muster: kubectl describe pod &lt;name&gt;." };
   },
   "k-create": sim => {
     let name = pick(NAMES);
     while (sim.deployments.some(d => d.name === name)) name = pick(NAMES) + rnd(2, 9);
     const img = pick(IMAGES);
-    return { text: "Erstelle ein Deployment <code>" + name + "</code> mit dem Image <code>" + img + "</code>.", accept: [new RegExp("^kubectl\\s+create\\s+deployment\\s+" + name + "\\s+--image[=\\s]" + img + "(:\\S+)?$")], solution: "kubectl create deployment " + name + " --image=" + img, hint: "Muster: kubectl create deployment <name> --image=<image>", why: "create deployment legt den Dauerauftrag an; --image bestimmt, welches Image die Pods fahren – Muster: kubectl create deployment <name> --image=<image>." };
+    return { text: "Erstelle ein Deployment <code>" + name + "</code> mit dem Image <code>" + img + "</code>.", accept: [new RegExp("^kubectl\\s+create\\s+deployment\\s+" + name + "\\s+--image[=\\s]" + img + "(:\\S+)?$")], solution: "kubectl create deployment " + name + " --image=" + img, hint: "Muster: kubectl create deployment &lt;name&gt; --image=&lt;image&gt;", why: "create deployment legt den Dauerauftrag an; --image bestimmt, welches Image die Pods fahren – Muster: kubectl create deployment &lt;name&gt; --image=&lt;image&gt;." };
   },
   "k-scale": sim => {
     const d = ensureDeployment(sim);
     let n = rnd(2, 5);
     if (n === d.replicas) n++;
-    return { text: "Skaliere das Deployment <code>" + d.name + "</code> auf <b>" + n + "</b> Kopien. (Blick zum Dock!)", accept: [new RegExp("^kubectl\\s+scale\\s+deployment\\s+" + d.name + "\\s+--replicas[=\\s]" + n + "$")], solution: "kubectl scale deployment " + d.name + " --replicas=" + n, hint: "Muster: kubectl scale deployment <name> --replicas=<zahl>", why: "scale ändert die Soll-Zahl der Kopien; Kubernetes zieht das Ist sofort nach – Muster: kubectl scale deployment <name> --replicas=<zahl>." };
+    return { text: "Skaliere das Deployment <code>" + d.name + "</code> auf <b>" + n + "</b> Kopien. (Blick zum Dock!)", accept: [new RegExp("^kubectl\\s+scale\\s+deployment\\s+" + d.name + "\\s+--replicas[=\\s]" + n + "$")], solution: "kubectl scale deployment " + d.name + " --replicas=" + n, hint: "Muster: kubectl scale deployment &lt;name&gt; --replicas=&lt;zahl&gt;", why: "scale ändert die Soll-Zahl der Kopien; Kubernetes zieht das Ist sofort nach – Muster: kubectl scale deployment &lt;name&gt; --replicas=&lt;zahl&gt;." };
   },
   "k-delete-pod": sim => {
     const d = ensureDeployment(sim);
     const pod = d.pods[0].name;
-    return { text: "Versenke den Pod <code>" + pod + "</code> – und beobachte das Self-Healing am Dock!", accept: [new RegExp("^kubectl\\s+delete\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete pod " + pod, hint: "kubectl delete pod <name>", why: "Einen vom Deployment verwalteten Pod ersetzt Kubernetes nach dem Löschen sofort (Self-Healing) – das Soll bleibt erhalten. Muster: kubectl delete pod <name>." };
+    return { text: "Versenke den Pod <code>" + pod + "</code> – und beobachte das Self-Healing am Dock!", accept: [new RegExp("^kubectl\\s+delete\\s+pods?\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete pod " + pod, hint: "kubectl delete pod &lt;name&gt;", why: "Einen vom Deployment verwalteten Pod ersetzt Kubernetes nach dem Löschen sofort (Self-Healing) – das Soll bleibt erhalten. Muster: kubectl delete pod &lt;name&gt;." };
   },
   "k-expose": sim => {
     const d = ensureDeployment(sim);
     if (sim.services.some(s => s.name === d.name)) sim.exec("kubectl delete service " + d.name);
     const port = pick([80, 8080, 3000, 5432]);
-    return { text: "Stelle einen Service vor <code>" + d.name + "</code>, Port <b>" + port + "</b>.", accept: [new RegExp("^kubectl\\s+expose\\s+deployment\\s+" + d.name + "\\s+--port[=\\s]" + port + "$")], solution: "kubectl expose deployment " + d.name + " --port=" + port, hint: "Muster: kubectl expose deployment <name> --port=<port>", why: "expose stellt einen Service als feste Adresse vor das Deployment; --port ist der Port, unter dem er erreichbar ist – Muster: kubectl expose deployment <name> --port=<port>." };
+    return { text: "Stelle einen Service vor <code>" + d.name + "</code>, Port <b>" + port + "</b>.", accept: [new RegExp("^kubectl\\s+expose\\s+deployment\\s+" + d.name + "\\s+--port[=\\s]" + port + "$")], solution: "kubectl expose deployment " + d.name + " --port=" + port, hint: "Muster: kubectl expose deployment &lt;name&gt; --port=&lt;port&gt;", why: "expose stellt einen Service als feste Adresse vor das Deployment; --port ist der Port, unter dem er erreichbar ist – Muster: kubectl expose deployment &lt;name&gt; --port=&lt;port&gt;." };
   },
   "k-apply": sim => {
     sim.files["uebung.yaml"] = "# Übungs-Manifest\nkind: Deployment\n…";
     sim.applyEffects["uebung.yaml"] = { deployment: { name: "uebung", image: "nginx", replicas: 1 } };
     if (sim.deployments.some(d => d.name === "uebung")) sim.exec("kubectl delete deployment uebung");
-    return { text: "Wende die Datei <code>uebung.yaml</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+uebung\.yaml$/], solution: "kubectl apply -f uebung.yaml", hint: "kubectl apply -f <datei>", why: "apply gleicht den Cluster an die Datei an – deklarativ und idempotent (zweimal apply schadet nicht). Muster: kubectl apply -f <datei>." };
+    return { text: "Wende die Datei <code>uebung.yaml</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+uebung\.yaml$/], solution: "kubectl apply -f uebung.yaml", hint: "kubectl apply -f &lt;datei&gt;", why: "apply gleicht den Cluster an die Datei an – deklarativ und idempotent (zweimal apply schadet nicht). Muster: kubectl apply -f &lt;datei&gt;." };
   },
   "helm-install": sim => {
     if (!sim.helmRepos.includes("bitnami")) sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami");
     let rel = pick(NAMES);
     while (sim.releases.some(r => r.name === rel)) rel = pick(NAMES) + rnd(2, 9);
     const chart = pick(["nginx", "redis"]);
-    return { text: "Installiere <code>bitnami/" + chart + "</code> als Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+bitnami\\/" + chart + "$")], solution: "helm install " + rel + " bitnami/" + chart, hint: "Muster: helm install <release> <repo>/<chart>", why: "install rollt ein Chart als benanntes Release aus – der Release-Name kommt vor dem Chart: helm install <release> <repo>/<chart>." };
+    return { text: "Installiere <code>bitnami/" + chart + "</code> als Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+bitnami\\/" + chart + "$")], solution: "helm install " + rel + " bitnami/" + chart, hint: "Muster: helm install &lt;release&gt; &lt;repo&gt;/&lt;chart&gt;", why: "install rollt ein Chart als benanntes Release aus – der Release-Name kommt vor dem Chart: helm install &lt;release&gt; &lt;repo&gt;/&lt;chart&gt;." };
   },
   "helm-list": () => ({ text: "Zeig alle installierten Releases.", accept: [/^helm\s+(list|ls)$/], solution: "helm list", hint: "Englisch für „auflisten“.", why: "list (Kurzform ls) zeigt alle installierten Releases mit Revision und Status." }),
   "helm-upgrade": sim => {
     let r = sim.releases[0];
     if (!r) { sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami"); sim.exec("helm install uebung bitnami/nginx"); r = sim.releases[0]; }
     const n = rnd(2, 4);
-    return { text: "Stelle das Release <code>" + r.name + "</code> per <code>--set replicaCount=" + n + "</code> um.", accept: [new RegExp("^helm\\s+upgrade\\s+" + r.name + "\\s+" + r.chart.replace("/", "\\/") + "\\s+--set\\s+replicaCount=" + n + "$")], solution: "helm upgrade " + r.name + " " + r.chart + " --set replicaCount=" + n, hint: "Muster: helm upgrade <release> <chart> --set replicaCount=<n>", why: "upgrade ändert ein laufendes Release; --set überschreibt einzelne Werte, ohne eine neue values-Datei zu brauchen – Muster: helm upgrade <release> <chart> --set <schlüssel>=<wert>." };
+    return { text: "Stelle das Release <code>" + r.name + "</code> per <code>--set replicaCount=" + n + "</code> um.", accept: [new RegExp("^helm\\s+upgrade\\s+" + r.name + "\\s+" + r.chart.replace("/", "\\/") + "\\s+--set\\s+replicaCount=" + n + "$")], solution: "helm upgrade " + r.name + " " + r.chart + " --set replicaCount=" + n, hint: "Muster: helm upgrade &lt;release&gt; &lt;chart&gt; --set replicaCount=&lt;n&gt;", why: "upgrade ändert ein laufendes Release; --set überschreibt einzelne Werte, ohne eine neue values-Datei zu brauchen – Muster: helm upgrade &lt;release&gt; &lt;chart&gt; --set &lt;schlüssel&gt;=&lt;wert&gt;." };
   },
   "helm-rollback": sim => {
     let r = sim.releases.find(r => r.revision > 1);
@@ -176,26 +176,26 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
       if (!r) { sim.exec("helm repo add bitnami https://charts.bitnami.com/bitnami"); sim.exec("helm install uebung bitnami/nginx"); r = sim.releases[0]; }
       sim.exec("helm upgrade " + r.name + " " + r.chart + " --set replicaCount=2");
     }
-    return { text: "Hoppla, das Upgrade von <code>" + r.name + "</code> war ein Fehler – rolle auf Revision <b>1</b> zurück!", accept: [new RegExp("^helm\\s+rollback\\s+" + r.name + "\\s+1$")], solution: "helm rollback " + r.name + " 1", hint: "Muster: helm rollback <release> <revision>", why: "Helm führt pro Release eine Revisions-Historie; rollback setzt auf eine frühere Revision zurück – Muster: helm rollback <release> <revision>." };
+    return { text: "Hoppla, das Upgrade von <code>" + r.name + "</code> war ein Fehler – rolle auf Revision <b>1</b> zurück!", accept: [new RegExp("^helm\\s+rollback\\s+" + r.name + "\\s+1$")], solution: "helm rollback " + r.name + " 1", hint: "Muster: helm rollback &lt;release&gt; &lt;revision&gt;", why: "Helm führt pro Release eine Revisions-Historie; rollback setzt auf eine frühere Revision zurück – Muster: helm rollback &lt;release&gt; &lt;revision&gt;." };
   },
   "helm-create": sim => {
     let name = pick(CHART_NAMES);
     while (sim.charts.some(c => c.name === name)) name = pick(CHART_NAMES) + rnd(2, 99);
-    return { text: "Bau ein eigenes Chart-Gerüst namens <code>" + name + "</code>.", accept: [new RegExp("^helm\\s+create\\s+" + name + "$")], solution: "helm create " + name, hint: "Muster: helm create <chart-name>", why: "create legt das Chart-Gerüst an (Chart.yaml als Steckbrief, values.yaml als Drehknöpfe, templates/ als Vorlagen) – Muster: helm create <chart-name>." };
+    return { text: "Bau ein eigenes Chart-Gerüst namens <code>" + name + "</code>.", accept: [new RegExp("^helm\\s+create\\s+" + name + "$")], solution: "helm create " + name, hint: "Muster: helm create &lt;chart-name&gt;", why: "create legt das Chart-Gerüst an (Chart.yaml als Steckbrief, values.yaml als Drehknöpfe, templates/ als Vorlagen) – Muster: helm create &lt;chart-name&gt;." };
   },
   "helm-lint": sim => {
     const name = ensureChart(sim);
-    return { text: "Prüfe dein Chart <code>" + name + "</code> auf Fehler.", accept: [new RegExp("^helm\\s+lint\\s+(\\.\\/)?" + name + "$")], solution: "helm lint " + name, hint: "Muster: helm lint <chart>", why: "lint ist die Generalprobe fürs Chart: es prüft Struktur und Stil, bevor du es ausrollst oder teilst – Muster: helm lint <chart>." };
+    return { text: "Prüfe dein Chart <code>" + name + "</code> auf Fehler.", accept: [new RegExp("^helm\\s+lint\\s+(\\.\\/)?" + name + "$")], solution: "helm lint " + name, hint: "Muster: helm lint &lt;chart&gt;", why: "lint ist die Generalprobe fürs Chart: es prüft Struktur und Stil, bevor du es ausrollst oder teilst – Muster: helm lint &lt;chart&gt;." };
   },
   "helm-package": sim => {
     const name = ensureChart(sim);
-    return { text: "Pack dein Chart <code>" + name + "</code> in ein verteilbares Archiv.", accept: [new RegExp("^helm\\s+package\\s+(\\.\\/)?" + name + "$")], solution: "helm package " + name, hint: "Muster: helm package <chart>", why: "package schnürt das Chart in ein versioniertes .tgz-Archiv – genau das, was in Chart-Repos liegt und sich teilen lässt. Muster: helm package <chart>." };
+    return { text: "Pack dein Chart <code>" + name + "</code> in ein verteilbares Archiv.", accept: [new RegExp("^helm\\s+package\\s+(\\.\\/)?" + name + "$")], solution: "helm package " + name, hint: "Muster: helm package &lt;chart&gt;", why: "package schnürt das Chart in ein versioniertes .tgz-Archiv – genau das, was in Chart-Repos liegt und sich teilen lässt. Muster: helm package &lt;chart&gt;." };
   },
   "helm-install-local": sim => {
     const name = ensureChart(sim);
     let rel = pick(NAMES);
     while (sim.releases.some(r => r.name === rel)) rel = pick(NAMES) + rnd(2, 99);
-    return { text: "Installiere aus deinem eigenen Chart <code>./" + name + "</code> ein Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+\\.\\/" + name + "$")], solution: "helm install " + rel + " ./" + name, hint: "Muster: helm install <release> ./<chart>", why: "Aus einem lokalen Chart-Ordner installierst du über den Pfad statt über <repo>/<chart> – Muster: helm install <release> ./<chart>." };
+    return { text: "Installiere aus deinem eigenen Chart <code>./" + name + "</code> ein Release <code>" + rel + "</code>.", accept: [new RegExp("^helm\\s+install\\s+" + rel + "\\s+\\.\\/" + name + "$")], solution: "helm install " + rel + " ./" + name, hint: "Muster: helm install &lt;release&gt; ./&lt;chart&gt;", why: "Aus einem lokalen Chart-Ordner installierst du über den Pfad statt über &lt;repo&gt;/&lt;chart&gt; – Muster: helm install &lt;release&gt; ./&lt;chart&gt;." };
   },
   "tf-plan": sim => {
     if (!sim.tf.initialized) sim.tf.initialized = true; // Übung setzt ein initialisiertes Projekt voraus
@@ -208,29 +208,29 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
   "k-secret": sim => {
     let name = pick(["schatzkarte", "funkcode", "kombuesen-rezept"]) + rnd(2, 99);
     while (sim.secrets.some(s => s.name === name)) name = "funkcode" + rnd(100, 9999);
-    return { text: "Lege ein Secret <code>" + name + "</code> mit <code>--from-literal=passwort=geheim" + rnd(10, 99) + "x</code> an. (Wert frei wählbar!)", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+generic\\s+" + name + "\\s+--from-literal[=\\s][\\w.-]+=\\S+$")], solution: "kubectl create secret generic " + name + " --from-literal=passwort=geheim123", hint: "Muster: kubectl create secret generic <name> --from-literal=schluessel=wert", why: "Secrets halten Vertrauliches – statt Klartext in YAML; --from-literal=<schlüssel>=<wert> setzt einen Wert direkt. Muster: kubectl create secret generic <name> --from-literal=<schlüssel>=<wert>." };
+    return { text: "Lege ein Secret <code>" + name + "</code> mit <code>--from-literal=passwort=geheim" + rnd(10, 99) + "x</code> an. (Wert frei wählbar!)", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+generic\\s+" + name + "\\s+--from-literal[=\\s][\\w.-]+=\\S+$")], solution: "kubectl create secret generic " + name + " --from-literal=passwort=geheim123", hint: "Muster: kubectl create secret generic &lt;name&gt; --from-literal=schluessel=wert", why: "Secrets halten Vertrauliches – statt Klartext in YAML; --from-literal=&lt;schlüssel&gt;=&lt;wert&gt; setzt einen Wert direkt. Muster: kubectl create secret generic &lt;name&gt; --from-literal=&lt;schlüssel&gt;=&lt;wert&gt;." };
   },
   "k-get-secrets": () => ({ text: "Zeig alle Secrets an.", accept: [/^kubectl\s+get\s+(secrets|secret)$/], solution: "kubectl get secrets", hint: "kubectl get …", why: "Gleiches get-Muster: kubectl get secrets listet die Secrets des Namespaces." }),
   "k-secret-tls": sim => {
     let name = pick(["hafen-tls", "kasse-tls", "lager-tls"]);
     while (sim.secrets.some(s => s.name === name)) name = "tor-tls-" + rnd(100, 9999);
-    return { text: "Lege ein TLS-Secret <code>" + name + "</code> aus <code>tls.crt</code> und <code>tls.key</code> an.", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+tls\\s+" + name + "\\s+(?:--cert[=\\s]\\S+\\s+--key[=\\s]\\S+|--key[=\\s]\\S+\\s+--cert[=\\s]\\S+)$")], solution: "kubectl create secret tls " + name + " --cert=tls.crt --key=tls.key", hint: "Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key", why: "Ein TLS-Secret bündelt Zertifikat und Schlüssel; --cert zeigt auf die .crt-, --key auf die .key-Datei – Muster: kubectl create secret tls <name> --cert=tls.crt --key=tls.key." };
+    return { text: "Lege ein TLS-Secret <code>" + name + "</code> aus <code>tls.crt</code> und <code>tls.key</code> an.", accept: [new RegExp("^kubectl\\s+create\\s+secret\\s+tls\\s+" + name + "\\s+(?:--cert[=\\s]\\S+\\s+--key[=\\s]\\S+|--key[=\\s]\\S+\\s+--cert[=\\s]\\S+)$")], solution: "kubectl create secret tls " + name + " --cert=tls.crt --key=tls.key", hint: "Muster: kubectl create secret tls &lt;name&gt; --cert=tls.crt --key=tls.key", why: "Ein TLS-Secret bündelt Zertifikat und Schlüssel; --cert zeigt auf die .crt-, --key auf die .key-Datei – Muster: kubectl create secret tls &lt;name&gt; --cert=tls.crt --key=tls.key." };
   },
   "k-get-ingress": () => ({ text: "Zeig alle Hafentore (Ingresses) an.", accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch.", why: "kubectl get ingress (Kurzform ing) zeigt die Hafentore – die Routen von außen ins Cluster." }),
   "k-logs": sim => {
     const d = ensureDeployment(sim);
     const pod = d.pods[0].name;
-    return { text: "Lies die Logs des Pods <code>" + pod + "</code>.", accept: [new RegExp("^kubectl\\s+logs\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl logs " + pod, hint: "kubectl logs <pod-name> – Name per get pods holen.", why: "logs zeigt die Ausgabe der App im Pod (die App-Sicht) – Muster: kubectl logs <pod-name>; den Namen holst du dir per get pods." };
+    return { text: "Lies die Logs des Pods <code>" + pod + "</code>.", accept: [new RegExp("^kubectl\\s+logs\\s+" + pod.replace(/[-]/g, "\\-") + "$")], solution: "kubectl logs " + pod, hint: "kubectl logs &lt;pod-name&gt; – Name per get pods holen.", why: "logs zeigt die Ausgabe der App im Pod (die App-Sicht) – Muster: kubectl logs &lt;pod-name&gt;; den Namen holst du dir per get pods." };
   },
   "k-rollout": sim => {
     const d = ensureDeployment(sim);
-    return { text: "Starte alle Pods von <code>" + d.name + "</code> sauber neu (Rolling Restart).", accept: [new RegExp("^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]" + d.name + "$")], solution: "kubectl rollout restart deployment " + d.name, hint: "Muster: kubectl rollout restart deployment <name>", why: "rollout restart ersetzt alle Pods rollierend (z.B. nachdem die Ursache eines Fehlers behoben ist) – Muster: kubectl rollout restart deployment <name>." };
+    return { text: "Starte alle Pods von <code>" + d.name + "</code> sauber neu (Rolling Restart).", accept: [new RegExp("^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]" + d.name + "$")], solution: "kubectl rollout restart deployment " + d.name, hint: "Muster: kubectl rollout restart deployment &lt;name&gt;", why: "rollout restart ersetzt alle Pods rollierend (z.B. nachdem die Ursache eines Fehlers behoben ist) – Muster: kubectl rollout restart deployment &lt;name&gt;." };
   },
   "k-set-resources": sim => {
     const d = ensureDeployment(sim);
     const lim = pick([128, 256, 512]);
     const req = lim / 2;
-    return { text: "Setz dem Deployment <code>" + d.name + "</code> ein memory-Limit von <b>" + lim + "Mi</b> und einen Request von <b>" + req + "Mi</b>.", accept: [new RegExp("^kubectl\\s+set\\s+resources\\s+deployment[\\/\\s]" + d.name + "\\s+(?:--limits[=\\s][^\\s]*memory=" + lim + "Mi\\s+--requests[=\\s][^\\s]*memory=" + req + "Mi|--requests[=\\s][^\\s]*memory=" + req + "Mi\\s+--limits[=\\s][^\\s]*memory=" + lim + "Mi)$")], solution: "kubectl set resources deployment/" + d.name + " --limits=memory=" + lim + "Mi --requests=memory=" + req + "Mi", hint: "Muster: kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi", why: "requests reservieren Platz auf dem Node, limits sind die Obergrenze im Betrieb (Speicher drüber → OOMKilled) – beide setzt du mit kubectl set resources deployment/<name> --limits=memory=<X>Mi --requests=memory=<Y>Mi." };
+    return { text: "Setz dem Deployment <code>" + d.name + "</code> ein memory-Limit von <b>" + lim + "Mi</b> und einen Request von <b>" + req + "Mi</b>.", accept: [new RegExp("^kubectl\\s+set\\s+resources\\s+deployment[\\/\\s]" + d.name + "\\s+(?:--limits[=\\s][^\\s]*memory=" + lim + "Mi\\s+--requests[=\\s][^\\s]*memory=" + req + "Mi|--requests[=\\s][^\\s]*memory=" + req + "Mi\\s+--limits[=\\s][^\\s]*memory=" + lim + "Mi)$")], solution: "kubectl set resources deployment/" + d.name + " --limits=memory=" + lim + "Mi --requests=memory=" + req + "Mi", hint: "Muster: kubectl set resources deployment/&lt;name&gt; --limits=memory=&lt;X&gt;Mi --requests=memory=&lt;Y&gt;Mi", why: "requests reservieren Platz auf dem Node, limits sind die Obergrenze im Betrieb (Speicher drüber → OOMKilled) – beide setzt du mit kubectl set resources deployment/&lt;name&gt; --limits=memory=&lt;X&gt;Mi --requests=memory=&lt;Y&gt;Mi." };
   },
   "git-status": sim => {
     ensureGit(sim);
@@ -240,7 +240,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     ensureGit(sim);
     const fn = "seekarte-" + sim.clock + "-" + rnd(100, 9999) + ".md";
     sim.files[fn] = "# Karte";
-    return { text: "Merke die neue Datei <code>" + fn + "</code> zum Commit vor.", accept: [new RegExp("^git\\s+add\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git add " + fn, hint: "Muster: git add <datei>", why: "add merkt eine Datei für den nächsten Commit vor (Staging) – erst auswählen, dann mit commit festhalten. Muster: git add <datei>." };
+    return { text: "Merke die neue Datei <code>" + fn + "</code> zum Commit vor.", accept: [new RegExp("^git\\s+add\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git add " + fn, hint: "Muster: git add &lt;datei&gt;", why: "add merkt eine Datei für den nächsten Commit vor (Staging) – erst auswählen, dann mit commit festhalten. Muster: git add &lt;datei&gt;." };
   },
   "git-commit": sim => {
     ensureGit(sim);
@@ -253,13 +253,13 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     ensureGit(sim);
     let name = "karte-" + rnd(2, 99);
     while (sim.git.branches.includes(name)) name = "karte-" + rnd(100, 9999);
-    return { text: "Lege einen neuen Branch <code>" + name + "</code> an (nur anlegen, nicht wechseln).", accept: [new RegExp("^git\\s+branch\\s+" + name + "$")], solution: "git branch " + name, hint: "Muster: git branch <name>", why: "branch legt einen neuen Zweig an, ohne dorthin zu wechseln (das täte checkout) – Muster: git branch <name>." };
+    return { text: "Lege einen neuen Branch <code>" + name + "</code> an (nur anlegen, nicht wechseln).", accept: [new RegExp("^git\\s+branch\\s+" + name + "$")], solution: "git branch " + name, hint: "Muster: git branch &lt;name&gt;", why: "branch legt einen neuen Zweig an, ohne dorthin zu wechseln (das täte checkout) – Muster: git branch &lt;name&gt;." };
   },
   "git-checkout": sim => {
     ensureGit(sim);
     let name = "feature-" + rnd(2, 99);
     while (sim.git.branches.includes(name)) name = "feature-" + rnd(100, 9999);
-    return { text: "Lege den Branch <code>" + name + "</code> an UND wechsle direkt hinein.", accept: [new RegExp("^git\\s+checkout\\s+-b\\s+" + name + "$")], solution: "git checkout -b " + name, hint: "Muster: git checkout -b <name>", why: "checkout -b macht beides in einem Schritt: Branch anlegen UND direkt hineinwechseln – Muster: git checkout -b <name>." };
+    return { text: "Lege den Branch <code>" + name + "</code> an UND wechsle direkt hinein.", accept: [new RegExp("^git\\s+checkout\\s+-b\\s+" + name + "$")], solution: "git checkout -b " + name, hint: "Muster: git checkout -b &lt;name&gt;", why: "checkout -b macht beides in einem Schritt: Branch anlegen UND direkt hineinwechseln – Muster: git checkout -b &lt;name&gt;." };
   },
   "git-add-all": sim => {
     ensureGit(sim);
@@ -272,7 +272,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     if (!sim.files[".gitlab-ci.yml"]) sim.files[".gitlab-ci.yml"] = "stages: [build, test, deploy]";
     const fn = "auslieferung-" + sim.clock + "-" + rnd(100, 9999) + ".txt";
     sim.files[fn] = "x"; sim.exec("git add " + fn); sim.exec('git commit -m "Auslieferung"'); sim.exec("git push");
-    return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci <unterbefehl> – der Befehl fürs Nachschauen.", why: "Ein Push löst die Pipeline aus; glab ci status zeigt, ob sie durchlief – kein Mensch klickt das an." };
+    return { text: "Schau nach, ob die letzte Pipeline durchgelaufen ist.", accept: [/^glab\s+ci\s+status$/], solution: "glab ci status", hint: "glab ci &lt;unterbefehl&gt; – der Befehl fürs Nachschauen.", why: "Ein Push löst die Pipeline aus; glab ci status zeigt, ob sie durchlief – kein Mensch klickt das an." };
   },
   // Git-Team-Alltag (#69). Bewusst NACH "ci-status" (das pusht) und vor den k8s-Drills,
   // damit kein folgender Drill von einem offenen Konflikt überrascht wird.
@@ -294,7 +294,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     sim.exec("git merge " + br); // löst den Konflikt aus – jetzt steckt er in fn
     const side = pick(["--ours", "--theirs"]);
     const wer = side === "--ours" ? "<b>eigene</b>" : "<b>hereinkommende</b>";
-    return { text: "Merge-Konflikt in <code>" + fn + "</code>: übernimm die " + wer + " Version.", accept: [new RegExp("^git\\s+checkout\\s+" + side + "\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git checkout " + side + " " + fn, hint: "Muster: git checkout --ours/--theirs <datei>", why: "Im Konflikt wählst du eine Seite: --ours ist deine, --theirs die hereinkommende Version. Hier ist die " + wer + " gefragt – Muster: git checkout " + side + " <datei>." };
+    return { text: "Merge-Konflikt in <code>" + fn + "</code>: übernimm die " + wer + " Version.", accept: [new RegExp("^git\\s+checkout\\s+" + side + "\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git checkout " + side + " " + fn, hint: "Muster: git checkout --ours/--theirs &lt;datei&gt;", why: "Im Konflikt wählst du eine Seite: --ours ist deine, --theirs die hereinkommende Version. Hier ist die " + wer + " gefragt – Muster: git checkout " + side + " &lt;datei&gt;." };
   },
   "k-get-netpol": sim => {
     ensureNetworkPolicy(sim);
@@ -306,15 +306,15 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const file = "drill-netpol.yaml";
     sim.files[file] = NETPOL_YAML;
     sim.applyEffects[file] = { networkPolicy: { name, podSelector: pick(NETPOL_APPS), allowFrom: "hafentor" } };
-    return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f <datei>", why: "Auch eine NetworkPolicy ist ein ganz normales Manifest – mit kubectl apply -f <datei> wird sie deklarativ angewandt." };
+    return { text: "Wende die Hafenmauer-Karte <code>" + file + "</code> deklarativ an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-netpol\.yaml$/], solution: "kubectl apply -f " + file, hint: "kubectl apply -f &lt;datei&gt;", why: "Auch eine NetworkPolicy ist ein ganz normales Manifest – mit kubectl apply -f &lt;datei&gt; wird sie deklarativ angewandt." };
   },
   "k-describe-netpol": sim => {
     const np = ensureNetworkPolicy(sim);
-    return { text: "Beschreibe die Hafenmauer <code>" + np.name + "</code> – wer darf rein?", accept: [new RegExp("^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe networkpolicy " + np.name, hint: "kubectl describe networkpolicy <name>", why: "describe zeigt die Details der Policy: wen sie schützt (podSelector) und wer durchdarf (from) – Muster: kubectl describe networkpolicy <name>." };
+    return { text: "Beschreibe die Hafenmauer <code>" + np.name + "</code> – wer darf rein?", accept: [new RegExp("^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl describe networkpolicy " + np.name, hint: "kubectl describe networkpolicy &lt;name&gt;", why: "describe zeigt die Details der Policy: wen sie schützt (podSelector) und wer durchdarf (from) – Muster: kubectl describe networkpolicy &lt;name&gt;." };
   },
   "k-delete-netpol": sim => {
     const np = ensureNetworkPolicy(sim);
-    return { text: "Reiß die Hafenmauer <code>" + np.name + "</code> wieder ein.", accept: [new RegExp("^kubectl\\s+delete\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete networkpolicy " + np.name, hint: "kubectl delete networkpolicy <name>", why: "delete entfernt die NetworkPolicy wieder – danach ist das Netzwerk an dieser Stelle wieder offen. Muster: kubectl delete networkpolicy <name>." };
+    return { text: "Reiß die Hafenmauer <code>" + np.name + "</code> wieder ein.", accept: [new RegExp("^kubectl\\s+delete\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+" + np.name.replace(/[-]/g, "\\-") + "$")], solution: "kubectl delete networkpolicy " + np.name, hint: "kubectl delete networkpolicy &lt;name&gt;", why: "delete entfernt die NetworkPolicy wieder – danach ist das Netzwerk an dieser Stelle wieder offen. Muster: kubectl delete networkpolicy &lt;name&gt;." };
   },
   // GitOps-Archipel (#98): Üben mit Argo CD – Application anlegen, Überblick, Akte lesen, Soll ziehen.
   "argo-apply": sim => {
@@ -324,7 +324,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     const file = "drill-application.yaml";
     sim.files[file] = ARGO_APPLICATION_MANUAL_YAML;
     sim.applyEffects[file] = { application: { name, repo: "https://github.com/port-kubernia/seekarten.git", path: name, autoSync: false, selfHeal: false, deployment: { name, image: "nginx:1.27", replicas: 2 } } };
-    return { text: "Eine Argo-<b>Application</b> ist ein ganz normales Manifest: wende die Seekarte <code>" + file + "</code> deklarativ an, damit Argo den neuen Auftrag kennt.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-application\.yaml$/], solution: "kubectl apply -f " + file, hint: "Der vertraute Befehl: kubectl apply -f <datei>", why: "Eine Argo-Application ist selbst nur ein Manifest – mit dem vertrauten kubectl apply -f <datei> machst du Argo den Soll-Zustand bekannt." };
+    return { text: "Eine Argo-<b>Application</b> ist ein ganz normales Manifest: wende die Seekarte <code>" + file + "</code> deklarativ an, damit Argo den neuen Auftrag kennt.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+drill-application\.yaml$/], solution: "kubectl apply -f " + file, hint: "Der vertraute Befehl: kubectl apply -f &lt;datei&gt;", why: "Eine Argo-Application ist selbst nur ein Manifest – mit dem vertrauten kubectl apply -f &lt;datei&gt; machst du Argo den Soll-Zustand bekannt." };
   },
   "argo-app-list": sim => {
     ensureArgoApp(sim);
@@ -332,11 +332,11 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
   },
   "argo-app-get": sim => {
     const app = ensureArgoApp(sim);
-    return { text: "Öffne die Akte der Application <code>" + app.name + "</code> – lies Sync Status und Health.", accept: [new RegExp("^argocd\\s+app\\s+get\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app get " + app.name, hint: "Muster: argocd app get <name> – die Namen zeigt 'argocd app list'.", why: "argocd app get <name> öffnet die Akte einer einzelnen Application (Sync Status, Health, Details); die Namen liefert vorher argocd app list." };
+    return { text: "Öffne die Akte der Application <code>" + app.name + "</code> – lies Sync Status und Health.", accept: [new RegExp("^argocd\\s+app\\s+get\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app get " + app.name, hint: "Muster: argocd app get &lt;name&gt; – die Namen zeigt 'argocd app list'.", why: "argocd app get &lt;name&gt; öffnet die Akte einer einzelnen Application (Sync Status, Health, Details); die Namen liefert vorher argocd app list." };
   },
   "argo-app-sync": sim => {
     const app = ensureArgoApp(sim, true); // garantiert OutOfSync: es gibt echt etwas zu ziehen
-    return { text: "Die Application <code>" + app.name + "</code> ist <b>OutOfSync</b>. Zieh den im Git deklarierten Soll-Zustand in den Cluster (Pull-Prinzip).", accept: [new RegExp("^argocd\\s+app\\s+sync\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app sync " + app.name, hint: "Muster: argocd app sync <name>", why: "OutOfSync heißt: Cluster-Ist und Git-Soll klaffen auseinander. sync zieht den im Git deklarierten Stand per Pull in den Cluster – Muster: argocd app sync <name>." };
+    return { text: "Die Application <code>" + app.name + "</code> ist <b>OutOfSync</b>. Zieh den im Git deklarierten Soll-Zustand in den Cluster (Pull-Prinzip).", accept: [new RegExp("^argocd\\s+app\\s+sync\\s+" + app.name.replace(/[-]/g, "\\-") + "$")], solution: "argocd app sync " + app.name, hint: "Muster: argocd app sync &lt;name&gt;", why: "OutOfSync heißt: Cluster-Ist und Git-Soll klaffen auseinander. sync zieht den im Git deklarierten Stand per Pull in den Cluster – Muster: argocd app sync &lt;name&gt;." };
   },
 };
 
