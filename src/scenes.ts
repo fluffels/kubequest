@@ -1394,7 +1394,7 @@ import { getMapEntry } from "./mapregistry";
       // Quest-Marker
       for (const n of this.npcs) {
         let show = UI.questMarkerFor(n.id);
-        if (n.id === "kralle" && Game.dueReviewItems(1).length > 0) show = true;
+        if (n.id === "kralle" && Game.shouldReviewGate()) show = true;
         n.marker.setVisible(!blocked && show);
       }
 

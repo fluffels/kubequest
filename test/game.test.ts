@@ -525,3 +525,26 @@ test("Wiederholungs-Gate (#222): nach der letzten Quest kein Gate", () => {
   expect(Game.currentQuest()).toBe(null);
   expect(Game.shouldReviewGate()).toBe(false);
 });
+
+test("#323 Quest-Count-Gate: feuert nach ≥ 3 Quests wenn Karten vorhanden (nicht fällig)", () => {
+  Game.state.questStep = 0;
+  Game.state.questsSinceGate = 3;
+  // Karte vorhanden, aber noch nicht fällig
+  Game.state.review["q-ch1-1"] = { box: 3, due: 9_999_999 };
+  expect(Game.dueReviewItems().length).toBe(0); // keine fälligen
+  expect(Game.shouldReviewGate()).toBe(true);   // aber Quest-Count-Gate greift
+});
+
+test("#323 Quest-Count-Gate: feuert NICHT nach < 3 Quests ohne fällige Karten", () => {
+  Game.state.questStep = 0;
+  Game.state.questsSinceGate = 2;
+  Game.state.review["q-ch1-1"] = { box: 3, due: 9_999_999 };
+  expect(Game.shouldReviewGate()).toBe(false);
+});
+
+test("#323 Quest-Count-Gate: feuert NICHT wenn review-Dict leer (gar nichts gelernt)", () => {
+  Game.state.questStep = 0;
+  Game.state.questsSinceGate = 5;
+  Game.state.review = {};
+  expect(Game.shouldReviewGate()).toBe(false);
+});

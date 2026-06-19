@@ -103,6 +103,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       clusterSnapshot: null,
       audio: { music: true, sfx: true, musicVol: 0.5, sfxVol: 0.8, track: "hafen" },
       settings: { events: "normal" },
+      questsSinceGate: 0,
     };
   }
 
@@ -234,6 +235,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       clusterSnapshot: isPlainObject(raw.clusterSnapshot) ? raw.clusterSnapshot : null,
       audio: safeAudio(raw.audio),
       settings: safeSettings(raw.settings),
+      questsSinceGate: safeCount(raw.questsSinceGate, 0),
     };
   }
 
@@ -469,6 +471,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
         this.state.completedQuests.push(q.id);
         this.state.questIdx++;
         this.state.questStep = 0;
+        this.state.questsSinceGate++;
         this.save();
         return { questDone: q };
       }
@@ -537,15 +540,16 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       return due.slice(0, limit || 10).map(d => d.id);
     },
 
-    /** Sanftes Wiederholungs-Gate (#222): true, wenn der Spieler gerade am ANFANG
-     *  einer Quest steht (Schritt 0) und mindestens eine Karte fällig ist. Dann
-     *  frischt er erst kurz auf, bevor die nächste Hauptquest startet. Sind keine
-     *  Karten fällig (oder steht man mitten in einer Quest / sind alle durch),
-     *  blockiert nichts – das Gate ist weich und nur so oft wie nötig. */
+    /** Sanftes Wiederholungs-Gate (#222/#323): true, wenn der Spieler am ANFANG einer
+     *  Quest steht UND (a) mindestens eine Karte fällig ist ODER (b) seit dem letzten
+     *  Gate-Feuern ≥ 3 Quests abgeschlossen wurden und es überhaupt Review-Items gibt.
+     *  Variante (b) ist ein Quest-Count-Nudge (#323): bei verketteten Quests (z.B. q3→q3b)
+     *  kommt auch ohne Fälligkeiten ein Kralle-Beat. */
     shouldReviewGate(): boolean {
       if (this.state.questStep !== 0) return false;
       if (!this.currentQuest()) return false;
-      return this.dueReviewItems().length > 0;
+      if (this.dueReviewItems().length > 0) return true;
+      return this.state.questsSinceGate >= 3 && Object.keys(this.state.review).length > 0;
     },
 
     /** Fürs FREIE Üben: alle gelernten Karten, unabhängig von der Fälligkeit, in

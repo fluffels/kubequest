@@ -190,7 +190,7 @@ export const QUESTS: Quest[] = [
             reply: "NEIN. pull HOLT ein fertiges Image. build STELLT eines HER – aus deinem Dockerfile. Das ist der ganze Punkt!" },
         ]},
       { type: "dialog", npc: "bo", lines: [
-        "Jetzt bist du <b>echter</b> Kisten-Profi: holen, bauen, etikettieren. <i>*Golem-Applaus*</i> Später baut eine <b>Pipeline</b> deine Images ganz von allein – aber das zeigt dir Ada. Erst will Ole dich sprechen: der GROSSE Umbau wartet! Und Üben bei Bo bringt weiter Dublonen.",
+        "Jetzt bist du <b>echter</b> Kisten-Profi: holen, bauen, etikettieren. <i>*Golem-Applaus*</i> Später baut eine <b>Pipeline</b> deine Images ganz von allein – aber das zeigt dir Ada. Erst will Ole dich sprechen: der GROSSE Umbau wartet! Und wenn du üben willst: <b>Kralle</b> gibt dir Wiederholungen – damit setzt sich das Gelernte fest.",
       ]},
     ]},
 

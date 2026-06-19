@@ -1137,13 +1137,26 @@ import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
 
     /** Wiederholungs-Gate (#222): kurz vor dem Start einer neuen Quest fällige Karten
      *  auffrischen. Freundliche Ankündigung, dann die fälligen Karten; danach geht es
-     *  automatisch in die Quest weiter (siehe Gate-Abschluss in renderReviewItem). */
+     *  automatisch in die Quest weiter (siehe Gate-Abschluss in renderReviewItem).
+     *  Seit #323: feuert auch nach ≥ 3 Quests ohne Gate (Quest-Count-Gate) – zeigt dann
+     *  einen sanften Nudge zum freien Üben statt hartem Pflicht-Review. */
     openReviewGate(npcId: string): void {
       this.closeOverlays();
+      Game.state.questsSinceGate = 0; // Gate feuert: Zähler immer zurücksetzen (#323).
+      Game.save();
       const dueIds = Game.dueReviewItems(10);
-      if (dueIds.length === 0) { // Sicherheitsnetz: nichts fällig -> direkt zur Quest
+      if (dueIds.length === 0) {
+        // Quest-Count-Gate (#323): nichts fällig, aber ≥ 3 Quests am Stück – sanfter Nudge.
         this._gateClearedIdx = Game.state.questIdx;
-        return this.talkTo(npcId);
+        $("overlay-review").classList.remove("hidden");
+        $("review-body").innerHTML = `<div style="text-align:center">
+          <div style="font-size:3em">🦀</div>
+          <p>„Schon eine ganze Weile unterwegs! Nichts ist überfällig, aber ein bisschen freies Üben schadet nie – Karten bleiben länger sitzen. Willst du kurz mit mir üben?"</p>
+          <button class="primary" id="nudge-practice">Kurz üben mit Kralle ⚓</button>
+          <button id="nudge-skip">Lieber direkt weiter ⚓</button></div>`;
+        $("nudge-practice").onclick = () => { this.closeOverlays(); this.startFreePractice(); };
+        $("nudge-skip").onclick = () => { this.closeOverlays(); this.talkTo(npcId); };
+        return;
       }
       $("overlay-review").classList.remove("hidden");
       this.review = { ids: dueIds, idx: 0, right: 0, free: false, gate: { npcId, questIdx: Game.state.questIdx } };

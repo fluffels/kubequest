@@ -51,6 +51,9 @@ export interface GameState {
   audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number; track: string };
   /** Spiel-Feel: Frequenz/Härte der Zufalls-Events (Anti-Frust, #71). */
   settings: { events: EventMode };
+  /** Abgeschlossene Quests seit dem letzten Review-Gate-Feuern (#323).
+   *  Zähler für das Quest-Count-Gate: ab 3 wird Kralle auch ohne fällige Karten vorgeschlagen. */
+  questsSinceGate: number;
 }
 
 /** Spiel-Feel-Stufe: regelt Häufigkeit & Härte der Zufalls-Events (Stürme,
