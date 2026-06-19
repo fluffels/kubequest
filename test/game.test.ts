@@ -11,6 +11,7 @@ import { vi } from "vitest";
 import { KQContent } from "../src/content";
 import { NPC_SPAWNS, TILE, TALK_RANGE } from "../src/world";
 import { setWorldScene } from "../src/runtime";
+import { MAP_REGISTRY } from "../src/mapregistry";
 
 let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
@@ -77,6 +78,19 @@ test("reset: kehrt zur Default-Startposition zurück, auch wenn die WorldScene l
   // Und der persistierte Stand ebenso, sonst holt der reload in ui.resetGame die alte Position zurück.
   const saved = JSON.parse(SaveStore.read()!);
   expect(saved.data.player).toEqual(startPos);
+});
+
+test("Registry-Fallback-Spawn (harbor) zeigt auf denselben Ort wie der Spielstand-Default (Ole, #294)", () => {
+  // spawnPlayer nutzt getMapEntry("harbor").spawn (in Kacheln, ×TILE) nur als Fallback,
+  // falls keine gespeicherte Position existiert. Damit der Fallback NICHT wieder aufs
+  // Schiff zeigt (alter Stand vor #288), muss er auf denselben Punkt führen wie der
+  // Erststart-Default in game.ts. Dieser Wächter hält beide Quellen zusammen, falls der
+  // immer-gesetzt-Guard in spawnPlayer je gelockert wird.
+  setWorldScene(null);
+  Game.reset();
+  const spawn = MAP_REGISTRY.harbor.spawn;
+  expect(spawn.x * TILE).toBe(Game.state.player.x);
+  expect(spawn.y * TILE).toBe(Game.state.player.y);
 });
 
 /* ---------- Spiel-Feel: Cozy-Modus (#71) ---------- */
