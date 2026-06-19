@@ -6,10 +6,10 @@
  * bündelt sie nur noch zum gewohnten `KQContent`-Objekt (öffentliche API).
  */
 import { RANKS, SHOP } from "./content/progression";
-// NPCs + Smalltalk sind Content-as-Data (#348): als JSON in content/data/,
-// geladen & gegen ein Schema validiert vom Loader. Siehe content/loader.ts.
-import { NPCS, SMALLTALK } from "./content/loader";
-import { QUESTS } from "./content/quests";
+// NPCs, Smalltalk und Quests sind Content-as-Data (#348): als JSON in
+// content/data/, geladen & gegen ein Schema validiert vom Loader (accept→RegExp,
+// check→Mechanik-Registry). Siehe content/loader.ts + content/checks.ts.
+import { NPCS, SMALLTALK, QUESTS } from "./content/loader";
 import { DRILLS, PRACTICE } from "./content/drills";
 import { CRAB_QUIZ, CMD_CARDS } from "./content/quiz";
 import { STACK_ROUNDS, corruptImage } from "./content/minigame";

@@ -9,8 +9,10 @@ import assert from "node:assert/strict";
 import {
   NPCS,
   SMALLTALK,
+  QUESTS,
   parseNpcs,
   parseSmalltalk,
+  parseQuests,
   ContentValidationError,
 } from "../src/content/loader";
 
@@ -116,4 +118,102 @@ test("parseSmalltalk: wirft bei nicht-textueller Zeile", () => {
 test("parseSmalltalk: akzeptiert wohlgeformte Daten", () => {
   const ok = parseSmalltalk({ ole: ["Zeile eins", "Zeile zwei"] }, known);
   assert.equal(ok.ole.length, 2);
+});
+
+/* ---------- Quests: echte Daten korrekt in Laufzeit-Form geladen ---------- */
+
+test("loader: QUESTS geladen, accept als RegExp, check als Funktion (Laufzeit-Form)", () => {
+  assert.ok(QUESTS.length > 0, "keine Quests geladen");
+  let sawAccept = false;
+  let sawCheck = false;
+  for (const quest of QUESTS) {
+    assert.ok(quest.id.length > 0);
+    for (const step of quest.steps) {
+      const tasks =
+        step.type === "teach" ? [step.cmd] : step.type === "terminal" ? step.tasks : [];
+      for (const t of tasks) {
+        // accept muss zu echten RegExp kompiliert sein (nicht mehr String).
+        assert.ok(Array.isArray(t.accept) && t.accept.length > 0, `${quest.id}/${t.id}: kein accept`);
+        for (const re of t.accept) {
+          assert.ok(re instanceof RegExp, `${quest.id}/${t.id}: accept kein RegExp`);
+          sawAccept = true;
+        }
+        // check (falls vorhanden) muss zur Funktion aufgelöst sein (nicht mehr Key-String).
+        if (t.check !== undefined) {
+          assert.equal(typeof t.check, "function", `${quest.id}/${t.id}: check keine Funktion`);
+          sawCheck = true;
+        }
+      }
+    }
+  }
+  assert.ok(sawAccept, "kein einziger accept-RegExp – Revival hat nichts getan?");
+  assert.ok(sawCheck, "kein einziger aufgelöster check – Revival hat nichts getan?");
+});
+
+/* ---------- parseQuests: gültige Daten ---------- */
+
+const minimalQuest = {
+  id: "qx",
+  title: "Test",
+  giver: "ole",
+  rewardXp: 10,
+  rewardCoins: 5,
+  steps: [
+    { type: "dialog", npc: "ole", lines: ["Hallo"] },
+    { type: "teach", brief: "B", cmd: { id: "t-x", intro: "I", text: "T", accept: ["^x$"], solution: "x", hint: "H", check: "qx/t-x" } },
+  ],
+};
+
+test("parseQuests: akzeptiert wohlgeformte Quest ohne check", () => {
+  const q = parseQuests([{ ...minimalQuest, steps: [{ type: "dialog", npc: "ole", lines: ["Hi"] }] }]);
+  assert.equal(q.length, 1);
+  assert.equal(q[0].steps[0].type, "dialog");
+});
+
+/* ---------- parseQuests: kaputte Daten MÜSSEN explizit werfen ---------- */
+
+test("parseQuests: wirft bei Nicht-Array", () => {
+  assert.throws(() => parseQuests({}), ContentValidationError);
+});
+
+test("parseQuests: wirft bei unbekanntem Schritt-Typ (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "zauberei", npc: "ole", lines: ["x"] }] }]),
+    (e: unknown) => e instanceof ContentValidationError && /steps\[0\]\.type/.test((e as Error).message),
+  );
+});
+
+test("parseQuests: wirft bei leerem accept-Array", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "teach", brief: "B", cmd: { id: "t", intro: "I", text: "T", accept: [], solution: "x", hint: "H" } }] }]),
+    ContentValidationError,
+  );
+});
+
+test("parseQuests: wirft bei ungültigem RegExp-Pattern (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "teach", brief: "B", cmd: { id: "t", intro: "I", text: "T", accept: ["("], solution: "x", hint: "H" } }] }]),
+    (e: unknown) => e instanceof ContentValidationError && /accept\[0\]/.test((e as Error).message),
+  );
+});
+
+test("parseQuests: wirft bei unbekanntem check-Key (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "teach", brief: "B", cmd: { id: "t", intro: "I", text: "T", accept: ["^x$"], solution: "x", hint: "H", check: "gibtsnicht/nie" } }] }]),
+    (e: unknown) => e instanceof ContentValidationError && /check/.test((e as Error).message),
+  );
+});
+
+test("parseQuests: wirft bei dialog-Schritt ohne Zeilen", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "dialog", npc: "ole", lines: [] }] }]),
+    ContentValidationError,
+  );
+});
+
+test("parseQuests: wirft bei choice ohne wohlgeformte Optionen", () => {
+  assert.throws(
+    () => parseQuests([{ ...minimalQuest, steps: [{ type: "choice", npc: "ole", q: "?", options: [{ t: "A", ok: "ja", reply: "R" }] }] }]),
+    ContentValidationError,
+  );
 });
