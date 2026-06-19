@@ -1164,3 +1164,22 @@ test("App-of-Apps: Snapshot/Reset bewahrt die Wurzel inkl. Kind-Apps", () => {
   assert.ok(wieder.argoApps.some(a => a.name === "flotte-lager"), "Kind-App überlebt das Speichern");
   assert.match(wieder.exec("argocd app get hafen-flotte").output!, /Synced/);
 });
+
+// #307: Drill-Feedback verstummt, wenn die Eingabe einen Sim-Fehler produziert.
+// Die UI-Bedingung `!result.error` blockierte das Anzeigen des `why`-Hinweises.
+// Dieser Test beweist das Sim-Verhalten, das den Bug auslöst:
+// Ein falscher Befehl (docker build ohne Dockerfile) während einer docker-run-Drill
+// liefert error:true → der Drill-Hinweis muss dennoch erscheinen (#307 fix in ui.ts).
+test("#307 Szenario: falscher Befehl produziert Sim-Fehler (error:true)", () => {
+  // Ohne Dockerfile schlägt docker build fehl – das ist der Auslöser für das Verstummen
+  const r = sim.exec("docker build .");
+  assert.ok(r.error, "docker build ohne Dockerfile liefert error:true");
+  // Gleichzeitig würde cmdOk für eine docker-run-Aufgabe false sein → Bug: UI zeigte nichts
+  // Die zugehörige UI-Korrektur steht in src/ui.ts (else-if entfernt !result.error)
+});
+
+test("#307 Szenario: Subcommand-Vertauscher produziert Sim-Fehler", () => {
+  // docker stop auf nicht-existenten Container → error:true, aber cmdOk für docker-run-Task = false
+  const r = sim.exec("docker stop nicht-vorhanden");
+  assert.ok(r.error, "docker stop auf unbekannten Container liefert error:true");
+});
