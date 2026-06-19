@@ -14,3 +14,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Build-Flag (#331): per Vite-`define` gesetztes, statisch foldbares Literal –
+// true nur im `--mode devpanel`-Build (liefert das Dev-Panel mit aus), sonst
+// false (Panel wird aus build/build:offline rausgestrippt). Siehe vite.config.ts.
+declare const __KQ_DEVPANEL__: boolean;

@@ -2,10 +2,13 @@ name: CI
 
 # Qualitätstore bei jedem Push auf main und bei jedem Pull Request.
 # Hält main grün: Tests + Typecheck + beide Builds müssen durchlaufen.
+# workflow_dispatch erlaubt zusätzlich den manuellen Start – v.a. um den
+# Dev-Panel-Build (#331) zwischendurch anzustoßen und das Artefakt zu ziehen.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 # Veraltete Runs desselben Branches/PRs abbrechen, sobald ein neuer startet.
 concurrency:
@@ -46,4 +49,40 @@ jobs:
         with:
           name: kubequest-offline
           path: dist-offline/index.html
+          if-no-files-found: error
+
+  # Dev-Panel-Build (#331): liefert das sonst dev-server-only Panel als eine
+  # self-contained Datei aus, passwortgated über das Repo-Secret VITE_KQ_DEVPANEL_PW.
+  # WICHTIG (Geheimhaltung): nur bei Push auf main bzw. manuellem Start – NICHT bei
+  # pull_request, damit das Secret nie an (Fork-)PRs gerät. GitHub liefert Secrets
+  # ohnehin nicht an Fork-PRs aus; das if ist der zusätzliche, explizite Riegel.
+  devpanel-build:
+    name: Dev-Panel-Build (passwortgated, nur main/manuell)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Dev-Panel-Build (Single-File, Passwort aus Secret injiziert)
+        run: npm run build:devpanel
+        env:
+          # Wert steht NICHT im Repo – kommt aus dem Repo-Secret. Fehlt das Secret,
+          # baut es trotzdem durch; das Panel bleibt dann nur gesperrt.
+          VITE_KQ_DEVPANEL_PW: ${{ secrets.VITE_KQ_DEVPANEL_PW }}
+
+      - name: Dev-Panel-Build als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubequest-devpanel
+          path: dist-devpanel/index.html
           if-no-files-found: error
