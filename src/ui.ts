@@ -71,6 +71,7 @@ import { worldScene, interiorOpen } from "./runtime";
     _gateClearedIdx: -1,     // questIdx, für den das Wiederholungs-Gate schon erledigt ist (#222)
     choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
     choiceSel: 0,
+    reviewSel: -1,           // markierte Quiz-Option in der Wissensrunde (Pfeiltasten, #258)
 
     /* ========== Event-Delegation ==========
      * Ein einziger delegierter Listener am document übersetzt data-action-
@@ -1133,9 +1134,10 @@ import { worldScene, interiorOpen } from "./runtime";
       if (content.kind === "quiz") {
         const q = content.q!;
         r.current.order = shuffled(q.options.map((_: unknown, i: number) => i));
+        this.reviewSel = -1;   // Tastatur-Auswahl (#258) je Karte zurücksetzen
         body = `<div class="quiz-q">${q.q}</div>
           <div class="quiz-options" id="quiz-options">
-            ${r.current.order.map((oi: number) => `<button data-action="answerReviewQuiz" data-oi="${oi}">${esc(q.options[oi])}</button>`).join("")}
+            ${r.current.order.map((oi: number, i: number) => `<button data-action="answerReviewQuiz" data-oi="${oi}"><span class="qnum">${i + 1}</span>${esc(q.options[oi])}</button>`).join("")}
           </div><div id="review-explain"></div>`;
       } else {
         const card = content.card!;
@@ -1159,10 +1161,64 @@ import { worldScene, interiorOpen } from "./runtime";
       document.querySelectorAll("#quiz-options button").forEach(btn => {
         const oi = parseInt((btn as HTMLElement).dataset.oi!, 10);
         (btn as HTMLButtonElement).disabled = true;
+        btn.classList.remove("sel");   // Tastatur-Markierung weg, sobald korrekt/falsch greift (#258)
         if (oi === q.correct) btn.classList.add("correct");
         else if (oi === optionIndex) btn.classList.add("wrong");
       });
+      this.reviewSel = -1;
       this.finishReviewItem(correct, q.explain);
+    },
+
+    /** Tastatursteuerung der Wissensrunde (#258). Wird aus dem globalen Keydown
+     *  (main.ts) aufgerufen, solange das Review-Overlay offen ist. Gibt `true`
+     *  zurück, wenn die Taste verarbeitet wurde (dann kein Spieler-/Default-Effekt).
+     *  - Offene Quiz-Frage: Ziffern 1–n wählen direkt, ↑/↓ markieren, Enter bestätigt.
+     *  - Beantwortet / Zwischen- & Endscreens / Gate: Enter/Leertaste löst den
+     *    sichtbaren Primär-Button („Weiter ➡️", „Frei üben", Gate-Weiter) aus.
+     *  Die Befehls-Eingabe hat ihren eigenen Enter-Handler (answerReviewCmd) und
+     *  wird von main.ts gar nicht erst hierher geleitet (Fokus liegt im INPUT). */
+    reviewKey(k: string, ev: KeyboardEvent): boolean {
+      const r = this.review;
+      if (r && r.current && !r.current.answered && r.current.content.kind === "quiz") {
+        const order: number[] = r.current.order;
+        if (/^[1-9]$/.test(k)) {
+          const pos = Number(k) - 1;
+          if (pos < order.length) { ev.preventDefault(); this.answerReviewQuiz(order[pos]); }
+          return true;
+        }
+        if (k === "ArrowDown" || k === "ArrowUp") {
+          const n = order.length;
+          const start = k === "ArrowDown" ? -1 : 0;
+          const cur = this.reviewSel < 0 ? start : this.reviewSel;
+          this.reviewSel = ((cur + (k === "ArrowDown" ? 1 : -1)) % n + n) % n;
+          this.highlightReviewOption();
+          ev.preventDefault();
+          return true;
+        }
+        if (k === "Enter" || k === " ") {
+          if (this.reviewSel >= 0 && this.reviewSel < order.length) {
+            ev.preventDefault();
+            this.answerReviewQuiz(order[this.reviewSel]);
+          }
+          return true;   // offene Frage „schluckt" Enter/Leer, damit nichts dahinter feuert
+        }
+        return false;
+      }
+      // beantwortet / Zwischen-/Endscreen / Gate: Primär-Button per Enter/Leertaste
+      if (k === "Enter" || k === " ") {
+        const btn = $("review-body").querySelector(
+          "button.primary, #gate-start, #gate-continue, [data-action='nextReviewItem']",
+        ) as HTMLButtonElement | null;
+        if (btn) { ev.preventDefault(); btn.click(); return true; }
+      }
+      return false;
+    },
+
+    /** Hebt die per Pfeiltasten markierte Quiz-Option hervor (#258). */
+    highlightReviewOption() {
+      document.querySelectorAll("#quiz-options button").forEach((b, i) => {
+        b.classList.toggle("sel", i === this.reviewSel);
+      });
     },
 
     answerReviewCmd(ev: any) {
