@@ -135,6 +135,19 @@ import { keys, clearKeys } from "./runtime";
 
     // Boot-Markierung fürs Sicherheitsnetz in index.html (früher: window.Game)
     document.body.dataset.kqBooted = "1";
+
+    // #301: Im Dev-Server unterdrückt das Vite-Plugin `kq-dev-no-full-reload`
+    // den störenden Auto-Reload bei Code-Änderungen (sonst riss er mitten im
+    // Spiel laufende Gespräche weg + blaues Flackern). Statt stillschweigend
+    // nicht zu aktualisieren, sagen wir es dem Menschen am Schirm: ein Toast,
+    // dass eine Code-Änderung vorliegt und ein bewusstes Neuladen sie holt.
+    // `import.meta.hot` existiert nur im Dev-Build und wird im Prod-/Offline-
+    // Build samt diesem Block weggestrippt – kein Gameplay-Einfluss.
+    if (import.meta.hot) {
+      import.meta.hot.on("kq:code-changed", () => {
+        UI.toast("🔄 Code geändert – zum Übernehmen neu laden (F5). Spielstand &amp; laufendes Gespräch bleiben erhalten.");
+      });
+    }
   }
 
   document.addEventListener("DOMContentLoaded", boot);
