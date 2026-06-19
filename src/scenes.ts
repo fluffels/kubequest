@@ -10,7 +10,7 @@ import { UI } from "./ui";
 import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, TALK_RANGE, interiorEAction, type Door } from "./world";
+import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, TALK_RANGE, interiorEAction, interiorEFlank, type Door } from "./world";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -1601,17 +1601,21 @@ import { getMapEntry } from "./mapregistry";
       // Talk-Reichweite) → mit ihm reden; sonst (E-Flanke oder auf der
       // Tür-Schwelle) → hinausgehen. Die Entscheidung liegt pur in
       // interiorEAction() (world.ts), hier nur das Sammeln der Eingaben.
-      const e = !blocked && (!!keys["e"] || !!keys["Enter"] || !!keys[" "]);
+      // #305: Flanke + nächster ePrev kommen aus interiorEFlank() – das hält E
+      // während eines offenen Dialogs als „gedrückt", damit der E-Druck, der den
+      // Dialog schließt, ihn nicht sofort wieder öffnet (man hing sonst fest).
+      const ePhys = !!keys["e"] || !!keys["Enter"] || !!keys[" "];
       const onExit = Math.floor(pl.x / T) === this.exitTx && Math.floor(pl.y / T) === this.exitTy;
       const nearNpc = !!this.npcId && Math.hypot(pl.x - this.npcX, pl.y - this.npcY) <= TALK_RANGE;
       // Hinweis live umschalten (nur wenn man wirklich reden kann).
       this.hint.setText(sanitize(nearNpc ? this.hintTalk : this.hintExit));
+      const { eFlank, ePrev } = interiorEFlank({ ePhys, ePrev: this.ePrev, blocked });
+      this.ePrev = ePrev;
       if (!blocked) {
-        const action = interiorEAction({ eFlank: e && !this.ePrev, onExit, nearNpc });
-        if (action === "talk") { UI.talkTo(this.npcId); this.ePrev = e; return; }
+        const action = interiorEAction({ eFlank, onExit, nearNpc });
+        if (action === "talk") { UI.talkTo(this.npcId); return; }
         if (action === "exit") { this.exitInterior(); return; }
       }
-      this.ePrev = e;
     }
   }
 
