@@ -161,6 +161,10 @@ export function validateContent(c: ContentBundle): string[] {
             if (t.accept.length === 0) err(`Quest ${quest.id}: Aufgabe „${t.id}" ohne accept-Regel`);
           }
           break;
+        case "minigame":
+          if (!npcIds.has(step.npc)) err(`Quest ${quest.id}: unbekannter NPC „${step.npc}" (minigame)`);
+          if (step.game !== "stack") err(`Quest ${quest.id}: unbekanntes Minispiel „${step.game}"`);
+          break;
       }
     }
   }

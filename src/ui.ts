@@ -285,6 +285,9 @@ import { worldScene, interiorOpen } from "./runtime";
       if (!q || !step) { el.textContent = ""; return; }
       if (Game.isFunkStep(step)) {
         el.innerHTML = "📜 <b>" + q.title + "</b> – 📻 Funkgerät öffnen (<b>T</b>)!";
+      } else if (step.type === "minigame") {
+        const npc = NPCS[step.npc];
+        el.innerHTML = "📜 <b>" + q.title + "</b> – Sprich <b>" + npc.name + "</b> an und wähle 🎮 Stapel-Spiel";
       } else {
         const npc = NPCS[step.npc];
         el.innerHTML = "📜 <b>" + q.title + "</b> – Sprich mit <b>" + npc.name + "</b> (" + npc.title + ")";
@@ -331,7 +334,7 @@ import { worldScene, interiorOpen } from "./runtime";
     /* ========== Interaktion ========== */
     questMarkerFor(npcId: string) {
       const step = Game.currentStep();
-      return !!(step && (step.type === "dialog" || step.type === "choice") && step.npc === npcId);
+      return !!(step && (step.type === "dialog" || step.type === "choice" || step.type === "minigame") && step.npc === npcId);
     },
 
     updatePrompt() {
@@ -860,6 +863,10 @@ import { worldScene, interiorOpen } from "./runtime";
           oben dein Code (ändert sich oft). Gute Reihenfolge = schnelle Builds!</p>
           <button class="primary" data-action="closeOverlays">Zurück zu Bo</button></div>`;
         this.stack = null;
+        // Geführter Minispiel-Quest-Schritt (#276): einmal komplett gespielt = Schritt
+        // erfüllt. Ist der aktuelle Quest-Schritt das Stapel-Spiel, schließen wir ihn ab.
+        const mgStep = Game.currentStep();
+        if (mgStep && mgStep.type === "minigame" && mgStep.game === "stack") this.afterStep();
         return;
       }
       const round = rounds[st.round];

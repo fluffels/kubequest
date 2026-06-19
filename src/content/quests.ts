@@ -99,8 +99,17 @@ export const QUESTS: Quest[] = [
           { t: "Alle Container, die es je gab.", ok: false, reply: "FAST. Das macht docker ps -a. Ohne -a: nur die laufenden." },
         ]},
       { type: "dialog", npc: "bo", lines: [
-        "Bo hat eine Überraschung: Sprich Bo nochmal an und wähle <b>🎮 Stapel-Spiel</b>! Da lernst du, wie Images aus <b>Schichten</b> gebaut sind. Macht Spaß. Bo verliert nie. Bo ist Stein.",
+        "Bo hat noch eine Überraschung für dich, Landratte – ein <b>Minispiel</b>. Bo zeigt dir gleich, wie's geht. Bo verliert nie. Bo ist Stein.",
       ]},
+    ]},
+
+  { id: "q2b", title: "Bos Stapel-Spiel", giver: "bo", rewardXp: 15, rewardCoins: 10,
+    steps: [
+      { type: "dialog", npc: "bo", lines: [
+        "Jetzt das <b>Minispiel</b>! Damit lernst du, wie ein Image aus <b>Schichten</b> gebaut ist – die Basis ganz unten, dein eigener Code oben drauf. Und es macht Spaß.",
+        "So rufst du es auf: <b>Sprich Bo an</b> (Taste <b>E</b>), dann wähle im Menü <b>🎮 Stapel-Spiel</b> und spiel es einmal ganz durch. Danach geht's weiter – los, Landratte!",
+      ]},
+      { type: "minigame", npc: "bo", game: "stack", brief: "Stapel-Spiel spielen" },
     ]},
 
   { id: "q3", title: "Namen und Hintergrund", giver: "bo", rewardXp: 35, rewardCoins: 25,
