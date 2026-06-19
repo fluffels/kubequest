@@ -72,6 +72,7 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
     stack: null as any,      // Stapel-Minispiel
     failCount: 0,
     _gateClearedIdx: -1,     // questIdx, für den das Wiederholungs-Gate schon erledigt ist (#222)
+    _lastClock: "",          // zuletzt gesetzte HUD-Uhr-Signatur – die Uhr tickt jede reale Sekunde, aber updateDayNight feuert jeden Frame; nur bei echter Änderung in den DOM schreiben (#121)
     choiceBtns: null as any, // Dialog-Antwort-Buttons (für Tastatur-Navigation)
     choiceSel: 0,
     questLogViewIdx: null as number | null, // welche Quest im Logbuch gerade „nachgelesen" wird (null = Übersicht, #326)
@@ -299,8 +300,14 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
     },
 
     /** Uhrzeit + Datum im HUD setzen. Wird vom Tag-Nacht-Zyklus jeden Frame
-     *  aufgerufen, damit die Anzeige synchron zum Lichtschleier läuft. (#39) */
+     *  aufgerufen, damit die Anzeige synchron zum Lichtschleier läuft. (#39)
+     *  Die Uhr tickt jede reale Sekunde sichtbar hoch (#121); da updateDayNight
+     *  aber pro Frame feuert, schreiben wir nur bei echter Änderung in den DOM –
+     *  spart ~60 redundante Text-Node-Ersetzungen pro Sekunde. */
     setClock(dateLabel: string, timeLabel: string, title: string) {
+      const sig = dateLabel + "|" + timeLabel + "|" + title;
+      if (sig === this._lastClock) return;
+      this._lastClock = sig;
       $("hud-date").textContent = dateLabel;
       $("hud-time").textContent = timeLabel;
       $("hud-clock").title = title;
