@@ -71,6 +71,12 @@ export const CONCEPT_INTRO: Record<string, string> = {
   "q-flag-git-commit-m": "q18",   // git commit -m (q18)
   "q-flag-git-checkout-b": "q19", // git checkout -b (q19)
   "q-flag-git-add-dot": "q20",    // git add . (q20)
+  // ----- Monitoring-Leuchtturm (Phase 5, #118) -----
+  "q-obs-targets": "q32",         // Scrape-Targets up/down (Prometheus-Scrape in q32 eingeführt)
+  "q-obs-logs-follow": "q34",     // kubectl logs -f/--follow (teach-Schritt in q34)
+  "q-obs-promql": "q35",          // PromQL erstmals als expr der PrometheusRule gezeigt (q35)
+  "q-obs-prom-rule": "q35",       // PrometheusRule angewandt & erklärt (q35)
+  "q-obs-alertmanager": "q35",    // Alertmanager im q35-Dialog eingeführt
 };
 
 /** Reine Prüflogik (testbar, ohne Spielzustand): Vergleicht je Karte die
