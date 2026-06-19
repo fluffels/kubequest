@@ -4,6 +4,10 @@
 import { test, beforeEach } from "vitest";
 import assert from "node:assert/strict";
 import { Sim as KQSim } from "../src/sim";
+import {
+  SERVICEACCOUNT_YAML, ROLE_YAML, ROLEBINDING_YAML,
+  CLUSTERROLE_YAML, CLUSTERROLEBINDING_YAML, POD_SECURITY_YAML,
+} from "../src/content/manifests";
 
 let sim: KQSim;
 beforeEach(() => { sim = new KQSim({}); });
@@ -1327,4 +1331,78 @@ test("#126 Serialisierung: SA/Rollen/Bindings/PSA überleben snapshot→reset", 
   wieder.files["u.yaml"] = "kind: Deployment";
   wieder.applyEffects["u.yaml"] = { deployment: { name: "x", image: "nginx", replicas: 1 } };
   assert.ok(wieder.exec("kubectl apply -f u.yaml").error, "PSA-Stufe überlebt das Speichern");
+});
+
+/* ===================== Wachturm-Quartier: RBAC/Security-Manifeste via kubectl apply (#128) ===================== */
+
+test("#128 Manifeste: alle Vorlagen sind nicht-leere YAML-Strings mit korrektem kind", () => {
+  const cases: Array<[string, string]> = [
+    [SERVICEACCOUNT_YAML, "kind: ServiceAccount"],
+    [ROLE_YAML, "kind: Role"],
+    [ROLEBINDING_YAML, "kind: RoleBinding"],
+    [CLUSTERROLE_YAML, "kind: ClusterRole"],
+    [CLUSTERROLEBINDING_YAML, "kind: ClusterRoleBinding"],
+    [POD_SECURITY_YAML, "securityContext"],
+  ];
+  for (const [yaml, needle] of cases) {
+    assert.ok(typeof yaml === "string" && yaml.length > 0, "Manifest leer: " + needle);
+    assert.ok(yaml.includes(needle), "Manifest enthält '" + needle + "' nicht");
+    assert.ok(yaml.includes("apiVersion"), "Manifest ohne apiVersion: " + needle);
+  }
+  // RoleBinding-kind matcht nicht versehentlich auf ClusterRoleBinding und umgekehrt.
+  assert.ok(!/kind: ClusterRole\b/.test(ROLE_YAML), "ROLE_YAML darf keine ClusterRole sein");
+  assert.ok(/kind: ClusterRole\b/.test(CLUSTERROLE_YAML), "CLUSTERROLE_YAML muss kind: ClusterRole sein");
+});
+
+test("#128 apply: ServiceAccount-Manifest legt die SA an (idempotent)", () => {
+  sim.files["sa.yaml"] = SERVICEACCOUNT_YAML;
+  sim.applyEffects["sa.yaml"] = { serviceAccount: { name: "deploy-bot" } };
+  const r = sim.exec("kubectl apply -f sa.yaml");
+  assert.ok(!r.error);
+  assert.match(r.output!, /serviceaccount\/deploy-bot created/);
+  assert.match(sim.exec("kubectl get sa").output!, /deploy-bot/);
+  // zweites apply = unchanged, keine zweite SA
+  assert.match(sim.exec("kubectl apply -f sa.yaml").output!, /unchanged/);
+  assert.equal(sim.serviceAccounts.filter(s => s.name === "deploy-bot").length, 1);
+});
+
+test("#128 apply: Role + RoleBinding via Manifest → can-i wird yes (Negativfall bleibt no)", () => {
+  sim.files["sa.yaml"] = SERVICEACCOUNT_YAML;
+  sim.files["role.yaml"] = ROLE_YAML;
+  sim.files["rb.yaml"] = ROLEBINDING_YAML;
+  sim.applyEffects["sa.yaml"] = { serviceAccount: { name: "deploy-bot" } };
+  sim.applyEffects["role.yaml"] = { role: { name: "pod-leser", rules: [{ verbs: ["get", "list", "watch"], resources: ["pods"] }] } };
+  sim.applyEffects["rb.yaml"] = { roleBinding: { name: "pod-leser-binden", roleRef: { kind: "Role", name: "pod-leser" }, subjects: [{ kind: "ServiceAccount", name: "deploy-bot", namespace: "default" }] } };
+
+  const sub = "--as=system:serviceaccount:default:deploy-bot";
+  assert.equal(sim.exec("kubectl auth can-i get pods " + sub).output, "no", "vor dem Binden: kein Recht");
+  sim.exec("kubectl apply -f sa.yaml");
+  assert.match(sim.exec("kubectl apply -f role.yaml").output!, /role\.rbac\.authorization\.k8s\.io\/pod-leser created/);
+  assert.match(sim.exec("kubectl apply -f rb.yaml").output!, /rolebinding\.rbac\.authorization\.k8s\.io\/pod-leser-binden created/);
+  assert.equal(sim.exec("kubectl auth can-i get pods " + sub).output, "yes", "nach dem Binden: darf pods lesen");
+  assert.equal(sim.exec("kubectl auth can-i delete pods " + sub).output, "no", "aber nur die gebundenen verbs");
+});
+
+test("#128 apply: ClusterRole + ClusterRoleBinding via Manifest → can-i für User", () => {
+  sim.files["cr.yaml"] = CLUSTERROLE_YAML;
+  sim.files["crb.yaml"] = CLUSTERROLEBINDING_YAML;
+  sim.applyEffects["cr.yaml"] = { role: { name: "knoten-leser", cluster: true, rules: [{ verbs: ["get", "list"], resources: ["nodes"] }] } };
+  sim.applyEffects["crb.yaml"] = { roleBinding: { name: "knoten-leser-binden", cluster: true, roleRef: { kind: "ClusterRole", name: "knoten-leser" }, subjects: [{ kind: "User", name: "wache" }] } };
+  assert.match(sim.exec("kubectl apply -f cr.yaml").output!, /clusterrole\.rbac\.authorization\.k8s\.io\/knoten-leser created/);
+  assert.match(sim.exec("kubectl apply -f crb.yaml").output!, /clusterrolebinding\.rbac\.authorization\.k8s\.io\/knoten-leser-binden created/);
+  assert.equal(sim.exec("kubectl auth can-i get nodes --as=wache").output, "yes");
+  assert.equal(sim.exec("kubectl auth can-i delete nodes --as=wache").output, "no");
+});
+
+test("#128 apply: securityContext-Manifest besteht restricted, plain wird abgelehnt", () => {
+  sim.files["secure.yaml"] = POD_SECURITY_YAML;
+  sim.applyEffects["secure.yaml"] = { deployment: { name: "wachposten", image: "nginx", replicas: 1, securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true } } };
+  sim.exec("kubectl label namespace default pod-security.kubernetes.io/enforce=restricted");
+  const ok = sim.exec("kubectl apply -f secure.yaml");
+  assert.ok(!ok.error, "der sichere Workload kommt unter restricted durch");
+  assert.ok(sim.deployments.some(d => d.name === "wachposten"));
+  // Gegenprobe: ein plain Deployment ohne securityContext wird abgelehnt
+  sim.files["plain.yaml"] = "kind: Deployment";
+  sim.applyEffects["plain.yaml"] = { deployment: { name: "barfuss", image: "nginx", replicas: 1 } };
+  assert.ok(sim.exec("kubectl apply -f plain.yaml").error, "unsicherer Workload bleibt abgelehnt");
 });

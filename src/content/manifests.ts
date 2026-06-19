@@ -327,3 +327,98 @@ export const STATEFULSET_YAML = [
   "          requests:",
   "            storage: 10Gi",
 ].join("\n");
+
+/* ===== Wachturm-Quartier: RBAC / ServiceAccounts / Pod-Security (#128) =====
+ * Vorlagen für Phase 6. Sie passen zu den Sim-Mechaniken aus #126:
+ * `kubectl apply -f` legt SA/Role/RoleBinding/ClusterRole/ClusterRoleBinding an,
+ * `kubectl auth can-i` wertet die Bindungen aus, und die Pod-Security-Stufe
+ * (`pod-security.kubernetes.io/enforce`) prüft den securityContext beim Anlegen.
+ */
+
+// ServiceAccount: die Identität, unter der ein Pod im Cluster auftritt – Basis für
+// Least Privilege (eigene SA statt der allmächtigen default-SA).
+export const SERVICEACCOUNT_YAML = [
+  "apiVersion: v1", "kind: ServiceAccount", "metadata:",
+  "  name: deploy-bot          # eigene Identität fuer den Deploy-Automaten",
+  "  namespace: default",
+].join("\n");
+
+// Role: ein Bündel Rechte INNERHALB eines Namespace. Hier: pods nur lesen
+// (get/list/watch) – kein delete, kein create. Genau so viel, wie noetig.
+export const ROLE_YAML = [
+  "apiVersion: rbac.authorization.k8s.io/v1", "kind: Role", "metadata:",
+  "  name: pod-leser",
+  "  namespace: default",
+  "rules:",
+  "  - apiGroups: [\"\"]            # \"\" = die Kern-API-Gruppe (pods, services, …)",
+  "    resources: [\"pods\"]",
+  "    verbs: [\"get\", \"list\", \"watch\"]   # nur lesen, NICHT veraendern",
+].join("\n");
+
+// RoleBinding: verbindet ein Subjekt (hier die SA deploy-bot) mit einer Role.
+// Erst die Bindung macht aus den Regeln ein echtes Recht fuer jemanden.
+export const ROLEBINDING_YAML = [
+  "apiVersion: rbac.authorization.k8s.io/v1", "kind: RoleBinding", "metadata:",
+  "  name: pod-leser-binden",
+  "  namespace: default",
+  "subjects:",
+  "  - kind: ServiceAccount",
+  "    name: deploy-bot",
+  "    namespace: default",
+  "roleRef:",
+  "  kind: Role                 # zeigt auf die Role oben",
+  "  name: pod-leser",
+  "  apiGroup: rbac.authorization.k8s.io",
+].join("\n");
+
+// ClusterRole: wie eine Role, aber CLUSTER-WEIT (z.B. fuer nicht-namespaced
+// Ressourcen wie nodes). Hier: Knoten lesen duerfen.
+export const CLUSTERROLE_YAML = [
+  "apiVersion: rbac.authorization.k8s.io/v1", "kind: ClusterRole", "metadata:",
+  "  name: knoten-leser         # ClusterRole hat KEINEN namespace",
+  "rules:",
+  "  - apiGroups: [\"\"]",
+  "    resources: [\"nodes\"]",
+  "    verbs: [\"get\", \"list\"]",
+].join("\n");
+
+// ClusterRoleBinding: bindet ein Subjekt cluster-weit an eine ClusterRole.
+// Hier bekommt der User \"wache\" das Recht, Knoten im ganzen Cluster zu lesen.
+export const CLUSTERROLEBINDING_YAML = [
+  "apiVersion: rbac.authorization.k8s.io/v1", "kind: ClusterRoleBinding", "metadata:",
+  "  name: knoten-leser-binden",
+  "subjects:",
+  "  - kind: User",
+  "    name: wache",
+  "    apiGroup: rbac.authorization.k8s.io",
+  "roleRef:",
+  "  kind: ClusterRole",
+  "  name: knoten-leser",
+  "  apiGroup: rbac.authorization.k8s.io",
+].join("\n");
+
+// Pod-Security: ein Workload, der die strenge \"restricted\"-Stufe besteht. Der
+// securityContext sitzt im Pod-Template (runAsNonRoot) und am Container
+// (allowPrivilegeEscalation: false, readOnlyRootFilesystem: true).
+export const POD_SECURITY_YAML = [
+  "apiVersion: apps/v1", "kind: Deployment", "metadata:",
+  "  name: wachposten",
+  "spec:",
+  "  replicas: 1",
+  "  selector:",
+  "    matchLabels:",
+  "      app: wachposten",
+  "  template:",
+  "    metadata:",
+  "      labels:",
+  "        app: wachposten",
+  "    spec:",
+  "      securityContext:                 # gilt fuer den ganzen Pod",
+  "        runAsNonRoot: true             # NICHT als root laufen",
+  "      containers:",
+  "        - name: wachposten",
+  "          image: nginx",
+  "          securityContext:             # gilt fuer diesen Container",
+  "            allowPrivilegeEscalation: false   # keine Rechte-Eskalation",
+  "            readOnlyRootFilesystem: true      # Dateisystem nur lesbar",
+].join("\n");

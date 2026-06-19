@@ -194,6 +194,11 @@ export interface ArgoApp {
 /** Wirkung eines `kubectl apply -f <datei>` (was die Datei im Cluster erzeugt). */
 export interface ApplyEffect {
   deployment?: { name: string; image: string; replicas: number; securityContext?: SecurityContext };
+  // RBAC-CRDs (#128): vom `kubectl apply -f` der Wachturm-Manifeste angelegt. `cluster`
+  // unterscheidet Role/ClusterRole bzw. RoleBinding/ClusterRoleBinding (wie in roles/roleBindings).
+  serviceAccount?: { name: string };
+  role?: { name: string; cluster?: boolean; rules: PolicyRule[] };
+  roleBinding?: { name: string; cluster?: boolean; roleRef: { kind: "Role" | "ClusterRole"; name: string }; subjects: RbacSubject[] };
   service?: { name: string; type?: string; port: string | number };
   ingress?: { name: string; host: string; path?: string; service: string; port: string | number; className?: string; tls?: { secretName: string } };
   networkPolicy?: { name: string; podSelector?: string; allowFrom?: string };
@@ -2086,6 +2091,39 @@ export interface Scenario {
           this.statefulSets.push(sts);
           out.push("statefulset.apps/" + effSts.name + " created");
           out.push("💡 " + sts.replicas + " Pod(s) mit stabiler Identität (" + sts.name + "-0 …), jeder mit eigenem PVC '" + sts.volumeClaimName + "-" + sts.name + "-0' usw.");
+        }
+      }
+      // RBAC-CRDs (#128): SA / Role(+Cluster) / RoleBinding(+Cluster) deklarativ anlegen,
+      // idempotent wie alles andere. Genau diese Objekte wertet `kubectl auth can-i` aus.
+      const effSa = eff.serviceAccount;
+      if (effSa) {
+        if (this.serviceAccounts.some(s => s.name === effSa.name)) {
+          out.push("serviceaccount/" + effSa.name + " unchanged");
+        } else {
+          this.serviceAccounts.push({ name: effSa.name, created: this.clock });
+          out.push("serviceaccount/" + effSa.name + " created");
+        }
+      }
+      const effRole = eff.role;
+      if (effRole) {
+        const cluster = !!effRole.cluster;
+        const kind = cluster ? "clusterrole" : "role";
+        if (this.roles.some(r => r.name === effRole.name && r.cluster === cluster)) {
+          out.push(kind + ".rbac.authorization.k8s.io/" + effRole.name + " unchanged");
+        } else {
+          this.roles.push({ name: effRole.name, cluster, rules: effRole.rules.map(rule => ({ verbs: rule.verbs.slice(), resources: rule.resources.slice() })), created: this.clock });
+          out.push(kind + ".rbac.authorization.k8s.io/" + effRole.name + " created");
+        }
+      }
+      const effRb = eff.roleBinding;
+      if (effRb) {
+        const cluster = !!effRb.cluster;
+        const kind = cluster ? "clusterrolebinding" : "rolebinding";
+        if (this.roleBindings.some(b => b.name === effRb.name && b.cluster === cluster)) {
+          out.push(kind + ".rbac.authorization.k8s.io/" + effRb.name + " unchanged");
+        } else {
+          this.roleBindings.push({ name: effRb.name, cluster, roleRef: { kind: effRb.roleRef.kind, name: effRb.roleRef.name }, subjects: effRb.subjects.map(s => Object.assign({}, s)), created: this.clock });
+          out.push(kind + ".rbac.authorization.k8s.io/" + effRb.name + " created");
         }
       }
       return out.join("\n");
