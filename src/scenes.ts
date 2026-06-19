@@ -589,19 +589,25 @@ import { getMapEntry } from "./mapregistry";
     }
 
     /** „Digitales" Cluster-Tag: Monospace + farbiger Status-Punkt (grün ok / rot kaputt
-     *  / gelb Warnung). Startet unsichtbar – wird per Nähe-Aufdeckung eingeblendet. */
-    makeTechTag(x: number, y: number, text: string, statusColor: number) {
+     *  / gelb Warnung). Startet unsichtbar – wird per Nähe-Aufdeckung eingeblendet.
+     *  `compact` (#255): Schrift + Panel genau so groß wie die Orts-Schilder (#254) –
+     *  dieselbe `SIGN_FONT`/`SIGN_SCALE`-Behandlung, damit die vielen Fass-Tags ruhiger
+     *  und lesbarer sind statt die Szene zu überladen. */
+    makeTechTag(x: number, y: number, text: string, statusColor: number, compact = false) {
       // Pixelschrift (#188) auf dunklem Panel + farbiger Status-Punkt. BitmapText kann
       // keinen Hintergrund/Padding wie add.text – darum eigenes Rechteck dahinter.
-      const txt = pixelText(this, 0, 0, text, { color: "#e3edf8", origin: [0, 0.5] });
+      const txt = pixelText(this, 0, 0, text, { color: "#e3edf8", origin: [0, 0.5], size: compact ? SIGN_FONT : undefined });
       const padL = 9, padR = 4, padY = 2;
       const w = txt.width + padL + padR, h = txt.height + padY * 2;
       const bg = this.add.rectangle(0, 0, w, h, 0x0a101c, 0.82).setOrigin(0.5);
       txt.setPosition(-w / 2 + padL, 0);
       const dot = this.add.circle(-w / 2 + 4.5, 0, 1.5, statusColor);
       // Tiefe setzt der Aufrufer (mkTag) y-sortiert am Bezugs-Objekt aus (#207),
-      // damit davorstehende Figuren das Tag verdecken statt umgekehrt.
-      return this.add.container(x, y, [bg, txt, dot]).setAlpha(0);
+      // damit davorstehende Figuren das Tag verdecken statt umgekehrt. compact:
+      // ganzes Tag wie das Holz-Schild runterskalieren → gleiche Endgröße.
+      const cont = this.add.container(x, y, [bg, txt, dot]).setAlpha(0);
+      if (compact) cont.setScale(SIGN_SCALE);
+      return cont;
     }
 
     /** Weicher Schatten unter einer Figur – radial ausgefranste Textur statt harter Ellipse (#4). */
@@ -1044,8 +1050,8 @@ import { getMapEntry } from "./mapregistry";
       this.dynLabels = [];
       // Digitales Cluster-Tag bauen + für die Nähe-Aufdeckung registrieren.
       // (lx,ly) = Tag-Position, (ax,ay) = Bezugspunkt des Objekts (Distanz zur Figur).
-      const mkTag = (lx: number, ly: number, str: string, status: number, ax: number, ay: number) => {
-        const tag = this.makeTechTag(lx, ly, str, status);
+      const mkTag = (lx: number, ly: number, str: string, status: number, ax: number, ay: number, compact = false) => {
+        const tag = this.makeTechTag(lx, ly, str, status, compact);
         // Tiefe am Bezugs-Objekt (ay) ausrichten statt fix ganz oben: so rendert eine
         // davorstehende Figur (größeres Fuß-y → größere Tiefe) ÜBER dem Tag und wird
         // nicht mehr verdeckt (#207) – analog zur y-Sortierung der Holz-Schilder.
@@ -1072,7 +1078,7 @@ import { getMapEntry } from "./mapregistry";
         const bx = (4 + (i % 5) * 2) * T + 8, by = (26 + Math.floor(i / 5) * 0.0) * T + 8;
         const barrel = this.add.image(bx, by, "barrel").setScale(0.5).setDepth(by + 8).setAlpha(c.running ? 1 : 0.45);
         this.dynGroup.add(barrel);
-        mkTag(bx, by - 9 - (i % 2) * 7, c.name, c.running ? 0x6fe09a : 0x8a98a8, bx, by);
+        mkTag(bx, by - 9 - (i % 2) * 7, c.name, c.running ? 0x6fe09a : 0x8a98a8, bx, by, true);
       });
       // Helm-Flaggen an der Werft
       Game.sim.releases.forEach((r, i) => {
@@ -1116,7 +1122,10 @@ import { getMapEntry } from "./mapregistry";
       const offset = boxes.length;
       for (const dl of visible) {
         const bg = dl.obj.list[0];   // Hintergrund-Rechteck des Tech-Tags (Maße = Panel)
-        boxes.push({ x: dl.obj.x, y: dl.ty, w: bg.width, h: bg.height });
+        // Container-Skalierung einrechnen (#255): compact-Fass-Tags sind um SIGN_SCALE
+        // verkleinert – das Entzerren muss die TATSÄCHLICHE Endgröße nehmen, sonst
+        // reserviert es zu viel Platz und schiebt die Tags unnötig auseinander.
+        boxes.push({ x: dl.obj.x, y: dl.ty, w: bg.width * dl.obj.scaleX, h: bg.height * dl.obj.scaleY });
       }
       const dys = spreadLabelsVertically(boxes, 2);
       visible.forEach((dl, i) => { dl.obj.y = dl.ty + dys[offset + i]; });
