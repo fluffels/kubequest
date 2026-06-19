@@ -124,7 +124,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Profi-Start", cmd: {
         id: "t-run-named", intro: "🆕 Neue Flags: <code>-d</code> (Hintergrund) und <code>--name</code> (eigener Name).",
         text: "Starte aus <code>nginx</code> einen Container im Hintergrund mit dem Namen <code>webserver</code>.",
-        accept: [/^docker\s+run\s+(?:-d\s+--name\s+webserver|--name\s+webserver\s+-d)\s+nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
+        accept: [/^docker\s+run\s+(?:(?:-d|--detach)\s+--name\s+webserver|--name\s+webserver\s+(?:-d|--detach))\s+nginx(:\S+)?$/], solution: "docker run -d --name webserver nginx",
         hint: "Muster: docker run -d --name <wunschname> <image>" } },
       { type: "drill", brief: "Bos Übungsrunde", pool: ["docker-run-named", "docker-run-named", "docker-stop"], count: 3,
         intro: "Das lange Muster üben wir extra gründlich:" },
@@ -375,13 +375,13 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Karte anwenden", cmd: {
         id: "t-apply", intro: "🆕 Neuer Befehl: <code>kubectl apply -f</code> – „Stelle her, was in der Datei steht.“",
         text: "Wende <code>deployment.yaml</code> auf den Cluster an – und schau zum Dock!",
-        accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "kubectl apply -f <datei>" } },
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "kubectl apply -f <datei>" } },
       { type: "terminal", brief: "Adas Doppeltrick", tasks: [
-        { id: "t-ada-3", text: "Wende auch <code>service.yaml</code> an.", accept: [/^kubectl\s+apply\s+-f\s+service\.yaml$/], solution: "kubectl apply -f service.yaml", hint: "Gleicher Befehl, andere Datei." },
+        { id: "t-ada-3", text: "Wende auch <code>service.yaml</code> an.", accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+service\.yaml$/], solution: "kubectl apply -f service.yaml", hint: "Gleicher Befehl, andere Datei." },
         { id: "t-ada-4", text: "Adas Lieblingstrick: Denselben apply <b>nochmal</b> – nichts passiert doppelt („unchanged“)!",
-          accept: [/^kubectl\s+apply\s+-f\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "Wirklich nochmal exakt derselbe Befehl." },
+          accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+deployment\.yaml$/], solution: "kubectl apply -f deployment.yaml", hint: "Wirklich nochmal exakt derselbe Befehl." },
         { id: "t-ada-5", text: "Eine dritte Karte liegt bereit: <code>ingress.yaml</code> – das <b>Hafentor</b>, von dem Ole sprach. Wende es an und öffne den Weg vom offenen Meer zu <code>hafen.de/lager</code>.",
-          accept: [/^kubectl\s+apply\s+-f\s+ingress\.yaml$/], solution: "kubectl apply -f ingress.yaml", hint: "Gleicher apply, Datei ingress.yaml." },
+          accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+ingress\.yaml$/], solution: "kubectl apply -f ingress.yaml", hint: "Gleicher apply, Datei ingress.yaml." },
         { id: "t-ada-6", text: "Schau dir das frische Tor an: <code>kubectl get ingress</code> – Spalte HOSTS zeigt <code>hafen.de</code>.",
           accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], check: (sim: Sim) => sim.ingresses.some(i => i.name === "hafentor"),
           solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch." },
@@ -851,7 +851,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Festhalten", cmd: {
         id: "t-git-commit", intro: "🆕 <code>git commit -m \"…\"</code> – hält die vorgemerkten Änderungen als Schnappschuss in der Historie fest, mit kurzer Nachricht.",
         text: "Halte die Karte fest – Commit-Nachricht z.B. <code>Erste Seekarte</code>.",
-        accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"', hint: 'Muster: git commit -m "deine Nachricht"' } },
+        accept: [/^git\s+commit\s+(?:-m|--message)\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Erste Seekarte"', hint: 'Muster: git commit -m "deine Nachricht"' } },
       { type: "dialog", npc: "ada", lines: [
         "<b>Festgehalten!</b> Diese Version ist für immer sicher. Jede:r kann später nachlesen, was wann geändert wurde. Schau in die Historie: <code>git log</code>.",
       ] },
@@ -905,7 +905,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Festhalten", cmd: {
         id: "t-git-commit2", intro: "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält es fest.",
         text: "Committe die neue Route, z.B. mit <code>Neue Route skizziert</code>.",
-        accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Neue Route skizziert"', hint: 'Muster: git commit -m "Nachricht"' } },
+        accept: [/^git\s+commit\s+(?:-m|--message)\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "Neue Route skizziert"', hint: 'Muster: git commit -m "Nachricht"' } },
       { type: "dialog", npc: "ada", lines: [
         "Die Route sitzt sicher im Zweig. Jetzt zurück zur Hauptkarte: wechsle nach <code>main</code>.",
       ] },
@@ -967,7 +967,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Festhalten", cmd: {
         id: "t-ci-commit", intro: "↩︎ Wiederholung: <code>git commit -m \"…\"</code> hält die vorgemerkten Änderungen fest.",
         text: "Committe die Pipeline-Einrichtung, z.B. mit <code>CI-Pipeline eingerichtet</code>.",
-        accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "CI-Pipeline eingerichtet"', hint: 'Muster: git commit -m "Nachricht"' } },
+        accept: [/^git\s+commit\s+(?:-m|--message)\s+("[^"]+"|'[^']+'|\S+)$/], solution: 'git commit -m "CI-Pipeline eingerichtet"', hint: 'Muster: git commit -m "Nachricht"' } },
       { type: "teach", brief: "Push löst Pipeline aus", cmd: {
         id: "t-ci-push", intro: "🆕 Der entscheidende Moment: <code>git push</code> lädt nicht nur hoch – weil jetzt eine <code>.gitlab-ci.yml</code> im Repo liegt, <b>startet der Runner automatisch die Pipeline</b>.",
         text: "Schiebe deine Arbeit zum Server – und lass die erste Pipeline laufen.",
@@ -1060,7 +1060,7 @@ export const QUESTS: Quest[] = [
           accept: [/^git\s+add\s+seekarte\.md$/], check: (sim: Sim) => !sim.git.conflict && sim.git.staged.includes("seekarte.md"),
           solution: "git add seekarte.md", hint: "Wie immer: git add <datei> – das sagt Git „erledigt“." },
         { id: "t-conf-commit", text: "Schließ den Merge ab mit einem Commit, z.B. <code>git commit -m \"Konflikt geloest: Lennarts Route\"</code>.",
-          accept: [/^git\s+commit\s+-m\s+("[^"]+"|'[^']+'|\S+)$/], check: (sim: Sim) => !sim.git.conflict,
+          accept: [/^git\s+commit\s+(?:-m|--message)\s+("[^"]+"|'[^']+'|\S+)$/], check: (sim: Sim) => !sim.git.conflict,
           solution: 'git commit -m "Konflikt geloest: Lennarts Route"', hint: 'Muster: git commit -m "Nachricht"' },
       ]},
       { type: "dialog", npc: "ada", lines: [
@@ -1163,7 +1163,7 @@ export const QUESTS: Quest[] = [
         { id: "t-juno-np-1", text: "Ich habe dir die Karte <code>netpol.yaml</code> hingelegt. Lies sie mit <code>cat</code> – achte auf <code>podSelector</code> (WEN schützt die Mauer?) und <code>ingress.from</code> (WER darf rein?).",
           accept: [/^cat\s+netpol\.yaml$/], solution: "cat netpol.yaml", hint: "cat <datei>" },
         { id: "t-juno-np-2", text: "Zieh die Mauer hoch: wende <code>netpol.yaml</code> an. Ab jetzt darf nur noch das <code>hafentor</code> ans <code>lager</code>.",
-          accept: [/^kubectl\s+apply\s+-f\s+netpol\.yaml$/], solution: "kubectl apply -f netpol.yaml", hint: "Gleicher apply wie bei Adas Karten, Datei netpol.yaml." },
+          accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+netpol\.yaml$/], solution: "kubectl apply -f netpol.yaml", hint: "Gleicher apply wie bei Adas Karten, Datei netpol.yaml." },
         { id: "t-juno-np-3", text: "Prüf die frische Mauer: <code>kubectl get networkpolicies</code> – jetzt steht <code>hafenmauer</code> in der Liste.",
           accept: [/^kubectl\s+get\s+(networkpolicies|networkpolicy|netpol|netpols)$/], check: (sim: Sim) => sim.networkPolicies.some(n => n.name === "hafenmauer"),
           solution: "kubectl get networkpolicies", hint: "Kurzform 'netpol' geht auch." },
@@ -1209,7 +1209,7 @@ export const QUESTS: Quest[] = [
         { id: "t-ada-tls-1", text: "Schau dir die neue Karte an: <code>cat ingress-tls.yaml</code> – achte auf den frischen Block <code>spec.tls</code> mit <code>secretName: hafen-tls</code>.",
           accept: [/^cat\s+ingress-tls\.yaml$/], solution: "cat ingress-tls.yaml", hint: "cat <datei>" },
         { id: "t-ada-tls-2", text: "Schalt HTTPS auf: wende <code>ingress-tls.yaml</code> an. Das Tor wird umkonfiguriert (<code>configured</code>) – ab jetzt verschlüsselt.",
-          accept: [/^kubectl\s+apply\s+-f\s+ingress-tls\.yaml$/], solution: "kubectl apply -f ingress-tls.yaml", hint: "Gleicher apply wie immer, Datei ingress-tls.yaml." },
+          accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+ingress-tls\.yaml$/], solution: "kubectl apply -f ingress-tls.yaml", hint: "Gleicher apply wie immer, Datei ingress-tls.yaml." },
         { id: "t-ada-tls-3", text: "Prüf das Tor: <code>kubectl get ingress</code> – in der Spalte <b>PORTS</b> steht jetzt <code>80, 443</code> (443 = HTTPS).",
           accept: [/^kubectl\s+get\s+(ingress|ingresses|ing)$/], check: (sim: Sim) => sim.ingresses.some(i => i.name === "hafentor" && !!i.tls),
           solution: "kubectl get ingress", hint: "Kurzform 'ing' geht auch." },
@@ -1434,7 +1434,7 @@ export const QUESTS: Quest[] = [
       { type: "teach", brief: "Auftrag ausrollen", cmd: {
         id: "t-argo-apply", intro: "🆕 Die <b>Application</b> selbst ist ein ganz normales Manifest – du wendest sie mit dem längst bekannten <code>kubectl apply -f</code> an. Damit kennt Argo ab jetzt deinen Auftrag.",
         text: "Lege die Application im Cluster an: wende <code>application.yaml</code> an.",
-        accept: [/^kubectl\s+apply\s+-f\s+application\.yaml$/], solution: "kubectl apply -f application.yaml",
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+application\.yaml$/], solution: "kubectl apply -f application.yaml",
         hint: "Der vertraute Befehl aus dem Kartenhaus: kubectl apply -f <datei>." } },
       { type: "dialog", npc: "argo", lines: [
         "Angelegt! Aber Achtung: Diese Seekarte hat <b>keine</b> automatische Sync-Politik. Argo <i>kennt</i> jetzt den Soll-Zustand, hat ihn aber noch <b>nicht</b> in den Cluster gesegelt. Lass uns nachschauen, was Argo über den Auftrag weiß.",
@@ -1511,7 +1511,7 @@ export const QUESTS: Quest[] = [
         id: "t-sh-apply",
         intro: "🆕 <code>kubectl apply -f</code> ist idempotent: ändert sich die Konfiguration, gibt Kubernetes <b>configured</b> zurück (statt <i>unchanged</i>). So schaltest du Self-Heal für eine bestehende Application ein, ohne sie neu anlegen zu müssen.",
         text: "Aktiviere Self-Heal: wende <code>application-selfheal.yaml</code> an.",
-        accept: [/^kubectl\s+apply\s+-f\s+application-selfheal\.yaml$/],
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+application-selfheal\.yaml$/],
         check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-lager" && a.selfHeal),
         solution: "kubectl apply -f application-selfheal.yaml",
         hint: "kubectl apply -f <datei> – der vertraute Befehl." } },
@@ -1587,7 +1587,7 @@ export const QUESTS: Quest[] = [
         id: "t-aoa-apply",
         intro: "🆕 Das App-of-Apps-Muster: du wendest <b>eine</b> Wurzel-Application an – und weil sie auf einen Ordner voller weiterer Applications zeigt (und <code>automated</code> aktiv ist), legt Argo die <b>ganze Flotte</b> in einem Rutsch an. Ein <code>apply</code> statt n einzelner.",
         text: "Lass die Flotte auslaufen: wende <code>app-of-apps.yaml</code> an.",
-        accept: [/^kubectl\s+apply\s+-f\s+app-of-apps\.yaml$/],
+        accept: [/^kubectl\s+apply\s+(?:-f|--filename)\s+app-of-apps\.yaml$/],
         check: (sim: Sim) => sim.argoApps.some(a => a.name === "hafen-flotte" && !!a.childApps)
           && ["flotte-lager", "flotte-funk", "flotte-kran"].every(n => sim.argoApps.some(a => a.name === n)),
         solution: "kubectl apply -f app-of-apps.yaml",
