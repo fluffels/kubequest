@@ -23,10 +23,15 @@ export interface GameClock {
  *  Uhrzeit + Stardew-Datum ab. phase 0 = Mittag … 0.5 = Mitternacht – identisch
  *  zur Schleier-Berechnung. */
 export function gameClock(time: number, cycle: number): GameClock {
-  const phase = (time % cycle) / cycle;
-  // phase 0 = Mittag → Stunde = (phase*24 + 12) mod 24; auf 10-Min-Schritte runden
-  // (Stardew-Gefühl, kein Sekunden-Geflacker im HUD).
-  const totalMin = (Math.round((((phase * 24 + 12) % 24) * 60) / 10) * 10) % 1440;
+  // Angezeigte Minuten seit Mittag (phase 0 = Mittag). Minutengenau abgeschnitten
+  // (floor), damit die Minute im Sekundentakt sichtbar hochzählt wie auf einer
+  // Digitaluhr (#121): bei cycle = 24 realen Minuten/Tag entspricht 1 reale Sekunde =
+  // 1 angezeigte Minute, 1 reale Minute = 1 angezeigte Stunde. Schleier & Uhr teilen
+  // weiterhin dieselbe time/cycle-Quelle, bleiben also synchron.
+  // Multiplikation VOR der Division hält ganze Minutengrenzen exakt (kein Float-Drift,
+  // der z.B. 00:00 als 23:59 zeigen würde); 1440 = Minuten/Tag, +720 = 12:00 als Anker.
+  const minutesFromNoon = Math.floor(((time % cycle) * 1440) / cycle);
+  const totalMin = (minutesFromNoon + 720) % 1440;
   const hhmm = String(Math.floor(totalMin / 60)).padStart(2, "0") + ":" +
                String(totalMin % 60).padStart(2, "0");
   // Tageszähler springt bei Mitternacht (phase 0.5) auf den nächsten Tag.
