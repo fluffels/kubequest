@@ -1,0 +1,14 @@
+{
+  "npcs": [
+    { "id": "ole",   "map": "harbor",     "x": 26,   "y": 14.6 },
+    { "id": "bo",    "map": "harbor",     "x": 8,    "y": 25 },
+    { "id": "ada",   "map": "harbor",     "x": 40,   "y": 13.6 },
+    { "id": "runa",  "map": "harbor",     "x": 13,   "y": 13 },
+    { "id": "theo",  "map": "harbor",     "x": 44,   "y": 20.6 },
+    { "id": "pelle", "map": "harbor",     "x": 31,   "y": 17.2 },
+    { "id": "juno",  "map": "harbor",     "x": 45.8, "y": 24.2 },
+    { "id": "argo",  "map": "archipel",   "x": 12,   "y": 8 },
+    { "id": "lumi",  "map": "lighthouse", "x": 11,   "y": 9 },
+    { "id": "knut",  "map": "warehouse",  "x": 12,   "y": 8 }
+  ]
+}

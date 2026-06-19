@@ -14,6 +14,7 @@
  */
 import { TILE } from "./world";
 import { warpAt, type Warp } from "./archipel";
+import { npcSpawnForMap, type Spawn } from "./content/entities";
 
 export { warpAt, type Warp };
 
@@ -34,9 +35,10 @@ const CX = 13, CY = 9;   // Mittelpunkt der Gras-Hochebene
 export const LIGHTHOUSE_TOWER = { x: CX, y: 5 } as const;
 
 /** Standplatz des Observability-NPC „Lumi" (#112): die Leuchtturmwärterin, die ab
- *  den Phase-5-Quests (#113–116) das Monitoring vergibt. Die id entspricht dem
- *  NPCS-/SMALLTALK-Schlüssel (analog "argo" beim Archipel). */
-export const LIGHTHOUSE_NPC = { id: "lumi", x: CX - 2, y: CY } as const;
+ *  den Phase-5-Quests (#113–116) das Monitoring vergibt. Seit #349 aus der Entity-
+ *  Registry (`content/data/entities.json`, Karte "lighthouse") gelesen statt hier
+ *  hartcodiert; der Eintrag dort liegt auf (CX-2, CY) der Klippen-Hochebene. */
+export const LIGHTHOUSE_NPC: Spawn = npcSpawnForMap("lighthouse");
 
 /** Quest-Trigger = die Monitoring-Station (Dashboard + Alarmglocke). Hier docken die
  *  Phase-5-Observability-Quests an; bis dahin steht ein Schild als Platzhalter. */
