@@ -205,6 +205,11 @@ export interface ApplyEffect {
   prometheusRule?: { name: string; alert: string; severity?: string; expr?: string; forDuration?: string };
   grafanaDatasource?: { name: string; dsType?: string; url?: string };
   grafanaDashboard?: { name: string; title: string; panels?: number };
+  // Stateful-Workload-CRDs (#122): vom `kubectl apply -f` der Lagerhallen-Manifeste angelegt.
+  statefulSet?: { name: string; image: string; replicas: number; serviceName?: string; volumeClaimName?: string; storage?: string; storageClass?: string };
+  pvc?: { name: string; storage?: string; storageClass?: string; accessModes?: string };
+  pv?: { name: string; capacity?: string; storageClass?: string; accessModes?: string; reclaimPolicy?: string };
+  storageClass?: { name: string; provisioner?: string; reclaimPolicy?: string; isDefault?: boolean };
 }
 
 /* ---------- Observability-Manifeste als Cluster-Objekte (#110) ---------- */
@@ -239,6 +244,53 @@ export interface GrafanaDashboardRes {
   title: string;
   panels: number;
   created?: number;
+}
+/* ---------- Stateful Workloads & Speicher (#122, Phase 7) ---------- */
+
+/** StatefulSet: Workload mit STABILER Identität. Anders als ein Deployment heißen
+ *  die Pods nicht zufällig, sondern fest `<name>-0`, `<name>-1`, … und jeder bekommt
+ *  über `volumeClaimTemplates` ein eigenes, dauerhaftes PVC. */
+export interface StatefulSetRes {
+  name: string;
+  image: string;
+  replicas: number;
+  serviceName: string;       // zugehöriger (headless) Service, der die stabilen Netzwerk-IDs vergibt
+  volumeClaimName: string;   // Name des volumeClaimTemplate → PVC heißt "<vct>-<name>-<ordinal>"
+  storage: string;           // angeforderte Größe je Replica, z.B. "1Gi"
+  storageClass?: string;     // welche StorageClass die PVCs provisioniert (leer/undefiniert = Default)
+  pods: PodInstance[];       // stabile Namen <name>-0 …
+  created: number;
+}
+/** PersistentVolumeClaim: der Antrag eines Pods auf dauerhaften Speicher. Bindet an
+ *  ein PV (statisch) bzw. wird über eine StorageClass dynamisch provisioniert. */
+export interface PvcRes {
+  name: string;
+  status: "Pending" | "Bound"; // Pending = noch kein Speicher gefunden, Bound = hat ein PV
+  volume: string;              // Name des gebundenen PV ("" solange Pending)
+  capacity: string;            // angeforderte/gebundene Größe, z.B. "1Gi"
+  storageClass: string;        // genutzte StorageClass ("" = statische Bindung an vorhandenes PV)
+  accessModes: string;         // z.B. "RWO" (ReadWriteOnce)
+  created: number;
+}
+/** PersistentVolume: das konkrete Speicherstück im Cluster (statisch angelegt oder
+ *  dynamisch von einer StorageClass erzeugt). */
+export interface PvRes {
+  name: string;
+  capacity: string;
+  status: "Available" | "Bound" | "Released"; // frei / an ein PVC gebunden / PVC weg, noch nicht recycelt
+  claim: string;               // gebundenes PVC ("default/<name>", "" solange Available)
+  storageClass: string;
+  accessModes: string;
+  reclaimPolicy: string;       // "Delete" | "Retain" – was beim Freigeben passiert
+  created: number;
+}
+/** StorageClass: die Vorlage, nach der PVCs dynamisch ein PV bekommen. */
+export interface StorageClassRes {
+  name: string;
+  provisioner: string;         // wer das PV anlegt, z.B. "rancher.io/local-path"
+  reclaimPolicy: string;       // "Delete" | "Retain"
+  isDefault: boolean;          // greift, wenn ein PVC keine StorageClass nennt
+  created: number;
 }
 /** Berechneter Anzeige-Status eines Pods (für get/describe). */
 export interface PodStatus {
@@ -293,6 +345,12 @@ export interface Scenario {
   prometheusRules?: PrometheusRuleRes[];
   grafanaDatasources?: GrafanaDatasourceRes[];
   grafanaDashboards?: GrafanaDashboardRes[];
+  // Stateful Workloads & Speicher (#122). Eingabe-Schreibweisen bewusst locker –
+  // reset()/_makeStatefulSet füllen Defaults und binden PVCs.
+  statefulSets?: Array<{ name: string; image: string; replicas: number; serviceName?: string; volumeClaimName?: string; storage?: string; storageClass?: string }>;
+  pvcs?: Array<{ name: string; storage?: string; capacity?: string; storageClass?: string; accessModes?: string; status?: "Pending" | "Bound"; volume?: string }>;
+  pvs?: Array<{ name: string; capacity?: string; storageClass?: string; accessModes?: string; reclaimPolicy?: string; status?: "Available" | "Bound" | "Released"; claim?: string }>;
+  storageClasses?: Array<{ name: string; provisioner?: string; reclaimPolicy?: string; isDefault?: boolean }>;
   argoApps?: ArgoApp[];
   helmRepos?: string[];
   releases?: Array<{ name: string; chart: string; revision: number; depName: string; history?: HistoryEntry[] }>;
@@ -388,6 +446,10 @@ export interface Scenario {
     prometheusRules!: PrometheusRuleRes[];
     grafanaDatasources!: GrafanaDatasourceRes[];
     grafanaDashboards!: GrafanaDashboardRes[];
+    statefulSets!: StatefulSetRes[];
+    pvcs!: PvcRes[];
+    pvs!: PvRes[];
+    storageClasses!: StorageClassRes[];
     argoApps!: ArgoApp[];
     helmRepos!: string[];
     releases!: Release[];
@@ -435,6 +497,25 @@ export interface Scenario {
       this.prometheusRules = (sc.prometheusRules || []).map(r => Object.assign({}, r));
       this.grafanaDatasources = (sc.grafanaDatasources || []).map(d => Object.assign({}, d));
       this.grafanaDashboards = (sc.grafanaDashboards || []).map(d => Object.assign({}, d));
+
+      // Speicher (#122) – Reihenfolge zählt: StorageClass + PVs müssen stehen, bevor
+      // PVCs/StatefulSets binden. Ohne explizite Vorgabe gibt es – wie in kind/minikube –
+      // genau eine Default-StorageClass "standard", die PVCs dynamisch ein PV beschafft.
+      this.storageClasses = (sc.storageClasses || [
+        { name: "standard", provisioner: "rancher.io/local-path", reclaimPolicy: "Delete", isDefault: true },
+      ]).map(s => ({ name: s.name, provisioner: s.provisioner || "rancher.io/local-path", reclaimPolicy: s.reclaimPolicy || "Delete", isDefault: !!s.isDefault, created: 0 }));
+      this.pvs = (sc.pvs || []).map(p => ({ name: p.name, capacity: p.capacity || "1Gi", status: p.status || "Available", claim: p.claim || "", storageClass: p.storageClass || "", accessModes: p.accessModes || "RWO", reclaimPolicy: p.reclaimPolicy || "Retain", created: 0 }));
+      this.pvcs = [];
+      for (const p of sc.pvcs || []) {
+        if (p.status === "Bound" && p.volume) {
+          // schon gebunden (z.B. aus einem gespeicherten Stand) – nicht neu provisionieren
+          this.pvcs.push({ name: p.name, status: "Bound", volume: p.volume, capacity: p.storage || p.capacity || "1Gi", storageClass: p.storageClass || "", accessModes: p.accessModes || "RWO", created: 0 });
+        } else {
+          this.pvcs.push(this._makePvc(p.name, p.storage || p.capacity || "1Gi", p.storageClass, p.accessModes));
+        }
+      }
+      this.statefulSets = (sc.statefulSets || []).map(s => this._makeStatefulSet(s));
+
       this.argoApps = (sc.argoApps || []).map(a => this._cloneArgoApp(a));
 
       this.helmRepos = (sc.helmRepos || []).slice();
@@ -492,6 +573,75 @@ export interface Scenario {
         d.pods.push({ name: makePodName(name), created: this.clock, restarts: 0 });
       }
       return d;
+    }
+
+    /** Name der Default-StorageClass (oder "", wenn keine als Default markiert ist).
+     *  Ein PVC ohne eigene StorageClass bekommt im echten Cluster genau diese. */
+    _defaultStorageClassName(): string {
+      const def = this.storageClasses.find(s => s.isDefault);
+      return def ? def.name : "";
+    }
+
+    /** Bindet ein PVC an Speicher: erst dynamisch über seine StorageClass (legt on-demand
+     *  ein passendes PV an), sonst statisch an ein vorhandenes freies PV. Findet sich
+     *  beides nicht, bleibt das PVC `Pending` – genau das Lehrbild „kein Speicher da". */
+    _bindPvc(pvc: PvcRes) {
+      if (pvc.status === "Bound" && pvc.volume) return;
+      const sc = pvc.storageClass ? this.storageClasses.find(s => s.name === pvc.storageClass) : null;
+      if (sc && sc.provisioner) {
+        const pvName = "pvc-" + randSuffix(8);
+        this.pvs.push({ name: pvName, capacity: pvc.capacity, status: "Bound", claim: "default/" + pvc.name, storageClass: sc.name, accessModes: pvc.accessModes, reclaimPolicy: sc.reclaimPolicy, created: this.clock });
+        pvc.status = "Bound";
+        pvc.volume = pvName;
+        return;
+      }
+      const pv = this.pvs.find(p => p.status === "Available" && (!pvc.storageClass || p.storageClass === pvc.storageClass));
+      if (pv) {
+        pv.status = "Bound";
+        pv.claim = "default/" + pvc.name;
+        pvc.status = "Bound";
+        pvc.volume = pv.name;
+        if (pv.capacity) pvc.capacity = pv.capacity;
+      }
+      // sonst: bleibt Pending (volume "")
+    }
+
+    /** Legt ein PVC an und bindet es sofort (siehe _bindPvc). Ohne StorageClass-Angabe
+     *  greift die Default-StorageClass; ein leeres "" erzwingt statische Bindung. */
+    _makePvc(name: string, storage: string, storageClass?: string, accessModes?: string): PvcRes {
+      const pvc: PvcRes = {
+        name,
+        status: "Pending",
+        volume: "",
+        capacity: storage || "1Gi",
+        storageClass: storageClass !== undefined ? storageClass : this._defaultStorageClassName(),
+        accessModes: accessModes || "RWO",
+        created: this.clock,
+      };
+      this._bindPvc(pvc);
+      return pvc;
+    }
+
+    /** Baut ein StatefulSet: Pods mit STABILER Identität (<name>-0 …) plus je Replica
+     *  ein PVC aus dem volumeClaimTemplate (<vct>-<name>-<ordinal>), das gleich gebunden wird. */
+    _makeStatefulSet(spec: { name: string; image: string; replicas: number; serviceName?: string; volumeClaimName?: string; storage?: string; storageClass?: string }): StatefulSetRes {
+      const vct = spec.volumeClaimName || "data";
+      const sts: StatefulSetRes = {
+        name: spec.name, image: spec.image, replicas: spec.replicas,
+        serviceName: spec.serviceName || spec.name,
+        volumeClaimName: vct,
+        storage: spec.storage || "1Gi",
+        storageClass: spec.storageClass,
+        pods: [], created: this.clock,
+      };
+      for (let i = 0; i < spec.replicas; i++) {
+        sts.pods.push({ name: spec.name + "-" + i, created: this.clock, restarts: 0 });
+        const pvcName = vct + "-" + spec.name + "-" + i;
+        if (!this.pvcs.some(p => p.name === pvcName)) {
+          this.pvcs.push(this._makePvc(pvcName, sts.storage, spec.storageClass, "RWO"));
+        }
+      }
+      return sts;
     }
 
     /** Pod-Status eines Deployments (für get/describe/logs). */
@@ -568,6 +718,21 @@ export interface Scenario {
       for (const d of sc.grafanaDashboards || []) {
         if (!this.grafanaDashboards.some(x => x.name === d.name)) this.grafanaDashboards.push(Object.assign({}, d));
       }
+      // Speicher (#122) – Reihenfolge wie in reset(): StorageClass + PVs vor PVCs/StatefulSets.
+      for (const s of sc.storageClasses || []) {
+        if (!this.storageClasses.some(x => x.name === s.name)) this.storageClasses.push({ name: s.name, provisioner: s.provisioner || "rancher.io/local-path", reclaimPolicy: s.reclaimPolicy || "Delete", isDefault: !!s.isDefault, created: this.clock });
+      }
+      for (const p of sc.pvs || []) {
+        if (!this.pvs.some(x => x.name === p.name)) this.pvs.push({ name: p.name, capacity: p.capacity || "1Gi", status: p.status || "Available", claim: p.claim || "", storageClass: p.storageClass || "", accessModes: p.accessModes || "RWO", reclaimPolicy: p.reclaimPolicy || "Retain", created: this.clock });
+      }
+      for (const p of sc.pvcs || []) {
+        if (this.pvcs.some(x => x.name === p.name)) continue;
+        if (p.status === "Bound" && p.volume) this.pvcs.push({ name: p.name, status: "Bound", volume: p.volume, capacity: p.storage || p.capacity || "1Gi", storageClass: p.storageClass || "", accessModes: p.accessModes || "RWO", created: this.clock });
+        else this.pvcs.push(this._makePvc(p.name, p.storage || p.capacity || "1Gi", p.storageClass, p.accessModes));
+      }
+      for (const s of sc.statefulSets || []) {
+        if (!this.statefulSets.some(x => x.name === s.name)) this.statefulSets.push(this._makeStatefulSet(s));
+      }
       for (const a of sc.argoApps || []) {
         if (!this.argoApps.some(x => x.name === a.name)) this.argoApps.push(this._cloneArgoApp(a));
       }
@@ -638,6 +803,13 @@ export interface Scenario {
         prometheusRules: this.prometheusRules.map(r => Object.assign({}, r)),
         grafanaDatasources: this.grafanaDatasources.map(d => Object.assign({}, d)),
         grafanaDashboards: this.grafanaDashboards.map(d => Object.assign({}, d)),
+        // Speicher (#122): PVCs gebunden serialisieren (volume + status), damit ein Reload
+        // sie NICHT neu provisioniert; StatefulSets nur als Spezifikation – ihre Pods (stabile
+        // Namen) und bereits vorhandene PVCs baut reset() deterministisch wieder auf.
+        storageClasses: this.storageClasses.map(s => Object.assign({}, s)),
+        pvs: this.pvs.map(p => Object.assign({}, p)),
+        pvcs: this.pvcs.map(p => ({ name: p.name, storage: p.capacity, status: p.status, volume: p.volume, storageClass: p.storageClass, accessModes: p.accessModes })),
+        statefulSets: this.statefulSets.map(s => ({ name: s.name, image: s.image, replicas: s.replicas, serviceName: s.serviceName, volumeClaimName: s.volumeClaimName, storage: s.storage, storageClass: s.storageClass })),
         argoApps: this.argoApps.map(a => this._cloneArgoApp(a)),
         helmRepos: this.helmRepos.slice(),
         releases: this.releases.map(r => ({
@@ -977,6 +1149,10 @@ export interface Scenario {
           const st = this._podStatus(d);
           for (const p of d.pods) rows.push([p.name, st.ready, st.status, String(st.restarts || p.restarts), this._age(p.created)]);
         }
+        // StatefulSet-Pods (#122): stabile Namen <sts>-0, immer Running/ready.
+        for (const s of this.statefulSets) {
+          for (const p of s.pods) rows.push([p.name, "1/1", "Running", String(p.restarts), this._age(p.created)]);
+        }
         if (rows.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "READY", "STATUS", "RESTARTS", "AGE"], rows);
       }
@@ -1066,6 +1242,30 @@ export interface Scenario {
         if (this.grafanaDashboards.length === 0) return "No resources found in default namespace.";
         return table(["NAME", "TITLE", "PANELS", "AGE"],
           this.grafanaDashboards.map(d => [d.name, d.title, String(d.panels), this._age(d.created || 0)]));
+      }
+
+      if (["statefulsets", "statefulset", "sts"].includes(what)) {
+        if (this.statefulSets.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "READY", "AGE"],
+          this.statefulSets.map(s => [s.name, s.pods.length + "/" + s.replicas, this._age(s.created)]));
+      }
+
+      if (["persistentvolumeclaims", "persistentvolumeclaim", "pvc"].includes(what)) {
+        if (this.pvcs.length === 0) return "No resources found in default namespace.";
+        return table(["NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESS MODES", "STORAGECLASS", "AGE"],
+          this.pvcs.map(p => [p.name, p.status, p.volume || "", p.status === "Bound" ? p.capacity : "", p.accessModes, p.storageClass || "", this._age(p.created)]));
+      }
+
+      if (["persistentvolumes", "persistentvolume", "pv"].includes(what)) {
+        if (this.pvs.length === 0) return "No resources found.";
+        return table(["NAME", "CAPACITY", "ACCESS MODES", "RECLAIM POLICY", "STATUS", "CLAIM", "STORAGECLASS", "AGE"],
+          this.pvs.map(p => [p.name, p.capacity, p.accessModes, p.reclaimPolicy, p.status, p.claim || "", p.storageClass || "", this._age(p.created)]));
+      }
+
+      if (["storageclasses", "storageclass", "sc"].includes(what)) {
+        if (this.storageClasses.length === 0) return "No resources found.";
+        return table(["NAME", "PROVISIONER", "RECLAIMPOLICY", "AGE"],
+          this.storageClasses.map(s => [s.name + (s.isDefault ? " (default)" : ""), s.provisioner, s.reclaimPolicy, this._age(s.created)]));
       }
 
       if (["alerts", "alert"].includes(what)) {
@@ -1285,6 +1485,26 @@ export interface Scenario {
           const i = this.networkPolicies.findIndex(x => x.name === effNp.name);
           if (i >= 0) { this.networkPolicies.splice(i, 1); out.push('networkpolicy.networking.k8s.io "' + effNp.name + '" deleted'); }
         }
+        const effStsDel = eff.statefulSet;
+        if (effStsDel) {
+          const i = this.statefulSets.findIndex(x => x.name === effStsDel.name);
+          if (i >= 0) { this.statefulSets.splice(i, 1); out.push('statefulset.apps "' + effStsDel.name + '" deleted'); } // PVCs bleiben absichtlich (#122)
+        }
+        const effPvcDel = eff.pvc;
+        if (effPvcDel) {
+          const i = this.pvcs.findIndex(x => x.name === effPvcDel.name);
+          if (i >= 0) { this.pvcs.splice(i, 1); out.push('persistentvolumeclaim "' + effPvcDel.name + '" deleted'); }
+        }
+        const effPvDel = eff.pv;
+        if (effPvDel) {
+          const i = this.pvs.findIndex(x => x.name === effPvDel.name);
+          if (i >= 0) { this.pvs.splice(i, 1); out.push('persistentvolume "' + effPvDel.name + '" deleted'); }
+        }
+        const effScDel = eff.storageClass;
+        if (effScDel) {
+          const i = this.storageClasses.findIndex(x => x.name === effScDel.name);
+          if (i >= 0) { this.storageClasses.splice(i, 1); out.push('storageclass.storage.k8s.io "' + effScDel.name + '" deleted'); }
+        }
         return out.join("\n") || "nothing deleted";
       }
 
@@ -1292,13 +1512,25 @@ export interface Scenario {
 
       if (["pod", "pods", "po"].includes(what)) {
         const dep = this._findDeploymentOfPod(name);
-        if (!dep) return this._err('Error from server (NotFound): pods "' + name + '" not found', "Pod-Namen siehst du mit 'kubectl get pods'.");
-        const idx = dep.pods.findIndex(p => p.name === name);
-        dep.pods.splice(idx, 1);
-        this.lastDeletedPod = name;
-        // Self-Healing: das Deployment ersetzt den Pod sofort!
-        dep.pods.push({ name: makePodName(dep.name), created: this.clock, restarts: 0 });
-        return 'pod "' + name + '" deleted';
+        if (dep) {
+          const idx = dep.pods.findIndex(p => p.name === name);
+          dep.pods.splice(idx, 1);
+          this.lastDeletedPod = name;
+          // Self-Healing: das Deployment ersetzt den Pod sofort – mit NEUEM Zufallsnamen.
+          dep.pods.push({ name: makePodName(dep.name), created: this.clock, restarts: 0 });
+          return 'pod "' + name + '" deleted';
+        }
+        // StatefulSet-Pod (#122): kommt mit GLEICHEM Namen und GLEICHEM PVC zurück –
+        // die Daten überleben. Das PVC wird bewusst NICHT angefasst.
+        const sts = this.statefulSets.find(s => s.pods.some(p => p.name === name));
+        if (sts) {
+          const idx = sts.pods.findIndex(p => p.name === name);
+          sts.pods.splice(idx, 1);
+          this.lastDeletedPod = name;
+          sts.pods.splice(idx, 0, { name, created: this.clock, restarts: 0 }); // stabile Identität: gleicher Name, gleiche Ordinalposition
+          return 'pod "' + name + '" deleted';
+        }
+        return this._err('Error from server (NotFound): pods "' + name + '" not found', "Pod-Namen siehst du mit 'kubectl get pods'.");
       }
 
       if (["deployment", "deployments", "deploy"].includes(what)) {
@@ -1341,6 +1573,41 @@ export interface Scenario {
         if (idx === -1) return this._err('Error from server (NotFound): networkpolicies.networking.k8s.io "' + name + '" not found');
         this.networkPolicies.splice(idx, 1);
         return 'networkpolicy.networking.k8s.io "' + name + '" deleted';
+      }
+
+      if (["statefulset", "statefulsets", "sts"].includes(what)) {
+        const idx = this.statefulSets.findIndex(s => s.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): statefulsets.apps "' + name + '" not found');
+        this.statefulSets.splice(idx, 1);
+        // Die PVCs bleiben absichtlich erhalten – Kern der Datendauerhaftigkeit (#122).
+        return 'statefulset.apps "' + name + '" deleted\n💡 Die PVCs bleiben bestehen – die Daten überleben das Löschen des StatefulSets. Skalierst du es wieder hoch, hängen die alten Volumes wieder dran.';
+      }
+
+      if (["pvc", "persistentvolumeclaim", "persistentvolumeclaims"].includes(what)) {
+        const idx = this.pvcs.findIndex(p => p.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): persistentvolumeclaims "' + name + '" not found');
+        const [removed] = this.pvcs.splice(idx, 1);
+        // Gebundenes PV freigeben: Delete-Policy entfernt es, Retain hinterlässt es als "Released".
+        const pv = this.pvs.find(p => p.name === removed.volume);
+        if (pv) {
+          if (pv.reclaimPolicy === "Retain") { pv.status = "Released"; pv.claim = ""; }
+          else { const j = this.pvs.findIndex(x => x.name === pv.name); if (j >= 0) this.pvs.splice(j, 1); }
+        }
+        return 'persistentvolumeclaim "' + name + '" deleted';
+      }
+
+      if (["pv", "persistentvolume", "persistentvolumes"].includes(what)) {
+        const idx = this.pvs.findIndex(p => p.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): persistentvolumes "' + name + '" not found');
+        this.pvs.splice(idx, 1);
+        return 'persistentvolume "' + name + '" deleted';
+      }
+
+      if (["storageclass", "storageclasses", "sc"].includes(what)) {
+        const idx = this.storageClasses.findIndex(s => s.name === name);
+        if (idx === -1) return this._err('Error from server (NotFound): storageclasses.storage.k8s.io "' + name + '" not found');
+        this.storageClasses.splice(idx, 1);
+        return 'storageclass.storage.k8s.io "' + name + '" deleted';
       }
 
       return this._err("kubectl delete: Ressourcentyp '" + what + "' kennt der Simulator nicht.");
@@ -1496,6 +1763,50 @@ export interface Scenario {
         } else {
           this.grafanaDashboards.push({ name: effGd.name, title: effGd.title, panels: effGd.panels || 0, created: this.clock });
           out.push("grafanadashboard.grafana.integreatly.org/" + effGd.name + " created");
+        }
+      }
+      // Stateful-Workload-CRDs (#122). Reihenfolge: StorageClass + PV vor PVC/StatefulSet,
+      // damit das Binden im selben apply schon greift.
+      const effSc = eff.storageClass;
+      if (effSc) {
+        if (this.storageClasses.some(s => s.name === effSc.name)) {
+          out.push("storageclass.storage.k8s.io/" + effSc.name + " unchanged");
+        } else {
+          this.storageClasses.push({ name: effSc.name, provisioner: effSc.provisioner || "rancher.io/local-path", reclaimPolicy: effSc.reclaimPolicy || "Delete", isDefault: !!effSc.isDefault, created: this.clock });
+          out.push("storageclass.storage.k8s.io/" + effSc.name + " created");
+        }
+      }
+      const effPv = eff.pv;
+      if (effPv) {
+        if (this.pvs.some(p => p.name === effPv.name)) {
+          out.push("persistentvolume/" + effPv.name + " unchanged");
+        } else {
+          this.pvs.push({ name: effPv.name, capacity: effPv.capacity || "1Gi", status: "Available", claim: "", storageClass: effPv.storageClass || "", accessModes: effPv.accessModes || "RWO", reclaimPolicy: effPv.reclaimPolicy || "Retain", created: this.clock });
+          out.push("persistentvolume/" + effPv.name + " created");
+        }
+      }
+      const effPvc = eff.pvc;
+      if (effPvc) {
+        if (this.pvcs.some(p => p.name === effPvc.name)) {
+          out.push("persistentvolumeclaim/" + effPvc.name + " unchanged");
+        } else {
+          const pvc = this._makePvc(effPvc.name, effPvc.storage || "1Gi", effPvc.storageClass, effPvc.accessModes);
+          this.pvcs.push(pvc);
+          out.push("persistentvolumeclaim/" + effPvc.name + " created");
+          out.push(pvc.status === "Bound"
+            ? "💡 PVC '" + pvc.name + "' ist Bound – es hat Speicher bekommen (PV " + pvc.volume + ")."
+            : "💡 PVC '" + pvc.name + "' ist Pending – kein passendes PV da und keine StorageClass, die eins anlegt.");
+        }
+      }
+      const effSts = eff.statefulSet;
+      if (effSts) {
+        if (this.statefulSets.some(s => s.name === effSts.name)) {
+          out.push("statefulset.apps/" + effSts.name + " unchanged");
+        } else {
+          const sts = this._makeStatefulSet(effSts);
+          this.statefulSets.push(sts);
+          out.push("statefulset.apps/" + effSts.name + " created");
+          out.push("💡 " + sts.replicas + " Pod(s) mit stabiler Identität (" + sts.name + "-0 …), jeder mit eigenem PVC '" + sts.volumeClaimName + "-" + sts.name + "-0' usw.");
         }
       }
       return out.join("\n");
