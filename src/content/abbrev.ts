@@ -140,3 +140,57 @@ export function abbrevLockHint(hit: LockedAbbrev): string {
   return `🔒 <code>${hit.used}</code> ist eine Profi-Abkürzung, die du <b>später freischaltest</b>. `
     + `Schreib sie vorerst aus: <code>${hit.pair.long}</code>.`;
 }
+
+/** Treffer einer „Beinahe"-Schreibweise: richtiges Flag, falsche Bindestrich-Anzahl. */
+export interface FlagNearMiss {
+  readonly pair: AbbrevPair;
+  /** Das falsch geschriebene Token, z.B. `-all` (statt `-a`/`--all`) oder `--a`. */
+  readonly used: string;
+}
+
+/** Erkennt eine „Beinahe"-Schreibweise eines Flags (#367): richtige Buchstaben,
+ *  aber falsche Bindestrich-Anzahl – der klassische Anfänger-Stolperstein
+ *  `docker ps -all` (ein Strich + ganzes Wort) statt `-a`/`--all`, sowie
+ *  symmetrisch `--a` (zwei Striche + ein Buchstabe). Nur für `kind: "flag"`
+ *  (Aliase wie `pods`/`po` haben keine Bindestrich-Form). Befehls-genau wie das
+ *  Gating: nur Flags DES getippten Befehls. Pur (Phaser-/DOM-frei), testbar.
+ *
+ *  Gibt das gemeinte Paar + das falsche Token zurück, sonst `undefined`. Gültige
+ *  Formen (`-a`, `--all`) lösen NIE aus – die führt der Akzeptanz-Pfad. */
+export function flagNearMiss(input: string): FlagNearMiss | undefined {
+  const tokens = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return undefined;
+  const cmd = tokens[0];
+  for (const a of ABBREVS) {
+    if (a.kind !== "flag") continue;
+    if (abbrevCommand(a) !== cmd) continue;
+    // Falsche Schreibweisen sammeln: „-<langwort>" (ein Strich) + je Kürzel „--<buchstabe>".
+    const malformed = new Set<string>(["-" + a.long.replace(/^--/, "")]);
+    for (const s of a.short) malformed.add("--" + s.replace(/^-+/, ""));
+    const used = tokens.find(t => malformed.has(t) && t !== a.long && !a.short.includes(t));
+    if (used) return { pair: a, used };
+  }
+  return undefined;
+}
+
+/** Hinweis für eine Beinahe-Schreibweise (#367): nennt die korrekten Formen.
+ *  Die **Kurzform wird nur vorgeschlagen, wenn sie verfügbar ist** – freigeschaltet
+ *  ODER vom gerade laufenden Lehr-Schritt freigeschaltet (`exemptId`, #366). Solange
+ *  sie gesperrt ist, nennt der Hinweis NUR die Langform, damit er kein Kürzel
+ *  vorwegnimmt (gleiche Regel wie das Gating). `undefined`, wenn keine Beinahe-
+ *  Schreibweise vorliegt. */
+export function flagNearMissHint(
+  input: string,
+  isUnlocked: (id: string) => boolean,
+  exemptId?: string,
+): string | undefined {
+  const hit = flagNearMiss(input);
+  if (!hit) return undefined;
+  const shortAvailable = isUnlocked(hit.pair.id) || hit.pair.id === exemptId;
+  if (shortAvailable) {
+    return `🔧 <code>${hit.used}</code> gibt es nicht. Gemeint ist <code>${hit.pair.short[0]}</code> `
+      + `(ein Strich + ein Buchstabe) oder <code>${hit.pair.long}</code> (zwei Striche + ganzes Wort).`;
+  }
+  return `🔧 <code>${hit.used}</code> gibt es nicht – schreib <code>${hit.pair.long}</code> `
+    + `(zwei Striche + ganzes Wort).`;
+}

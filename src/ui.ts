@@ -8,7 +8,7 @@ import { KQAssets } from "./assets-data";
 import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
 import { resolveOverlayKey } from "./overlaykbd";
-import { ABBREVS, lockedAbbrevInInput, abbrevLockHint } from "./content/abbrev";
+import { ABBREVS, lockedAbbrevInInput, abbrevLockHint, flagNearMissHint } from "./content/abbrev";
 import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlog";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
@@ -771,7 +771,13 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
       } else {
         this.failCount++;
         const fb = $("tt-feedback");
-        if (fb && this.failCount >= 3) {
+        // #367: Beinahe-Schreibweise eines Flags (z.B. „-all“ statt „-a“/„--all“) → gezielter
+        // Hinweis statt der generischen Meldung. Die Kurzform schlägt der Hinweis nur vor, wenn
+        // sie schon verfügbar ist (freigeschaltet ODER dieser Lehr-Schritt schaltet sie frei, #366).
+        const nearMiss = flagNearMissHint(norm, (id) => Game.isAbbrevUnlocked(id), Game.currentStep()?.unlockAbbrev);
+        if (fb && nearMiss) {
+          fb.innerHTML = '<div class="tt-feedback">' + nearMiss + '</div>';
+        } else if (fb && this.failCount >= 3) {
           // nach mehreren Versuchen: zum Hinweis-Knopf lotsen
           this.failCount = 0;
           fb.innerHTML = '<div class="tt-feedback">💪 Tippfehler sind der häufigste Stolperstein. Der 🔭 Hinweis unten hilft – das ist keine Schande!</div>';

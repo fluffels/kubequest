@@ -10,7 +10,7 @@
  */
 import { test, expect, describe } from "vitest";
 import assert from "node:assert/strict";
-import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, type AbbrevPair } from "../src/content/abbrev";
+import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, flagNearMiss, flagNearMissHint, type AbbrevPair } from "../src/content/abbrev";
 import { KQContent } from "../src/content";
 import { Sim as KQSim } from "../src/sim";
 
@@ -311,5 +311,77 @@ describe("#366: Quest-/Lehrtexte nehmen keine gesperrten Abkürzungen vorweg", (
       }
     });
     assert.deepEqual(verstoesse, [], "Texte mit vorweggenommener Kurzform:\n" + verstoesse.join("\n"));
+  });
+});
+
+/* #367: „Beinahe"-Schreibweise eines Flags (richtige Buchstaben, falsche Strich-
+ * Anzahl) bekommt einen gezielten Hinweis. Die Kurzform wird darin nur genannt,
+ * wenn sie verfügbar ist (freigeschaltet ODER vom laufenden Lehr-Schritt, #366). */
+describe("#367: Beinahe-Schreibweise eines Flags (-all statt -a/--all)", () => {
+  const NICHTS_FREI = (_id: string) => false;
+  const nurFrei = (...ids: string[]) => (id: string) => ids.includes(id);
+
+  describe("flagNearMiss – Erkennung", () => {
+    test("ein Strich + ganzes Wort wird erkannt (-all)", () => {
+      const hit = flagNearMiss("docker ps -all");
+      expect(hit?.pair.id).toBe("docker-ps-all");
+      expect(hit?.used).toBe("-all");
+    });
+
+    test("zwei Striche + ein Buchstabe wird erkannt (--a)", () => {
+      const hit = flagNearMiss("docker ps --a");
+      expect(hit?.pair.id).toBe("docker-ps-all");
+      expect(hit?.used).toBe("--a");
+    });
+
+    test("greift für weitere Flags und ist befehls-genau (-detach, -message)", () => {
+      expect(flagNearMiss("docker run -detach nginx")?.pair.id).toBe("docker-run-detach");
+      expect(flagNearMiss("git commit -message x")?.pair.id).toBe("git-commit-message");
+      // -filename gehört zu kubectl; helm hat es nicht → kein Fehlalarm bei helm.
+      expect(flagNearMiss("kubectl apply -filename app.yaml")?.pair.id).toBe("kubectl-filename");
+    });
+
+    test("gültige Formen lösen NIE aus (Negativfall)", () => {
+      expect(flagNearMiss("docker ps -a")).toBeUndefined();
+      expect(flagNearMiss("docker ps --all")).toBeUndefined();
+      expect(flagNearMiss("docker ps")).toBeUndefined();
+    });
+
+    test("Aliase (pods/po) sind keine Flag-Beinahe-Treffer", () => {
+      // -pods wäre kein gültiges Flag, aber kubectl-pods ist kind:"alias" → nicht erkannt.
+      expect(flagNearMiss("kubectl get -pods")).toBeUndefined();
+      expect(flagNearMiss("kubectl get --po")).toBeUndefined();
+    });
+
+    test("leere/fremde Eingabe → kein Treffer", () => {
+      expect(flagNearMiss("")).toBeUndefined();
+      expect(flagNearMiss("ls -all")).toBeUndefined();   // „ls" ist hier der Befehl, kein Katalog-Befehl
+    });
+  });
+
+  describe("flagNearMissHint – Kurzform nur wenn verfügbar (#366-Regel)", () => {
+    test("gesperrt: schlägt NUR die Langform vor, kein Kürzel", () => {
+      const msg = flagNearMissHint("docker ps -all", NICHTS_FREI)!;
+      expect(msg).toContain("<code>--all</code>");
+      expect(msg).not.toContain("<code>-a</code>");   // -a darf noch nicht vorweggenommen werden
+    });
+
+    test("freigeschaltet: schlägt beide Formen vor", () => {
+      const msg = flagNearMissHint("docker ps -all", nurFrei("docker-ps-all"))!;
+      expect(msg).toContain("<code>-a</code>");
+      expect(msg).toContain("<code>--all</code>");
+    });
+
+    test("im freischaltenden Lehr-Schritt (exemptId) wird die Kurzform genannt", () => {
+      // Genau der q2-Fall: -a wird hier gelehrt, also darf der Hinweis -a nennen.
+      const msg = flagNearMissHint("docker ps -all", NICHTS_FREI, "docker-ps-all")!;
+      expect(msg).toContain("<code>-a</code>");
+      expect(msg).toContain("<code>--all</code>");
+    });
+
+    test("gültige Eingabe → kein Hinweis", () => {
+      expect(flagNearMissHint("docker ps -a", NICHTS_FREI, "docker-ps-all")).toBeUndefined();
+      expect(flagNearMissHint("docker ps --all", NICHTS_FREI)).toBeUndefined();
+    });
   });
 });
