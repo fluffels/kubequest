@@ -38,19 +38,8 @@ import { helmCommand } from "./sim/helm";
 import { terraformCommand } from "./sim/terraform";
 import { gitCommand } from "./sim/git";
 import { argocdCommand, reconcileAutoSync, cloneArgoApp } from "./sim/argocd";
+import { podMetrics as obsPodMetrics, nodeMetrics as obsNodeMetrics, scrapeTargets as obsScrapeTargets, alerts as obsAlerts, evaluateAlerts as obsEvaluateAlerts } from "./sim/observability";
 import { randSuffix, pad, table, makePodName } from "./sim/util";
-
-  /** Stabiler kleiner Hash (FNV-1a-artig). Liefert aus einem Namen einen festen
-   *  Zahlenwert – Grundlage für deterministische Metrik-Werte (kein Math.random,
-   *  damit `kubectl top` über Aufrufe hinweg gleich bleibt und Tests reproduzierbar sind). */
-  function hashStr(s: string): number {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
 
   class Sim implements ClusterState {
     // `!` = definite assignment: alle Felder werden in reset() gesetzt, das der
@@ -509,7 +498,7 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
       reconcileAutoSync(this);
       // Alert-Regeln gegen den (ggf. gerade reconcilten) Zustand auswerten, damit der
       // firing→resolved-Verlauf mitläuft, während gespielt wird (Observability #109).
-      this._evaluateAlerts();
+      obsEvaluateAlerts(this);
       this.lastError = false;
       const raw = line.trim();
       if (!raw) return { output: "", error: false };
@@ -611,112 +600,13 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
       ].join("\n");
     }
 
-
-    /** Momentane Ressourcen-Last eines Pods – oder null, wenn der Container gar nicht
-     *  läuft (ImagePull/Pending), dann gibt es schlicht keine Metriken. Deterministisch
-     *  aus dem Pod-Namen abgeleitet, damit `kubectl top` über Aufrufe hinweg stabil bleibt. */
-    _podMetric(d: Deployment, p: PodInstance): PodMetrics | null {
-      if (d.broken && (d.broken.type === "imagepull" || d.broken.type === "pending")) return null;
-      const h = hashStr(p.name);
-      let cpuMilli = 4 + (h % 36);          // 4..39m Grundlast
-      let memMi = 14 + ((h >>> 7) % 50);    // 14..63Mi Grundverbrauch
-      if (d.cpuHeavy) cpuMilli = 850 + (h % 200); // 850..1049m: weit über der HighCPU-Schwelle
-      if (d.broken && d.broken.type === "oomkilled") memMi = d.broken.memNeeded || 256; // klettert ans Limit
-      return { cpuMilli, memMi };
-    }
-
-    /** Metriken aller laufenden Pods (für `kubectl top pods` + Prometheus + Alerts). */
-    podMetrics(): Array<{ name: string; cpuMilli: number; memMi: number }> {
-      const out: Array<{ name: string; cpuMilli: number; memMi: number }> = [];
-      for (const d of this.deployments) {
-        for (const p of d.pods) {
-          const m = this._podMetric(d, p);
-          if (m) out.push({ name: p.name, cpuMilli: m.cpuMilli, memMi: m.memMi });
-        }
-      }
-      return out;
-    }
-
-    /** Aggregierte Node-Last: Grundlast (deterministisch aus dem Node-Namen) plus der
-     *  gleichmäßig verteilte Pod-Verbrauch – so hebt ein CPU-hungriger Pod auch die Node. */
-    nodeMetrics(): NodeMetrics[] {
-      const CPU_CAP = 2000, MEM_CAP = 4096; // pro Node vereinfacht: 2 Kerne, 4 GiB
-      const pods = this.podMetrics();
-      const n = this.nodes.length || 1;
-      const cpuShare = Math.round(pods.reduce((s, p) => s + p.cpuMilli, 0) / n);
-      const memShare = Math.round(pods.reduce((s, p) => s + p.memMi, 0) / n);
-      return this.nodes.map(nd => {
-        const h = hashStr(nd.name);
-        const ctrl = nd.roles.includes("control-plane");
-        const baseCpu = (ctrl ? 120 : 60) + (h % (ctrl ? 80 : 60));
-        const baseMem = (ctrl ? 900 : 500) + (h % 300);
-        const cpuMilli = Math.min(CPU_CAP, baseCpu + cpuShare);
-        const memMi = Math.min(MEM_CAP, baseMem + memShare);
-        return { name: nd.name, cpuMilli, cpuPct: Math.round(cpuMilli / CPU_CAP * 100), memMi, memPct: Math.round(memMi / MEM_CAP * 100) };
-      });
-    }
-
-
-    /** Prometheus-Scrape-Ziele aus dem Cluster-Zustand abgeleitet (Grundgerüst #109):
-     *  Node-Targets (kubelet) sowie ein App-Target je Service – up/down je nach Erreichbarkeit. */
-    scrapeTargets(): ScrapeTarget[] {
-      const targets: ScrapeTarget[] = [];
-      for (const nd of this.nodes) {
-        targets.push({ job: "kubelet", instance: nd.name + ":10250", health: nd.status === "Ready" ? "up" : "down" });
-      }
-      for (const s of this.services) {
-        const dep = this.deployments.find(d => d.name === s.name);
-        const healthy = !!dep && this._podReady(dep);
-        targets.push({ job: s.name, instance: s.clusterIP + ":" + s.port, health: healthy ? "up" : "down" });
-      }
-      return targets;
-    }
-
-    /** Die Alert-Regeln samt aktueller Bedingung – die EINE Stelle, die festlegt,
-     *  was den simulierten Alertmanager auslöst (hohe CPU, CrashLoop, OOM, Node weg). */
-    _alertRules(): Array<{ name: string; severity: "warning" | "critical"; summary: string; firing: boolean }> {
-      const crash = this.deployments.some(d => d.broken && d.broken.type === "crashloop");
-      const oom = this.deployments.some(d => d.broken && d.broken.type === "oomkilled");
-      const hotPod = this.podMetrics().some(m => m.cpuMilli > 500);
-      const nodeDown = this.nodes.some(nd => nd.status !== "Ready");
-      return [
-        { name: "KubePodCrashLooping", severity: "critical", summary: "Ein Pod startet immer wieder neu (CrashLoopBackOff).", firing: crash },
-        { name: "KubePodOOMKilled", severity: "critical", summary: "Ein Pod sprengt sein Speicher-Limit und wird gekillt (OOMKilled).", firing: oom },
-        { name: "HighPodCPU", severity: "warning", summary: "Ein Pod verbraucht ungewöhnlich viel CPU (über 500m).", firing: hotPod },
-        { name: "KubeNodeNotReady", severity: "critical", summary: "Ein Node ist nicht mehr bereit (NotReady).", firing: nodeDown },
-      ];
-    }
-
-    /** Aktuellen Zustand gegen die Regeln prüfen und den firing→resolved-Verlauf fortschreiben. */
-    _evaluateAlerts() {
-      for (const r of this._alertRules()) {
-        if (r.firing) {
-          this._firingAlerts.add(r.name);
-          this._resolvedAlerts.delete(r.name);
-        } else if (this._firingAlerts.has(r.name)) {
-          // Bedingung weg, war aber an -> als resolved merken (verschwindet erst beim reset).
-          this._firingAlerts.delete(r.name);
-          this._resolvedAlerts.add(r.name);
-        }
-      }
-    }
-
-    /** Aktuelle Alerts (firing + resolved), nach Name sortiert. Wertet vorher neu aus,
-     *  damit auch eine direkte Abfrage ohne vorausgehenden Befehl stimmt. */
-    alerts(): Alert[] {
-      this._evaluateAlerts();
-      const meta = new Map(this._alertRules().map(r => [r.name, r]));
-      const out: Alert[] = [];
-      for (const name of this._firingAlerts) {
-        const r = meta.get(name)!;
-        out.push({ name, severity: r.severity, state: "firing", summary: r.summary });
-      }
-      for (const name of this._resolvedAlerts) {
-        const r = meta.get(name)!;
-        out.push({ name, severity: r.severity, state: "resolved", summary: r.summary });
-      }
-      return out.sort((a, b) => a.name.localeCompare(b.name));
-    }
+    // Observability (#109/#110) liegt seit #384 in ./sim/observability.ts. Die öffentliche API
+    // bleibt hier als dünne Delegation, damit Aufrufer (kubectl get/top über KubectlHost,
+    // content/checks + content/drills, Tests) unverändert sim.podMetrics() & Co. nutzen.
+    podMetrics(): Array<{ name: string; cpuMilli: number; memMi: number }> { return obsPodMetrics(this); }
+    nodeMetrics(): NodeMetrics[] { return obsNodeMetrics(this); }
+    scrapeTargets(): ScrapeTarget[] { return obsScrapeTargets(this); }
+    alerts(): Alert[] { return obsAlerts(this); }
 
     /** Baut eine Pipeline für den aktuellen Branch und lässt ihre Stages laufen. */
     _runPipeline() {
