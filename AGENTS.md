@@ -73,7 +73,7 @@ Vite + TypeScript + ES-Module. `index.html` lädt nur `src/main.ts`, Vite bünde
 
 > Welches Modul genau was macht (mit Links), steht **einmal** in der [CLAUDE.md › Repo-Landkarte](CLAUDE.md) – hier steht nur das *Warum* der Schichtung, nicht die Dateiliste.
 
-Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator inkl. Troubleshooting), `content.test.ts` (Konsistenz aller Inhalte), `quests.test.ts` (spielt die ganze Story + alle Drills durch), `readme.test.ts` (Doku-Sync: Quest-Zahl der README gegen den Code).
+Tests in `test/` (Vitest), u.a.: `sim.test.ts` (Simulator-Kern/Dispatch; die Befehlsfamilien gespiegelt zu den `sim/`-Modulen unter `test/sim/`, Fixtures in `test/sim/helpers.ts` – Split #383), `content.test.ts` (Konsistenz aller Inhalte), `quests.test.ts` (spielt die ganze Story + alle Drills durch), `readme.test.ts` (Doku-Sync: Quest-Zahl der README gegen den Code).
 
 ## Konventionen
 
