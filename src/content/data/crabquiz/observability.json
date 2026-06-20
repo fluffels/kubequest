@@ -1,0 +1,170 @@
+[
+  {
+    "id": "q-obs-scrape",
+    "q": "Wie kommt <b>Prometheus</b> an die Metriken eines Dienstes?",
+    "options": [
+      "Es <b>scrapt</b> sie im Takt selbst ab – ruft die <code>/metrics</code>-Seite des Dienstes auf (Pull). Antwortet das Target, ist es <b>up</b>, sonst <b>down</b>.",
+      "Jeder Dienst pusht seine Zahlen von sich aus an Prometheus, sobald sich etwas ändert.",
+      "Prometheus liest die Zahlen aus den Container-Logs heraus.",
+      "Ein Mensch trägt die Werte einmal pro Stunde von Hand ein."
+    ],
+    "correct": 0,
+    "explain": "Klassisches Prometheus arbeitet nach dem <b>Pull-Prinzip</b>: Es geht von sich aus im festen Takt bei jedem <b>Target</b> vorbei und liest dessen <code>/metrics</code>-Endpunkt. Antwortet das Target, steht es auf <b>up</b>; schweigt es, auf <b>down</b> – ein stummes Target ist oft das erste Warnsignal. Die Dienste schicken nichts von selbst (kein Push)."
+  },
+  {
+    "id": "q-obs-top",
+    "q": "Was zeigt dir <code>kubectl top pods</code>?",
+    "options": [
+      "Die <b>aktuelle</b> CPU- und Speicher-Last je laufendem Pod (CPU in <code>m</code>/Millicores, Speicher in <code>Mi</code>).",
+      "Die Logs (Textausgaben) jedes Pods.",
+      "Ob ein Pod läuft oder abgestürzt ist (Status Running/CrashLoop).",
+      "Die YAML-Definition des Pods."
+    ],
+    "correct": 0,
+    "explain": "<code>kubectl top pods</code> ist der schnelle Live-Blick auf den <b>Verbrauch</b>: wie viel CPU (Millicores) und Speicher (Mi) jeder laufende Pod gerade zieht – ideal, um den heißen Pod zu finden. Den <i>Status</i> zeigt <code>kubectl get pods</code>, die <i>Logs</i> <code>kubectl logs</code>. <code>kubectl top nodes</code> macht dasselbe für ganze Nodes."
+  },
+  {
+    "id": "q-obs-servicemonitor",
+    "q": "Wozu dient ein <b>ServiceMonitor</b> (Prometheus-Operator-CRD)?",
+    "options": [
+      "Er sagt Prometheus deklarativ, <b>welchen</b> Service es scrapen soll – per <code>selector</code> (Label) plus Port & Intervall in <code>endpoints</code>.",
+      "Er startet einen Pod, der den Service überwacht und bei Fehlern neu startet.",
+      "Er verschickt die Metriken per Push an einen externen Server.",
+      "Er ist ein Dashboard, das die Metriken anzeigt."
+    ],
+    "correct": 0,
+    "explain": "Ein ServiceMonitor ist der <b>deklarative Scrape-Auftrag</b>: Sein <code>selector</code> wählt per Label den Service, seine <code>endpoints</code> legen Port und Takt fest, an dem <code>/metrics</code> abgegrast wird. Er startet nichts und verschickt nichts – Prometheus <i>holt</i> die Daten weiterhin selbst (Pull); der ServiceMonitor sagt nur, <b>welches</b> Target dafür in Frage kommt. So spart man sich das Prometheus-Config-Gefummel von Hand."
+  },
+  {
+    "id": "q-obs-datasource",
+    "q": "Wozu braucht Grafana eine <b>GrafanaDatasource</b>?",
+    "options": [
+      "Sie sagt Grafana, <b>woher</b> es die Metriken holt – Typ (z.B. Prometheus), Cluster-Adresse und Zugriffsweg.",
+      "Sie startet Prometheus und sorgt dafür, dass es Metriken scrapt.",
+      "Sie legt fest, welche Dashboards angezeigt werden und wie viele Panels sie haben.",
+      "Sie verschickt Metriken per Push von Grafana an externe Dienste."
+    ],
+    "correct": 0,
+    "explain": "Die <b>GrafanaDatasource</b> ist die Brücke zwischen Grafana und der Datenquelle: Sie konfiguriert, unter welcher Adresse Grafana Prometheus findet und wie es anfragen soll (Typ, URL, Zugriffsweg). Ohne Datasource bleiben alle Panels leer – Grafana weiß sonst nicht, wo die Zahlen herkommen. Das Scrapen selbst macht weiterhin Prometheus."
+  },
+  {
+    "id": "q-obs-dashboard-panel",
+    "q": "Im Grafana-Panel <b>Scrape-Targets up/down</b> steht plötzlich ein Target auf <code>down</code>. Was bedeutet das – und was ist dein nächster Schritt?",
+    "options": [
+      "Der betroffene Dienst antwortet nicht auf <code>/metrics</code> – Prometheus kann ihn nicht scrapen. Nächster Schritt: <code>kubectl get pods</code>, um den Pod-Status zu prüfen.",
+      "Grafana hat die Verbindung zur Datasource verloren – <code>kubectl apply -f grafanadatasource.yaml</code> erneut ausführen.",
+      "Das Target wurde bewusst deaktiviert – kein Handlungsbedarf.",
+      "Prometheus scrapt gerade – das Target ist kurz offline und kommt von selbst zurück."
+    ],
+    "correct": 0,
+    "explain": "Ein <code>down</code>-Target bedeutet: Prometheus hat beim Scrapen keine Antwort bekommen. Der Pod könnte abgestürzt sein, am falschen Port horchen oder ein Startproblem haben. Wäre die Datasource weg, wären <i>alle</i> Panels betroffen, nicht nur ein einzelnes Target. Erster Handgriff: <code>kubectl get pods</code>, dann <code>kubectl describe pod &lt;name&gt;</code> für Details."
+  },
+  {
+    "id": "q-obs-logs-basic",
+    "q": "Was zeigt dir <code>kubectl logs &lt;pod&gt;</code>?",
+    "options": [
+      "Die Textausgaben der App – stdout/stderr des laufenden Containers.",
+      "Die Kubernetes-Events des Pods (Scheduling, ImagePull, Neustart).",
+      "Die aktuelle CPU- und Speicher-Last des Pods.",
+      "Die YAML-Definition des Pod-Manifests."
+    ],
+    "correct": 0,
+    "explain": "<code>kubectl logs</code> zeigt, was die App selbst schreibt – ihr stdout und stderr: Meldungen, Fehler, Statuszeilen. Die Kubernetes-Sicht (Events, Scheduling, Restarts) steckt dagegen in <code>kubectl describe pod</code>. Die Last zeigt <code>kubectl top pods</code>. Beide Perspektiven zusammen – App-Logs und Kubernetes-Events – ergeben das vollständige Bild bei der Fehlersuche."
+  },
+  {
+    "id": "q-obs-logs-previous",
+    "q": "Ein Pod läuft in CrashLoopBackOff. Mit welchem Befehl liest du die Logs des <b>letzten abgestürzten</b> Containers (nicht des gerade neu gestarteten)?",
+    "options": [
+      "<code>kubectl logs --previous &lt;pod&gt;</code> (Kurzform: <code>-p</code>) – zeigt den Log des Vorgänger-Containers.",
+      "<code>kubectl logs -f &lt;pod&gt;</code> – folgt dem Log live.",
+      "<code>kubectl describe pod &lt;pod&gt;</code> – zeigt den Absturz-Grund in den Events.",
+      "<code>kubectl get pods --previous</code> – listet beendete Pods."
+    ],
+    "correct": 0,
+    "explain": "<code>--previous</code> (oder <code>-p</code>) zeigt die Logs des zuletzt abgestürzten Containers – genau das, was er kurz vor dem Exit ausgegeben hat. Ohne <code>--previous</code> sieht man die Logs des gerade laufenden (neugestarteten) Containers, die oft noch leer sind. <code>-f</code> folgt dem aktuellen Log live. <code>kubectl describe pod</code> zeigt Kubernetes-Events, nicht die App-Logs."
+  },
+  {
+    "id": "q-obs-prom-rule",
+    "q": "Was definiert eine <b>PrometheusRule</b>?",
+    "options": [
+      "Eine Alert-Regel: <code>expr</code> (PromQL-Bedingung), <code>for</code> (Mindest-Dauer) und <code>severity</code> legen fest, wann Prometheus einen Alert an den Alertmanager schickt.",
+      "Welcher Service von Prometheus gescrapt wird – Port, Intervall und Label-Selector.",
+      "Ein Grafana-Panel mit Datenquelle, Typ und PromQL-Abfrage.",
+      "Eine NetworkPolicy, die den Traffic zwischen Pods im Cluster regelt."
+    ],
+    "correct": 0,
+    "explain": "Die <b>PrometheusRule</b> ist der formale Alarm-Auftrag: <code>alert</code> ist der Name, <code>expr</code> die PromQL-Bedingung (wann feuert er?), <code>for</code> die Mindest-Dauer, die sie wahr sein muss (Schutz vor kurzen Spitzen), <code>severity</code> der Schweregrad (<code>warning</code>/<code>critical</code>). Scrape-Aufträge definiert dagegen ein ServiceMonitor; Dashboards ein GrafanaDashboard."
+  },
+  {
+    "id": "q-obs-alert-firing",
+    "q": "Ein Alert steht im Zustand <b>firing</b>. Was bedeutet das?",
+    "options": [
+      "Die Bedingung (<code>expr</code>) ist wahr und hält lang genug an – Prometheus feuert den Alert aktiv.",
+      "Ein Mensch hat den Alert manuell ausgelöst, weil ihm etwas im Dashboard auffiel.",
+      "Prometheus ist abgestürzt und kann keine Metriken mehr scrapen.",
+      "Der Alert ist verworfen – er taucht nicht wieder auf, bis man ihn neu anwendet."
+    ],
+    "correct": 0,
+    "explain": "<code>firing</code> bedeutet: Prometheus prüft laufend seinen PromQL-Ausdruck (<code>expr</code>) – sobald die Bedingung wahr bleibt, feuert der Alert. Kein Mensch löst das aus; Prometheus sieht es von selbst. Der Alertmanager entscheidet dann, wen er benachrichtigt (Slack, PagerDuty, E-Mail). <code>firing</code> ist das aktive Signal, <code>resolved</code> der Rückzug."
+  },
+  {
+    "id": "q-obs-alert-resolved",
+    "q": "Ein Alert wechselt von <b>firing</b> auf <b>resolved</b>. Was ist passiert?",
+    "options": [
+      "Die Bedingung ist nicht mehr wahr – Prometheus stellt keine Verletzung mehr fest, die Ursache wurde behoben.",
+      "Jemand hat den Alert manuell auf resolved gesetzt, um ihn zum Schweigen zu bringen.",
+      "Der Alert wurde gelöscht und taucht erst wieder auf, wenn man ihn erneut anwendet.",
+      "Prometheus ist ausgefallen und kann den Zustand nicht mehr melden."
+    ],
+    "correct": 0,
+    "explain": "<code>resolved</code> kommt automatisch, wenn Prometheus sieht, dass der PromQL-Ausdruck nicht mehr wahr ist – niemand setzt das von Hand. Der Alert bleibt kurz als resolved sichtbar, damit klar ist, dass er da war und wieder weg ist. So gibt es keine stillen Verschwinder. Erst Ursache beheben, dann kommt resolved – nicht umgekehrt."
+  },
+  {
+    "id": "q-obs-targets",
+    "q": "Im Prometheus-Sinn: Was ist ein <b>Target</b>, und was bedeutet sein Status <code>up</code> bzw. <code>down</code>?",
+    "options": [
+      "Ein Target ist ein Scrape-Ziel (ein <code>/metrics</code>-Endpunkt). <code>up</code> = die letzte Abfrage hat geklappt, <code>down</code> = Prometheus bekam keine Antwort.",
+      "Ein Target ist ein Alert; <code>up</code> heißt, er feuert, <code>down</code> heißt, er ist gelöst.",
+      "Ein Target ist ein Grafana-Dashboard; <code>up</code>/<code>down</code> sagt, ob es sichtbar ist.",
+      "Ein Target ist ein Pod-Replikat; <code>up</code>/<code>down</code> ist die Anzahl laufender Kopien."
+    ],
+    "correct": 0,
+    "explain": "Ein <b>Target</b> ist eine Adresse, die Prometheus im Takt abklappert, um deren <code>/metrics</code>-Seite zu lesen (ein Node, ein Service-Pod …). Der Health-Status <code>up</code> heißt: die letzte Scrape-Anfrage war erfolgreich; <code>down</code>: keine Antwort – Pod weg, falscher Port, Startproblem. Ein stilles <code>down</code>-Target ist oft das erste Warnsignal, lange bevor ein Mensch etwas merkt."
+  },
+  {
+    "id": "q-obs-promql",
+    "q": "Was ist <b>PromQL</b> – und wozu dient es?",
+    "options": [
+      "Die Abfragesprache von Prometheus: eine Metrik auswählen, per Label/Zeitfenster einschränken und rechnen (z.B. <code>rate(...)</code>) – die Basis für Dashboards und Alert-Bedingungen (<code>expr</code>).",
+      "Ein Dateiformat, in dem Prometheus seine Metriken auf der Platte ablegt.",
+      "Das Protokoll, über das die Targets ihre Werte per Push an Prometheus schicken.",
+      "Ein Kommandozeilen-Tool, das Container-Logs nach Stichwörtern durchsucht."
+    ],
+    "correct": 0,
+    "explain": "<b>PromQL</b> (Prometheus Query Language) ist die Sprache, mit der du Zeitreihen abfragst: Metrik wählen, per Label filtern, über ein Zeitfenster aggregieren (z.B. <code>rate(http_requests_total[5m])</code>). Genau solche Ausdrücke stehen im <code>expr</code> einer Alert-Regel und hinter jedem Grafana-Panel. Gespeichert wird damit nichts, gepusht auch nicht – PromQL fragt nur ab."
+  },
+  {
+    "id": "q-obs-logs-follow",
+    "q": "Wozu dient das Flag <code>-f</code> (<code>--follow</code>) bei <code>kubectl logs</code>?",
+    "options": [
+      "Es hält den Log-Stream offen – neue Zeilen erscheinen live, bis du mit <code>^C</code> abbrichst.",
+      "Es zeigt die Logs des zuletzt abgestürzten Vorgänger-Containers.",
+      "Es filtert die Logs nach einem Suchbegriff.",
+      "Es speichert die Logs in eine Datei, statt sie anzuzeigen."
+    ],
+    "correct": 0,
+    "explain": "<code>-f</code> (follow) lässt <code>kubectl logs</code> am Pod „hängen“ und streamt neue Zeilen live mit – ideal, um zuzusehen, was eine App gerade tut. Beendet wird mit <code>^C</code>. Den Absturz-Log des Vorgängers zeigt dagegen <code>--previous</code>, eine Stichwortsuche macht erst eine Pipe an <code>grep</code>."
+  },
+  {
+    "id": "q-obs-alertmanager",
+    "q": "Prometheus feuert einen Alert. Was ist die Aufgabe des <b>Alertmanagers</b>?",
+    "options": [
+      "Er nimmt die feuernden Alerts entgegen und kümmert sich um die Zustellung: gruppieren, entdoppeln, stummschalten (Silences) und an die richtigen Kanäle routen (Slack, E-Mail, PagerDuty).",
+      "Er wertet die PromQL-Ausdrücke aus und entscheidet, ob ein Alert feuert.",
+      "Er scrapt die Targets und sammelt die Metriken ein.",
+      "Er zeichnet die Dashboards, auf denen die Alerts angezeigt werden."
+    ],
+    "correct": 0,
+    "explain": "Arbeitsteilung: <b>Prometheus</b> wertet die Regeln aus und <i>feuert</i> – ob eine Bedingung zutrifft. Der <b>Alertmanager</b> kümmert sich um alles danach: gleichartige Alerts bündeln (grouping), Dubletten unterdrücken (dedup), Wartungsfenster stummschalten (silences) und an die richtigen Empfänger zustellen (routing). Scrapen macht Prometheus, Zeichnen macht Grafana."
+  }
+]

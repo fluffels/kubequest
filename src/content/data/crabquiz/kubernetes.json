@@ -1,0 +1,194 @@
+[
+  {
+    "id": "q-ch2-1",
+    "q": "Wofür braucht man Kubernetes, wenn es Docker gibt?",
+    "options": [
+      "Es verwaltet viele Container auf vielen Servern automatisch: neu starten, verteilen, skalieren.",
+      "Es ersetzt Docker, weil Docker veraltet ist.",
+      "Es macht Container kleiner.",
+      "Es ist nur eine grafische Oberfläche für Docker."
+    ],
+    "correct": 0,
+    "explain": "Docker startet Container, Kubernetes orchestriert sie in großem Stil – die Hafenmeisterei für hunderte Kisten."
+  },
+  {
+    "id": "q-ch2-2",
+    "q": "Was ist ein Pod?",
+    "options": [
+      "Die kleinste Einheit in Kubernetes – meist genau ein Container drin.",
+      "Ein anderes Wort für einen Server.",
+      "Eine Gruppe von mindestens zehn Containern.",
+      "Das Konfigurationsformat von Kubernetes."
+    ],
+    "correct": 0,
+    "explain": "Kubernetes verwaltet nie Container direkt, sondern immer Pods – die Liegeplätze mit den Kisten drauf."
+  },
+  {
+    "id": "q-ch2-3",
+    "q": "Was ist ein Node?",
+    "options": [
+      "Ein einzelner Server, der zum Cluster gehört und Pods ausführt.",
+      "Ein Backup des Clusters.",
+      "Ein spezieller Pod für Datenbanken.",
+      "Das Kabel zwischen zwei Clustern."
+    ],
+    "correct": 0,
+    "explain": "Im Hafenbild: ein Steg. Mehrere Nodes zusammen bilden den Cluster."
+  },
+  {
+    "id": "q-ch2-podnode",
+    "q": "Pod vs. Node – was ist der Unterschied?",
+    "options": [
+      "Node = die Maschine (Server/VM), die rechnet; Pod = die kleinste laufende Einheit (meist 1 Container), die AUF einem Node liegt. Ein Node trägt viele Pods.",
+      "Pod = die Maschine, Node = die laufende App darauf.",
+      "Pod und Node sind dasselbe – nur in verschiedenen Kubernetes-Versionen.",
+      "Node = ein einzelner Container, Pod = eine Gruppe von Servern."
+    ],
+    "correct": 0,
+    "explain": "Maschine ↔ laufende Einheit: Der Scheduler verteilt die <b>vergänglichen</b> Pods auf die festen Nodes – fällt ein Pod (oder ein ganzer Node) aus, startet Kubernetes woanders Ersatz. Darum verwaltet K8s nie Container direkt, sondern Pods als kleinste planbare Einheit. Eselsbrücke: <b>Pod</b> = „Schote/Hülse“ (wie die Erbsenschote – passt zum Docker-Wal & Containerschiff; auch eine Walschule heißt „pod“), <b>Node</b> = „Knoten“ im Cluster-Netz. Im Hafenbild: Node = Steg, Pod = Liegeplatz darauf."
+  },
+  {
+    "id": "q-ch2-4",
+    "q": "Ein Container stürzt nachts um 3 Uhr ab. Was passiert?",
+    "options": [
+      "Kubernetes merkt es und startet automatisch Ersatz.",
+      "Der Admin bekommt einen Anruf.",
+      "Der Pod bleibt kaputt bis zum Morgen.",
+      "Der Cluster fährt sicherheitshalber herunter."
+    ],
+    "correct": 0,
+    "explain": "Self-Healing: Kubernetes überwacht den Soll-Zustand und stellt ihn automatisch wieder her."
+  },
+  {
+    "id": "q-ch2-5",
+    "q": "Ein Pod heißt <code>kantine-9f4c2-x7k1</code>. Woher kommt das kryptische Anhängsel?",
+    "options": [
+      "Kubernetes vergibt es automatisch, damit jeder Pod einen eindeutigen Namen hat.",
+      "Der Admin hat es von Hand eingetippt.",
+      "Es ist die Versionsnummer der laufenden App.",
+      "Es ist die IP-Adresse des Pods in Kurzform."
+    ],
+    "correct": 0,
+    "explain": "Pods aus einem Deployment werden automatisch benannt: <Deployment>-<ReplicaSet-Hash>-<Pod-Hash>. So kollidiert kein Name, auch wenn ständig neue Pods nachstarten. Die noch kryptischere CONTAINER ID in <code>docker ps</code> vergibt analog die Container-Runtime – beides sind eindeutige, maschinengemachte Stempel, keine Handarbeit."
+  },
+  {
+    "id": "q-ch3-1",
+    "q": "Warum erstellt man Pods über ein Deployment statt direkt?",
+    "options": [
+      "Pods sind sterblich – das Deployment ersetzt tote Pods automatisch und hält die Anzahl.",
+      "Einzelne Pods verbrauchen mehr Speicher.",
+      "Pods brauchen sonst Admin-Rechte.",
+      "Direkte Pods sind verboten."
+    ],
+    "correct": 0,
+    "explain": "Das Deployment ist der Dauerauftrag: „Halte immer N Kopien am Laufen.“"
+  },
+  {
+    "id": "q-ch3-2",
+    "q": "Du löschst einen Pod eines Deployments (replicas: 3). Was passiert?",
+    "options": [
+      "Kubernetes startet sofort einen neuen – es sollen ja 3 sein.",
+      "Es laufen dauerhaft nur noch 2.",
+      "Das Deployment wird ungültig.",
+      "Kubernetes fragt erst nach."
+    ],
+    "correct": 0,
+    "explain": "Soll (3) vs. Ist (2) → Differenz wird sofort behoben. Self-Healing live!"
+  },
+  {
+    "id": "q-ch3-3",
+    "q": "Wozu braucht man einen Service?",
+    "options": [
+      "Als feste, stabile Adresse vor den Pods – deren Namen und IPs wechseln ständig.",
+      "Um Pods schneller zu machen.",
+      "Als Backup für Deployments.",
+      "Services starten Nodes neu."
+    ],
+    "correct": 0,
+    "explain": "Der Empfangstresen: Wer die App erreichen will, redet mit dem Service – der leitet an die lebenden Pods weiter."
+  },
+  {
+    "id": "q-ch4-1",
+    "q": "Imperativ vs. deklarativ?",
+    "options": [
+      "Imperativ = einzelne Befehle rufen. Deklarativ = Wunschzustand in eine Datei schreiben.",
+      "Imperativ ist für Linux, deklarativ für Windows.",
+      "Deklarativ heißt: mit der Maus klicken.",
+      "Kein Unterschied."
+    ],
+    "correct": 0,
+    "explain": "Deklarativ ist der Profi-Standard, weil die Dateien in Git versioniert werden können."
+  },
+  {
+    "id": "q-ch4-2",
+    "q": "Was gibt das Feld kind in einem Manifest an?",
+    "options": [
+      "Welche Art von Ressource beschrieben wird – z.B. Deployment oder Service.",
+      "Wie freundlich der Cluster antworten soll.",
+      "Die Kubernetes-Version.",
+      "Den Namen des Erstellers."
+    ],
+    "correct": 0,
+    "explain": "kind: Deployment, kind: Service … es bestimmt, was die Datei beschreibt."
+  },
+  {
+    "id": "q-ch4-3",
+    "q": "Worauf musst du bei YAML besonders achten?",
+    "options": [
+      "Einrückung mit Leerzeichen – niemals Tabs.",
+      "Großschreibung aller Schlüssel.",
+      "Semikolon am Zeilenende.",
+      "Maximal 100 Zeilen."
+    ],
+    "correct": 0,
+    "explain": "YAML lebt von Einrückung. Ein Leerzeichen daneben = Fehler. Ada würde weinen."
+  },
+  {
+    "id": "q-ch4-4",
+    "q": "kubectl apply -f app.yaml – zweimal ausgeführt. Was passiert beim zweiten Mal?",
+    "options": [
+      "Nichts Schlimmes – „unchanged“, alles stimmt schon.",
+      "Alles wird doppelt erstellt.",
+      "Fehler: apply geht nur einmal.",
+      "Alles wird gelöscht und neu erstellt."
+    ],
+    "correct": 0,
+    "explain": "apply gleicht Soll mit Ist ab und tut nur das Nötige – idempotent."
+  },
+  {
+    "id": "q-res-1",
+    "q": "Was ist der Unterschied zwischen <code>requests</code> und <code>limits</code> bei den Ressourcen eines Containers?",
+    "options": [
+      "requests = was der Scheduler fest reserviert (Platzwahl auf dem Node), limits = harte Obergrenze (beim Speicher: drüber → OOMKilled).",
+      "requests ist für CPU, limits nur für Speicher.",
+      "Beides ist dasselbe, limits ist nur das neuere Wort.",
+      "requests ist die Obergrenze, limits der Mindestbedarf."
+    ],
+    "correct": 0,
+    "explain": "requests entscheiden, auf welchem Node ein Pod Platz findet (der Scheduler rechnet damit). limits sind die Obergrenze im Betrieb: CPU drüber wird gedrosselt, Speicher drüber wird hart gekillt (OOMKilled). Zu knapp = Absturz, zu üppig = reservierter Platz, den keiner nutzt."
+  },
+  {
+    "id": "q-res-cost",
+    "q": "Warum sind absichtlich riesige <code>limits/requests</code> „sicherheitshalber\" eine schlechte Idee?",
+    "options": [
+      "Reservierter Speicher kostet – große requests blockieren Node-Platz (und damit Dublonen), den niemand nutzt; man dimensioniert nach echtem Bedarf.",
+      "Große Limits machen den Pod automatisch langsamer.",
+      "Kubernetes verbietet Limits über 100Mi.",
+      "Limits haben keinerlei Auswirkung auf Kosten."
+    ],
+    "correct": 0,
+    "explain": "requests reservieren Node-Kapazität fest – wer überall „sicherheitshalber\" 2Gi anfordert, füllt die Nodes mit Luft und zahlt für ungenutzten Platz. Right-Sizing (an echtem Verbrauch messen, dann passend setzen) hält den Cluster stabil UND günstig: knapp genug gegen OOMKilled, klein genug gegen Verschwendung."
+  },
+  {
+    "id": "q-res-hpa",
+    "q": "Wofür ist ein <b>HorizontalPodAutoscaler</b> (HPA) da?",
+    "options": [
+      "Er ändert automatisch die Anzahl der Pods (Replicas) je nach Last – z.B. mehr Pods bei hoher CPU/Memory-Auslastung.",
+      "Er vergrößert automatisch das memory-Limit eines einzelnen Pods.",
+      "Er startet abgestürzte Pods neu.",
+      "Er verteilt Secrets an alle Pods."
+    ],
+    "correct": 0,
+    "explain": "Der HPA skaliert HORIZONTAL: er erhöht/senkt die Replica-Zahl anhand gemessener Auslastung (braucht dafür requests als Bezugsgröße). Das ist die Automatik hinter dem manuellen 'kubectl scale'. Vertikal (das Limit eines Pods anpassen) macht stattdessen der VPA – nicht zu verwechseln."
+  }
+]

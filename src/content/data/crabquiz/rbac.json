@@ -1,0 +1,122 @@
+[
+  {
+    "id": "q-sa-1",
+    "q": "Was ist ein <b>ServiceAccount</b> in Kubernetes?",
+    "options": [
+      "Die Identität, mit der sich ein Pod beim Kubernetes-API ausweist – ein Ausweis für Programme, nicht für Menschen.",
+      "Das Benutzerkonto, mit dem sich ein Admin am Cluster anmeldet.",
+      "Ein Dienst, der abgestürzte Pods automatisch neu startet.",
+      "Ein spezieller Pod, der Tokens an alle anderen verteilt."
+    ],
+    "correct": 0,
+    "explain": "ServiceAccounts sind Maschinen-Identitäten: ein Pod weist sich damit beim API-Server aus („der bin ich“). Menschen melden sich über User-Accounts/Zertifikate an, Programme im Cluster über ServiceAccounts."
+  },
+  {
+    "id": "q-sa-2",
+    "q": "Du legst einen Pod an, ohne einen <code>serviceAccountName</code> zu setzen. Welche Identität bekommt er?",
+    "options": [
+      "Den ServiceAccount <code>default</code> seines Namespaces – den hat jeder Namespace automatisch.",
+      "Gar keine – der Pod kann dann nicht mit dem API reden.",
+      "Die Identität des Admins, der ihn erstellt hat.",
+      "Einen frisch erzeugten, zufällig benannten ServiceAccount."
+    ],
+    "correct": 0,
+    "explain": "Jeder Namespace bringt automatisch einen ServiceAccount namens default mit; ohne Angabe läuft der Pod darunter. Profi-Praxis: Apps, die wirklich API-Rechte brauchen, bekommen einen eigenen SA mit genau den nötigen Rechten – statt dem default Rechte zu geben, die dann jeder Pod erbt."
+  },
+  {
+    "id": "q-rbac-1",
+    "q": "Role vs. ClusterRole – worin unterscheiden sie sich?",
+    "options": [
+      "Eine Role gilt nur in EINEM Namespace, eine ClusterRole cluster-weit (alle Namespaces + clusterweite Dinge wie Nodes).",
+      "Eine Role ist für Menschen, eine ClusterRole für Pods.",
+      "Eine Role darf grundsätzlich mehr als eine ClusterRole.",
+      "Kein Unterschied – nur zwei Namen für dasselbe."
+    ],
+    "correct": 0,
+    "explain": "Der Unterschied ist der Geltungsbereich: Role = an einen Namespace gebunden, ClusterRole = gilt überall (und für nicht-namespaced Ressourcen wie Nodes oder PersistentVolumes). Beide beschreiben nur, WAS erlaubt ist – an WEN das geht, regelt erst das Binding."
+  },
+  {
+    "id": "q-rbac-2",
+    "q": "Wozu dient ein <b>RoleBinding</b>?",
+    "options": [
+      "Es verknüpft eine Role (die Rechte) mit einem Subjekt (User, Gruppe oder ServiceAccount) – erst dann gelten die Rechte.",
+      "Es erstellt eine neue Role aus einer Vorlage.",
+      "Es löscht abgelaufene Rechte automatisch wieder.",
+      "Es bindet einen Pod fest an einen bestimmten Node."
+    ],
+    "correct": 0,
+    "explain": "Role/ClusterRole sagen nur, WAS man darf. Das Binding klebt diese Rechte an ein konkretes WER. RoleBinding wirkt in einem Namespace, ClusterRoleBinding vergibt die Rechte cluster-weit. Ohne Binding ist eine Role wirkungslos – ein Schlüssel, den niemand in der Hand hält."
+  },
+  {
+    "id": "q-rbac-3",
+    "q": "Was meint das Prinzip <b>Least Privilege</b> bei RBAC?",
+    "options": [
+      "Jedes Subjekt bekommt nur genau die Rechte, die es wirklich braucht – nicht mehr.",
+      "Alle bekommen erst Admin-Rechte, das Einschränken kommt später.",
+      "Rechte werden möglichst breit vergeben, damit ja nichts blockiert.",
+      "Nur der Cluster-Admin darf überhaupt irgendetwas."
+    ],
+    "correct": 0,
+    "explain": "„So wenig Rechte wie möglich, so viele wie nötig.“ Darf ein gekaperter Pod nur eine ConfigMap lesen, kann ein Angreifer auch nur das. Breite Rechte wie cluster-admin für alles sind der Krakentraum – ein einziges Leck reicht dann fürs ganze Schiff."
+  },
+  {
+    "id": "q-rbac-4",
+    "q": "Du bist unsicher, ob der ServiceAccount <code>lager</code> Pods löschen darf. Wie prüfst du es, statt zu raten?",
+    "options": [
+      "<code>kubectl auth can-i delete pods --as=system:serviceaccount:&lt;ns&gt;:lager</code> – es antwortet schlicht yes/no.",
+      "Einen Pod löschen und schauen, ob es klappt.",
+      "In der Doku des Container-Images nachlesen.",
+      "Den Cluster neu starten und beobachten, was passiert."
+    ],
+    "correct": 0,
+    "explain": "kubectl auth can-i <verb> <resource> fragt den API-Server direkt: „darf ich das?“ Mit --as= prüfst du es stellvertretend für ein anderes Subjekt (z.B. einen ServiceAccount). So verifizierst du Berechtigungen vorher – statt sie im Ernstfall am kaputten Cluster zu erraten."
+  },
+  {
+    "id": "q-podsec-1",
+    "q": "Wofür ist der <code>securityContext</code> eines Pods/Containers da?",
+    "options": [
+      "Er legt Sicherheits-Eigenschaften fest – z.B. als welcher User der Container läuft oder ob er Root-Rechte bekommt.",
+      "Er bestimmt, auf welchem Node der Pod landet.",
+      "Er verschlüsselt die Logs des Pods.",
+      "Er regelt, wie viel CPU und RAM der Pod bekommt."
+    ],
+    "correct": 0,
+    "explain": "Der securityContext härtet den Container: runAsNonRoot, runAsUser, readOnlyRootFilesystem, allowPrivilegeEscalation u.a. Ohne ihn läuft vieles per Default als Root – ein gefundenes Fressen für die Krake, sobald die App geknackt wird."
+  },
+  {
+    "id": "q-podsec-2",
+    "q": "Was bewirkt <code>runAsNonRoot: true</code> im securityContext?",
+    "options": [
+      "Kubernetes verweigert den Start, wenn der Container als Root (UID 0) laufen würde.",
+      "Es macht den Container automatisch zum Root.",
+      "Es löscht den Root-User aus dem Image.",
+      "Es gibt dem Container zusätzliche Admin-Rechte."
+    ],
+    "correct": 0,
+    "explain": "runAsNonRoot ist die Wache am Tor: Will der Container als Root starten, verweigert Kubernetes den Start mit Fehler. So erzwingst du, dass Apps unprivilegiert laufen – ein Einbrecher im Container ist dann eben nicht gleich Root auf dem Node."
+  },
+  {
+    "id": "q-podsec-3",
+    "q": "Pod Security Standards: Unterschied zwischen <code>baseline</code> und <code>restricted</code>?",
+    "options": [
+      "baseline verbietet die schlimmsten Risiken (z.B. privileged), restricted ist strenger und erzwingt zusätzlich Härtung wie runAsNonRoot.",
+      "baseline ist strenger als restricted.",
+      "Beide sind identisch, nur anders benannt.",
+      "restricted erlaubt alles, baseline nichts."
+    ],
+    "correct": 0,
+    "explain": "Drei Stufen: privileged (alles erlaubt), baseline (verbietet bekannte Eskalationen wie privileged-Container oder hostNetwork) und restricted (zusätzlich aktiv gehärtet: non-root, kein Privilege-Escalation, eingeschränkte Capabilities). Zugewiesen wird das pro Namespace per Label."
+  },
+  {
+    "id": "q-podsec-4",
+    "q": "Warum ist ein Container mit <code>privileged: true</code> so gefährlich?",
+    "options": [
+      "Er hat nahezu vollen Zugriff auf den Node (Kernel, Geräte) – aus dem Container heraus lässt sich der ganze Host übernehmen.",
+      "Er läuft spürbar langsamer als normale Container.",
+      "Er kann nicht mehr neu gestartet werden.",
+      "Er darf keine Logs mehr schreiben."
+    ],
+    "correct": 0,
+    "explain": "privileged hebt fast alle Isolations-Grenzen auf – der Container agiert wie Root direkt auf dem Node. Wird so ein Pod geknackt, ist faktisch der ganze Node verloren. Echte Apps brauchen das nie; nur seltene Infra-Fälle. baseline und restricted verbieten es deshalb."
+  }
+]

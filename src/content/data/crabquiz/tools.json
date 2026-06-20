@@ -1,0 +1,50 @@
+[
+  {
+    "id": "q-tools-ingress",
+    "q": "Ein Service ist nur im Cluster erreichbar. Wie kommen Besucher aus dem Internet rein?",
+    "options": [
+      "Über einen Ingress – das Hafentor, das z.B. hafen.de/kasse an den richtigen Service weiterleitet.",
+      "Gar nicht, ein Service ist immer öffentlich.",
+      "Über einen zweiten Pod.",
+      "Mit kubectl logs."
+    ],
+    "correct": 0,
+    "explain": "Service = Empfangstresen IM Hafen. Ingress = das Tor nach draußen: eine Adresse + HTTPS-Route von außen auf die passenden Services. Im Job erledigt das ein Ingress-Controller (oft nginx- oder Gateway-basiert)."
+  },
+  {
+    "id": "q-tools-keycloak",
+    "q": "Deine App braucht Login. Was nimmst du, statt selbst eine Benutzerverwaltung zu bauen?",
+    "options": [
+      "Keycloak – einen fertigen Auth-/IDP-Server für Anmeldung, Tokens und Rechte.",
+      "Eine Textdatei mit allen Passwörtern.",
+      "Ein zweites Deployment namens login.",
+      "git commit."
+    ],
+    "correct": 0,
+    "explain": "Keycloak ist ein Identity Provider (IDP): zentrale Anmeldung, Single Sign-On, Rollen/Rechte. Man stellt ihn vor die Apps, statt jede App ihren eigenen Login bauen zu lassen."
+  },
+  {
+    "id": "q-tools-monitoring",
+    "q": "Wofür stehen Prometheus und Grafana im Cluster?",
+    "options": [
+      "Prometheus sammelt Messwerte (Metriken), Grafana macht daraus Dashboards.",
+      "Beides sind Datenbanken.",
+      "Prometheus ist ein Webserver, Grafana ein Cache.",
+      "Beides sind Paketmanager."
+    ],
+    "correct": 0,
+    "explain": "Monitoring-Duo: Prometheus zapft laufend Metriken an (CPU, Requests, Fehler), Grafana zeigt sie als Diagramme und schlägt Alarm. So siehst du, ob der Hafen gesund ist."
+  },
+  {
+    "id": "q-tools-stack",
+    "q": "PostgreSQL und Redis – welches Tool ist wofür?",
+    "options": [
+      "PostgreSQL = Datenbank (Daten dauerhaft), Redis = schneller Zwischenspeicher (Cache).",
+      "PostgreSQL = Cache, Redis = Webserver.",
+      "Beides sind Webserver.",
+      "PostgreSQL = Monitoring, Redis = Login."
+    ],
+    "correct": 0,
+    "explain": "Typischer App-Stack: PostgreSQL hält die Daten dauerhaft, Redis legt Häufiges blitzschnell in den Arbeitsspeicher. nginx davor als Webserver, Keycloak für den Login."
+  }
+]

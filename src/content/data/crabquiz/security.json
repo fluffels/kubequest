@@ -1,0 +1,38 @@
+[
+  {
+    "id": "q-sec-1",
+    "q": "Wohin gehören Passwörter und API-Schlüssel im Cluster?",
+    "options": [
+      "In Secrets – niemals im Klartext in YAML oder ConfigMaps.",
+      "In die ConfigMap, da sind sie übersichtlich.",
+      "Als Kommentar ins Manifest.",
+      "In den Image-Namen."
+    ],
+    "correct": 0,
+    "explain": "ConfigMaps sind Klartext – Krakenfutter! Vertrauliches gehört in Secrets (und echte Profis verschlüsseln zusätzlich, z.B. mit Sealed Secrets oder Vault)."
+  },
+  {
+    "id": "q-sec-2",
+    "q": "Warum sind Klartext-Passwörter in YAML-Dateien doppelt gefährlich?",
+    "options": [
+      "Jede:r mit Cluster- oder Git-Zugriff kann sie lesen – YAML landet ja in Git!",
+      "YAML-Dateien werden automatisch veröffentlicht.",
+      "Passwörter machen YAML-Dateien langsam.",
+      "Sie sind nicht gefährlich."
+    ],
+    "correct": 0,
+    "explain": "Deklarative Dateien gehören in Git – und damit wandert jedes Klartext-Passwort in die Versionshistorie. Für immer. Secrets brechen diese Kette."
+  },
+  {
+    "id": "q-sec-3",
+    "q": "Eine App braucht den DB-Host <code>hafen-db</code> und das DB-Passwort. Was gehört in eine ConfigMap, was in ein Secret?",
+    "options": [
+      "DB-Host in die ConfigMap (harmlose Einstellung), das Passwort ins Secret (vertraulich).",
+      "Beides in die ConfigMap – ist übersichtlicher an einem Ort.",
+      "Beides ins Secret – sicher ist sicher.",
+      "DB-Host ins Secret, das Passwort in die ConfigMap."
+    ],
+    "correct": 0,
+    "explain": "Faustregel: nicht-geheime Einstellungen (Hostnamen, Ports, Log-Level, Feature-Flags) → ConfigMap; alles Vertrauliche (Passwörter, Tokens, Schlüssel) → Secret. Beide bindet man gleich ein – z.B. per 'kubectl set env deployment/<name> --from=configmap/<n>' bzw. '--from=secret/<n>'. Eine Truhe nützt nichts, wenn die App nicht reinschaut."
+  }
+]

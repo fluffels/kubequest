@@ -1,0 +1,98 @@
+[
+  {
+    "id": "q-git-1",
+    "q": "Was macht git commit?",
+    "options": [
+      "Hält die vorgemerkten Änderungen als Schnappschuss mit Nachricht in der Historie fest.",
+      "Lädt die Dateien auf den Server hoch.",
+      "Löscht alle ungespeicherten Änderungen.",
+      "Wechselt auf einen anderen Branch."
+    ],
+    "correct": 0,
+    "explain": "Ein Commit ist ein lokaler Speicherpunkt mit Nachricht. Hochladen zum Server macht erst git push."
+  },
+  {
+    "id": "q-git-2",
+    "q": "Wozu legt man in Git einen eigenen Branch (Zweig) an?",
+    "options": [
+      "Um Änderungen abseits von main auszuprobieren und erst nach Review zusammenzuführen.",
+      "Damit Git schneller läuft.",
+      "Um Speicherplatz zu sparen.",
+      "Um Dateien endgültig zu löschen."
+    ],
+    "correct": 0,
+    "explain": "Branches erlauben sicheres, paralleles Arbeiten: main bleibt stabil, das Experiment lebt im Zweig – am Ende wird gemergt."
+  },
+  {
+    "id": "q-git-3",
+    "q": "Unterschied zwischen git add und git commit?",
+    "options": [
+      "add merkt Änderungen vor (Staging), commit hält die vorgemerkten dauerhaft in der Historie fest.",
+      "Kein Unterschied, beides speichert dasselbe.",
+      "add committet, commit pusht zum Server.",
+      "add ist für neue Dateien, commit für alte."
+    ],
+    "correct": 0,
+    "explain": "Zwei bewusste Schritte: erst auswählen, was in den Schnappschuss soll (add/Staging), dann festhalten (commit)."
+  },
+  {
+    "id": "q-git-4",
+    "q": "Team-Alltag: Du willst deine Arbeit teilen. Was zuerst – pull oder push?",
+    "options": [
+      "Erst git pull (holen), dann git push – sonst bin ich veraltet und der Server weist ab.",
+      "Immer zuerst git push, pull braucht man nur selten.",
+      "Reihenfolge egal, Git sortiert das selbst.",
+      "Weder noch – ein Commit reicht zum Teilen."
+    ],
+    "correct": 0,
+    "explain": "„Erst holen, dann pushen.“ Wer vor dem Push den Stand des Teams holt, vermeidet abgewiesene Pushes und die meisten Konflikte."
+  },
+  {
+    "id": "q-git-5",
+    "q": "Was ist ein Merge-Konflikt?",
+    "options": [
+      "Zwei Seiten haben dieselbe Stelle unterschiedlich geändert – Git lässt mich entscheiden, welche gilt.",
+      "Git ist kaputt und das Repository ist verloren.",
+      "Zwei Branches mit demselben Namen.",
+      "Ein abgelehnter git push."
+    ],
+    "correct": 0,
+    "explain": "Kein Drama: Git legt beide Versionen mit Markern (<<<<<<< ======= >>>>>>>) nebeneinander und wartet auf deine Wahl – z.B. git checkout --ours/--theirs, dann add + commit."
+  },
+  {
+    "id": "q-ci-1",
+    "q": "Was löst in GitLab eine Pipeline aus?",
+    "options": [
+      "Ein git push in ein Repo, das eine .gitlab-ci.yml enthält.",
+      "Man muss sie jeden Morgen von Hand starten.",
+      "Ein kubectl apply.",
+      "Das Anlegen eines neuen Branches."
+    ],
+    "correct": 0,
+    "explain": "CI heißt Continuous Integration: Bei jedem Push prüft der Runner die .gitlab-ci.yml und arbeitet die Stages automatisch ab – kein Mensch klickt etwas."
+  },
+  {
+    "id": "q-ci-2",
+    "q": "Die typische Stage-Reihenfolge einer CI/CD-Pipeline?",
+    "options": [
+      "build → test → deploy",
+      "deploy → test → build",
+      "test → deploy → build",
+      "Die Reihenfolge ist egal."
+    ],
+    "correct": 0,
+    "explain": "Erst bauen (Image erzeugen), dann testen (prüfen, BEVOR etwas live geht), dann deployen (in den Cluster ausrollen). Fällt eine frühe Stage durch, laufen die späteren gar nicht erst."
+  },
+  {
+    "id": "q-ci-3",
+    "q": "Wofür stehen CI und CD?",
+    "options": [
+      "Continuous Integration und Continuous Delivery/Deployment.",
+      "Code Inspection und Code Deployment.",
+      "Container Init und Container Deploy.",
+      "Central Integration und Central Delivery."
+    ],
+    "correct": 0,
+    "explain": "CI = Änderungen laufend automatisch bauen & testen. CD = sie automatisch ausliefern/ausrollen. Zusammen: vom Commit bis in den Cluster ohne Handarbeit."
+  }
+]

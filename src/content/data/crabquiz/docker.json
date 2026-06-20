@@ -1,0 +1,110 @@
+[
+  {
+    "id": "q-ch1-1",
+    "q": "Welches Problem lösen Software-Container hauptsächlich?",
+    "options": [
+      "Eine App läuft mit allem Drumherum überall gleich – Laptop, Server, Cloud.",
+      "Sie machen Programme automatisch schneller.",
+      "Sie verschlüsseln Programme gegen Angriffe.",
+      "Sie sparen Speicherplatz."
+    ],
+    "correct": 0,
+    "explain": "Container packen die App mit allen Abhängigkeiten in eine genormte Box. „Bei mir läuft's aber!“ ist damit Geschichte."
+  },
+  {
+    "id": "q-ch1-2",
+    "q": "Image vs. Container – was ist was?",
+    "options": [
+      "Image = Bauplan/Vorlage, Container = laufende Instanz davon.",
+      "Kein Unterschied, zwei Wörter für dasselbe.",
+      "Container = Vorlage, Image = das laufende Programm.",
+      "Images sind für Linux, Container für Windows."
+    ],
+    "correct": 0,
+    "explain": "Tiefkühlpizza (Image) und Pizza im Ofen (Container): Aus einem Image kannst du viele Container starten."
+  },
+  {
+    "id": "q-ch1-3",
+    "q": "Was ist Docker Hub?",
+    "options": [
+      "Eine Registry – ein öffentlicher „Supermarkt“ für fertige Images.",
+      "Das Hauptquartier der Firma Docker.",
+      "Ein USB-Hub für Container.",
+      "Ein Überwachungstool."
+    ],
+    "correct": 0,
+    "explain": "Eine Registry speichert Images. docker pull nginx lädt z.B. das nginx-Image von Docker Hub."
+  },
+  {
+    "id": "q-ch1-4",
+    "q": "Was zeigt der Befehl docker ps?",
+    "options": [
+      "Alle gerade laufenden Container.",
+      "Alle heruntergeladenen Images.",
+      "Die Prozessorlast.",
+      "Alle Images auf Docker Hub."
+    ],
+    "correct": 0,
+    "explain": "docker ps = laufende Container. Mit -a („all“) siehst du auch die gestoppten."
+  },
+  {
+    "id": "q-ch1-5",
+    "q": "Woraus besteht ein Docker-Image intern?",
+    "options": [
+      "Aus übereinandergestapelten Schichten (Layern) – unten die Basis, oben die App.",
+      "Aus einer einzigen großen Datei ohne Struktur.",
+      "Aus dem Quellcode der App.",
+      "Aus einer virtuellen Festplatte mit Betriebssystem."
+    ],
+    "correct": 0,
+    "explain": "Image = Schichtstapel: Base-Image unten, dann Bibliotheken, oben die App. Unveränderte Schichten kommen aus dem Cache – deshalb sind gute Schicht-Reihenfolgen so wichtig (Stapel-Spiel bei Bo!)."
+  },
+  {
+    "id": "q-ch1-6",
+    "q": "Was macht <code>docker build -t name:tag .</code>?",
+    "options": [
+      "Es baut aus dem Dockerfile ein eigenes Image und gibt ihm mit -t einen Namen.",
+      "Es lädt ein fertiges Image aus der Registry.",
+      "Es startet einen Container aus einem Image.",
+      "Es löscht alle ungenutzten Images."
+    ],
+    "correct": 0,
+    "explain": "build liest den Bauplan (Dockerfile) im aktuellen Ordner (der Punkt) und schichtet daraus ein Image. pull holt nur Fertiges – build stellt Eigenes her. Mit docker tag gibst du demselben Image weitere Namen (z.B. :latest – ein Konventions-Name, nicht automatisch die neueste Version)."
+  },
+  {
+    "id": "q-ch1-7",
+    "q": "Was bewirkt <code>-d</code> (detached) bei <code>docker run</code>?",
+    "options": [
+      "Der Container läuft abgekoppelt im Hintergrund weiter – das Terminal ist sofort wieder frei.",
+      "Der Container wird gelöscht, sobald er fertig ist.",
+      "Der Container startet im Debug-Modus.",
+      "Docker lädt das Image vor dem Start neu herunter."
+    ],
+    "correct": 0,
+    "explain": "Ohne -d (attached) hängt das Terminal am Container und zeigt dessen Ausgabe – die Konsole ist blockiert, bis er endet. Mit -d (detached) koppelt er sich ab und läuft im Hintergrund weiter; das „Funkgerät“ ist sofort frei für den nächsten Befehl."
+  },
+  {
+    "id": "q-ch1-8",
+    "q": "Bei <code>docker run -d --name webserver nginx</code> – was ist <code>webserver</code> und was <code>nginx</code>?",
+    "options": [
+      "webserver = dein frei gewählter Container-Name (--name), nginx = das Image, aus dem der Container entsteht.",
+      "webserver = das Image, nginx = der Container-Name.",
+      "Beides sind Images, die zusammen geladen werden.",
+      "webserver ist ein Tippfehler – nur nginx zählt."
+    ],
+    "correct": 0,
+    "explain": "Hinter --name steht DEIN Wunschname (frei wählbar – auch „meine-kiste“). Ganz hinten steht immer das Image: die Vorlage/der Bausatz, aus dem der Container gestartet wird – und das muss als Bauplan existieren. Muster: docker run [optionen] --name <wunschname> <image>."
+  },
+  {
+    "id": "q-ch1-9",
+    "q": "Du willst sehen, welche Dateien im aktuellen Ordner liegen. Welcher Befehl?",
+    "options": [
+      "<code>ls</code> – listet den Inhalt des aktuellen Ordners auf.",
+      "<code>cat</code> – das zeigt den Inhalt EINER Datei, nicht die Liste.",
+      "<code>cd</code> – das wechselt nur den Ordner.",
+      "<code>docker ps</code> – das zeigt Container, keine Dateien."
+    ],
+    "correct": 0,
+    "explain": "ls = „list“: zeigt, was im Ordner liegt (Dateien/Verzeichnisse). cat <datei> zeigt dagegen den INHALT einer einzelnen Datei. Faustregel: erst ls (was ist da?), dann cat <datei> (was steht drin?)."
+  }
+]
