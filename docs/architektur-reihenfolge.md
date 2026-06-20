@@ -23,25 +23,24 @@ Diese Tickets sind **keine „bau-X"-Tickets**, sondern Entscheidungen, die man 
 
 Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
-0. **Pre-Flight zuerst (Pflicht, immer): Stimmt diese Liste noch mit dem Live-Stand?** Bevor irgendein Ticket gegriffen wird, **einmal** den echten GitHub-Stand holen und gegen diese Liste abgleichen:
+1. **Direkt aus der Liste unten wählen — KEIN Vorab-Abgleich der ganzen Liste.** Das **oberste noch offene** Ticket nehmen, das
+   - **nicht** `status:zurückgestellt` ist (die werden ignoriert, siehe unten), und
+   - **kein** Assignee hat (Kollisionsschutz — siehe AGENTS.md, „Board-Workflow"), und
+   - keinen offenen Branch/Worktree hat.
+
+   Dabei **nur dieses eine Kandidaten-Ticket** kurz gegen den Live-Stand prüfen (`gh issue view <nr>`: offen? kein Assignee? Branch/Worktree-Gegencheck `git worktree list` + `git branch -a`). Ist es schon geschlossen / vergeben / zurückgestellt, das **nächste** der Liste nehmen. Die **ganze Liste wird NICHT vorab gegen GitHub abgeglichen** — Drift wird erst am Ende eingearbeitet (Schritt 4). Das spart bei jeder Auswahl die teure Komplett-Sichtung; die Liste ist gepflegt genug, dass das oberste freie Ticket fast immer stimmt.
+2. Dieses Ticket mit dem normalen kubequest-Workflow abarbeiten (self-assignen → eigener Worktree → umsetzen → nach `main` → Issue schließen).
+3. **⚠️-Flags beachten** (siehe Liste): manche Tickets werden NICHT direkt umgesetzt (Epic zerlegen, Optik erst abstimmen) oder haben eine harte Voraussetzung.
+4. **Erst NACH getaner Arbeit diese Liste pflegen — der „puh, fertig"-Schritt.** Jetzt (nicht vorher) einmal den echten GitHub-Stand der `area:architektur`-Issues holen und Drift einarbeiten:
    ```bash
    gh issue list --label "area:architektur" --state open --limit 300 \
      --json number,title,labels,assignees \
      --jq '.[] | "#\(.number)\t\(([.labels[].name]|map(select(startswith("status:")))|join(","))//"-")\tassignee:\([.assignees[].login]|join(","))\t\(.title)"' | sort -n
    ```
-   Drift einarbeiten, **bevor** gewählt wird:
-   - **In der Liste, aber geschlossen** → Zeile entfernen.
-   - **Jetzt `status:zurückgestellt`** → raus aus der Reihenfolge, runter in den Zurückgestellt-Block (überspringen).
-   - **Jetzt Assignee / offener Branch/Worktree** (`git worktree list` + `git branch -a`) → als „in Arbeit" überspringen, nächstes nehmen.
-   - **Neues offenes `area:architektur`-Issue, nicht in der Liste** → an dependency-passender Stelle einsortieren (nicht unten anhängen).
-   - **Reaktiviert** (zurückgestellt-Label weg) → einsortieren.
-   - **Driftet die Liste → erst die Doku fixen + committen** (eigener Worktree, Doku-only → kein Test-Lauf), Stand-Datum oben aktualisieren, **dann** wählen. Stimmt alles, ohne Commit weiter.
-1. Aus der (jetzt aktuellen) Liste das **oberste noch offene** Ticket nehmen, das
-   - **nicht** `status:zurückgestellt` ist (die werden ignoriert, siehe unten), und
-   - **kein** Assignee hat (Kollisionsschutz — siehe AGENTS.md, „Board-Workflow"), und
-   - keinen offenen Branch/Worktree hat.
-2. Dieses Ticket mit dem normalen kubequest-Workflow abarbeiten (self-assignen → eigener Worktree → umsetzen → nach `main` → Issue schließen).
-3. **⚠️-Flags beachten** (siehe Liste): manche Tickets werden NICHT direkt umgesetzt (Epic zerlegen, Optik erst abstimmen) oder haben eine harte Voraussetzung.
+   - **Gerade erledigt / sonst geschlossen / nicht mehr `area:architektur`** → Zeile entfernen.
+   - **Neues offenes `area:architektur`-Issue, nicht in der Liste** → an dependency-passender Stelle **einsortieren + einpriorisieren** (nicht unten anhängen).
+   - **Jetzt `status:zurückgestellt`** → runter in den Zurückgestellt-Block. **Reaktiviert** (Label weg) → einsortieren.
+   - **Driftet die Liste → Doku fixen, Stand-Datum oben aktualisieren, committen** (Doku-only → kein Test-Lauf). Hat sich nichts geändert, kein Commit nötig.
 
 > Erledigte Tickets werden hier **nicht durchgestrichen, sondern entfernt** (GitHub-Issue-Status ist die SSOT für „erledigt"). Diese Datei führt nur die noch offenen Architektur-Tickets in Reihenfolge.
 
@@ -87,7 +86,7 @@ Wird eins davon reaktiviert (Label `status:zurückgestellt` entfernt), gehört e
 
 ## Pflege dieser Liste
 
-Diese Liste ist **lebendig** — sie wird beim Entwickeln laufend fortgeschrieben, nicht nur einmal erstellt:
+Diese Liste ist **lebendig** — sie wird **am Ende jedes Architektur-Tickets** fortgeschrieben (der „puh, fertig"-Schritt 4 oben), **nicht** als Vorab-Check vor der Auswahl:
 
 - **Erledigtes Ticket** → Zeile entfernen (Issue-Status ist die SSOT).
 - **Beim Bearbeiten etwas aufgefallen** (Bug, Tech-Debt, fragwürdige Altentscheidung) → **neues Ticket anlegen** (ohne Assignee, passende Labels) und hier an der dependency-passenden Stelle einsortieren — festhalten, *wann* es dran ist.
