@@ -9,7 +9,7 @@
 ## ⚡ Schnellstart (in <1 Minute zum ersten Schritt)
 
 ```
-1. npm install                              # einmalig
+1. npm run setup                            # einmalig: prüft Node, npm install, Tests+Typecheck+Arch-Check (oder nur npm install)
 2. npm run dev                              # Dev-Server, angezeigte Adresse im Browser öffnen
 3. gh issue list --state open --limit 500   # GANZE Liste holen! ohne --limit nur die 30 neuesten. Dann nach Prio (hoch→mittel→niedrig) + niedrigster freier Nummer wählen, nicht nach Inhalt
 4. gh issue edit <nr> --add-assignee @me    # SOFORT claimen = "in Arbeit"-Marker, dann mit gh issue view <nr> prüfen
@@ -43,6 +43,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 
 | Zweck | Befehl |
 |---|---|
+| One-Command-Setup (Node-Check + install + alle Checks, #387) | `npm run setup` |
 | Erstinstallation | `npm install` |
 | Dev-Server | `npm run dev` |
 | Host-/Prod-Build (Multi-File nach `dist/`) | `npm run build` |
@@ -128,6 +129,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 
 | Was | Wo |
 |---|---|
+| 🤝 Mitentwickeln (Einstieg + One-Command-Setup `npm run setup`) | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | 📖 Spiel-Doku (Story, Steuerung, Lernpfad) | [README.md](README.md) |
 | 📋 Agenten-Regeln, Board-Workflow, Konventionen | [AGENTS.md](AGENTS.md) |
 | 🎨 PixelLab-Assets (Liste + IDs) | [assets/pixellab/README.md](assets/pixellab/README.md) |

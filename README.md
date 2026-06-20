@@ -107,21 +107,20 @@ Wird **automatisch alle 5 Sekunden** im Browser gespeichert (IndexedDB). Im 📜
 
 ## Mitentwickeln (Entwickler:innen & KI-Agenten)
 
-Voraussetzung: **Node ≥ 22** (siehe [`.nvmrc`](.nvmrc)). Dann:
+Voraussetzung: **Node ≥ 22** (siehe [`.nvmrc`](.nvmrc)). In **einem** Befehl startklar:
 
 ```
-npm install        # einmalig
-npm run dev        # Dev-Server – angezeigte Adresse im Browser öffnen
-npm test           # Vitest
-npm run typecheck  # TypeScript strict
-npm run check:arch # Architektur-Wächter (Schichtung)
+npm run setup   # prüft Node, installiert, lässt Tests + Typecheck + Architektur-Wächter einmal laufen
+npm run dev     # Dev-Server – angezeigte Adresse im Browser öffnen
 ```
+
+Voller Einstieg (Voraussetzungen, Alltags-Befehle, „wo finde ich was"): **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 - **Wo liegt was?** Datei-für-Datei-Landkarte: [CLAUDE.md](CLAUDE.md).
 - **Wie wird hier gearbeitet** (Regeln, Board-Workflow, Konventionen): [AGENTS.md](AGENTS.md).
 - **Architektur-Stand & Ausbau-Plan** (Stardew-Scope): [docs/architektur-analyse-2026-06.md](docs/architektur-analyse-2026-06.md) + [docs/architektur-reihenfolge.md](docs/architektur-reihenfolge.md).
 
-> Ein **One-Command-Setup** (`npm run setup`) und eine **containerisierte Dev-Umgebung** (devcontainer/`docker compose`) sind in Arbeit (#387, #388) und machen den Einstieg künftig noch einfacher.
+> Eine **containerisierte Dev-Umgebung** (devcontainer/`docker compose`) ist in Arbeit (#388) und macht den Einstieg künftig noch reproduzierbarer.
 
 ## Dev-/Test-Modus (nur für Entwickler:innen)
 

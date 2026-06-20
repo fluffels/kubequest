@@ -30,6 +30,7 @@
 
 | Zweck | Befehl |
 |---|---|
+| One-Command-Setup (Node-Check + `npm install` + Tests/Typecheck/Arch-Check, #387) | `npm run setup` |
 | Dev-Server (Code-Änderung → manuell neu laden, #301) | `npm run dev` → angezeigte Adresse öffnen |
 | Host-/Prod-Build (Multi-File nach `dist/`, zum Ausliefern) | `npm run build` |
 | Offline-Build (eine self-contained `dist-offline/index.html`) | `npm run build:offline` |
@@ -39,7 +40,7 @@
 | Typen prüfen (Alias, identisch zu `typecheck`) | `npm run typecheck:strict` |
 | Architektur-Wächter (Schichtung, #347) | `npm run check:arch` (dependency-cruiser) |
 
-Einmalig vorher: `npm install`.
+Einmalig vorher: `npm run setup` (prüft Node, installiert, lässt Tests/Typecheck/Arch-Check einmal laufen) – oder mindestens `npm install`.
 
 ⚠️ **Die rohe `index.html` im Root ist die Dev-Version** und braucht den Vite-Server. Per Doppelklick / statischem Server öffnen liefert `.ts` als falschen MIME-Typ → leere Seite. Zum Offline-Spielen `npm run build:offline` und dann `dist-offline/index.html` doppelklicken.
 
