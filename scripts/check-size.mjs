@@ -1,4 +1,8 @@
-#!/usr/bin/env node
+// Kein Shebang: dieses Skript wird ausschließlich über `node scripts/check-size.mjs`
+// (npm run check:size) gestartet UND von test/filesize.test.ts importiert. Eine
+// `#!`-Zeile bricht genau diesen Test-Import quer über die Plattformen (Vitest/esbuild
+// stolpert über das `#!`-Token → „Invalid or unexpected token"), während sie für den
+// npm-Aufruf wirkungslos ist. Darum bewusst weggelassen.
 /**
  * Dateigröße-Wächter (#390) – Frühwarnung gegen neue God-Files.
  *
