@@ -47,21 +47,42 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
 ## Reihenfolge
 
-Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Stardew-Scope und ist voll abschließbar), dann die **großen Refactors** (vom Architektur-Wächter abgesichert) und **Welt/Tiles**, dann **UX-Komfort**, zuletzt die **Sonderfälle** (Epic, Optik, anlegendes Review). (Stand 2026-06-20: Fundament, Refactors und das Welt/Tiles-Hitbox-Ticket #386 sind erledigt; die Liste beginnt darum beim UX-Komfort.)
+**Neu sortiert nach der Stardew-Architektur-Analyse 2026-06** (Begründung: [architektur-analyse-2026-06.md](architektur-analyse-2026-06.md)). Leitlinie: **Umbau zuerst, dann der große Content-Push.** Reihenfolge der Blöcke:
 
-| # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
-|---|--------|--------------|---------------------------|
-| 1 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
-| 2 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
-| 3 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 4 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
-| 5 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 6 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. Die „freigeschaltet durch Nutzung"-Mechanik gibt es schon als Präzedenzfall: #316 (Befehlshistorie, erledigt) nutzt genau dieses Muster (`Game.cmdHistoryUnlocked`). |
-| 7 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+1. **Fundament** – die Save-Decke heben (blockt Stardew-Scale-Stände).
+2. **KI-/Dev-Hebel** – Onboarding + schlanke Doku, damit alle weiteren Schritte (gerade KI-getrieben) billig & sicher werden.
+3. **Qualitätsnetz** – Arch-Wächter/Lint/Boot-Smoke, *bevor* groß refaktorisiert wird.
+4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos.
+5. **Skalierungs-Enabler** – Assets/Entities für viele Welten.
+6. **Features** – Save-Slots, Wiederspielen, Dev-Panel.
+7. **Sonderfälle** – Optik (abstimmen), Epic (zerlegen), anlegendes Review (zuletzt).
+
+Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem dann tragfähigen Fundament.
+
+| # | Block | Ticket | Worum's geht | Warum hier / Abhängigkeit |
+|---|-------|--------|--------------|---------------------------|
+| 1 | Fundament | **#350** | IndexedDB statt localStorage | **prio:hoch.** localStorage-Limit (~5–10 MB) bricht bei Stardew-Scale-Ständen. Nur `store.ts` (async) tauschen; Backup-Slot + Migrationskette bleiben. ⚠️ **Bestehende Stände migrieren, kein Stand darf brechen.** |
+| 2 | KI/Dev-Hebel | **#387** | Dev-Onboarding-Doku + `npm run setup` | **prio:hoch.** Ein Schritt zum lauffähigen Stand für Kolleg:innen UND KI → senkt alle Folgekosten. |
+| 3 | KI/Dev-Hebel | **#394** | CLAUDE.md-Landkarte verschlanken | Spart in **jeder** KI-Session Tokens (schlanker Always-Index + Tiefendocs on demand). |
+| 4 | Qualitätsnetz | **#390** | Arch-Wächter härten (Zyklen/Orphans/Dateigröße) | Schützt die folgenden Splits automatisch; verhindert neue God-Files. |
+| 5 | Qualitätsnetz | **#389** | ESLint + CI-Gate | Netz für viel KI-Code, bevor groß refaktorisiert/ausgebaut wird. |
+| 6 | Qualitätsnetz | **#391** | CI: Boot-Smoke-Test (headless) | CI baut, startet das Spiel aber nie — Boot-Fehler fangen, bevor die Splits laufen. |
+| 7 | Splits | **#392** | game.ts aufteilen (793 LOC God-Object) | **prio:hoch.** Unter dem Netz (4–6). Fassade unverändert; ⚠️ **Saves/`sanitizeState`/Migration penibel grün halten** (Red-Green mit echtem Alt-Stand). |
+| 8 | Splits | **#393** | WorldScene.ts aufteilen (1344 LOC, größte Datei) | Token-Effizienz + Wartbarkeit; im Browser verifizieren. |
+| 9 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387. Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
+| 10 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
+| 11 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 12 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 13 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350). |
+| 14 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 15 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 16 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 17 | Sonderfall | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen, zerlegen** (session-große Kinder, Übersichts-Kommentar, Epic auf done). Präzedenz: #316 (`Game.cmdHistoryUnlocked`). |
+| 18 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 
-Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, **23 Stück**, vollständig): „Echter Modus"-Bogen #173/#174/#175/#176/#177/#178, Phase-10-Save-Sync #158/#159/#160, neue Inseln/Bereiche + Progression #130 (Wachturm), #144 (Lagerhallen), #146/#147/#148/#156 (Expeditions-Flotte), Storage-Lernpfad #240/#241, Self-Hosting #221, Tasten-Umbelegung #232, Lazy-Asset-Loading #198, Sprite-Atlas #339, Schiff-Szene #257, Enter/Leertaste-Dialoge #312.
+Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, **21 Stück**, vollständig): „Echter Modus"-Bogen #173/#174/#175/#176/#177/#178, Phase-10-Save-Sync #158/#159/#160, neue Inseln/Bereiche + Progression #130 (Wachturm), #144 (Lagerhallen), #146/#147/#148/#156 (Expeditions-Flotte), Storage-Lernpfad #240/#241, Self-Hosting #221, Tasten-Umbelegung #232, Schiff-Szene #257, Enter/Leertaste-Dialoge #312. *(#198 Lazy-Asset-Loading und #339 Texture-Atlas wurden am 2026-06-20 reaktiviert und in die Reihenfolge oben aufgenommen.)*
 
 Maßgeblich ist immer das **Label**, nicht diese Aufzählung: bei „nächstes Architektur" gilt jedes Issue mit `status:zurückgestellt` als übersprungen, auch falls die Liste hier mal nicht nachgezogen wurde.
 

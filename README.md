@@ -105,6 +105,24 @@ Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (voll 
 
 Wird **automatisch alle 5 Sekunden** im Browser gespeichert (localStorage). Im 📜 Logbuch (Taste J) gibt es zusätzlich **„Spielstand sichern“** (lädt eine JSON-Datei herunter) und **„Spielstand laden“** – für Backups oder den Umzug auf einen anderen Rechner/Browser.
 
+## Mitentwickeln (Entwickler:innen & KI-Agenten)
+
+Voraussetzung: **Node ≥ 22** (siehe [`.nvmrc`](.nvmrc)). Dann:
+
+```
+npm install        # einmalig
+npm run dev        # Dev-Server – angezeigte Adresse im Browser öffnen
+npm test           # Vitest
+npm run typecheck  # TypeScript strict
+npm run check:arch # Architektur-Wächter (Schichtung)
+```
+
+- **Wo liegt was?** Datei-für-Datei-Landkarte: [CLAUDE.md](CLAUDE.md).
+- **Wie wird hier gearbeitet** (Regeln, Board-Workflow, Konventionen): [AGENTS.md](AGENTS.md).
+- **Architektur-Stand & Ausbau-Plan** (Stardew-Scope): [docs/architektur-analyse-2026-06.md](docs/architektur-analyse-2026-06.md) + [docs/architektur-reihenfolge.md](docs/architektur-reihenfolge.md).
+
+> Ein **One-Command-Setup** (`npm run setup`) und eine **containerisierte Dev-Umgebung** (devcontainer/`docker compose`) sind in Arbeit (#387, #388) und machen den Einstieg künftig noch einfacher.
+
 ## Dev-/Test-Modus (nur für Entwickler:innen)
 
 Für die Entwicklung gibt es ein **Dev-/Test-Panel**, mit dem man gezielt zu einem beliebigen Quest-/Story-Stand springen und Erststart vs. Zurücksetzen testen kann – statt sich jedes Mal von vorn durchzuspielen. Es ist **bewusst nicht für Spieler:innen gedacht** und doppelt abgesichert: Der Code fällt aus den ausgelieferten Builds (`build`/`build:offline`) komplett heraus und ist **nur im Dev-Server** vorhanden, und dort ist der Einstieg zusätzlich **passwortgeschützt**. Das Passwort liegt ausschließlich lokal (in einer nicht eingecheckten `.env`, Vorlage: [`.env.example`](.env.example)) und steht **nicht** im Repo – wer das Projekt klont, kann das Panel ohne eigenen Passwort-Eintrag nicht öffnen.
