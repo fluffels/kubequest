@@ -33,7 +33,6 @@ export const LOC_BUDGET = 800
  *  Fällt die Datei unter Budget (Split erledigt), meldet der Wächter den Eintrag als
  *  stale und schlägt fehl – das erinnert daran, die Ausnahme wieder zu entfernen. */
 export const ALLOWLIST = [
-  { file: 'src/sim/kubectl.ts', reason: 'wird in #397 aufgeteilt' },
 ]
 
 /** Zählt physische Zeilen (wie `wc -l`; ein abschließender Zeilenumbruch zählt nicht doppelt). */

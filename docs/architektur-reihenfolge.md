@@ -52,7 +52,7 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 1. **Fundament** – die Save-Decke heben (blockt Stardew-Scale-Stände). ✅ **erledigt** (#350 IndexedDB auf `main`).
 2. **KI-/Dev-Hebel** – Onboarding + schlanke Doku, damit alle weiteren Schritte (gerade KI-getrieben) billig & sicher werden. (**#387 ✅** One-Command-Setup, **#388 ✅ erledigt 2026-06-21** containerisierte Dev-Umgebung – devcontainer + `docker compose up`, ohne lokales Node; Drift-Wächter `test/devcontainer.test.ts`.)
 3. **Qualitätsnetz** – Arch-Wächter/Lint/CI-Härtung, *bevor* groß refaktorisiert wird. (Arch-Wächter **#390 ✅ erledigt** – inkl. Zyklen-/Orphan-/Dateigröße-Wächter; **Lint #389 ✅ erledigt** – ESLint + CI-Gate. **Boot-Smoke #391 ist nicht mehr `area:architektur`** (nur noch `area:tests`) → läuft über die generische Board-Auswahl, nicht über diese Liste. **#396** (Dependabot + npm-audit-Gate) ✅ erledigt 2026-06-21 — Dependabot-Config + zweistufiges `npm audit`-Gate (Prod-Deps blockierend, Dev nur berichtend); **#398** (Actions v4→v5) ✅ erledigt 2026-06-21 — dabei `upload-artifact` bis **v7** gehoben, weil dessen `@v5` noch auf node20 lief und die Node-20-Deprecation sonst geblieben wäre. Der Qualitätsnetz-Block ist damit leer.)
-4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos. (**game.ts #392 ✅** – Fassade + `src/game/*`-Bündel; **WorldScene.ts #393 ✅** – Systeme in `src/scenes/worldscene/*` (terrain/scenery/clustersync/events/warps); Schwestern zu sim.ts #346 / ui.ts #356. Offen bleibt **#397** sim/kubectl.ts.)
+4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos. (**game.ts #392 ✅** – Fassade + `src/game/*`-Bündel; **WorldScene.ts #393 ✅** – Systeme in `src/scenes/worldscene/*` (terrain/scenery/clustersync/events/warps); Schwestern zu sim.ts #346 / ui.ts #356. **sim/kubectl.ts #397 ✅** – Dispatch-Barrel + Unterfamilien `src/sim/kubectl/*` (inspect/lifecycle/ops/security/host). Damit ist der God-File-Split-Block abgeschlossen.)
 5. **Skalierungs-Enabler** – Assets/Entities für viele Welten.
 6. **Features** – Save-Slots, Wiederspielen, Dev-Panel.
 7. **Sonderfälle** – Optik (abstimmen), Epic (zerlegen), anlegendes Review (zuletzt).
@@ -61,16 +61,15 @@ Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem d
 
 | # | Block | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|-------|--------|--------------|---------------------------|
-| 1 | Splits | **#397** | sim/kubectl.ts aufteilen (1220 LOC God-File) | **Befund aus #390** (Dateigröße-Budget 800). Größte verbliebene Datei; analog zum sim.ts-Split #346 und zum WorldScene.ts-Split #393. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` entfernen. |
-| 2 | Skalierungs-Enabler | **#401** | `navigator.storage.persist()` + Quota-Monitoring (Eviction-Schutz) | **Befund aus ADR 0006/#400.** Härtet das Save-Fundament (#350 ✓), auf dem alle Skalierung steht: schützt Stände vor stillem LRU-Löschen durch den Browser. Klein, unabhängig, client-seitig — vor der Asset-/Entity-Erweiterung, weil Datenverlust-Schutz dringlicher ist als Optimierung. |
-| 3 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
-| 4 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
-| 5 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
-| 6 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
-| 7 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
-| 8 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
-| 9 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
-| 10 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | Skalierungs-Enabler | **#401** | `navigator.storage.persist()` + Quota-Monitoring (Eviction-Schutz) | **Befund aus ADR 0006/#400.** Härtet das Save-Fundament (#350 ✓), auf dem alle Skalierung steht: schützt Stände vor stillem LRU-Löschen durch den Browser. Klein, unabhängig, client-seitig — vor der Asset-/Entity-Erweiterung, weil Datenverlust-Schutz dringlicher ist als Optimierung. |
+| 2 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
+| 3 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 4 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 5 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
+| 6 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 7 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 8 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 9 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 
