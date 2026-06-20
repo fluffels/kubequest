@@ -69,7 +69,12 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/sim/state.ts`](src/sim/state.ts) | pure Domäne | Simulator-Zustand & Domänentypen (Pod/Deployment/…, `ClusterState`). |
 | [`src/sim/util.ts`](src/sim/util.ts) | pure Domäne | Geteilte pure Sim-Helfer (IDs, Pod-Namen, Tabellen). |
 | [`src/sim/docker.ts`](src/sim/docker.ts) | pure Domäne | docker-Befehlsfamilie. |
-| [`src/sim/kubectl.ts`](src/sim/kubectl.ts) | pure Domäne | kubectl-Befehlsfamilie (größter Block; RBAC/Pod-Security #126/#128). |
+| [`src/sim/kubectl.ts`](src/sim/kubectl.ts) | pure Domäne | kubectl-Familie: dünner Dispatch-Barrel über `src/sim/kubectl/*` (Split #397). → [sim.md](docs/module/sim.md) |
+| [`src/sim/kubectl/host.ts`](src/sim/kubectl/host.ts) | pure Domäne | `KubectlHost`-Interface (was kubectl von der Sim-Klasse braucht). |
+| [`src/sim/kubectl/inspect.ts`](src/sim/kubectl/inspect.ts) | pure Domäne | kubectl lesend: get/describe/top/logs (#397). |
+| [`src/sim/kubectl/lifecycle.ts`](src/sim/kubectl/lifecycle.ts) | pure Domäne | kubectl Lebenszyklus: create/apply/delete (#397). |
+| [`src/sim/kubectl/ops.ts`](src/sim/kubectl/ops.ts) | pure Domäne | kubectl Workload-Ops: scale/expose/set/rollout (#397). |
+| [`src/sim/kubectl/security.ts`](src/sim/kubectl/security.ts) | pure Domäne | kubectl RBAC (auth can-i #126) + Pod-Security (label/admitPod #128). |
 | [`src/sim/helm.ts`](src/sim/helm.ts) | pure Domäne | helm-Befehlsfamilie. |
 | [`src/sim/terraform.ts`](src/sim/terraform.ts) | pure Domäne | terraform-Befehlsfamilie. |
 | [`src/sim/git.ts`](src/sim/git.ts) | pure Domäne | git-Befehlsfamilie (`git push` stößt die CI an). |
