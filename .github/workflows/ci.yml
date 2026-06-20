@@ -54,7 +54,7 @@ jobs:
         run: npm run build:offline
 
       - name: Offline-Build als Artefakt hochladen
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: kubequest-offline
           path: dist-offline/index.html
@@ -77,10 +77,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Node einrichten
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -123,7 +123,7 @@ jobs:
           VITE_KQ_DEVPANEL_PW: ${{ secrets.VITE_KQ_DEVPANEL_PW }}
 
       - name: Dev-Panel-Build als Artefakt hochladen
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: kubequest-devpanel
           path: dist-devpanel/index.html
