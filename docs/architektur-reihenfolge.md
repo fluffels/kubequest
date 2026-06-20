@@ -65,10 +65,11 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 | 12 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen → **nach #353** sauberer. |
 | 13 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → erst wenn Save-Format (#353) sitzt. |
 | 14 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 15 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`); wird dort geschlossen, sobald fertig (#349/#350 noch offen). Erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
-| 16 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 17 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 18 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 15 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`); wird dort geschlossen, sobald fertig (#350 noch offen; #349 erledigt). Erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
+| 16 | **#357** ⚠️ | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | **Umbau-/ADR-0004-gekoppelt:** baut auf der Entity-Registry aus #349 auf, die nur auf `umbau/skalierungs-fundament` liegt → dort umsetzen, nicht `main`. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. |
+| 17 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 18 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 19 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 
