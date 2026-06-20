@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { UI } from "../ui";
 import { SFX } from "../sfx";
-import { resolveMove } from "../world";
+import { resolveMove, circleHitbox, rectHitbox, npcHitboxes, type Hitbox } from "../world";
 import { npcSpawnsForMap } from "../content/entities";
 import { WATER as A_WATER, warpAt } from "../archipel";
 import { DOCK as WH_DOCK, buildWarehouse, WAREHOUSE_TO_WORLD, WAREHOUSE_ARRIVAL, WAREHOUSE_QUEST_TRIGGER, WAREHOUSE_CRANES, WAREHOUSE_CONTAINERS } from "../warehouse";
@@ -17,6 +17,11 @@ import { T, FOAM, WANG, pixelText, spawnIslandNpc, buildSign, floatPixelText } f
  * Quests folgen in #125/#127/#129). Boden über dieselben Wang-Tiles wie die Hauptkarte
  * (Stein-Kai + Holz-Steg); Geometrie/Kollision kommen pur aus warehouse.ts, Bewegung
  * teilt sich resolveMove. */
+/** #343/#386: Radius/Maße der Sub-Tile-Hitboxen. Fässer (rund) als Kreis, Kisten (eckig)
+ *  als leicht eingerücktes Rechteck, NPCs rund – wie in WorldScene. */
+const HIT_R = 6;
+const CRATE_HIT = 12;   // Kantenlänge der (mittig eingerückten) Kisten-Rechteck-Hitbox
+
 export class WarehouseScene extends Phaser.Scene {
   [key: string]: any;
   constructor() { super("Warehouse"); }
@@ -24,16 +29,32 @@ export class WarehouseScene extends Phaser.Scene {
   create() {
     const m = buildWarehouse();
     this.W = m.W; this.H = m.H; this.ground = m.ground; this.solid = m.solid;
+    // #343/#386: runde/kleinere Sub-Tile-Hitboxen für die Lager-Güter + NPCs statt voller
+    // Kachel – man gleitet weich vorbei. `solid` bleibt für eckige Strukturen (Meer/Kai-
+    // Wand/Kräne/Container); `softGrid` hält nur die Kachel-Belegung der Sub-Tile-Objekte.
+    this.softGrid = new Uint8Array(this.W * this.H);
+    this.softObstacles = [] as Hitbox[];
 
     this.renderGround();
 
-    // Verladekräne oben am Wasser (PixelLab, #124) – ragen über die Kaikante.
+    // Verladekräne oben am Wasser (PixelLab, #124) – ragen über die Kaikante. Große,
+    // eckige Strukturen → bleiben volles Kachel-Solid (aus der puren Geometrie).
     for (const c of WAREHOUSE_CRANES) this.objSprite(c.x, c.y, "crane", 0.34, 30, 10);
-    // Frachtcontainer-Stapel auf der Quay-Fläche.
+    // Frachtcontainer-Stapel auf der Quay-Fläche – ebenfalls eckige Strukturen, volles Solid.
     for (const c of WAREHOUSE_CONTAINERS) this.objSprite(c.x, c.y, "container", 0.3, 26, 8);
-    // Lager-Güter (Kisten/Fässer) aus der puren Geometrie.
+    // Lager-Güter (Kisten/Fässer) aus der puren Geometrie. Die pure Kachel-Solidität
+    // (buildWarehouse) wird hier durch eine Sub-Tile-Hitbox ersetzt (#386): Fässer rund,
+    // Kisten als leicht eingerücktes Rechteck – so gleitet man weich an ihnen vorbei.
     for (const g of m.goods) {
       this.add.image(g.x * T + 8, (g.y + 1) * T, g.kind).setOrigin(0.5, 1).setScale(0.5).setDepth((g.y + 1) * T);
+      this.solid[g.y * this.W + g.x] = 0;
+      this.softGrid[g.y * this.W + g.x] = 1;
+      if (g.kind === "barrel") {
+        this.softObstacles.push(circleHitbox(g.x * T + 8, g.y * T + 8, HIT_R));
+      } else {
+        const off = (T - CRATE_HIT) / 2;   // mittig in der Kachel
+        this.softObstacles.push(rectHitbox(g.x * T + off, g.y * T + off, CRATE_HIT, CRATE_HIT));
+      }
     }
 
     // Quest-Trigger = das Lager-Kontor (Schild; die Phase-7-Quests #127/#129 docken hier an).
@@ -44,7 +65,10 @@ export class WarehouseScene extends Phaser.Scene {
     // NPC hier hart zu setzen – neuer NPC = nur JSON-Eintrag. Reden läuft über
     // E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt er Smalltalk.
     const warehouseNpcs = npcSpawnsForMap("warehouse");
-    for (const s of warehouseNpcs) this.solid[s.y * this.W + s.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+    // #31/#343/#386: NPCs solide als RUNDE Hitbox (Kreis um den Standplatz) statt voller
+    // Kachel – man gleitet weich an ihnen vorbei; Reden (E) greift weiter von der Nachbarkachel.
+    this.softObstacles.push(...npcHitboxes(warehouseNpcs, HIT_R));
+    for (const s of warehouseNpcs) this.softGrid[s.y * this.W + s.x] = 1;
     this.npcs = warehouseNpcs.map(s => spawnIslandNpc(this, s));
 
     // Rück-Anleger im Süden sichtbar markieren (Abstiegs-Pfeil + Schild).
@@ -198,7 +222,7 @@ export class WarehouseScene extends Phaser.Scene {
       else if (dx > 0) pl.face = "east";
       else if (dy < 0) pl.face = "north";
       else if (dy > 0) pl.face = "south";
-      const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt);
+      const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt, this.softObstacles);
       pl.x = next.x; pl.y = next.y;
       this.bobT += dt * 12;
     }

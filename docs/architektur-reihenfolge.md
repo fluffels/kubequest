@@ -47,20 +47,19 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
 ## Reihenfolge
 
-Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Stardew-Scope und ist voll abschließbar), dann die **großen Refactors** (vom Architektur-Wächter abgesichert), dann **Welt/Tiles**, dann **UX-Komfort**, zuletzt die **Sonderfälle** (Epic, Optik, anlegendes Review).
+Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Stardew-Scope und ist voll abschließbar), dann die **großen Refactors** (vom Architektur-Wächter abgesichert) und **Welt/Tiles**, dann **UX-Komfort**, zuletzt die **Sonderfälle** (Epic, Optik, anlegendes Review). (Stand 2026-06-20: Fundament, Refactors und das Welt/Tiles-Hitbox-Ticket #386 sind erledigt; die Liste beginnt darum beim UX-Komfort.)
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#386** | Sub-Tile-Hitboxen in Insel-/Lager-Szenen + Büsche/Laternen (Folge zu #343) | Welt/Tiles, direkte Fortsetzung von #256: die pure Hitbox-Logik (#343) ist fertig + getestet, hier nur noch das Verdrahten in den übrigen Präsentations-Szenen. Nach dem erledigten #340/#343. |
-| 2 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". (Funkgerät-Code liegt seit #356 in `src/ui/radio.ts`.) |
-| 3 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `src/ui/dialog.ts`/`overlaykbd.ts` (seit #356). |
-| 4 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
-| 5 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
-| 6 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 7 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
-| 8 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 9 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 10 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". (Funkgerät-Code liegt seit #356 in `src/ui/radio.ts`.) |
+| 2 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `src/ui/dialog.ts`/`overlaykbd.ts` (seit #356). |
+| 3 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
+| 4 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
+| 5 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 6 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
+| 7 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 8 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 9 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

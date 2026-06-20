@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { UI } from "../ui";
 import { SFX } from "../sfx";
-import { resolveMove } from "../world";
+import { resolveMove, circleHitbox, npcHitboxes, type Hitbox } from "../world";
 import { npcSpawnsForMap } from "../content/entities";
 import { WATER as A_WATER, warpAt } from "../archipel";
 import { PATH as L_PATH, buildLighthouse, LIGHTHOUSE_TO_WORLD, LIGHTHOUSE_ARRIVAL, LIGHTHOUSE_QUEST_TRIGGER, LIGHTHOUSE_TOWER, LIGHTHOUSE_NPC, LIGHTHOUSE_GRAFANA, LIGHTHOUSE_BELL } from "../lighthouse";
@@ -16,6 +16,9 @@ import { T, FOAM, WANG, pixelText, spawnIslandNpc, buildSign, floatPixelText } f
  * NPC-Standplatz (Sprite + Quests folgen in einem Kinderticket, analog #93). Boden
  * über dieselben Wang-Tiles wie die Hauptkarte (inkl. Stein-Kai für die Klippe);
  * Geometrie/Kollision kommen pur aus lighthouse.ts, Bewegung teilt sich resolveMove. */
+/** #343/#386: Radius der runden Sub-Tile-Hitboxen (Felsbrocken/Büsche/NPCs), wie in WorldScene. */
+const HIT_R = 6;
+
 export class LighthouseScene extends Phaser.Scene {
   [key: string]: any;
   constructor() { super("Lighthouse"); }
@@ -23,12 +26,21 @@ export class LighthouseScene extends Phaser.Scene {
   create() {
     const m = buildLighthouse();
     this.W = m.W; this.H = m.H; this.ground = m.ground; this.solid = m.solid;
+    // #343/#386: runde Sub-Tile-Hitboxen für Felsbrocken/Büsche/NPCs statt voller Kachel –
+    // man gleitet weich vorbei. `solid` bleibt für eckige Strukturen (Meer/Turm/Station);
+    // `softGrid` hält nur die Kachel-Belegung der runden Objekte fürs Deko-Streuen.
+    this.softGrid = new Uint8Array(this.W * this.H);
+    this.softObstacles = [] as Hitbox[];
 
     this.renderGround();
 
-    // Felsbrocken am Klippenrand – deterministisch aus der puren Geometrie.
+    // Felsbrocken am Klippenrand – deterministisch aus der puren Geometrie. Die pure
+    // Kachel-Solidität (buildLighthouse) wird hier durch eine runde Hitbox ersetzt (#386),
+    // sodass man weich an den Brocken vorbeigleitet statt eckig abzuprallen.
     for (const r of m.rocks) {
       this.add.image(r.x * T + 8, (r.y + 1) * T, "rock").setOrigin(0.5, 1).setScale(0.5).setDepth((r.y + 1) * T);
+      this.solid[r.y * this.W + r.x] = 0;
+      this.addSoftCircle(r.x, r.y);
     }
     // Etwas Gras-Deko auf der Hochebene (begehbar) – deterministisch gestreut.
     this.scatterDecor();
@@ -60,7 +72,10 @@ export class LighthouseScene extends Phaser.Scene {
     // den NPC hier hart zu setzen – neuer NPC = nur JSON-Eintrag. Reden läuft über
     // E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt sie Smalltalk.
     const lighthouseNpcs = npcSpawnsForMap("lighthouse");
-    for (const s of lighthouseNpcs) this.solid[s.y * this.W + s.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+    // #31/#343/#386: NPCs solide als RUNDE Hitbox (Kreis um den Standplatz) statt voller
+    // Kachel – man gleitet weich an ihnen vorbei; Reden (E) greift weiter von der Nachbarkachel.
+    this.softObstacles.push(...npcHitboxes(lighthouseNpcs, HIT_R));
+    for (const s of lighthouseNpcs) this.softGrid[s.y * this.W + s.x] = 1;
     this.npcs = lighthouseNpcs.map(s => spawnIslandNpc(this, s));
 
     // Rück-Warp am südlichen Klippenrand sichtbar markieren (Abstiegs-Pfeil + Schild).
@@ -155,12 +170,12 @@ export class LighthouseScene extends Phaser.Scene {
         const i = y * this.W + x;
         const v = this.ground[i];
         if (v !== 0 && v !== 1 && v !== 2) continue;   // nur Gras
-        if (this.solid[i]) continue;                   // kein Solid drunter
+        if (this.occupied(x, y)) continue;             // kein Solid/rundes Objekt drunter
         if (reserved.has(i)) continue;
         const h = (((x * 374761393) ^ (y * 668265263)) >>> 0) % 100;
-        if (h < 5) {                                   // Busch (solide)
+        if (h < 5) {                                   // Busch: runde Hitbox (#386) statt voller Kachel
           this.add.image(x * T + 8, (y + 1) * T, "bush").setOrigin(0.5, 1).setScale(0.5).setDepth((y + 1) * T);
-          this.solid[i] = 1;
+          this.addSoftCircle(x, y);
         } else if (h < 14) {                           // Blume (begehbar)
           this.add.image(x * T + 8, y * T + 10, "flowers").setScale(0.5).setDepth(y * T + 6);
         }
@@ -186,6 +201,20 @@ export class LighthouseScene extends Phaser.Scene {
     const gull = this.add.image(fromLeft ? -20 : this.W * T + 20, y, "seagull")
       .setDepth(11000).setScale(0.35).setFlipX(!fromLeft);
     this.tweens.add({ targets: gull, x: fromLeft ? this.W * T + 30 : -30, duration: Phaser.Math.Between(9000, 15000), onComplete: () => gull.destroy() });
+  }
+
+  /** Kachel belegt? – fürs Deko-Streuen: eckiges Solid (Meer/Turm/Station) ODER rundes
+   *  Sub-Tile-Objekt (Felsbrocken/Busch/NPC, #386). Bewusst getrennt von isSolidAt, das
+   *  runde Objekte als Hitbox prüft (resolveMove), nicht als volle Kachel. */
+  occupied(x: number, y: number) {
+    const i = y * this.W + x;
+    return !!this.solid[i] || !!this.softGrid[i];
+  }
+
+  /** Rundes Sub-Tile-Hindernis (#343/#386): Kreis um den Kachel-Mittelpunkt + Belegung. */
+  addSoftCircle(tx: number, ty: number, r = HIT_R) {
+    this.softObstacles.push(circleHitbox(tx * T + 8, ty * T + 8, r));
+    this.softGrid[ty * this.W + tx] = 1;
   }
 
   isSolidAt(px: number, py: number) {
@@ -241,7 +270,7 @@ export class LighthouseScene extends Phaser.Scene {
       else if (dx > 0) pl.face = "east";
       else if (dy < 0) pl.face = "north";
       else if (dy > 0) pl.face = "south";
-      const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt);
+      const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx / len * 75 * dt, dy / len * 75 * dt, this.softObstacles);
       pl.x = next.x; pl.y = next.y;
       this.bobT += dt * 12;
     }

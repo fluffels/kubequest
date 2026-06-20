@@ -3,7 +3,7 @@ import { Game } from "../game";
 import { UI } from "../ui";
 import { KQContent } from "../content";
 import { SFX } from "../sfx";
-import { NPC_SPAWNS, npcSolidIndices, npcHitboxes, circleHitbox, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, type Door, type Hitbox } from "../world";
+import { NPC_SPAWNS, npcSolidIndices, npcHitboxes, circleHitbox, rectHitbox, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, type Door, type Hitbox } from "../world";
 import { type Spawn } from "../content/entities";
 import { warpAt, WORLD_TO_ARCHIPEL, WORLD_RETURN } from "../archipel";
 import { WORLD_TO_LIGHTHOUSE, WORLD_RETURN_LH } from "../lighthouse";
@@ -18,11 +18,14 @@ import { spreadLabelsVertically, type LayoutBox } from "../labellayout";
 import { getMapEntry } from "../mapregistry";
 import { T, DIRT, WOOD, ANVIL, TABLE, DEVICE, BOOK, WATER, FOAM, WANG, hashHue, hueColor, pixelText, SIGN_FONT, SIGN_SCALE, buildSign, floatPixelText } from "./shared";
 
-/* #343: Sub-Tile-Kollisionsradien (Pixel). Steine und NPCs prallen nicht mehr als
- * volles 16×16-Quadrat ab, sondern als runde Hitbox um ihren Mittelpunkt – so
- * gleitet man an der runden Silhouette weich vorbei statt eckig abzuprallen. */
+/* #343/#386: Sub-Tile-Kollisionsradien (Pixel). Steine, Büsche und NPCs prallen nicht
+ * mehr als volles 16×16-Quadrat ab, sondern als runde Hitbox um ihren Mittelpunkt – so
+ * gleitet man an der runden Silhouette weich vorbei statt eckig abzuprallen. Laternen
+ * sind schmale Pfosten und bekommen darum ein kleineres, dünnes Rechteck (#386). */
 const NPC_HIT_R = 6;
 const ROCK_HIT_R = 6;
+const BUSH_HIT_R = 6;
+const LAMP_HIT: readonly [number, number] = [6, 10];   // Pfosten: schmale Rechteck-Hitbox (B×H)
 
 export class WorldScene extends Phaser.Scene {
   [key: string]: any;
@@ -82,9 +85,9 @@ export class WorldScene extends Phaser.Scene {
     this.spawnGrassDetail();   // #40: dichtes, variiertes Gras (Stardew-Look)
     this.spawnNpcs();
     this.spawnPlayer();
-    this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
+    this.scatter("bush", 16, 0.5, [0, 1, 2], false, BUSH_HIT_R); // Büsche: runde Hitbox (#386) statt voller Kachel, nicht an Wegen
     this.scatter("rock", 14, 0.45, [0, 1, 2, -3], false, ROCK_HIT_R); // Steine: runde Hitbox (#343), auch am Strand
-    this.scatter("lamppost", 4, 0.55, [0, 1, 2], true);  // ein paar Hafenlaternen
+    this.scatter("lamppost", 4, 0.55, [0, 1, 2], false, 0, LAMP_HIT); // Hafenlaternen: schmales Pfosten-Rechteck (#386)
     this.scatter("mushroom", 10, 0.28, [0, 1, 2]);       // Pilze: kleine Wald-/Wiesendeko, begehbar (#7)
     this.scatter("seashell", 8, 0.22, [-3]);             // Muscheln: nur am Sandstrand (#7)
     this.scatter("driftwood", 5, 0.3, [-3]);             // Treibholz: nur am Sandstrand (#7)
@@ -513,7 +516,7 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  scatter(tex: string, count: number, scale: number, kinds: number[], solid = false, hitR = 0) {
+  scatter(tex: string, count: number, scale: number, kinds: number[], solid = false, hitR = 0, hitRect?: readonly [number, number]) {
     // PixelLab-Objekte streuen: nur passende Felder, nie auf/neben Wege, nicht auf Solids, Spieler-Start frei.
     // Platzierung ist deterministisch (#3) – Büsche/Steine/Laternen sitzen bei jedem Laden an festen Stellen.
     const isDirt = (x: number, y: number) => this.ground[y * this.W + x] === 25;
@@ -541,10 +544,17 @@ export class WorldScene extends Phaser.Scene {
         this.registerCullable(glow, ox, oy);   // Glühen mit der Laterne mit-cullen (kein Floating-Glow)
       }
       if (hitR > 0) {
-        // #343: runde Hitbox unter dem Objekt (Stein) statt voller Kachel – man
+        // #343: runde Hitbox unter dem Objekt (Stein/Busch) statt voller Kachel – man
         // gleitet weich vorbei. Die Kachel bleibt für die Deko-Platzierung belegt
         // (softGrid), zählt aber NICHT als eckiges Solid in der Kollision.
         this.softObstacles.push(circleHitbox(ox, oy, hitR));
+        this.softGrid[p.y * this.W + p.x] = 1;
+      } else if (hitRect) {
+        // #386: kleineres Rechteck statt voller Kachel (schmaler Pfosten, z.B. Laterne) –
+        // mittig um den Objekt-Ankerpunkt, sodass man dicht daran vorbeigeht. Ebenfalls
+        // softGrid-belegt (Deko-Platzierung), aber kein eckiges Vollquadrat in der Kollision.
+        const [hw, hh] = hitRect;
+        this.softObstacles.push(rectHitbox(ox - hw / 2, oy - hh / 2, hw, hh));
         this.softGrid[p.y * this.W + p.x] = 1;
       } else if (solid) {
         this.solidGrid[p.y * this.W + p.x] = 1;
