@@ -51,7 +51,7 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#368** ⚠️ | CRAB_QUIZ auf Content-as-Data migrieren (Folge zu #352) | Letztes Content-as-Data-Stück (ADR 0004), schließt die Inhalts-Migration ab; baut auf #352 (erledigt) auf. **Vor der Umsetzung die Aufteilungs-Frage klären** (CRAB_QUIZ hat kein `chapter`-Feld – pro Region/Geber splitten wie #348/#352, nicht als Monolith). Low-Risk, normaler Ablauf über `main`. |
+| 1 | **#371** ⚠️ | Jede Quiz-Karte erreicht den SR-Pool (22 Karten werden nie gelernt) | Lern-Lücke aus #368: 22 von 111 Quiz-Karten landen nie im Spaced-Repetition-Pool – widerspricht dem „am Ende alles lernen"-Kern. Vorschlag: `chapter`-Feld + Auto-Registrierung wie CMD_CARDS (#352) + Wächter-Test, dass keine Karte rausfällt. 11 Waisen sofort einhängbar; 11 (RBAC) warten auf Wachturm #130. ⚠️ Berührt Gameplay/Save – `registerQuestCards` idempotent halten, Alt-Stände nicht brechen, Lernreihenfolge-Wächter (#235) beachten, im Browser verifizieren. |
 | 2 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. Profitiert von den sprechenden Quest-IDs (#354, erledigt). |
 | 3 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
 | 4 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
