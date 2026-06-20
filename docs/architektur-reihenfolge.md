@@ -1,6 +1,6 @@
 # Architektur-Reihenfolge
 
-> **Stand: 2026-06-21 (nach #396).** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
+> **Stand: 2026-06-21 (nach #388).** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
 > Diese Liste **überschreibt** für Architektur-Tickets die generische Board-Auswahl (Prio→Nummer aus AGENTS.md):
 > Die Reihenfolge hier ist **abhängigkeitsbewusst** sortiert, nicht nur nach Prio-Label.
 
