@@ -18,8 +18,10 @@
  *  Einzeldatei (src/ui.ts, src/sfx.ts) als auch die Modul-Ordner ab (src/scenes/*
  *  seit dem scenes.ts-Split #345; analog künftig src/ui/*). */
 const PRESENTATION = "^src/(scenes|ui|sfx)(\\.ts$|/)";
-/** Anwendungs-/Persistenzschicht – muss phaser- und präsentationsfrei bleiben. */
-const APPLICATION = "^src/(game|runtime|devpanel|store)\\.ts$";
+/** Anwendungs-/Persistenzschicht – muss phaser- und präsentationsfrei bleiben. Deckt sowohl
+ *  die Einzeldatei (src/game.ts, src/store.ts …) als auch den Modul-Ordner src/game/* ab
+ *  (game.ts-Split #392, analog zu src/scenes/* #345 und src/ui/* #356). */
+const APPLICATION = "^src/(game|runtime|devpanel|store)(\\.ts$|/)";
 /** Einstieg/Assets – main bootet bewusst Phaser + Szenen; assets-data hält PNG-Imports. */
 const ENTRY = "^src/(main|assets-data)\\.ts$";
 /** Phaser, egal über welchen aufgelösten Pfad (Pfad beginnt mit `node_modules/…`, kein führender Slash). */

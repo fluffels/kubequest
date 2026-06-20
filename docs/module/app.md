@@ -6,7 +6,13 @@
 |---|---|---|
 | `src/main.ts` | Einstieg | Start & Tastatursteuerung; registriert die Szenen (`KQScenes`) und ruft beim Boot `await SaveStore.init()` vor `Game.load()`. |
 | `src/types.ts` | Typen | Zentrale Typen (GameState, Quest, …). (Die Cluster-Ressourcen-Typen liegen dagegen in `src/sim/state.ts`, siehe [sim.md](sim.md).) |
-| `src/game.ts` | Anwendung | Spielstand, XP, Wirtschaft, Spaced Repetition. **`sanitizeState`** härtet kaputte/fehlende Felder gegen die Defaults ab (auch Migration alter Index-Stände → `currentQuestId`). `LEGACY_QUEST_ID_MAP` mappt umbenannte Quest-IDs. ⚠️ Aufteilung geplant (#392) — dabei Saves/`sanitizeState`/Migration penibel grün halten. |
+| `src/game.ts` | Anwendung | Dünne **`Game`-Fassade/Barrel** (#392): deklariert den veränderlichen Spielzustand (`state`/`sim`/`incomeAcc`/`offlineEarnings`) und komponiert die öffentliche API per Spread aus den `src/game/*`-Bündeln. Re-exportiert die Freischalt-Konstanten aus `game/shared.ts`. Logik siehe unten. |
+| `src/game/shared.ts` | Anwendung | Geteilte Bausteine des Splits: `part`/`GameSelf` (this-Typ, Daten-Felder getypt, Methoden permissiv), `today`, die Quest-ID↔Index-Brücke (#353), `makeDefaultState`, `isEventMode`, die Freischalt-Schwellen (`ALL_ABBREV_UNLOCKED`/`ABBREV_EARN_THRESHOLD`/`CMD_HISTORY_UNLOCK_AT`). |
+| `src/game/save.ts` | Anwendung | Persistenz: `load`/`save`/`reset`/`exportData`/`importData` + **`sanitizeState`** (härtet kaputte/fehlende Felder gegen die Defaults ab, inkl. Migration alter Index-Stände → `currentQuestId`) + `LEGACY_QUEST_ID_MAP` (umbenannte Quest-IDs #354). |
+| `src/game/economy.ts` | Anwendung | Hafen-Wirtschaft (`incomeRate`/`economyTick`/`eventProfile`/`EVENT_PROFILES` #71), Streak (`touchStreak`/`coinMultiplier`), XP/Rang, Dublonen und Shop (`buy`/`useConsumable`). |
+| `src/game/progression.ts` | Anwendung | Quest-Fortschritt (`currentQuest`/`advanceStep`/`allQuestsDone`), Dev-/Test-Sprung (`getQuestRoadmap`/`spawnAtQuestGiver`/`jumpToQuest` #329) und freies Üben (`practiceDrillsFor`). |
+| `src/game/unlocks.ts` | Anwendung | „Verdiente" Freischaltungen: Abkürzungen (#287/#297/#313) und ↑/↓-Befehlshistorie (#316) — additive Flags, die ein Alt-Stand regulär nachverdient. |
+| `src/game/spaced-repetition.ts` | Anwendung | Leitner-Spaced-Repetition: Review-Plan (Box 1..5 + Fälligkeit), Review-Gate (#222/#323), freies Üben. |
 | `src/runtime.ts` | Anwendung | Laufzeit-Singletons (ersetzt den früheren `window`-Shim; bricht Import-Zyklen). |
 | `src/devpanel.ts` | Anwendung | Dev-/Test-Panel (#325): klickbares Panel zum Springen auf beliebigen Quest-Stand (Jump-API #329), Erststart und Reset — nur aktiv wenn `__KQ_DEVPANEL__` true (Devpanel-Build #331); Phaser-frei, DOM-Anbindung in `ui.ts`. |
 | `src/store.ts` | Persistenz | **SaveStore** — siehe unten. |

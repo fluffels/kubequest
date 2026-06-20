@@ -97,7 +97,13 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/harbormap.ts`](src/harbormap.ts) | pure Domäne | Hafenkarte als Daten + Tiled-Serialisierung (#192). |
 | [`src/mapregistry.ts`](src/mapregistry.ts) | pure Domäne | Zentrale Map-Registry (ID → `.tmj` + Metadaten, #193). |
 | [`src/types.ts`](src/types.ts) | Typen | Zentrale Typen (GameState, Quest, …). → [app.md](docs/module/app.md) |
-| [`src/game.ts`](src/game.ts) | Anwendung | Spielstand, XP, Wirtschaft, Spaced Repetition; `sanitizeState`. |
+| [`src/game.ts`](src/game.ts) | Anwendung | `Game`-Fassade/Barrel (#356-Muster): State-Felder + Spread der `src/game/*`-Bündel. → [app.md](docs/module/app.md) |
+| [`src/game/shared.ts`](src/game/shared.ts) | Anwendung | Geteilte Bausteine: `part`/`GameSelf`, `today`, Quest-ID↔Index-Brücke, `makeDefaultState`, Freischalt-Konstanten. |
+| [`src/game/save.ts`](src/game/save.ts) | Anwendung | Laden/Speichern/Reset/Export/Import + `sanitizeState` + `LEGACY_QUEST_ID_MAP`. |
+| [`src/game/economy.ts`](src/game/economy.ts) | Anwendung | Hafen-Wirtschaft, Streak, XP/Rang, Dublonen, Shop. |
+| [`src/game/progression.ts`](src/game/progression.ts) | Anwendung | Quest-Fortschritt, Dev-Sprung (#329), freies Üben. |
+| [`src/game/unlocks.ts`](src/game/unlocks.ts) | Anwendung | Verdiente Abkürzungen (#313) + Befehlshistorie (#316). |
+| [`src/game/spaced-repetition.ts`](src/game/spaced-repetition.ts) | Anwendung | Leitner-Spaced-Repetition + Review-Gate. |
 | [`src/runtime.ts`](src/runtime.ts) | Anwendung | Laufzeit-Singletons (bricht Import-Zyklen). |
 | [`src/devpanel.ts`](src/devpanel.ts) | Anwendung | Dev-/Test-Panel (#325/#331). |
 | [`src/store.ts`](src/store.ts) | Persistenz | SaveStore: IndexedDB-Backend, sync API via In-Memory-Cache (#350). |
