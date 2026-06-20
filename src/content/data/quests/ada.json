@@ -1,6 +1,6 @@
 [
   {
-    "id": "q8",
+    "id": "k8s-apply-manifests",
     "title": "Adas Seekarten",
     "giver": "ada",
     "rewardXp": 45,
@@ -124,7 +124,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(ingress|ingresses|ing)$"
             ],
-            "check": "q8/t-ada-6",
+            "check": "k8s-apply-manifests/t-ada-6",
             "solution": "kubectl get ingress",
             "hint": "Kurzform 'ing' geht auch."
           }
@@ -158,7 +158,7 @@
     ]
   },
   {
-    "id": "q18",
+    "id": "git-version-control",
     "title": "Seekarten versionieren",
     "giver": "ada",
     "rewardXp": 45,
@@ -327,7 +327,7 @@
     ]
   },
   {
-    "id": "q19",
+    "id": "git-feature-branch",
     "title": "Ein eigener Zweig",
     "giver": "ada",
     "rewardXp": 50,
@@ -498,7 +498,7 @@
     ]
   },
   {
-    "id": "q20",
+    "id": "git-pipeline",
     "title": "Die Pipeline-Passage",
     "giver": "ada",
     "rewardXp": 60,
@@ -688,7 +688,7 @@
     ]
   },
   {
-    "id": "q25",
+    "id": "git-merge-branches",
     "title": "Zwei Karten, eine Linie",
     "giver": "ada",
     "rewardXp": 55,
@@ -721,7 +721,7 @@
           "accept": [
             "^git\\s+fetch$"
           ],
-          "check": "q25/t-git-fetch",
+          "check": "git-merge-branches/t-git-fetch",
           "solution": "git fetch",
           "hint": "git + ein Wort fürs „abholen, aber nicht einfügen“."
         }
@@ -743,7 +743,7 @@
           "accept": [
             "^git\\s+pull$"
           ],
-          "check": "q25/t-git-pull",
+          "check": "git-merge-branches/t-git-pull",
           "solution": "git pull",
           "hint": "git + ein Wort fürs „herziehen“."
         }
@@ -766,7 +766,7 @@
           "accept": [
             "^git\\s+merge\\s+lennart-route$"
           ],
-          "check": "q25/t-git-merge-conflict",
+          "check": "git-merge-branches/t-git-merge-conflict",
           "solution": "git merge lennart-route",
           "hint": "Muster: git merge <branch>"
         }
@@ -806,7 +806,7 @@
             "accept": [
               "^git\\s+checkout\\s+--theirs\\s+seekarte\\.md$"
             ],
-            "check": "q25/t-conf-theirs",
+            "check": "git-merge-branches/t-conf-theirs",
             "solution": "git checkout --theirs seekarte.md",
             "hint": "git checkout --theirs <datei> wählt die hereinkommende Seite (--ours wäre deine)."
           },
@@ -816,7 +816,7 @@
             "accept": [
               "^git\\s+add\\s+seekarte\\.md$"
             ],
-            "check": "q25/t-conf-add",
+            "check": "git-merge-branches/t-conf-add",
             "solution": "git add seekarte.md",
             "hint": "Wie immer: git add <datei> – das sagt Git „erledigt“."
           },
@@ -826,7 +826,7 @@
             "accept": [
               "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
             ],
-            "check": "q25/t-conf-commit",
+            "check": "git-merge-branches/t-conf-commit",
             "solution": "git commit -m \"Konflikt geloest: Lennarts Route\"",
             "hint": "Muster: git commit -m \"Nachricht\""
           }
@@ -849,7 +849,7 @@
           "accept": [
             "^git\\s+push$"
           ],
-          "check": "q25/t-git-push-resolved",
+          "check": "git-merge-branches/t-git-push-resolved",
           "solution": "git push",
           "hint": "Wirklich nur: git push"
         }
@@ -910,7 +910,7 @@
     ]
   },
   {
-    "id": "q23",
+    "id": "secrets-encrypted",
     "title": "Das verschlüsselte Hafentor",
     "giver": "ada",
     "rewardXp": 65,
@@ -987,7 +987,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(ingress|ingresses|ing)$"
             ],
-            "check": "q23/t-ada-tls-3",
+            "check": "secrets-encrypted/t-ada-tls-3",
             "solution": "kubectl get ingress",
             "hint": "Kurzform 'ing' geht auch."
           },

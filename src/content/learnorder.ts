@@ -12,15 +12,15 @@
  * Quellen 2 und 3 sind per Konstruktion in-Ordnung: Die Frage/der Drill erscheint
  * erst an der Stelle, an der das Konzept gerade gelehrt wurde. Nur bei EXTRA_CARDS
  * wird eine Karte von Hand an eine Quest gehängt – und kann dabei VOR ihrer Lektion
- * landen (konkret gefunden: `q-ch2-4` Self-Healing hing an q4, bewiesen wird
- * Self-Healing aber erst in q7, siehe #227).
+ * landen (konkret gefunden: `q-ch2-4` Self-Healing hing an k8s-first-deployment, bewiesen wird
+ * Self-Healing aber erst in k8s-self-healing, siehe #227).
  *
  * Darum führt diese Map für JEDE über EXTRA_CARDS platzierte Karte die Quest auf,
  * in der ihr Konzept zum ERSTEN Mal eingeführt wird (Beleg jeweils im Kommentar).
  * Der Test (test/learnorder.test.ts) prüft: Freischalt-Quest ≥ Einführungs-Quest
  * (in Spielreihenfolge = Reihenfolge des QUESTS-Arrays, NICHT der Nummer).
  *
- * Reihenfolge im Array weicht von den Nummern ab, z.B. … q14 → q26 → q15 …; deshalb
+ * Reihenfolge im Array weicht von den Nummern ab, z.B. … kraken-boss → k8s-configmap-secret → k8s-debug-imagepull …; deshalb
  * wird die Reihenfolge im Test immer aus dem QUESTS-Array abgeleitet, nie aus der Zahl.
  */
 
@@ -30,53 +30,53 @@
  *  sonst schlägt der Vollständigkeits-Test fehl. */
 export const CONCEPT_INTRO: Record<string, string> = {
   // ----- Docker-Grundlagen -----
-  "q-flag-ps-a": "q2",        // docker ps -a (Variante "auch gestoppte" in q2 eingeführt)
-  "q-ch1-3": "q1",            // Registry/Docker Hub (docker pull aus der Registry, q1)
-  "q-ch1-5": "q2",            // Image besteht aus Schichten (Stapel-Spiel bei Bo, q2)
-  "q-flag-run-d": "q3",       // docker run -d (q3)
-  "q-flag-run-name": "q3",    // docker run --name (q3)
-  "q-flag-build-t": "q3b",    // docker build -t/--tag, „tag“-Bedeutungen (q3b, #285)
+  "q-flag-ps-a": "docker-list-containers",        // docker ps -a (Variante "auch gestoppte" in docker-list-containers eingeführt)
+  "q-ch1-3": "docker-first-container",            // Registry/Docker Hub (docker pull aus der Registry, docker-first-container)
+  "q-ch1-5": "docker-list-containers",            // Image besteht aus Schichten (Stapel-Spiel bei Bo, docker-list-containers)
+  "q-flag-run-d": "docker-run-options",       // docker run -d (docker-run-options)
+  "q-flag-run-name": "docker-run-options",    // docker run --name (docker-run-options)
+  "q-flag-build-t": "docker-build-image",    // docker build -t/--tag, „tag“-Bedeutungen (docker-build-image, #285)
   // ----- Kubernetes-Grundlagen -----
-  "q-ch2-1": "q4",            // wofür Kubernetes (Hafen wird Cluster, q4)
-  "q-ch2-4": "q7",            // Self-Healing wird erst in q7 bewiesen (war fälschlich an q4)
-  "q-flag-kubectl-n": "q5",   // kubectl -n <namespace> (q5)
-  "q-ch3-2": "q7",            // Pod gelöscht → ersetzt (Self-Healing live, q7)
-  "q-tools-ingress": "q7",    // Ingress (erstmals erklärt im q7-Dialog "Hafentor")
+  "q-ch2-1": "k8s-first-deployment",            // wofür Kubernetes (Hafen wird Cluster, k8s-first-deployment)
+  "q-ch2-4": "k8s-self-healing",            // Self-Healing wird erst in k8s-self-healing bewiesen (war fälschlich an k8s-first-deployment)
+  "q-flag-kubectl-n": "k8s-inspect-pods",   // kubectl -n <namespace> (k8s-inspect-pods)
+  "q-ch3-2": "k8s-self-healing",            // Pod gelöscht → ersetzt (Self-Healing live, k8s-self-healing)
+  "q-tools-ingress": "k8s-self-healing",    // Ingress (erstmals erklärt im k8s-self-healing-Dialog "Hafentor")
   // ----- YAML / deklarativ -----
-  "q-ch4-1": "q8",            // imperativ vs. deklarativ (Adas Seekarten, q8)
-  "q-ch4-2": "q8",            // kind-Feld im Manifest (q8)
-  "q-ch4-3": "q8",            // YAML-Einrückung (q8)
-  "q-flag-apply-f": "q8",     // kubectl apply -f (q8)
+  "q-ch4-1": "k8s-apply-manifests",            // imperativ vs. deklarativ (Adas Seekarten, k8s-apply-manifests)
+  "q-ch4-2": "k8s-apply-manifests",            // kind-Feld im Manifest (k8s-apply-manifests)
+  "q-ch4-3": "k8s-apply-manifests",            // YAML-Einrückung (k8s-apply-manifests)
+  "q-flag-apply-f": "k8s-apply-manifests",     // kubectl apply -f (k8s-apply-manifests)
   // ----- Helm + reale Tools -----
-  "q-ch5-3": "q10",           // values.yaml als Drehknöpfe (q10)
-  "q-tools-stack": "q9",      // PostgreSQL/Redis (Werft-Aufzählung im q9-Dialog)
-  "q-tools-monitoring": "q9", // Prometheus/Grafana (q9-Dialog)
-  "q-flag-helm-set": "q11",   // helm upgrade --set (q11)
-  // Umbrella-/Bundle-Charts (#264): im q21-Schluss-Dialog (Runa) erklärt
-  "q-helm-deps": "q21",            // Umbrella-Chart = Eltern-Chart mit dependencies:
-  "q-helm-lock": "q21",            // helm dependency update / Chart.lock
-  "q-helm-umbrella-term": "q21",   // „Umbrella“ ist inoffizieller Begriff
-  "q-helm-condition": "q21",       // condition:-Toggle für Subcharts
-  "q-helm-subchart-source": "q21", // vendored vs. aus Registry
+  "q-ch5-3": "helm-release-install",           // values.yaml als Drehknöpfe (helm-release-install)
+  "q-tools-stack": "helm-intro",      // PostgreSQL/Redis (Werft-Aufzählung im helm-intro-Dialog)
+  "q-tools-monitoring": "helm-intro", // Prometheus/Grafana (helm-intro-Dialog)
+  "q-flag-helm-set": "helm-upgrade-rollback",   // helm upgrade --set (helm-upgrade-rollback)
+  // Umbrella-/Bundle-Charts (#264): im helm-umbrella-chart-Schluss-Dialog (Runa) erklärt
+  "q-helm-deps": "helm-umbrella-chart",            // Umbrella-Chart = Eltern-Chart mit dependencies:
+  "q-helm-lock": "helm-umbrella-chart",            // helm dependency update / Chart.lock
+  "q-helm-umbrella-term": "helm-umbrella-chart",   // „Umbrella“ ist inoffizieller Begriff
+  "q-helm-condition": "helm-umbrella-chart",       // condition:-Toggle für Subcharts
+  "q-helm-subchart-source": "helm-umbrella-chart", // vendored vs. aus Registry
   // ----- Terraform -----
-  "q-ch6-1": "q12",           // Infrastructure as Code (Theos Neuland, q12)
-  "q-ch6-4": "q13",           // Kubernetes vs. Terraform (q13)
+  "q-ch6-1": "terraform-intro",           // Infrastructure as Code (Theos Neuland, terraform-intro)
+  "q-ch6-4": "terraform-state-destroy",           // Kubernetes vs. Terraform (terraform-state-destroy)
   // ----- Security + Tools -----
-  "q-sec-2": "q14",           // Klartext-Passwörter in YAML / Secrets (q14)
-  "q-tools-keycloak": "q9",   // Keycloak (erstmals erwähnt im q9-Dialog)
+  "q-sec-2": "kraken-boss",           // Klartext-Passwörter in YAML / Secrets (kraken-boss)
+  "q-tools-keycloak": "helm-intro",   // Keycloak (erstmals erwähnt im helm-intro-Dialog)
   // ----- Troubleshooting -----
-  "q-ts-4": "q15",            // Debugging-Mantra get pods → describe → logs (q15)
-  "q-ts-5": "q16",            // kubectl rollout restart (q16)
+  "q-ts-4": "k8s-debug-imagepull",            // Debugging-Mantra get pods → describe → logs (k8s-debug-imagepull)
+  "q-ts-5": "k8s-debug-crashloop",            // kubectl rollout restart (k8s-debug-crashloop)
   // ----- Git / CI Bausteine -----
-  "q-flag-git-commit-m": "q18",   // git commit -m (q18)
-  "q-flag-git-checkout-b": "q19", // git checkout -b (q19)
-  "q-flag-git-add-dot": "q20",    // git add . (q20)
+  "q-flag-git-commit-m": "git-version-control",   // git commit -m (git-version-control)
+  "q-flag-git-checkout-b": "git-feature-branch", // git checkout -b (git-feature-branch)
+  "q-flag-git-add-dot": "git-pipeline",    // git add . (git-pipeline)
   // ----- Monitoring-Leuchtturm (Phase 5, #118) -----
-  "q-obs-targets": "q32",         // Scrape-Targets up/down (Prometheus-Scrape in q32 eingeführt)
-  "q-obs-logs-follow": "q34",     // kubectl logs -f/--follow (teach-Schritt in q34)
-  "q-obs-promql": "q35",          // PromQL erstmals als expr der PrometheusRule gezeigt (q35)
-  "q-obs-prom-rule": "q35",       // PrometheusRule angewandt & erklärt (q35)
-  "q-obs-alertmanager": "q35",    // Alertmanager im q35-Dialog eingeführt
+  "q-obs-targets": "observability-metrics",         // Scrape-Targets up/down (Prometheus-Scrape in observability-metrics eingeführt)
+  "q-obs-logs-follow": "observability-logs",     // kubectl logs -f/--follow (teach-Schritt in observability-logs)
+  "q-obs-promql": "observability-alerts",          // PromQL erstmals als expr der PrometheusRule gezeigt (observability-alerts)
+  "q-obs-prom-rule": "observability-alerts",       // PrometheusRule angewandt & erklärt (observability-alerts)
+  "q-obs-alertmanager": "observability-alerts",    // Alertmanager im observability-alerts-Dialog eingeführt
 };
 
 /** Reine Prüflogik (testbar, ohne Spielzustand): Vergleicht je Karte die

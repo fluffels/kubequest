@@ -1,6 +1,6 @@
 [
   {
-    "id": "q1",
+    "id": "docker-first-container",
     "title": "Die erste Kiste",
     "giver": "bo",
     "rewardXp": 25,
@@ -88,7 +88,7 @@
     ]
   },
   {
-    "id": "q2",
+    "id": "docker-list-containers",
     "title": "Den Überblick behalten",
     "giver": "bo",
     "rewardXp": 30,
@@ -133,7 +133,7 @@
           "accept": [
             "^docker\\s+stop\\s+\\S+$"
           ],
-          "check": "q2/t-stop",
+          "check": "docker-list-containers/t-stop",
           "solution": "docker stop <name aus docker ps>",
           "hint": "Erst docker ps für den Namen, dann docker stop <name>."
         }
@@ -200,7 +200,7 @@
     ]
   },
   {
-    "id": "q2b",
+    "id": "docker-stack-minigame",
     "title": "Bos Stapel-Spiel",
     "giver": "bo",
     "rewardXp": 15,
@@ -223,7 +223,7 @@
     ]
   },
   {
-    "id": "q3",
+    "id": "docker-run-options",
     "title": "Namen und Hintergrund",
     "giver": "bo",
     "rewardXp": 35,
@@ -294,7 +294,7 @@
     ]
   },
   {
-    "id": "q3b",
+    "id": "docker-build-image",
     "title": "Dein eigener Bauplan",
     "giver": "bo",
     "rewardXp": 40,

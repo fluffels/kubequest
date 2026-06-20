@@ -427,7 +427,7 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
     /** Menü: Plaudern / Üben / Stapel-Spiel */
     showNpcMenu(npcId: string) {
       const drills = Game.practiceDrillsFor(npcId);
-      const stackOk = npcId === "bo" && Game.state.completedQuests.includes("q2");
+      const stackOk = npcId === "bo" && Game.state.completedQuests.includes("docker-list-containers");
       if (drills.length === 0 && !stackOk) {
         const lines = SMALLTALK[npcId] || ["…"];
         return this.showDialogue(npcId, [lines[Math.floor(Math.random() * lines.length)]]);
@@ -507,7 +507,7 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
       if (!step) return;
       // Szenario eines Dialog-/Choice-Schritts beim Betreten einmischen. Funk-Schritte
       // bekommen ihr Szenario in afterStep/finishFunkStep; Dialog-/Choice-Schritte liefen
-      // bisher durch keinen Merge-Pfad, sodass z.B. das Dockerfile aus q3b live fehlte und
+      // bisher durch keinen Merge-Pfad, sodass z.B. das Dockerfile aus docker-build-image live fehlte und
       // erst nach einem Reload (game.ts re-merged erreichte Szenarien) auftauchte (#214).
       if (step.scenario) { Game.sim.mergeScenario(step.scenario); Game.save(); }
       if (step.type === "dialog") {

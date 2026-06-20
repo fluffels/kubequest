@@ -1,6 +1,6 @@
 [
   {
-    "id": "q28",
+    "id": "gitops-argocd-intro",
     "title": "Das Logbuch der Insel",
     "giver": "argo",
     "rewardXp": 40,
@@ -79,7 +79,7 @@
     ]
   },
   {
-    "id": "q29",
+    "id": "gitops-self-sync",
     "title": "Die selbstsegelnde Seekarte",
     "giver": "argo",
     "rewardXp": 55,
@@ -186,7 +186,7 @@
           "accept": [
             "^argocd\\s+app\\s+get\\s+hafen-lager$"
           ],
-          "check": "q29/t-argo-get",
+          "check": "gitops-self-sync/t-argo-get",
           "solution": "argocd app get hafen-lager",
           "hint": "argocd app get <name> – den Namen zeigt 'argocd app list'."
         }
@@ -209,7 +209,7 @@
           "accept": [
             "^argocd\\s+app\\s+sync\\s+hafen-lager$"
           ],
-          "check": "q29/t-argo-sync",
+          "check": "gitops-self-sync/t-argo-sync",
           "solution": "argocd app sync hafen-lager",
           "hint": "argocd app sync <name>."
         }
@@ -224,7 +224,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
             ],
-            "check": "q29/t-argo-verify",
+            "check": "gitops-self-sync/t-argo-verify",
             "solution": "kubectl get deployments",
             "hint": "kubectl get deployments (oder deploy)."
           }
@@ -258,7 +258,7 @@
     ]
   },
   {
-    "id": "q30",
+    "id": "gitops-drift-detection",
     "title": "Der stille Wächter",
     "giver": "argo",
     "rewardXp": 60,
@@ -328,7 +328,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+application-selfheal\\.yaml$"
           ],
-          "check": "q30/t-sh-apply",
+          "check": "gitops-drift-detection/t-sh-apply",
           "solution": "kubectl apply -f application-selfheal.yaml",
           "hint": "kubectl apply -f <datei> – der vertraute Befehl."
         }
@@ -350,7 +350,7 @@
             "accept": [
               "^argocd\\s+app\\s+get\\s+hafen-lager$"
             ],
-            "check": "q30/t-sh-get-before",
+            "check": "gitops-drift-detection/t-sh-get-before",
             "solution": "argocd app get hafen-lager",
             "hint": "argocd app get hafen-lager"
           },
@@ -360,7 +360,7 @@
             "accept": [
               "^kubectl\\s+scale\\s+(deployment\\/hafen-lager|deployment\\s+hafen-lager)\\s+--replicas[=\\s]+0$"
             ],
-            "check": "q30/t-sh-scale",
+            "check": "gitops-drift-detection/t-sh-scale",
             "solution": "kubectl scale deployment hafen-lager --replicas=0",
             "hint": "kubectl scale deployment hafen-lager --replicas=0"
           },
@@ -370,7 +370,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
             ],
-            "check": "q30/t-sh-get-after",
+            "check": "gitops-drift-detection/t-sh-get-after",
             "solution": "kubectl get deployments",
             "hint": "kubectl get deployments"
           }
@@ -410,7 +410,7 @@
     ]
   },
   {
-    "id": "q31",
+    "id": "gitops-app-of-apps",
     "title": "Die Flotte aus einer Hand",
     "giver": "argo",
     "rewardXp": 65,
@@ -504,7 +504,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+app-of-apps\\.yaml$"
           ],
-          "check": "q31/t-aoa-apply",
+          "check": "gitops-app-of-apps/t-aoa-apply",
           "solution": "kubectl apply -f app-of-apps.yaml",
           "hint": "kubectl apply -f app-of-apps.yaml – der vertraute Befehl, diesmal für die Wurzel."
         }
@@ -526,7 +526,7 @@
             "accept": [
               "^argocd\\s+app\\s+(list|ls)$"
             ],
-            "check": "q31/t-aoa-list",
+            "check": "gitops-app-of-apps/t-aoa-list",
             "solution": "argocd app list",
             "hint": "argocd app list (oder ls)."
           },
@@ -536,7 +536,7 @@
             "accept": [
               "^argocd\\s+app\\s+get\\s+hafen-flotte$"
             ],
-            "check": "q31/t-aoa-get",
+            "check": "gitops-app-of-apps/t-aoa-get",
             "solution": "argocd app get hafen-flotte",
             "hint": "argocd app get hafen-flotte"
           },
@@ -546,7 +546,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
             ],
-            "check": "q31/t-aoa-deploys",
+            "check": "gitops-app-of-apps/t-aoa-deploys",
             "solution": "kubectl get deployments",
             "hint": "kubectl get deployments"
           }

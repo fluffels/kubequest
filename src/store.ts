@@ -64,7 +64,7 @@
    *   2. Eine Migration migrations[n] ergänzen, die `data` von Version n auf n+1 bringt.
    * Die Kette läuft dann automatisch jede Zwischenstufe der Reihe nach durch.
    */
-  export const CURRENT_SAVE_VERSION = 2;
+  export const CURRENT_SAVE_VERSION = 3;
 
   /** Migration von Format-Version n auf n+1 (reine Funktion auf dem `data`-Objekt). */
   type Migration = (data: unknown) => unknown;
@@ -84,6 +84,13 @@
     //         v1-Stand vor dem ersten Überschreiben in den Backup-Slot gesichert wird
     //         (readState) – kein Spieler verliert beim Update seinen Fortschritt.
     1: (data) => data,
+    // 2 -> 3 (#354): Quest-IDs von numerisch (q5, q2b) auf sprechende Slugs umbenannt
+    //         (harbor-/k8s-/git-… ). Quest-IDs sind persistiert (completedQuests +
+    //         currentQuestId), also remappt die Migration alt -> neu. Wie bei 1->2 strukturell
+    //         ein No-op auf store-Ebene: das eigentliche Remapping liegt in game.ts ›
+    //         sanitizeState (LEGACY_QUEST_ID_MAP), damit es ALLE Ladewege trifft (auch der
+    //         rohe JSON-Import). Der Bump sichert jeden v2-Stand vor dem Überschreiben.
+    2: (data) => data,
   };
 
   /** Hebt `data` von `version` schrittweise auf CURRENT_SAVE_VERSION. */

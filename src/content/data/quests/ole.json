@@ -1,6 +1,6 @@
 [
   {
-    "id": "q0",
+    "id": "onboarding-sign-on",
     "title": "Anheuern in Port Kubernia",
     "giver": "ole",
     "rewardXp": 15,
@@ -40,7 +40,7 @@
     ]
   },
   {
-    "id": "q4",
+    "id": "k8s-first-deployment",
     "title": "Der Hafen wird ein Cluster",
     "giver": "ole",
     "rewardXp": 30,
@@ -146,7 +146,7 @@
     ]
   },
   {
-    "id": "q5",
+    "id": "k8s-inspect-pods",
     "title": "Genauer hinsehen",
     "giver": "ole",
     "rewardXp": 30,
@@ -254,7 +254,7 @@
     ]
   },
   {
-    "id": "q6",
+    "id": "k8s-service",
     "title": "Der Dauerauftrag",
     "giver": "ole",
     "rewardXp": 35,
@@ -336,7 +336,7 @@
     ]
   },
   {
-    "id": "q7",
+    "id": "k8s-self-healing",
     "title": "Der Sturm-Test",
     "giver": "ole",
     "rewardXp": 45,
@@ -388,7 +388,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q7/t-storm-3",
+            "check": "k8s-self-healing/t-storm-3",
             "solution": "kubectl get pods",
             "hint": "Nochmal die Pod-Liste."
           }
@@ -428,7 +428,7 @@
           "accept": [
             "^kubectl\\s+get\\s+(services|service|svc)$"
           ],
-          "check": "q7/t-getsvc",
+          "check": "k8s-self-healing/t-getsvc",
           "solution": "kubectl get services",
           "hint": "Kurzform svc geht auch."
         }
@@ -465,7 +465,7 @@
     ]
   },
   {
-    "id": "q14",
+    "id": "kraken-boss",
     "title": "Die Hacker-Krake",
     "giver": "ole",
     "rewardXp": 60,
@@ -575,7 +575,7 @@
     ]
   },
   {
-    "id": "q26",
+    "id": "k8s-configmap-secret",
     "title": "Truhe trifft Kombüse",
     "giver": "ole",
     "rewardXp": 55,
@@ -618,7 +618,7 @@
         "brief": "Das Geheimnis",
         "tasks": [
           {
-            "id": "t-q26-secret",
+            "id": "t-k8s-configmap-secret-secret",
             "text": "Jetzt das Vertrauliche: Lege ein Secret <code>passagier-geheim</code> an (z.B. <code>--from-literal=db_passwort=tiefsee42</code>).",
             "accept": [
               "^kubectl\\s+create\\s+secret\\s+generic\\s+passagier-geheim\\s+--from-literal[=\\s][\\w.-]+=\\S+$"
@@ -647,13 +647,13 @@
         "brief": "Geheimnis einbinden",
         "tasks": [
           {
-            "id": "t-q26-bind-secret",
+            "id": "t-k8s-configmap-secret-bind-secret",
             "text": "Und jetzt dasselbe fürs Secret – genau gleich, nur <code>--from=secret/passagier-geheim</code>. Erst dann kennt die App ihr Passwort.",
             "accept": [
               "^kubectl\\s+set\\s+env\\s+deployment\\/passagierliste\\s+--from[=\\s]secret\\/passagier-geheim$"
             ],
             "solution": "kubectl set env deployment/passagierliste --from=secret/passagier-geheim",
-            "check": "q26/t-q26-bind-secret",
+            "check": "k8s-configmap-secret/t-k8s-configmap-secret-bind-secret",
             "hint": "kubectl set env deployment/passagierliste --from=secret/<secret-name>"
           }
         ]

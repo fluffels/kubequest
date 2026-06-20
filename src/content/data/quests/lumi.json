@@ -1,6 +1,6 @@
 [
   {
-    "id": "q32",
+    "id": "observability-metrics",
     "title": "Licht ins Dunkel: die ersten Metriken",
     "giver": "lumi",
     "rewardXp": 50,
@@ -158,7 +158,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+servicemonitor\\.yaml$"
           ],
-          "check": "q32/t-sm-apply",
+          "check": "observability-metrics/t-sm-apply",
           "solution": "kubectl apply -f servicemonitor.yaml",
           "hint": "kubectl apply -f <datei> – der vertraute Befehl aus dem Kartenhaus."
         }
@@ -173,7 +173,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(servicemonitors|servicemonitor|smon)$"
             ],
-            "check": "q32/t-sm-get",
+            "check": "observability-metrics/t-sm-get",
             "solution": "kubectl get servicemonitors",
             "hint": "kubectl get servicemonitors (Kurzform: smon)."
           }
@@ -213,7 +213,7 @@
     ]
   },
   {
-    "id": "q33",
+    "id": "observability-grafana",
     "title": "Zahlen in Bilder: das Grafana-Dashboard",
     "giver": "lumi",
     "rewardXp": 55,
@@ -284,7 +284,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+grafanadatasource\\.yaml$"
           ],
-          "check": "q33/t-ds-apply",
+          "check": "observability-grafana/t-ds-apply",
           "solution": "kubectl apply -f grafanadatasource.yaml",
           "hint": "kubectl apply -f <datei> – der vertraute Befehl."
         }
@@ -299,7 +299,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(grafanadatasources|grafanadatasource|grafanadatasrc)$"
             ],
-            "check": "q33/t-ds-get",
+            "check": "observability-grafana/t-ds-get",
             "solution": "kubectl get grafanadatasources",
             "hint": "kubectl get grafanadatasources (Kurzform: grafanadatasrc)."
           }
@@ -383,7 +383,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+grafanadashboard\\.yaml$"
           ],
-          "check": "q33/t-gd-apply",
+          "check": "observability-grafana/t-gd-apply",
           "solution": "kubectl apply -f grafanadashboard.yaml",
           "hint": "kubectl apply -f <datei> – wie immer."
         }
@@ -398,7 +398,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(grafanadashboards|grafanadashboard|grafanadash)$"
             ],
-            "check": "q33/t-gd-get",
+            "check": "observability-grafana/t-gd-get",
             "solution": "kubectl get grafanadashboards",
             "hint": "kubectl get grafanadashboards (Kurzform: grafanadash)."
           }
@@ -438,7 +438,7 @@
     ]
   },
   {
-    "id": "q34",
+    "id": "observability-logs",
     "title": "Was die App zu sagen hat: kubectl logs",
     "giver": "lumi",
     "rewardXp": 50,
@@ -616,7 +616,7 @@
     ]
   },
   {
-    "id": "q35",
+    "id": "observability-alerts",
     "title": "Der Cluster ruft: Alerts & PrometheusRule",
     "giver": "lumi",
     "rewardXp": 60,
@@ -697,7 +697,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+prometheusrule\\.yaml$"
           ],
-          "check": "q35/t-pr-apply",
+          "check": "observability-alerts/t-pr-apply",
           "solution": "kubectl apply -f prometheusrule.yaml",
           "hint": "kubectl apply -f <datei> – der vertraute Befehl."
         }
@@ -712,7 +712,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(prometheusrules|prometheusrule|promrule|promrules)$"
             ],
-            "check": "q35/t-pr-get",
+            "check": "observability-alerts/t-pr-get",
             "solution": "kubectl get prometheusrules",
             "hint": "kubectl get prometheusrules (Kurzform: promrules)."
           }
@@ -728,7 +728,7 @@
           "accept": [
             "^kubectl\\s+get\\s+alerts$"
           ],
-          "check": "q35/t-alerts-get",
+          "check": "observability-alerts/t-alerts-get",
           "solution": "kubectl get alerts",
           "hint": "kubectl get alerts"
         }
@@ -789,7 +789,7 @@
           "accept": [
             "^kubectl\\s+scale\\s+deployment\\s+rechenknecht\\s+--replicas[=\\s]0$"
           ],
-          "check": "q35/t-scale-zero",
+          "check": "observability-alerts/t-scale-zero",
           "solution": "kubectl scale deployment rechenknecht --replicas=0",
           "hint": "kubectl scale deployment rechenknecht --replicas=0"
         }
