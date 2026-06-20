@@ -34,6 +34,7 @@ export type {
 // von hier UND den Befehls-Modulen importiert (kein Rückimport, der einen Zyklus bauen würde).
 import { dockerCommand } from "./sim/docker";
 import { kubectlCommand } from "./sim/kubectl";
+import { helmCommand } from "./sim/helm";
 import { randSuffix, pad, table, makePodName } from "./sim/util";
 
   /** Stabiler kleiner Hash (FNV-1a-artig). Liefert aus einem Namen einen festen
@@ -518,7 +519,7 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
         switch (cmd) {
           case "docker": out = dockerCommand(this, tokens, raw); break;
           case "kubectl": out = kubectlCommand(this, tokens, raw); break;
-          case "helm": out = this._helm(tokens, raw); break;
+          case "helm": out = helmCommand(this, tokens, raw); break;
           case "terraform": out = this._terraform(tokens, raw); break;
           case "git": out = this._git(tokens, raw); break;
           case "argocd": out = this._argocd(tokens); break;
@@ -712,209 +713,6 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
         out.push({ name, severity: r.severity, state: "resolved", summary: r.summary });
       }
       return out.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    /* ===================== helm ===================== */
-    _helm(t: string[], raw: string) {
-      const sub = t[1];
-      if (!sub) return this._err("helm: Unterbefehl fehlt.", "Probier z.B. 'helm list'.");
-
-      if (sub === "repo") {
-        const action = t[2];
-        if (action === "add") {
-          const name = t[3], url = t[4];
-          if (!name || !url) return this._err("helm repo add: Name und URL fehlen.", "z.B. 'helm repo add bitnami https://charts.bitnami.com/bitnami'");
-          if (!this.helmRepos.includes(name)) this.helmRepos.push(name);
-          return '"' + name + '" has been added to your repositories';
-        }
-        if (action === "update") {
-          if (this.helmRepos.length === 0) return this._err("Error: no repositories found.", "Erst ein Repo hinzufügen: 'helm repo add ...'");
-          return "Hang tight while we grab the latest from your chart repositories...\n" +
-            this.helmRepos.map(r => '...Successfully got an update from the "' + r + '" chart repository').join("\n") +
-            "\nUpdate Complete. ⎈Happy Helming!⎈";
-        }
-        if (action === "list") {
-          if (this.helmRepos.length === 0) return "Error: no repositories to show";
-          return table(["NAME", "URL"], this.helmRepos.map(r => [r, "https://charts.bitnami.com/" + r]));
-        }
-        return this._err("helm repo: unbekannte Aktion '" + (action || "") + "'");
-      }
-
-      if (sub === "search") {
-        const term = t[3] || "";
-        if (this.helmRepos.length === 0) return this._err("Error: no repositories configured", "Erst 'helm repo add bitnami https://charts.bitnami.com/bitnami'");
-        const charts = [
-          ["bitnami/nginx", "18.1.0", "1.27.0", "NGINX – der beliebte Webserver"],
-          ["bitnami/nginx-ingress-controller", "11.3.1", "1.11.1", "Ingress Controller auf NGINX-Basis"],
-          ["bitnami/redis", "19.5.2", "7.2.5", "Redis – In-Memory-Datenbank"],
-          ["bitnami/postgresql", "15.5.1", "16.3.0", "PostgreSQL-Datenbank"],
-        ].filter(c => !term || c[0].includes(term) || c[3].toLowerCase().includes(term.toLowerCase()));
-        if (charts.length === 0) return "No results found";
-        return table(["NAME", "CHART VERSION", "APP VERSION", "DESCRIPTION"], charts);
-      }
-
-      if (sub === "create") {
-        const name = t[2];
-        if (!name || name.startsWith("-")) return this._err("helm create: Chart-Name fehlt.", "Muster: 'helm create <mein-chart>'");
-        if (this.charts.some(c => c.name === name)) return this._err('Error: file "' + name + '" already exists', "Den Namen gibt es schon. Nimm einen anderen.");
-        this.charts.push({ name, version: "0.1.0", packaged: false });
-        // Das Gerüst, das echtes 'helm create' anlegt – als virtuelle Dateien zum Anschauen (ls/cat).
-        this.files[name + "/Chart.yaml"] = [
-          "apiVersion: v2", "name: " + name, "description: Ein Helm-Chart für Kubernetes",
-          "type: application", "version: 0.1.0", "appVersion: \"1.16.0\"",
-        ].join("\n");
-        this.files[name + "/values.yaml"] = [
-          "# Drehknöpfe des Charts – hier ohne die Vorlage zu ändern einstellbar.",
-          "replicaCount: 1", "image:", "  repository: nginx", "  tag: \"latest\"",
-          "service:", "  type: ClusterIP", "  port: 80",
-        ].join("\n");
-        this.files[name + "/templates/deployment.yaml"] = "# Vorlage: rendert mit den Werten aus values.yaml zu einem Deployment.";
-        this.files[name + "/templates/service.yaml"] = "# Vorlage: rendert zum Service.";
-        return "Creating " + name;
-      }
-
-      if (sub === "lint") {
-        const ref = t[2];
-        if (!ref) return this._err("helm lint: Welches Chart?", "Muster: 'helm lint <chart>' – z.B. das von 'helm create'.");
-        const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
-        if (!this.charts.some(c => c.name === name)) return this._err('Error: path "' + ref + '" not found', "Erst 'helm create " + name + "' – oder den Pfad prüfen.");
-        return [
-          "==> Linting " + ref,
-          "[INFO] Chart.yaml: icon is recommended",
-          "",
-          "1 chart(s) linted, 0 chart(s) failed",
-        ].join("\n");
-      }
-
-      if (sub === "package") {
-        const ref = t[2];
-        if (!ref) return this._err("helm package: Welches Chart?", "Muster: 'helm package <chart>'.");
-        const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
-        const chart = this.charts.find(c => c.name === name);
-        if (!chart) return this._err('Error: path "' + ref + '" not found', "Erst 'helm create " + name + "' – oder den Pfad prüfen.");
-        chart.packaged = true;
-        const tgz = name + "-" + chart.version + ".tgz";
-        this.files[tgz] = "(gepacktes Chart-Archiv – bereit zum Teilen oder Installieren)";
-        return "Successfully packaged chart and saved it to: /werft/" + tgz;
-      }
-
-      if (sub === "install") {
-        const release = t[2], chart = t[3];
-        if (!release || !chart || release.startsWith("-")) return this._err("helm install: Release-Name und Chart fehlen.", "Muster: 'helm install <mein-name> bitnami/nginx' oder '<mein-name> ./<eigenes-chart>'");
-        // Lokales Chart (eigenes, mit 'helm create' gebautes) vs. Repo-Chart unterscheiden.
-        const localName = chart.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
-        const isLocal = chart.startsWith(".") || chart.startsWith("/") || this.charts.some(c => c.name === localName);
-        if (isLocal) {
-          if (!this.charts.some(c => c.name === localName)) return this._err('Error: path "' + chart + '" not found', "Erst mit 'helm create " + localName + "' ein Chart anlegen – oder den Pfad prüfen.");
-        } else if (chart.includes("/") && !this.helmRepos.includes(chart.split("/")[0])) {
-          return this._err("Error: repo " + chart.split("/")[0] + " not found", "Erst 'helm repo add ...' ausführen.");
-        }
-        if (this.releases.some(r => r.name === release)) return this._err("Error: INSTALLATION FAILED: cannot re-use a name that is still in use", "Der Release-Name ist schon vergeben. Nimm 'helm upgrade' oder einen anderen Namen.");
-        const replicas = this._setValue(raw, "replicaCount") || 1;
-        const chartShort = isLocal ? localName : (chart.split("/").pop() || chart);
-        const depName = release + "-" + chartShort.split(":")[0];
-        this.deployments.push(this._makeDeployment(depName, chartShort + ":latest", replicas));
-        this.services.push({ name: depName, type: "ClusterIP", clusterIP: "10.96.40." + Math.floor(Math.random() * 250), port: "80", created: this.clock });
-        this.releases.push({ name: release, chart, revision: 1, depName, history: [{ revision: 1, replicas }] });
-        return [
-          "NAME: " + release,
-          "LAST DEPLOYED: heute",
-          "NAMESPACE: default",
-          "STATUS: deployed",
-          "REVISION: 1",
-          "NOTES:",
-          "Das Chart wurde installiert! Schau mit 'kubectl get pods' nach,",
-          "welche Pods es für dich erzeugt hat. ⎈",
-        ].join("\n");
-      }
-
-      if (sub === "list" || sub === "ls") {
-        if (this.releases.length === 0) return "NAME   NAMESPACE   REVISION   STATUS   CHART";
-        return table(["NAME", "NAMESPACE", "REVISION", "STATUS", "CHART"],
-          this.releases.map(r => [r.name, "default", String(r.revision), "deployed", (r.chart.split("/").pop() || r.chart) + "-18.1.0"]));
-      }
-
-      if (sub === "upgrade") {
-        const release = t[2], chart = t[3];
-        if (!release || !chart) return this._err("helm upgrade: Release und Chart fehlen.", "Muster: 'helm upgrade <release> bitnami/nginx --set replicaCount=3'");
-        const rel = this.releases.find(r => r.name === release);
-        if (!rel) return this._err('Error: UPGRADE FAILED: "' + release + '" has no deployed releases', "Welche Releases es gibt: 'helm list'");
-        const replicas = this._setValue(raw, "replicaCount");
-        rel.revision++;
-        const newReplicas = replicas || rel.history[rel.history.length - 1].replicas;
-        rel.history.push({ revision: rel.revision, replicas: newReplicas });
-        const dep = this.deployments.find(d => d.name === rel.depName);
-        if (dep && replicas) {
-          while (dep.pods.length < replicas) dep.pods.push({ name: makePodName(dep.name), created: this.clock, restarts: 0 });
-          while (dep.pods.length > replicas) dep.pods.pop();
-          dep.replicas = replicas;
-        }
-        return 'Release "' + release + '" has been upgraded. Happy Helming!\nREVISION: ' + rel.revision;
-      }
-
-      if (sub === "rollback") {
-        const release = t[2];
-        const targetRev = t[3] ? parseInt(t[3], 10) : null;
-        const rel = this.releases.find(r => r.name === release);
-        if (!rel) return this._err("Error: release: not found", "Welche Releases es gibt: 'helm list'");
-        const target = targetRev
-          ? rel.history.find(h => h.revision === targetRev)
-          : rel.history[rel.history.length - 2];
-        if (!target) return this._err("Error: revision not found", "Verfügbare Revisionen: 1 bis " + rel.revision);
-        rel.revision++;
-        rel.history.push({ revision: rel.revision, replicas: target.replicas });
-        const dep = this.deployments.find(d => d.name === rel.depName);
-        if (dep) {
-          while (dep.pods.length < target.replicas) dep.pods.push({ name: makePodName(dep.name), created: this.clock, restarts: 0 });
-          while (dep.pods.length > target.replicas) dep.pods.pop();
-          dep.replicas = target.replicas;
-        }
-        return "Rollback was a success! Happy Helming!";
-      }
-
-      if (sub === "uninstall" || sub === "delete") {
-        const release = t[2];
-        const idx = this.releases.findIndex(r => r.name === release);
-        if (idx === -1) return this._err("Error: uninstall: Release not loaded: " + (release || "?") + ": release: not found", "Welche Releases es gibt: 'helm list'");
-        const rel = this.releases[idx];
-        this.deployments = this.deployments.filter(d => d.name !== rel.depName);
-        this.services = this.services.filter(s => s.name !== rel.depName);
-        this.releases.splice(idx, 1);
-        return 'release "' + release + '" uninstalled';
-      }
-
-      if (sub === "status") {
-        const release = t[2];
-        const rel = this.releases.find(r => r.name === release);
-        if (!rel) return this._err("Error: release: not found");
-        return ["NAME: " + rel.name, "NAMESPACE: default", "STATUS: deployed", "REVISION: " + rel.revision].join("\n");
-      }
-
-      if (sub === "dependency" || sub === "dep") {
-        const action = t[2];
-        const ref = t[3];
-        if (action === "update" || action === "build" || action === "up") {
-          if (!ref) return this._err("helm dependency " + action + ": Chart-Pfad fehlt.", "z.B. 'helm dependency update ./mein-chart'");
-          const name = ref.replace(/^\.?\.?\//, "").replace(/\/+$/, "");
-          if (!this.charts.some(c => c.name === name)) return this._err('Error: path "' + ref + '" not found', "Chart erst mit 'helm create " + name + "' anlegen.");
-          return [
-            "Hang tight while we grab the latest from your chart repositories...",
-            "Saving " + name + " to " + ref + "/charts",
-            "Deleting outdated charts",
-            "",
-            "Successfully got an update from your chart repositories.",
-            "Chart.lock updated.",
-          ].join("\n");
-        }
-        return this._err("helm dependency: unbekannte Aktion '" + (action || "") + "'", "Gültig: update, build, up");
-      }
-
-      return this._err("helm: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
-    }
-
-    _setValue(raw: string, key: string): number | null {
-      const m = raw.match(new RegExp("--set\\s+" + key + "=(\\d+)"));
-      return m ? parseInt(m[1], 10) : null;
     }
 
     /* ===================== terraform ===================== */
