@@ -18,9 +18,12 @@
  */
 import type {
   ClusterState, Deployment, PodInstance, PodStatus, PvcRes, StatefulSetRes,
-  Broken, ArgoApp, ArgoChildSpec, NodeMetrics, Alert, RbacSubject, SecurityContext,
+  Broken, ArgoApp, NodeMetrics, Alert, RbacSubject, SecurityContext,
 } from "./state";
 import { table, makePodName } from "./util";
+// Argo-CD-Reconcile/-Klon liegen seit #378 bei der argocd-Familie in ./argocd – `kubectl apply -f`
+// einer Application zieht/kloniert den Soll direkt darüber (statt über eine Host-Methode).
+import { argoReconcile, cloneChildSpec } from "./argocd";
 
 // Alle Ingresses teilen sich die Adresse des einen Ingress-Controllers (wie im echten
 // Cluster). Nur die kubectl-Ausgaben (get/describe ingress) brauchen sie, darum hier.
@@ -53,9 +56,6 @@ export interface KubectlHost extends ClusterState {
   podMetrics(): Array<{ name: string; cpuMilli: number; memMi: number }>;
   nodeMetrics(): NodeMetrics[];
   alerts(): Alert[];
-  // Argo-CD-Reconcile (bleibt bei der argocd-Familie in sim.ts): apply einer Application nutzt es.
-  _argoReconcile(app: ArgoApp): void;
-  _cloneChildSpec(c: ArgoChildSpec): ArgoChildSpec;
 }
 
 export function kubectlCommand(host: KubectlHost, t: string[], raw: string): string {
@@ -842,7 +842,7 @@ function kubectlApply(host: KubectlHost, t: string[]) {
         existing.selfHeal = newSelfHeal;
         out.push("application.argoproj.io/" + effApp.name + " configured");
         if (existing.autoSync) {
-          host._argoReconcile(existing);
+          argoReconcile(host, existing);
           out.push("💡 Sync-Policy 'Automated'" + (existing.selfHeal ? " + Self-Heal" : "") + " aktiv – Argo gleicht den Cluster laufend mit dem Git-Soll ab.");
         }
       } else {
@@ -858,7 +858,7 @@ function kubectlApply(host: KubectlHost, t: string[]) {
         selfHeal: !!effApp.selfHeal,
         created: host.clock,
         ...(isAppOfApps
-          ? { childApps: effApp.childApps!.map(c => host._cloneChildSpec(c)) }
+          ? { childApps: effApp.childApps!.map(c => cloneChildSpec(c)) }
           : { desired: {
               deployment: Object.assign({}, effApp.deployment!),
               ...(effApp.service ? { service: Object.assign({}, effApp.service) } : {}),
@@ -868,7 +868,7 @@ function kubectlApply(host: KubectlHost, t: string[]) {
       out.push("application.argoproj.io/" + effApp.name + " created");
       // Mit auto-sync zieht Argo den Git-Soll sofort in den Cluster (Pull ohne manuelles 'argocd app sync').
       if (app.autoSync) {
-        host._argoReconcile(app);
+        argoReconcile(host, app);
         out.push(isAppOfApps
           ? "💡 App-of-Apps: Argo legt aus dem '" + app.path + "'-Ordner gleich die ganze Flotte an. Schau mit 'argocd app list'."
           : "💡 Sync-Policy 'Automated' – Argo rollt den deklarierten Stand sofort aus. Schau mit 'argocd app get " + app.name + "'.");
