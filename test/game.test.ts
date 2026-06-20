@@ -17,6 +17,7 @@ let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
 let SaveStore: typeof import("../src/store").SaveStore;
 let THRESHOLD: number;
+let CMD_HISTORY_AT: number;
 
 beforeAll(async () => {
   const map = new Map<string, string>();
@@ -29,6 +30,7 @@ beforeAll(async () => {
   });
   ({ Game } = await import("../src/game"));
   THRESHOLD = (await import("../src/game")).ABBREV_EARN_THRESHOLD;
+  CMD_HISTORY_AT = (await import("../src/game")).CMD_HISTORY_UNLOCK_AT;
   ({ Sim } = await import("../src/sim"));
   ({ SaveStore } = await import("../src/store"));
 });
@@ -538,6 +540,50 @@ test("introSeen (#288): Default ist false, valider Wert überlebt, kaputter fäl
   Game.importData(JSON.stringify({ v: 1, data: { introSeen: "ja" } }));
   Game.load();
   expect(Game.state.introSeen).toBe(false);
+});
+
+/* ---------- Befehlshistorie freischalten (#316) ---------- */
+
+test("cmdHistoryUnlocked (#316): Default false, Alt-Stand ohne Feld bleibt gesperrt, kaputt -> false", () => {
+  // Frischer Stand: Historie noch gesperrt.
+  Game.reset();
+  expect(Game.state.cmdHistoryUnlocked).toBe(false);
+  expect(Game.isCmdHistoryUnlocked()).toBe(false);
+
+  // Alt-Stand OHNE das Feld (von vor #316) darf nicht brechen -> Default gesperrt.
+  Game.importData(JSON.stringify({ v: 3, data: { xp: 50, questIdx: 3 } }));
+  Game.load();
+  expect(Game.state.cmdHistoryUnlocked).toBe(false);
+
+  // Freigeschalteter Stand überlebt Laden/Speichern.
+  Game.importData(JSON.stringify({ v: 3, data: { cmdHistoryUnlocked: true } }));
+  Game.load();
+  expect(Game.state.cmdHistoryUnlocked).toBe(true);
+
+  // Kaputter (nicht-boolescher) Wert fällt auf den Default false zurück.
+  Game.importData(JSON.stringify({ v: 3, data: { cmdHistoryUnlocked: "ja" } }));
+  Game.load();
+  expect(Game.state.cmdHistoryUnlocked).toBe(false);
+});
+
+test("maybeUnlockCmdHistory (#316): schaltet erst an der Schwelle frei, dann idempotent", () => {
+  Game.reset();
+  // Unter der Schwelle: kein Freischalten.
+  Game.state.stats.commands = CMD_HISTORY_AT - 1;
+  expect(Game.maybeUnlockCmdHistory()).toBe(false);
+  expect(Game.isCmdHistoryUnlocked()).toBe(false);
+
+  // Schwelle erreicht: GENAU dieser Aufruf schaltet frei (true für die einmalige Feier).
+  Game.state.stats.commands = CMD_HISTORY_AT;
+  expect(Game.maybeUnlockCmdHistory()).toBe(true);
+  expect(Game.isCmdHistoryUnlocked()).toBe(true);
+
+  // Danach idempotent: kein zweites Mal feiern.
+  expect(Game.maybeUnlockCmdHistory()).toBe(false);
+
+  // Bleibt über einen Reload erhalten (persistiert).
+  Game.load();
+  expect(Game.state.cmdHistoryUnlocked).toBe(true);
 });
 
 test("Erststart-Spawn (#288): neuer Spielstand startet in Redeweite neben Ole", () => {

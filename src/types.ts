@@ -49,6 +49,11 @@ export interface GameState {
    *  Kurzform verdient (landet in `unlockedAbbrev`). Fehlt/`{}` = noch nichts gezählt;
    *  bereits freigeschaltete Bausteine werden nicht weitergezählt. */
   abbrevUsage: Record<string, number>;
+  /** #316: Ist die Befehlshistorie im Funkgerät-Terminal (↑/↓) freigeschaltet? Startet
+   *  `false` und wird „durch Nutzung" freigeschaltet, sobald genug Befehle getippt wurden
+   *  (`CMD_HISTORY_UNLOCK_AT`) – eine kleine Komfort-Funktion als Upgrade, nicht von Anfang
+   *  an da. Persistiert, damit die Freischaltung über Reloads erhalten bleibt. */
+  cmdHistoryUnlocked: boolean;
   stats: {
     commands: number;
     reviews: number;

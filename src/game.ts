@@ -44,6 +44,11 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
    *  zugehörige Kurzform „verdient" und freischaltet. Zentral & bewusst tunebar. */
   export const ABBREV_EARN_THRESHOLD = 20;
 
+  /** Schwelle (#316): so viele Befehle müssen im Funkgerät-Terminal getippt sein, bis die
+   *  ↑/↓-Befehlshistorie „durch Nutzung" freigeschaltet wird. Bewusst früh – es soll ein
+   *  spürbares kleines Upgrade sein, sobald man das Terminal ein paar Mal benutzt hat. */
+  export const CMD_HISTORY_UNLOCK_AT = 10;
+
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
   // Hinweis: Baustein-Karten (#231, q-flag-*) hängen an genau der Quest, in der ihr
   // Flag/Teil per teach-Schritt eingeführt wird – erst eingeführt, dann abgefragt (#227).
@@ -161,6 +166,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       questLogIntroShown: false,
       unlockedAbbrev: [],
       abbrevUsage: {},
+      cmdHistoryUnlocked: false,
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
@@ -322,6 +328,10 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       questLogIntroShown: typeof raw.questLogIntroShown === "boolean" ? raw.questLogIntroShown : def.questLogIntroShown,
       unlockedAbbrev,
       abbrevUsage,
+      // #316: additives Bool-Flag wie die Abkürzungs-Freischaltung – fehlt es (Alt-Stand),
+      // gilt der Default (gesperrt); ein bestehender Vielspieler schaltet es beim nächsten
+      // getippten Befehl regulär frei (kein Bruch, kein Versions-Bump nötig).
+      cmdHistoryUnlocked: typeof raw.cmdHistoryUnlocked === "boolean" ? raw.cmdHistoryUnlocked : def.cmdHistoryUnlocked,
       stats,
       lastSeen: safeCount(raw.lastSeen, def.lastSeen),
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
@@ -436,6 +446,24 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       }
       this.save();
       return false;
+    },
+
+    /* ---------- Befehlshistorie freischalten (#316) ---------- */
+    /** Ist die ↑/↓-Befehlshistorie im Funkgerät-Terminal freigeschaltet? */
+    isCmdHistoryUnlocked(): boolean {
+      return this.state.cmdHistoryUnlocked;
+    },
+
+    /** Schaltet die Befehlshistorie frei, sobald genug Befehle getippt wurden
+     *  (`CMD_HISTORY_UNLOCK_AT`, Zähler = `stats.commands`). Idempotent; speichert bei der
+     *  Freischaltung. Gibt `true` zurück, wenn GENAU dieser Aufruf sie freigeschaltet hat
+     *  (für die einmalige Freischalt-Feier), sonst `false`. */
+    maybeUnlockCmdHistory(): boolean {
+      if (this.state.cmdHistoryUnlocked) return false;
+      if ((this.state.stats.commands || 0) < CMD_HISTORY_UNLOCK_AT) return false;
+      this.state.cmdHistoryUnlocked = true;
+      this.save();
+      return true;
     },
 
     /* ---------- Spielstand als Datei sichern / laden ---------- */

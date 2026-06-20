@@ -72,6 +72,10 @@ import { keys, clearKeys } from "./runtime";
       if (e.key === "Enter") {
         UI.termSubmit((e.target as HTMLInputElement).value);
         (e.target as HTMLInputElement).value = "";
+      } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        // #316: durch die Befehlshistorie blättern (sobald freigeschaltet). preventDefault
+        // verhindert, dass ↑ den Cursor an den Zeilenanfang springen lässt.
+        if (UI.termHistoryNav(e.key === "ArrowUp" ? -1 : 1)) e.preventDefault();
       }
     });
   }

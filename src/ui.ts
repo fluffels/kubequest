@@ -17,6 +17,8 @@ import { saveUI } from "./ui/save";
 export const UI = {
   dialogue: null as any,
   termLog: [] as any[],
+  termHistory: [] as string[], // #316: zuletzt getippte Funk-Befehle (Sitzung, ↑/↓-Historie)
+  termHistIdx: 0,              // Cursor in termHistory; == length bedeutet „neuer Entwurf"
   review: null as any,
   practice: null as any,   // { npcId, drills, idx, task }
   _drillTask: null as any, // aktuelle generierte Drill-Aufgabe des Quest-Schritts

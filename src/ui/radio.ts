@@ -2,6 +2,7 @@ import { Game, ABBREV_EARN_THRESHOLD } from "../game";
 import { KQContent } from "../content";
 import { SFX } from "../sfx";
 import { ABBREVS, lockedAbbrevInInput, abbrevLockHint, flagNearMissHint, longFormsInInput } from "../content/abbrev";
+import { pushHistory, navigateHistory } from "../cmdhistory";
 import { part, $, esc, NPCS } from "./shared";
 
 export const radioUI = part({
@@ -110,6 +111,10 @@ export const radioUI = part({
 
   termSubmit(line: string) {
     if (!line.trim()) return;
+    // #316: jede abgesendete Zeile in die Sitzungs-Historie aufnehmen (↑/↓), danach steht
+    // der Cursor wieder am Entwurf – so holt ↑ als Erstes den gerade getippten Befehl.
+    this.termHistory = pushHistory(this.termHistory, line);
+    this.termHistIdx = this.termHistory.length;
     const result = Game.sim.exec(line);
     if (result.clear) { this.termLog = []; this.termRedraw(); return; }
     this.termLog.push('<span class="t-cmd">crew@hafen:~$ ' + esc(line) + "</span>");
@@ -121,6 +126,12 @@ export const radioUI = part({
     this.termRedraw();
     Game.state.stats.commands++;
     Game.save();
+    // #316: Befehlshistorie „durch Nutzung" freischalten – einmalige Feier beim Erreichen
+    // der Schwelle. Vorher tun ↑/↓ nichts (kleine Komfort-Funktion als Upgrade, nicht von
+    // Anfang an da). Echte Shells können das auch – kurz erwähnt im Toast.
+    if (Game.maybeUnlockCmdHistory()) {
+      this.toast("🔓 Befehlshistorie freigeschaltet: Mit ↑/↓ holst du im Funkgerät vorherige Befehle zurück – wie in einer echten Shell.", "rankup");
+    }
 
     const task = this.currentTask();
     if (!task) return;
@@ -289,6 +300,21 @@ export const radioUI = part({
     // „Warum so?" gleich mitliefern (#233), nicht nur die Musterlösung zeigen.
     const why = task.why ? ' <span class="dim">' + task.why + "</span>" : "";
     if (fb) fb.innerHTML = '<div class="tt-feedback">🧭 <b>Lösung:</b> <code>' + esc(task.solution) + "</code> – selbst eintippen!" + why + "</div>";
+  },
+
+  /** #316: ↑/↓ im Terminal-Eingabefeld blättert durch die Sitzungs-Befehlshistorie –
+   *  aber nur, wenn die Komfort-Funktion freigeschaltet ist (sonst No-op, default-Verhalten
+   *  des Browsers bleibt). Die pure Navigations-Mathematik liegt in cmdhistory.ts; hier nur
+   *  die DOM-Anbindung (Eingabefeld setzen, Cursor ans Ende). Gibt `true` zurück, wenn der
+   *  Tastendruck verarbeitet wurde – dann unterdrückt main.ts das Default-Verhalten. */
+  termHistoryNav(dir: -1 | 1): boolean {
+    if (!Game.isCmdHistoryUnlocked() || this.termHistory.length === 0) return false;
+    const nav = navigateHistory(this.termHistory, this.termHistIdx, dir);
+    this.termHistIdx = nav.index;
+    const inp = $("term-input") as HTMLInputElement;
+    inp.value = nav.text;
+    inp.setSelectionRange(nav.text.length, nav.text.length);   // Cursor ans Ende
+    return true;
   },
 
   /* ========== Üben ========== */
