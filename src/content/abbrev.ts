@@ -98,13 +98,26 @@ export interface LockedAbbrev {
  *
  *  Pur: `isUnlocked` wird injiziert (keine Game-Kopplung) → im Node-Test prüfbar.
  *  Das UI ruft das VOR der Erfolgswertung auf und ersetzt einen Treffer durch
- *  einen freundlichen Hinweis statt eines harten „Falsch". */
-export function lockedAbbrevInInput(input: string, isUnlocked: (id: string) => boolean): LockedAbbrev | undefined {
+ *  einen freundlichen Hinweis statt eines harten „Falsch".
+ *
+ *  `exemptId` (#366): die Abkürzung, die der GERADE laufende Lehr-Schritt selbst
+ *  freischaltet (`step.unlockAbbrev`). Genau dieser Schritt führt die Kurzform ein
+ *  und schaltet sie beim Abschluss frei – seine eigene Kurzform darf er deshalb
+ *  schon verwenden, sonst widerspricht der Auftrag („tippe <code>docker ps -a</code>")
+ *  dem Gating („-a ist noch gesperrt, schreib --all"). Das Gating schützt also nur
+ *  noch VOR dem Lehr-Schritt, nicht IN ihm. Andere (noch gesperrte) Abkürzungen
+ *  bleiben auch in diesem Schritt blockiert. */
+export function lockedAbbrevInInput(
+  input: string,
+  isUnlocked: (id: string) => boolean,
+  exemptId?: string,
+): LockedAbbrev | undefined {
   const tokens = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return undefined;
   const cmd = tokens[0];
   for (const a of ABBREVS) {
     if (abbrevCommand(a) !== cmd) continue;     // nur Einträge dieses Befehls
+    if (a.id === exemptId) continue;            // #366: der freischaltende Schritt darf seine eigene Kurzform nutzen
     if (isUnlocked(a.id)) continue;             // freigeschaltet → beide Formen gelten
     const used = a.short.find(s => tokens.includes(s));
     if (!used) continue;

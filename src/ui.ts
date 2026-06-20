@@ -752,7 +752,12 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
       // freigeschaltetes Profi-Kürzel → freundlicher Hinweis (Langform schreiben)
       // statt es als gelöst zu werten. Die Langform gilt immer; nach Freischaltung
       // (Game.unlockAbbrev, #300) zählen beide Formen.
-      const lockedHit = cmdOk ? lockedAbbrevInInput(norm, (id) => Game.isAbbrevUnlocked(id)) : undefined;
+      // #366: Die Abkürzung, die GENAU DIESER Schritt freischaltet, ist hier
+      // ausgenommen – sonst blockt das Gating den Lehr-Auftrag, der sie einführt
+      // (z.B. „tippe docker ps -a“, während -a erst nach diesem Schritt freigeschaltet wird).
+      const lockedHit = cmdOk
+        ? lockedAbbrevInInput(norm, (id) => Game.isAbbrevUnlocked(id), Game.currentStep()?.unlockAbbrev)
+        : undefined;
       if (lockedHit) {
         const fb = $("tt-feedback");
         if (fb) fb.innerHTML = '<div class="tt-feedback">' + abbrevLockHint(lockedHit) + '</div>';

@@ -221,3 +221,95 @@ describe("unlockAbbrev-Lernpfad: jede Abkürzung wird in einem Quest-Schritt fre
     assert.deepEqual(ungültig, [], "Ungültige unlockAbbrev-Referenzen:\n" + ungültig.join("\n"));
   });
 });
+
+/* #366: Kein Lehr-/Quest-Text darf eine Profi-Abkürzung verlangen oder vorführen,
+ * die zu diesem Zeitpunkt noch gesperrt ist (sonst widerspricht der Auftrag dem
+ * Gating: „tippe docker ps -a" ↔ „-a ist gesperrt, schreib --all"). Zwei Wächter,
+ * beide über KQContent.QUESTS in Spielreihenfolge – greifen daher auf beiden
+ * Content-Repräsentationen (TS-Quests bzw. Content-as-Data via Loader). */
+describe("#366: Quest-/Lehrtexte nehmen keine gesperrten Abkürzungen vorweg", () => {
+  const NICHTS_FREI = (_id: string) => false;
+
+  test("Baseline: ohne Ausnahme bleibt die Kurzform des Lehr-Schritts geblockt", () => {
+    // Beweist, dass der folgende exemptId-Test kein False-Positive ist.
+    expect(lockedAbbrevInInput("docker ps -a", NICHTS_FREI)?.pair.id).toBe("docker-ps-all");
+  });
+
+  test("der freischaltende Schritt darf seine EIGENE Kurzform schon tippen (exemptId)", () => {
+    expect(lockedAbbrevInInput("docker ps -a", NICHTS_FREI, "docker-ps-all")).toBeUndefined();
+    expect(lockedAbbrevInInput("docker run -d --name web nginx", NICHTS_FREI, "docker-run-detach")).toBeUndefined();
+  });
+
+  test("die Ausnahme gilt NUR für die eigene Abkürzung (Negativfall)", () => {
+    // Ein Schritt, der docker-ps-all freischaltet, hebelt docker-run-detach NICHT aus.
+    expect(lockedAbbrevInInput("docker run -d", NICHTS_FREI, "docker-ps-all")?.pair.id).toBe("docker-run-detach");
+    // Eine fremde exemptId ändert nichts an einer anderen gesperrten Kurzform.
+    expect(lockedAbbrevInInput("docker ps -a", NICHTS_FREI, "kubectl-pods")?.pair.id).toBe("docker-ps-all");
+  });
+
+  test("(a) keine Sackgasse: jede Musterlösung ist zum Zeitpunkt ihres Schritts tippbar", () => {
+    // Spielreihenfolge durchlaufen, Freischaltungen mitführen (Unlock greift erst NACH
+    // dem Schritt → die eigene Abkürzung des Schritts ist nur via exemptId erlaubt).
+    const unlocked = new Set<string>();
+    const isUnlocked = (id: string) => unlocked.has(id);
+    const verstoesse: string[] = [];
+    for (const quest of KQContent.QUESTS) {
+      for (const step of quest.steps as any[]) {
+        const tasks = step.type === "teach" ? [step.cmd]
+                    : step.type === "terminal" ? step.tasks
+                    : [];
+        for (const t of tasks) {
+          const hit = lockedAbbrevInInput(t.solution, isUnlocked, step.unlockAbbrev);
+          if (hit) verstoesse.push(`${quest.id}/${t.id}: Lösung „${t.solution}" nutzt gesperrtes „${hit.used}" (${hit.pair.id})`);
+        }
+        if (step.unlockAbbrev) unlocked.add(step.unlockAbbrev);
+      }
+    }
+    assert.deepEqual(verstoesse, [], "Funk-Schritte mit blockierter Musterlösung:\n" + verstoesse.join("\n"));
+  });
+
+  test("(b) keine Vorwegnahme: kein <code>-Befehl zeigt eine erst später freigeschaltete Kurzform", () => {
+    const quests = KQContent.QUESTS;
+    // Pro Quest: alle Abkürzungen, die bis EINSCHLIESSLICH dieses Quests freigeschaltet
+    // werden. Quest-Granularität ist Absicht: die Einführungs-Dialoge im selben Quest
+    // wie der Lehr-Schritt dürfen die Kurzform zeigen, nur frühere Quests nicht.
+    const unlockedThrough: Set<string>[] = [];
+    const acc = new Set<string>();
+    for (const quest of quests) {
+      for (const step of quest.steps as any[]) if (step.unlockAbbrev) acc.add(step.unlockAbbrev);
+      unlockedThrough.push(new Set(acc));
+    }
+    const codeSnippets = (text: string): string[] => {
+      const out: string[] = [];
+      const re = /<code>([\s\S]*?)<\/code>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        out.push(m[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+      }
+      return out;
+    };
+    const stepTexts = (step: any): string[] => {
+      switch (step.type) {
+        case "dialog": return step.lines;
+        case "choice": return [step.q, ...step.options.flatMap((o: any) => [o.t, o.reply])];
+        case "teach": return [step.cmd.intro, step.cmd.text, step.cmd.hint];
+        case "terminal": return step.tasks.flatMap((t: any) => [t.text, t.hint]);
+        case "drill": return [step.intro];
+        default: return [];
+      }
+    };
+    const verstoesse: string[] = [];
+    quests.forEach((quest, qi) => {
+      const frei = unlockedThrough[qi];
+      for (const step of quest.steps as any[]) {
+        for (const text of stepTexts(step)) {
+          for (const snippet of codeSnippets(text)) {
+            const hit = lockedAbbrevInInput(snippet, (id) => frei.has(id));
+            if (hit) verstoesse.push(`${quest.id}: „${snippet}" zeigt „${hit.used}" (${hit.pair.id}), erst später freigeschaltet`);
+          }
+        }
+      }
+    });
+    assert.deepEqual(verstoesse, [], "Texte mit vorweggenommener Kurzform:\n" + verstoesse.join("\n"));
+  });
+});
