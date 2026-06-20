@@ -49,7 +49,7 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
 **Neu sortiert nach der Stardew-Architektur-Analyse 2026-06** (Begründung: [architektur-analyse-2026-06.md](architektur-analyse-2026-06.md)). Leitlinie: **Umbau zuerst, dann der große Content-Push.** Reihenfolge der Blöcke:
 
-1. **Fundament** – die Save-Decke heben (blockt Stardew-Scale-Stände).
+1. **Fundament** – die Save-Decke heben (blockt Stardew-Scale-Stände). ✅ **erledigt** (#350 IndexedDB auf `main`).
 2. **KI-/Dev-Hebel** – Onboarding + schlanke Doku, damit alle weiteren Schritte (gerade KI-getrieben) billig & sicher werden.
 3. **Qualitätsnetz** – Arch-Wächter/Lint/Boot-Smoke, *bevor* groß refaktorisiert wird.
 4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos.
@@ -61,24 +61,23 @@ Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem d
 
 | # | Block | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|-------|--------|--------------|---------------------------|
-| 1 | Fundament | **#350** | IndexedDB statt localStorage | **prio:hoch.** localStorage-Limit (~5–10 MB) bricht bei Stardew-Scale-Ständen. Nur `store.ts` (async) tauschen; Backup-Slot + Migrationskette bleiben. ⚠️ **Bestehende Stände migrieren, kein Stand darf brechen.** |
-| 2 | KI/Dev-Hebel | **#387** | Dev-Onboarding-Doku + `npm run setup` | **prio:hoch.** Ein Schritt zum lauffähigen Stand für Kolleg:innen UND KI → senkt alle Folgekosten. |
-| 3 | KI/Dev-Hebel | **#394** | CLAUDE.md-Landkarte verschlanken | Spart in **jeder** KI-Session Tokens (schlanker Always-Index + Tiefendocs on demand). |
-| 4 | Qualitätsnetz | **#390** | Arch-Wächter härten (Zyklen/Orphans/Dateigröße) | Schützt die folgenden Splits automatisch; verhindert neue God-Files. |
-| 5 | Qualitätsnetz | **#389** | ESLint + CI-Gate | Netz für viel KI-Code, bevor groß refaktorisiert/ausgebaut wird. |
-| 6 | Qualitätsnetz | **#391** | CI: Boot-Smoke-Test (headless) | CI baut, startet das Spiel aber nie — Boot-Fehler fangen, bevor die Splits laufen. |
-| 7 | Splits | **#392** | game.ts aufteilen (793 LOC God-Object) | **prio:hoch.** Unter dem Netz (4–6). Fassade unverändert; ⚠️ **Saves/`sanitizeState`/Migration penibel grün halten** (Red-Green mit echtem Alt-Stand). |
-| 8 | Splits | **#393** | WorldScene.ts aufteilen (1344 LOC, größte Datei) | Token-Effizienz + Wartbarkeit; im Browser verifizieren. |
-| 9 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387. Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
-| 10 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
-| 11 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
-| 12 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
-| 13 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350). |
-| 14 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
-| 15 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
-| 16 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
-| 17 | Sonderfall | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen, zerlegen** (session-große Kinder, Übersichts-Kommentar, Epic auf done). Präzedenz: #316 (`Game.cmdHistoryUnlocked`). |
-| 18 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | KI/Dev-Hebel | **#387** | Dev-Onboarding-Doku + `npm run setup` | **prio:hoch.** Ein Schritt zum lauffähigen Stand für Kolleg:innen UND KI → senkt alle Folgekosten. |
+| 2 | KI/Dev-Hebel | **#394** | CLAUDE.md-Landkarte verschlanken | Spart in **jeder** KI-Session Tokens (schlanker Always-Index + Tiefendocs on demand). |
+| 3 | Qualitätsnetz | **#390** | Arch-Wächter härten (Zyklen/Orphans/Dateigröße) | Schützt die folgenden Splits automatisch; verhindert neue God-Files. |
+| 4 | Qualitätsnetz | **#389** | ESLint + CI-Gate | Netz für viel KI-Code, bevor groß refaktorisiert/ausgebaut wird. |
+| 5 | Qualitätsnetz | **#391** | CI: Boot-Smoke-Test (headless) | CI baut, startet das Spiel aber nie — Boot-Fehler fangen, bevor die Splits laufen. |
+| 6 | Splits | **#392** | game.ts aufteilen (793 LOC God-Object) | **prio:hoch.** Unter dem Netz (3–5). Fassade unverändert; ⚠️ **Saves/`sanitizeState`/Migration penibel grün halten** (Red-Green mit echtem Alt-Stand). |
+| 7 | Splits | **#393** | WorldScene.ts aufteilen (1344 LOC, größte Datei) | Token-Effizienz + Wartbarkeit; im Browser verifizieren. |
+| 8 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387. Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
+| 9 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
+| 10 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 11 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 12 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
+| 13 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 14 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 15 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 16 | Sonderfall | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen, zerlegen** (session-große Kinder, Übersichts-Kommentar, Epic auf done). Präzedenz: #316 (`Game.cmdHistoryUnlocked`). |
+| 17 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

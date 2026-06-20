@@ -68,7 +68,7 @@ localStorage: 5–10 MB je Browser. Stardew-Scale-Spielstände (Inventar, Welt-Z
 **Negativ / Aufwand**
 - Content-Migration ist nicht trivial: bestehende Quest-TS-Objekte müssen in JSON überführt werden, Typ-Inferenz geht teilweise verloren
 - Entity-Registry erfordert ein neues Schicht-Konzept (Laden, Validieren, Instanzieren)
-- IndexedDB-API ist asynchron – `store.ts` muss auf async umgestellt werden
+- IndexedDB-API ist asynchron – gelöst (#350) über einen synchronen In-Memory-Cache vor IndexedDB (`await SaveStore.init()` beim Boot hydriert ihn), sodass die SaveStore-API synchron bleibt und KEIN Aufrufer umgestellt werden musste
 
 ## Umsetzungsreihenfolge (Tickets)
 
@@ -76,7 +76,7 @@ localStorage: 5–10 MB je Browser. Stardew-Scale-Spielstände (Inventar, Welt-Z
 |---|---|---|
 | **hoch** | #348 Content-as-Data: Schema + Loader | Fundament; blockiert alles andere im Content-Bereich |
 | **hoch** | #349 Entity-Registry | Fundament; blockiert alle neuen NPCs/Objekte |
-| **hoch** | #350 IndexedDB statt localStorage | Fundament; je früher, desto weniger Datenmigrations-Aufwand |
+| **hoch** ✓ | #350 IndexedDB statt localStorage | Fundament; je früher, desto weniger Datenmigrations-Aufwand. **Erledigt:** IndexedDB-Backend + sync In-Memory-Cache + einmalige localStorage→IndexedDB-Migration |
 | **mittel** | #344 game.ts → sfx.ts Schichtverletzung | Kleiner Fix, saubert die Schichtung bevor sie wächst |
 | **mittel** | #347 dependency-cruiser Architektur-Wächter | Verhindert neue Schichtverletzungen automatisch |
 | **niedrig** | #345 scenes.ts aufteilen | Komfort, kein Fundament |

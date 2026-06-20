@@ -1,11 +1,13 @@
 /* ===== KubeQuest – Persistenz-Schicht (SaveStore) =====
- * Eine dünne Schicht zwischen Spiellogik und Speicher. Heute: localStorage.
+ * Eine dünne Schicht zwischen Spiellogik und Speicher.
  *
- * Die Spiellogik (game.js) kennt NUR dieses Interface – read() / write() / remove().
- * Wenn später ein Backend + Datenbank dazukommt (siehe README, Phase 10), wird
- * NUR diese Datei erweitert: localStorage bleibt der schnelle lokale Cache, die
- * Server-Synchronisation kommt hier INTERN dazu. game.js muss dafür nicht
- * angefasst werden – das ist der ganze Sinn dieser Schicht.
+ * Die Spiellogik (game.ts) kennt NUR dieses Interface – read() / write() / remove()
+ * bzw. readState() / writeState(). Welches Backend dahinter liegt, ist ihr egal.
+ *
+ * Backend (#350): primär IndexedDB (praktisch kein Speicher-Limit, hebt die
+ * ~5–10 MB-Decke von localStorage für Stardew-Scale-Stände). Fallback: localStorage
+ * bzw. flüchtiger In-Memory-Speicher. Siehe den IndexedDB-Block weiter unten – dort
+ * steht auch, warum die nach außen sichtbare API trotz async IndexedDB synchron bleibt.
  */
   const SAVE_KEY = "kubequest-save-v3";
   // Ein-Slot-Sicherungskopie der Roh-Spielstanddatei. Wird befüllt, BEVOR ein Stand
@@ -39,6 +41,7 @@
   // und der Fehler würde sonst durch den 5-Sekunden-Auto-Save propagieren und das Spiel
   // reißen. Deshalb fängt safeSet jeden Schreibfehler ab, meldet ihn EINMALIG (nicht im
   // 5-s-Takt) und gibt zurück, ob das Schreiben geklappt hat.
+  // (Im IndexedDB-Modus ist genau dieses Kontingent kein Thema mehr – siehe unten.)
   let warnedWriteFailed = false;
   function safeSet(key: string, value: string): boolean {
     try {
@@ -54,10 +57,159 @@
     }
   }
 
+  /* ===== IndexedDB-Backend (#350) =====
+   * localStorage hat ein hartes Kontingent (~5–10 MB). Für Stardew-Scale-Stände
+   * (großes Spaced-Repetition-Deck, Welt-/NPC-Zustand, Quest-History) reicht das
+   * perspektivisch nicht; IndexedDB hat praktisch kein Limit.
+   *
+   * Knackpunkt: IndexedDB ist ASYNCHRON, die SaveStore-API ist synchron und wird an
+   * vielen Stellen synchron aufgerufen (u.a. Game.load() beim Boot, der 5-s-Auto-Save,
+   * exportData()). Statt die halbe Codebasis auf async umzustellen (großer Ripple,
+   * Risiko für bestehende Stände), liegt vor IndexedDB ein synchroner In-Memory-Cache:
+   *   • init() hydriert den Cache beim Boot EINMAL aus IndexedDB (async),
+   *   • danach lesen read()/readState() synchron aus dem Cache,
+   *   • write()/writeState() aktualisieren den Cache synchron UND spiegeln den Wert
+   *     asynchron (fire-and-forget) nach IndexedDB.
+   * IndexedDB ist damit die maßgebliche, unbegrenzte Quelle, der Cache nur ihr
+   * synchrones Spiegelbild für diese Sitzung.
+   *
+   * Ist IndexedDB nicht verfügbar (privater Modus, alter Browser, file://-Offline-Build,
+   * Node-Tests ohne Polyfill) ODER schlägt das Öffnen fehl, bleibt SaveStore im
+   * bisherigen, voll synchronen localStorage-Modus – init() ist dann ein No-op. So
+   * bricht nichts und der bestehende Code-/Testpfad ist unverändert.
+   */
+  const DB_NAME = "kubequest";
+  const DB_VERSION = 1;
+  const OBJECT_STORE = "saves"; // ein simpler Key→Wert-Store; Keys = SAVE_KEY / BACKUP_KEY
+
+  // idb != null ⇔ „IndexedDB-Modus aktiv" (init() lief erfolgreich durch). cache ist
+  // dann die synchrone Lese-/Schreibspiegelung; im Legacy-Modus wird er nie benutzt.
+  const cache = new Map<string, string>();
+  let idb: IDBDatabase | null = null;
+  let warnedIdbWriteFailed = false;
+
+  /** Die IndexedDB-Factory holen – globalThis deckt Browser (window.indexedDB) UND
+   *  Tests (fake-indexeddb) ab. null, wenn IndexedDB nicht existiert/zugreifbar ist. */
+  function getIndexedDB(): IDBFactory | null {
+    try {
+      const g = globalThis as unknown as { indexedDB?: IDBFactory };
+      return g.indexedDB ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Öffnet (bzw. legt an) die Datenbank. Resolved IMMER – mit der DB oder null
+   *  (nicht verfügbar / Fehler / blockiert). Wirft nie. */
+  function openIdb(): Promise<IDBDatabase | null> {
+    return new Promise((resolve) => {
+      const factory = getIndexedDB();
+      if (!factory) { resolve(null); return; }
+      let req: IDBOpenDBRequest;
+      try {
+        req = factory.open(DB_NAME, DB_VERSION);
+      } catch {
+        resolve(null);
+        return;
+      }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(OBJECT_STORE)) db.createObjectStore(OBJECT_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    });
+  }
+
+  /** Einen Wert async aus IndexedDB lesen. Resolved mit dem String oder null. Wirft nie. */
+  function idbGet(db: IDBDatabase, key: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      try {
+        const req = db.transaction(OBJECT_STORE, "readonly").objectStore(OBJECT_STORE).get(key);
+        req.onsuccess = () => resolve(typeof req.result === "string" ? req.result : null);
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  /** Wert async nach IndexedDB schreiben (fire-and-forget). Fehler werden EINMALIG
+   *  gemeldet und nie geworfen – ein fehlschlagender Persist darf den synchronen
+   *  Aufrufer (Auto-Save) nicht reißen; der Cache hält den Wert für die Sitzung. */
+  function idbPut(db: IDBDatabase, key: string, value: string): void {
+    try {
+      const tx = db.transaction(OBJECT_STORE, "readwrite");
+      tx.objectStore(OBJECT_STORE).put(value, key);
+      tx.onerror = () => warnIdbWrite(tx.error);
+      tx.onabort = () => warnIdbWrite(tx.error);
+    } catch (e) {
+      warnIdbWrite(e);
+    }
+  }
+
+  /** Wert async aus IndexedDB löschen (fire-and-forget, fehlertolerant). */
+  function idbDelete(db: IDBDatabase, key: string): void {
+    try {
+      const tx = db.transaction(OBJECT_STORE, "readwrite");
+      tx.objectStore(OBJECT_STORE).delete(key);
+      tx.onerror = () => warnIdbWrite(tx.error);
+      tx.onabort = () => warnIdbWrite(tx.error);
+    } catch (e) {
+      warnIdbWrite(e);
+    }
+  }
+
+  function warnIdbWrite(e: unknown): void {
+    if (warnedIdbWriteFailed) return;
+    warnedIdbWriteFailed = true;
+    // eslint-disable-next-line no-console
+    console.warn("SaveStore: IndexedDB-Schreiben fehlgeschlagen – Spiel läuft weiter (Cache hält den Stand).", e);
+  }
+
+  /* ----- Synchrones Routing: IndexedDB-Modus (Cache) vs. Legacy (localStorage) ----- */
+
+  /** Synchron lesen: im IndexedDB-Modus aus dem Cache, sonst direkt aus localStorage/In-Memory. */
+  function rawGet(key: string): string | null {
+    if (idb) return cache.has(key) ? cache.get(key)! : null;
+    return backend.getItem(key);
+  }
+
+  /** Synchron schreiben.
+   *  IndexedDB-Modus: Cache sofort setzen (gelingt immer) + async nach IndexedDB spiegeln → true.
+   *  Legacy-Modus: best-effort localStorage (false bei vollem Kontingent, wie bisher). */
+  function rawSet(key: string, value: string): boolean {
+    if (idb) {
+      cache.set(key, value);
+      idbPut(idb, key, value);
+      return true;
+    }
+    return safeSet(key, value);
+  }
+
+  /** Synchron löschen. Im IndexedDB-Modus zusätzlich localStorage leeren, damit ein
+   *  Reset keinen Alt-Stand zurücklässt, der bei künftig leerem IndexedDB erneut
+   *  migriert würde. */
+  function rawRemove(key: string): void {
+    if (idb) {
+      cache.delete(key);
+      idbDelete(idb, key);
+      try { backend.removeItem(key); } catch { /* egal – best effort */ }
+      return;
+    }
+    backend.removeItem(key);
+  }
+
   /* ===== Versionierung der Spielstände =====
-   * Persistierte Stände tragen ab jetzt eine Hülle: { v: <Format-Version>, data: <Spielstand> }.
+   * Persistierte Stände tragen eine Hülle: { v: <Format-Version>, data: <Spielstand> }.
    * So überleben alte Stände spätere Formatänderungen: beim Lesen wird die Hülle erkannt
    * und der Inhalt über eine Migrationskette auf die aktuelle Version gehoben.
+   *
+   * WICHTIG: Diese Versionierung betrifft das SAVE-FORMAT (Struktur der Nutzlast), NICHT
+   * das Speicher-Backend. Der Umzug localStorage → IndexedDB (#350) ändert das Format
+   * NICHT (dieselbe { v, data }-Hülle, nur woanders abgelegt) – darum kein Versions-Bump,
+   * sondern eine einmalige Storage-Migration in init().
    *
    * Erweitern bei einer Formatänderung:
    *   1. CURRENT_SAVE_VERSION um 1 erhöhen.
@@ -125,33 +277,81 @@
    * weiter – wir wollten nur eine zusätzliche Rettungskopie, kein Muss.
    */
   function backup(raw: string): void {
-    safeSet(BACKUP_KEY, raw);
+    rawSet(BACKUP_KEY, raw);
   }
 
   export const SaveStore = {
+    /**
+     * Schaltet SaveStore – falls möglich – auf IndexedDB als unbegrenztes Backend um.
+     * EINMAL beim Boot VOR Game.load() aufrufen UND awaiten. Hydriert den synchronen
+     * Cache aus IndexedDB und migriert einen bestehenden localStorage-Stand einmalig
+     * hinein. Ist IndexedDB nicht verfügbar oder schlägt etwas fehl, bleibt der
+     * bisherige localStorage-Modus aktiv (No-op). Wirft NIE und ist idempotent.
+     */
+    async init(): Promise<void> {
+      if (idb) return; // schon im IndexedDB-Modus
+      let db: IDBDatabase | null = null;
+      try {
+        db = await openIdb();
+      } catch {
+        db = null;
+      }
+      if (!db) return; // kein IndexedDB → synchroner localStorage-Modus bleibt
+      try {
+        const idbSave = await idbGet(db, SAVE_KEY);
+        if (idbSave != null) {
+          // IndexedDB ist die maßgebliche Quelle: Cache daraus hydrieren.
+          cache.set(SAVE_KEY, idbSave);
+          const idbBackup = await idbGet(db, BACKUP_KEY);
+          if (idbBackup != null) cache.set(BACKUP_KEY, idbBackup);
+        } else {
+          // Einmalige Storage-Migration: bestehenden localStorage-Stand nach IndexedDB
+          // heben. localStorage wird dabei NICHT gelöscht (bleibt als Zusatz-Backup des
+          // Vor-Migrations-Stands liegen) – ein Reset (rawRemove) räumt beides ab.
+          const lsSave = backend.getItem(SAVE_KEY);
+          if (lsSave != null) {
+            cache.set(SAVE_KEY, lsSave);
+            idbPut(db, SAVE_KEY, lsSave);
+          }
+          const lsBackup = backend.getItem(BACKUP_KEY);
+          if (lsBackup != null) {
+            cache.set(BACKUP_KEY, lsBackup);
+            idbPut(db, BACKUP_KEY, lsBackup);
+          }
+        }
+      } catch {
+        // Hydration/Migration fehlgeschlagen → lieber im sicheren localStorage-Modus bleiben.
+        return;
+      }
+      // Modus erst NACH erfolgreicher Hydration aktivieren, damit kein synchroner
+      // Leser je einen leeren Cache sieht.
+      idb = db;
+    },
+
     /** Roh-JSON des Spielstands lesen – oder null, wenn noch nichts gespeichert ist. */
     read() {
-      return backend.getItem(SAVE_KEY);
+      return rawGet(SAVE_KEY);
     },
 
     /**
      * Roh-JSON-String des Spielstands ablegen.
-     * Gibt zurück, ob das Schreiben geklappt hat (false z.B. bei vollem localStorage) –
-     * wirft NIE, damit ein fehlschlagendes Speichern den Aufrufer nicht reißt.
+     * Gibt zurück, ob das Schreiben geklappt hat (im IndexedDB-Modus immer true; im
+     * Legacy-Modus false z.B. bei vollem localStorage) – wirft NIE, damit ein
+     * fehlschlagendes Speichern den Aufrufer nicht reißt.
      */
     write(json: string): boolean {
-      return safeSet(SAVE_KEY, json);
+      return rawSet(SAVE_KEY, json);
     },
 
     /** Spielstand löschen (für „Zurücksetzen"). */
     remove() {
-      backend.removeItem(SAVE_KEY);
+      rawRemove(SAVE_KEY);
     },
 
     /** Roh-JSON der letzten Sicherungskopie lesen – oder null, wenn es keine gibt.
      *  Quelle für eine Wiederherstellung, falls eine Migration einen Stand zerschossen hat. */
     readBackup(): string | null {
-      return backend.getItem(BACKUP_KEY);
+      return rawGet(BACKUP_KEY);
     },
 
     /**
@@ -166,7 +366,7 @@
      * Zurückschreiben in game.ts (load → save) niemals den einzigen Stand unrettbar.
      */
     readState(): unknown | null {
-      const raw = backend.getItem(SAVE_KEY);
+      const raw = rawGet(SAVE_KEY);
       if (raw == null) return null;
       let parsed: unknown;
       try {
@@ -188,10 +388,11 @@
 
     /**
      * Spielstand in der aktuellen Versions-Hülle ablegen.
-     * Gibt zurück, ob das Schreiben geklappt hat (false z.B. bei vollem localStorage) –
-     * wirft NIE, damit der Auto-Save den Aufrufer nicht reißt.
+     * Gibt zurück, ob das Schreiben geklappt hat (im IndexedDB-Modus immer true; im
+     * Legacy-Modus false z.B. bei vollem localStorage) – wirft NIE, damit der
+     * Auto-Save den Aufrufer nicht reißt.
      */
     writeState(state: unknown): boolean {
-      return safeSet(SAVE_KEY, JSON.stringify({ v: CURRENT_SAVE_VERSION, data: state }));
+      return rawSet(SAVE_KEY, JSON.stringify({ v: CURRENT_SAVE_VERSION, data: state }));
     },
   };

@@ -103,7 +103,7 @@ Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (voll 
 
 ## Spielstand
 
-Wird **automatisch alle 5 Sekunden** im Browser gespeichert (localStorage). Im 📜 Logbuch (Taste J) gibt es zusätzlich **„Spielstand sichern“** (lädt eine JSON-Datei herunter) und **„Spielstand laden“** – für Backups oder den Umzug auf einen anderen Rechner/Browser.
+Wird **automatisch alle 5 Sekunden** im Browser gespeichert (IndexedDB). Im 📜 Logbuch (Taste J) gibt es zusätzlich **„Spielstand sichern“** (lädt eine JSON-Datei herunter) und **„Spielstand laden“** – für Backups oder den Umzug auf einen anderen Rechner/Browser.
 
 ## Mitentwickeln (Entwickler:innen & KI-Agenten)
 

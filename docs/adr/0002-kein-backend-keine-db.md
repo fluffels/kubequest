@@ -22,7 +22,7 @@ Der Kern-Wert von KubeQuest ist „läuft offline im Browser, eine Datei, einfac
 
 **Kein Backend, keine Datenbank, kein Service-Split fürs Spiel selbst.**
 
-- **Persistenz = lokale Saves.** Spielstand läuft über die SaveStore-Schicht ([`src/store.ts`](../../src/store.ts)): localStorage + Auto-Save alle 5 s + JSON-Export/Import. Eine Save-Datei via Tauri-Wrapper ist die spätere Desktop-Variante ([#83](https://github.com/fluffels/kubequest/issues/83)) – weiterhin **lokal**, ohne Server.
+- **Persistenz = lokale Saves.** Spielstand läuft über die SaveStore-Schicht ([`src/store.ts`](../../src/store.ts)): seit #350 IndexedDB (localStorage/In-Memory als Fallback) + Auto-Save alle 5 s + JSON-Export/Import – rein client-seitig, ohne Server. Eine Save-Datei via Tauri-Wrapper ist die spätere Desktop-Variante ([#83](https://github.com/fluffels/kubequest/issues/83)) – weiterhin **lokal**, ohne Server.
 - **Kein Docker fürs Spiel.** Docker/Cluster ist ausschließlich **Lerninhalt** – im optionalen „echter-Cluster"-Modus ([#28](https://github.com/fluffels/kubequest/issues/28)) bzw. als Meister-Abschluss ([#26](https://github.com/fluffels/kubequest/issues/26)) – **nicht** Betriebsinfrastruktur des Spiels. Die Simulation in [`src/sim.ts`](../../src/sim.ts) bildet den Cluster im Spiel nach, statt einen echten zu betreiben.
 - **Keine Service-Aufteilung.** Die Schichtung (pure Domäne ↔ Anwendung ↔ Präsentation, siehe [AGENTS.md › Architektur](../../AGENTS.md#architektur)) ist eine **In-Process-Trennung von Verantwortlichkeiten**, kein verteiltes System.
 

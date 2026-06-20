@@ -52,7 +52,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Typen prüfen (voll strict) | `npm run typecheck` |
 | Architektur-Wächter (Schichtung, #347) | `npm run check:arch` |
 
-> ⚠️ **Code-Änderungen laden im Dev-Server NICHT automatisch neu** (#301). Eine JS/TS-Änderung löst bewusst keinen Auto-Reload aus (der riss sonst mitten im Spielen laufende Gespräche weg + blaues Flackern, v.a. wenn parallele Agenten editieren). Stattdessen erscheint ein Toast „🔄 Code geändert – neu laden (F5)". Zum Übernehmen also **F5 / Seite neu laden** (Spielstand bleibt im localStorage). CSS-Edits swappen weiterhin live.
+> ⚠️ **Code-Änderungen laden im Dev-Server NICHT automatisch neu** (#301). Eine JS/TS-Änderung löst bewusst keinen Auto-Reload aus (der riss sonst mitten im Spielen laufende Gespräche weg + blaues Flackern, v.a. wenn parallele Agenten editieren). Stattdessen erscheint ein Toast „🔄 Code geändert – neu laden (F5)". Zum Übernehmen also **F5 / Seite neu laden** (Spielstand bleibt erhalten – seit #350 in IndexedDB). CSS-Edits swappen weiterhin live.
 
 ## 🗺️ Repo-Landkarte – wo finde ich was?
 
@@ -97,7 +97,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/game.ts`](src/game.ts) | Anwendung | Spielstand, XP, Wirtschaft, Spaced Repetition |
 | [`src/runtime.ts`](src/runtime.ts) | Anwendung | Laufzeit-Singletons (ersetzt den früheren `window`-Shim; bricht Import-Zyklen) |
 | [`src/devpanel.ts`](src/devpanel.ts) | Anwendung | Dev-/Test-Panel (#325): klickbares Panel zum Springen auf beliebigen Quest-Stand (Jump-API #329), Erststart und Reset – nur aktiv wenn `__KQ_DEVPANEL__` true (Devpanel-Build #331); Phaser-frei, DOM-Anbindung in `ui.ts` |
-| [`src/store.ts`](src/store.ts) | Persistenz | SaveStore (kapselt localStorage; Andockpunkt fürs spätere Backend) |
+| [`src/store.ts`](src/store.ts) | Persistenz | SaveStore: seit #350 **IndexedDB** als unbegrenztes Backend (localStorage/In-Memory als Fallback), Versions-Hülle `{v,data}` + Migrationskette + Backup-Slot. IndexedDB ist async, die API bleibt aber synchron: ein In-Memory-Cache wird beim Boot via `await SaveStore.init()` (in `main.ts` vor `Game.load()`) aus IndexedDB hydriert, Schreibvorgänge spiegeln async dorthin; `init()` migriert einen alten localStorage-Stand einmalig nach IndexedDB. Ohne IndexedDB (privat/file:///alt) bleibt der synchrone localStorage-Modus aktiv |
 | [`src/scenes.ts`](src/scenes.ts) | Präsentation | **Barrel** (#345): bündelt die Szenen-Module zu `KQScenes` (von `main.ts` registriert). Die 7 Phaser-Szenen liegen seit dem Split eine Datei je Klasse unter `src/scenes/`, gemeinsame Helfer in `src/scenes/shared.ts` |
 | [`src/scenes/shared.ts`](src/scenes/shared.ts) | Präsentation | Geteilte Szenen-Bausteine (#345): Karten-/Tile-Konstanten, die In-Welt-Pixel-Bitmap-Font (#188, `buildPixelFont`/`pixelText`), Orts-Schilder (#254, `buildSign`), schwebende Belohnungstexte (`floatPixelText`) und das datengesteuerte Insel-NPC-Rendering (#349, `spawnIslandNpc`) |
 | [`src/scenes/BootScene.ts`](src/scenes/BootScene.ts) | Präsentation | Lädt alle Grafiken + Frame-Slicing aus `ASSET_MANIFEST`, backt Font/Münz-Icon, startet dann `World` (bzw. `MapTest` via `?maptest`) |

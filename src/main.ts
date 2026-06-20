@@ -83,7 +83,7 @@ import { keys, clearKeys } from "./runtime";
     });
   }
 
-  function boot() {
+  async function boot() {
     // Dev-Sicherheitsnetz: Inhalts-Schema beim Start prüfen und Querverweis-Fehler
     // (unbekannte NPCs/Drills/Quests/reviewIds …) sofort in der Konsole melden.
     // Nur im Dev-Server aktiv – `import.meta.env.DEV` ist im Prod-Build `false`,
@@ -94,6 +94,11 @@ import { keys, clearKeys } from "./runtime";
         if (probleme.length) console.error("⚠️ KubeQuest-Inhalte inkonsistent (#81):\n" + probleme.join("\n"));
       });
     }
+    // Persistenz auf IndexedDB hochziehen, BEVOR der Stand geladen wird (#350): init()
+    // hydriert den synchronen Cache aus IndexedDB (und migriert einen alten localStorage-
+    // Stand einmalig hinein). Wirft nie und fällt ohne IndexedDB auf localStorage zurück,
+    // darum hält das await den Boot nicht auf, wenn kein IndexedDB da ist.
+    await SaveStore.init();
     Game.load();
     wireKeyboard();
     UI.bindEvents();
