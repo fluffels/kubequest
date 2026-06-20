@@ -1,6 +1,7 @@
 # Architektur-Analyse 2026-06 – Trägt der Stack ein Spiel in Stardew-Größe?
 
 > **Stand: 2026-06-20.** Kritische Gesamtanalyse vor dem großen Ausbau (viele Quests/Orte/Charaktere, Spielstände, Stardew-Scope).
+> **Nachtrag 2026-06-21:** Eine erneute, **ADR-blinde** Analyse hat drei übersehene **Spielsystem-/Mechanik-Schulden** ergänzt (diese Analyse war Infrastruktur-fokussiert). → Abschnitt „Nachtrag 2026-06-21" unten + [ADR 0007](adr/0007-spielsystem-fundamente.md).
 > Diese Analyse löst die ältere [architektur-analyse-stardew.md](architektur-analyse-stardew.md) (#46) als aktuellen Stand ab – die meisten ihrer Lücken sind inzwischen geschlossen (Tiled-Maps #191–196, Build-Split #58, Content-as-Data #348/#349, ID-basierte Saves #353/#354, sim/ui/scenes-Splits).
 > Die konkrete Umsetzungs-Reihenfolge steht in [architektur-reihenfolge.md](architektur-reihenfolge.md).
 
@@ -77,3 +78,24 @@ Assets werden eager geladen (Offline-Build inlinet alles); kein szenenweises Laz
 | #339 | Texture-Atlas (reaktiviert) | 🟡 niedrig |
 
 Bestehend & eingeordnet: #350 (IndexedDB, hoch), #357 (Entity-Registry Objekte), #306 (Save-Slots), #332, #334, #314 ⚠, #317 ⚠ EPIC, #293 ⚠, #355 (Grundsatz-Review Auslieferungsform).
+
+## Nachtrag 2026-06-21 — Spielsystem-Fundamente (Mechanik-Ebene)
+
+Die Analyse oben (Stand 2026-06-20) war auf **Infrastruktur** fokussiert (Persistenz, God-Files, KI-Effizienz, Qualitätsnetz, Asset-Skalierung) und kam zum Schluss „Fundament trägt, fünf Baustellen". Eine erneute Gesamtanalyse am 2026-06-21 — **bewusst ohne Blick in die ADRs**, um die alten Annahmen unvoreingenommen zu stresstesten — bestätigt das Infrastruktur-Verdikt, **ergänzt aber drei übersehene Schulden auf der Content-MECHANIK-Ebene** (nicht der -Ablage). Festgehalten in [ADR 0007](adr/0007-spielsystem-fundamente.md); sie gehören **vor** den Content-Push.
+
+| # | Titel | Prio | Befund (kurz) |
+|---|---|---|---|
+| #410 | Quest-Modell: erweiterbar statt linearem `questIdx` | 🔴 hoch | nur eine aktive Quest; `questIdx` in jedem Save → teuerste Migration je später |
+| #411 | Quest-Checks deklarativ (DSL statt 56 Hand-Prädikate) | 🔴 hoch | `checks.ts` ist Code; bricht „Content ist Daten" genau dort, wo Content explodiert |
+| #412 | Karten-Freischaltung konsolidieren (`EXTRA_CARDS`+`CONCEPT_INTRO` → JSON) | 🟠 mittel | Doppelpflege zweier Hand-Maps |
+| #413 | Persistenter Spiel-Kalender im `GameState` | 🔴 hoch | Zeit nur als Render-Effekt; Voraussetzung für saisonalen Content |
+| #414 | Save-Migrations-Integrationstest (echte Alt-Stand-Fixtures) | 🟠 mittel | Netz **vor** #410/#413; „Saves nie brechen" absichern |
+| #415 | WorldScene auf Map-Registry generalisieren + TS-Inseln datengetrieben | 🟠 mittel | neue Region = Copy-Paste-Szene; ergänzt #198/#339 |
+| #416 | Cluster-Tags cullbar/gebündelt (Frame-Performance) | 🟠 mittel | dynamische Tags ohne Culling |
+| #417 | Lazy-Content-Loading + `mergeScenario` entzerren | 🟡 niedrig | Content eager geparst; Laden wächst mit Quest-Zahl |
+| #418 | Proprietäre LICENSE + Copyright (public bleiben) | 🟠 mittel | Repo public ohne Lizenz |
+| #419 | `main`-Branch-Protection (Owner-Bypass) | 🟠 mittel | PR-Flow + Force-Push-Schutz |
+| #420 | NPC-Tagesplan/Routinen | ⏸ zurückgestellt | Scope-Frage; setzt #413 voraus |
+| #421 | Item-/Inventar-Modell-Fundament | ⏸ zurückgestellt | Scope-Frage (Crafting?) |
+
+**Korrigiertes Verdikt:** Das Infrastruktur-Fundament trägt — aber „die Basis steht" stimmt erst, wenn auch die drei Spielsystem-Säulen (Quest-Modell, Checks-als-Daten, Zeit-Achse) und das Save-Netz stehen. Umsetzungsreihenfolge: [architektur-reihenfolge.md](architektur-reihenfolge.md).

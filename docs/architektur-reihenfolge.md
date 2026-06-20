@@ -1,6 +1,6 @@
 # Architektur-Reihenfolge
 
-> **Stand: 2026-06-21 (nach #388).** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
+> **Stand: 2026-06-21 (nach #388; Spielsystem-Fundamente #410–#421 ergänzt → [ADR 0007](adr/0007-spielsystem-fundamente.md)).** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
 > Diese Liste **überschreibt** für Architektur-Tickets die generische Board-Auswahl (Prio→Nummer aus AGENTS.md):
 > Die Reihenfolge hier ist **abhängigkeitsbewusst** sortiert, nicht nur nach Prio-Label.
 
@@ -53,27 +53,42 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 2. **KI-/Dev-Hebel** – Onboarding + schlanke Doku, damit alle weiteren Schritte (gerade KI-getrieben) billig & sicher werden. (**#387 ✅** One-Command-Setup, **#388 ✅ erledigt 2026-06-21** containerisierte Dev-Umgebung – devcontainer + `docker compose up`, ohne lokales Node; Drift-Wächter `test/devcontainer.test.ts`.)
 3. **Qualitätsnetz** – Arch-Wächter/Lint/CI-Härtung, *bevor* groß refaktorisiert wird. (Arch-Wächter **#390 ✅ erledigt** – inkl. Zyklen-/Orphan-/Dateigröße-Wächter; **Lint #389 ✅ erledigt** – ESLint + CI-Gate. **Boot-Smoke #391 ist nicht mehr `area:architektur`** (nur noch `area:tests`) → läuft über die generische Board-Auswahl, nicht über diese Liste. **#396** (Dependabot + npm-audit-Gate) ✅ erledigt 2026-06-21 — Dependabot-Config + zweistufiges `npm audit`-Gate (Prod-Deps blockierend, Dev nur berichtend); **#398** (Actions v4→v5) ✅ erledigt 2026-06-21 — dabei `upload-artifact` bis **v7** gehoben, weil dessen `@v5` noch auf node20 lief und die Node-20-Deprecation sonst geblieben wäre. Der Qualitätsnetz-Block ist damit leer.)
 4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos. (**game.ts #392 ✅** – Fassade + `src/game/*`-Bündel; **WorldScene.ts #393 ✅** – Systeme in `src/scenes/worldscene/*` (terrain/scenery/clustersync/events/warps); Schwestern zu sim.ts #346 / ui.ts #356. **sim/kubectl.ts #397 ✅** – Dispatch-Barrel + Unterfamilien `src/sim/kubectl/*` (inspect/lifecycle/ops/security/host). Damit ist der God-File-Split-Block abgeschlossen.)
-5. **Skalierungs-Enabler** – Assets/Entities für viele Welten.
-6. **Features** – Save-Slots, Wiederspielen, Dev-Panel.
-7. **Sonderfälle** – Optik (abstimmen), Epic (zerlegen), anlegendes Review (zuletzt).
+5. **Recht/Schutz (NEU 2026-06-21)** – Lizenz + `main`-Branch-Protection. Klein, unabhängig, sofort wertvoll (#418/#419).
+6. **Save-Härtung/Netz** – Eviction-Schutz (#401) + Save-Migrations-Integrationstest (#414). **Vor** jeder Save-Format-Änderung – schützt bestehende Stände, bevor migriert wird.
+7. **Spielsystem-Fundamente (NEU 2026-06-21, [ADR 0007](adr/0007-spielsystem-fundamente.md))** – Quest-Modell erweiterbar, Checks/Freischaltung als Daten, persistente Zeit-Achse (#410–#413). Die Content-**Mechanik**-Schulden, die die Analyse 2026-06 (Infrastruktur-fokussiert) übersah – vor dem Content-Push.
+8. **Skalierungs-Enabler** – Assets/Entities/Szenen für viele Welten.
+9. **Features** – Save-Slots, Wiederspielen, Dev-Panel.
+10. **Sonderfälle** – Optik (abstimmen), Epic (zerlegen), anlegendes Review (zuletzt).
 
 Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem dann tragfähigen Fundament.
 
 | # | Block | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|-------|--------|--------------|---------------------------|
-| 1 | Skalierungs-Enabler | **#401** | `navigator.storage.persist()` + Quota-Monitoring (Eviction-Schutz) | **Befund aus ADR 0006/#400.** Härtet das Save-Fundament (#350 ✓), auf dem alle Skalierung steht: schützt Stände vor stillem LRU-Löschen durch den Browser. Klein, unabhängig, client-seitig — vor der Asset-/Entity-Erweiterung, weil Datenverlust-Schutz dringlicher ist als Optimierung. |
-| 2 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
-| 3 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
-| 4 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
-| 5 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
-| 6 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
-| 7 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
-| 8 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
-| 9 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | Recht/Schutz | **#418** | Proprietäre LICENSE + Copyright-Konvention | Sofort, trivial; macht „all rights reserved" sichtbar. Repo bleibt **public** (Forum/Spielen bleiben). Maintainerin-Entscheidung 2026-06-21. |
+| 2 | Recht/Schutz | **#419** ⚠️ | `main`-Branch-Protection (Owner-Bypass) | **Setting-Entscheidung mit der Maintainerin** (Schutz-Stufe). Owner-Bypass nötig, sonst bricht der direkte-Merge-Agenten-Workflow. Fremde müssen bei public ohnehin per PR beitragen. |
+| 3 | Save-Härtung | **#401** | `navigator.storage.persist()` + Quota-Monitoring | **ADR 0006/#400.** Schützt bestehende Stände **jetzt** vor stillem LRU-Löschen. Klein, client-seitig. |
+| 4 | Save-Härtung | **#414** | Save-Migrations-Integrationstest (echte Alt-Stand-Fixtures) | **Netz VOR jeder Save-Migration** (#410/#413). „Saves nie brechen" absichern, bevor das Format wächst. `area:tests`, hier als harte Voraussetzung vermerkt. |
+| 5 | Spielsystem-Fundament | **#410** | Quest-Modell erweiterbar statt linearem `questIdx` | Tiefster Umbau (Save-Migration über alle Stände) → je früher, desto billiger. **Nach #414.** ADR 0007. |
+| 6 | Spielsystem-Fundament | **#411** | Quest-Checks deklarativ (DSL statt 56 Hand-Prädikate) | Vollendet „Content ist Daten" (ADR 0004→0007). Unabhängig; sinnvoll nach dem Quest-Modell. |
+| 7 | Spielsystem-Fundament | **#412** | Karten-Freischaltung konsolidieren (`EXTRA_CARDS`+`CONCEPT_INTRO`→JSON) | Kleiner Schwester-Schnitt zu #411. |
+| 8 | Spielsystem-Fundament | **#413** | Persistenter Spiel-Kalender im `GameState` | Isoliert; Fundament für saisonalen Content/Routinen. **Nach #414** (Save-Format-Änderung). |
+| 9 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Vor dem Content-Push, wenn Bereiche viele platzierte Objekte/Trigger bekommen. |
+| 10 | Skalierungs-Enabler | **#415** | WorldScene auf Map-Registry generalisieren + TS-Inseln datengetrieben | Neue Region ohne Copy-Paste-Szene. Baut auf #57/#193 (✓). |
+| 11 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 12 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 13 | Skalierungs-Enabler | **#417** | Lazy-Content-Loading + `mergeScenario` entzerren | Content-Pendant zu #198 (Quest-/Karten-Daten statt Assets). |
+| 14 | Skalierungs-Enabler | **#416** | Cluster-Tags cullbar/gebündelt (Frame-Performance) | Rendering-Performance bei vielen Entities; unabhängig. |
+| 15 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
+| 16 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 17 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 18 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 19 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+
+> **Hinweis zu #414 (`area:tests`):** Streng genommen läuft es über die generische Board-Auswahl, ist aber als **harte Voraussetzung** für #410/#413 hier mitgeführt – vor diesen beiden Save-Umbauten muss das Netz stehen.
 
 ## Zurückgestellt — werden ignoriert
 
-Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-20, **21 Stück**, vollständig): „Echter Modus"-Bogen #173/#174/#175/#176/#177/#178, Phase-10-Save-Sync #158/#159/#160, neue Inseln/Bereiche + Progression #130 (Wachturm), #144 (Lagerhallen), #146/#147/#148/#156 (Expeditions-Flotte), Storage-Lernpfad #240/#241, Self-Hosting #221, Tasten-Umbelegung #232, Schiff-Szene #257, Enter/Leertaste-Dialoge #312. *(#198 Lazy-Asset-Loading und #339 Texture-Atlas wurden am 2026-06-20 reaktiviert und in die Reihenfolge oben aufgenommen.)*
+Alle offenen Architektur-Tickets mit Label **`status:zurückgestellt`** sind hier bewusst **nicht** eingeplant und werden bei „nächstes Architektur" übersprungen (Stand 2026-06-21, **23 Stück**, vollständig): „Echter Modus"-Bogen #173/#174/#175/#176/#177/#178, Phase-10-Save-Sync #158/#159/#160, neue Inseln/Bereiche + Progression #130 (Wachturm), #144 (Lagerhallen), #146/#147/#148/#156 (Expeditions-Flotte), Storage-Lernpfad #240/#241, Self-Hosting #221, Tasten-Umbelegung #232, Schiff-Szene #257, Enter/Leertaste-Dialoge #312, **NPC-Tagesplan/Routinen #420** und **Item-/Inventar-Modell #421** (beide neu 2026-06-21, Scope-Klärung nötig: bedeutet „Stardew-Scope" für ein K8s-Lernspiel Routinen/Crafting oder vor allem Lern-Tiefe?). *(#198 Lazy-Asset-Loading und #339 Texture-Atlas wurden am 2026-06-20 reaktiviert und in die Reihenfolge oben aufgenommen.)*
 
 Maßgeblich ist immer das **Label**, nicht diese Aufzählung: bei „nächstes Architektur" gilt jedes Issue mit `status:zurückgestellt` als übersprungen, auch falls die Liste hier mal nicht nachgezogen wurde.
 
