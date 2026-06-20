@@ -10,12 +10,12 @@
 import type {
   ExecResult,
   Broken, PodInstance, Deployment, ServiceRes, IngressRes, NetworkPolicyRes,
-  Secret, ConfigMap, ClusterNode, Container, HistoryEntry, Release,
-  Chart, TfResource, GitCommit, GitConflict, GitPending, PipelineStage,
-  Pipeline, CiDeploy, ArgoDesired, ArgoChildSpec, ArgoApp, ApplyEffect,
+  Secret, ConfigMap, ClusterNode, Container, Release,
+  Chart, TfResource, GitCommit, GitConflict, GitPending,
+  Pipeline, CiDeploy, ArgoApp, ApplyEffect,
   ServiceMonitorRes, PrometheusRuleRes, GrafanaDatasourceRes, GrafanaDashboardRes, StatefulSetRes, PvcRes,
-  PvRes, StorageClassRes, ServiceAccountRes, PolicyRule, RoleRes, RbacSubject,
-  RoleBindingRes, SecurityContext, PodSecurityLevel, PodStatus, PodMetrics, NodeMetrics,
+  PvRes, StorageClassRes, ServiceAccountRes, RoleRes,
+  RoleBindingRes, PodSecurityLevel, PodStatus, NodeMetrics,
   ScrapeTarget, Alert, Scenario, ClusterState,
 } from "./sim/state";
 export type {

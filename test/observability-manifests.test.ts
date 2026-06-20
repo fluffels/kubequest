@@ -3,7 +3,7 @@
  *  1. Struktur der YAML-Schnipsel in src/content/manifests.ts (valide, korrekt eingerückt).
  *  2. Der Simulator verarbeitet sie per `kubectl apply -f` und listet sie via `kubectl get`.
  */
-import { test, beforeEach } from "vitest";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { Sim as KQSim } from "../src/sim";
 import {

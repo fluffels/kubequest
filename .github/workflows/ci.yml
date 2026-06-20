@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck (strict)
         run: npm run typecheck
 
+      - name: Lint (ESLint, #389)
+        run: npm run lint
+
       - name: Architektur-Wächter (Schichtung, #347)
         run: npm run check:arch
 

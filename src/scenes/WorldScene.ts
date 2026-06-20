@@ -4,7 +4,6 @@ import { UI } from "../ui";
 import { KQContent } from "../content";
 import { SFX } from "../sfx";
 import { NPC_SPAWNS, npcSolidIndices, npcHitboxes, circleHitbox, rectHitbox, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, type Door, type Hitbox } from "../world";
-import { type Spawn } from "../content/entities";
 import { warpAt, WORLD_TO_ARCHIPEL, WORLD_RETURN } from "../archipel";
 import { WORLD_TO_LIGHTHOUSE, WORLD_RETURN_LH } from "../lighthouse";
 import { DOCK as WH_DOCK, WORLD_JETTY_WH, WORLD_TO_WAREHOUSE, WORLD_RETURN_WH } from "../warehouse";

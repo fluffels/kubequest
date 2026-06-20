@@ -27,7 +27,7 @@ export const saveUI = part({
         Game.importData(reader.result);
         this.toast("📂 Spielstand geladen – Spiel startet neu …");
         setTimeout(() => location.reload(), 800);
-      } catch (e) {
+      } catch {
         this.toast("⚠️ Das ist keine gültige KubeQuest-Spielstand-Datei.");
       }
     };

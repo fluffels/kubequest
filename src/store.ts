@@ -25,8 +25,8 @@
       window.localStorage.setItem(probe, probe);
       window.localStorage.removeItem(probe);
       return window.localStorage;
-    } catch (e) {
-      let mem: Record<string, string> = Object.create(null);
+    } catch {
+      const mem: Record<string, string> = Object.create(null);
       return {
         getItem: (k: string) => (k in mem ? mem[k] : null),
         setItem: (k: string, v: string) => { mem[k] = String(v); },
@@ -50,7 +50,7 @@
     } catch (e) {
       if (!warnedWriteFailed) {
         warnedWriteFailed = true;
-        // eslint-disable-next-line no-console
+         
         console.warn("SaveStore: Speichern fehlgeschlagen (localStorage voll/blockiert?) – Spiel läuft weiter, dieser Stand wurde nicht persistiert.", e);
       }
       return false;
@@ -164,7 +164,7 @@
   function warnIdbWrite(e: unknown): void {
     if (warnedIdbWriteFailed) return;
     warnedIdbWriteFailed = true;
-    // eslint-disable-next-line no-console
+     
     console.warn("SaveStore: IndexedDB-Schreiben fehlgeschlagen – Spiel läuft weiter (Cache hält den Stand).", e);
   }
 

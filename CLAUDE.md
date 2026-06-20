@@ -17,7 +17,7 @@
 6. coden                                    # im Worktree umsetzen, deutsche Umlaute in Texten/Kommentaren
 7. npm test                                 # muss grün sein (auch Negativfälle abdecken, Red-Green)
 8. npm run typecheck                        # muss grün sein (strict)
-9. im Browser verifizieren                  # sichtbare Änderungen wirklich anschauen
+9. npm run lint                             # muss grün sein (ESLint, #389) – im Browser sichtbare Änderungen zusätzlich anschauen
 10. nach main mergen → Worktree/Branch aufräumen → Issue schließen   # Details siehe AGENTS.md
 ```
 
@@ -51,6 +51,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Dev-Panel-Build (#331, Panel MIT, passwortgated, `dist-devpanel/`) | `npm run build:devpanel` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (voll strict) | `npm run typecheck` |
+| Linter (ESLint, #389) | `npm run lint` |
 | Architektur-Wächter (Schichtung + Zyklen + Orphans, #347/#390) | `npm run check:arch` |
 | Dateigröße-Wächter (God-File-Budget 800 LOC, #390) | `npm run check:size` |
 

@@ -60,6 +60,7 @@ const steps = [
   ['Abhängigkeiten installieren', 'npm install'],
   ['Tests', 'npm test'],
   ['Typecheck (strict)', 'npm run typecheck'],
+  ['Lint (ESLint)', 'npm run lint'],
   ['Architektur-Wächter', 'npm run check:arch'],
   ['Dateigröße-Wächter', 'npm run check:size'],
 ]

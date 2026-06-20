@@ -119,7 +119,7 @@ export const radioUI = part({
     if (result.clear) { this.termLog = []; this.termRedraw(); return; }
     this.termLog.push('<span class="t-cmd">crew@hafen:~$ ' + esc(line) + "</span>");
     if (result.output) {
-      let text = esc(result.output).replace(/💡[^\n]*/g, s => '</span><span class="t-tip">' + s + '</span><span>');
+      const text = esc(result.output).replace(/💡[^\n]*/g, s => '</span><span class="t-tip">' + s + '</span><span>');
       this.termLog.push(result.error ? '<span class="t-err">' + text + "</span>" : "<span>" + text + "</span>");
     }
     if (this.termLog.length > 160) this.termLog = this.termLog.slice(-120);

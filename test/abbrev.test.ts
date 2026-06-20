@@ -10,7 +10,7 @@
  */
 import { test, expect, describe } from "vitest";
 import assert from "node:assert/strict";
-import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, flagNearMiss, flagNearMissHint, longFormsInInput, type AbbrevPair } from "../src/content/abbrev";
+import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, flagNearMiss, flagNearMissHint, longFormsInInput } from "../src/content/abbrev";
 import { KQContent } from "../src/content";
 import { Sim as KQSim } from "../src/sim";
 

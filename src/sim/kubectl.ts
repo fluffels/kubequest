@@ -515,7 +515,7 @@ function canI(host: KubectlHost, verb: string, resource: string, subjectKey: str
 }
 
 
-function kubectlAuth(host: KubectlHost, t: string[], raw: string) {
+function kubectlAuth(host: KubectlHost, t: string[], _raw: string) {
   if (t[2] !== "can-i") return host._err("Der Simulator kann nur 'kubectl auth can-i <verb> <resource> [--as=…]'.");
   // can-i <verb> <resource>; --as ignorieren wir bei der Positions-Suche.
   const positional = t.slice(3).filter(tok => !tok.startsWith("-"));

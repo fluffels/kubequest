@@ -57,7 +57,7 @@ export const minigameUI = part({
     const round = rounds[st.round];
     st.target = round.layers;
     st.placed = 0;
-    let html = `<p><b>Runde ${st.round + 1}/${rounds.length}: ${round.name}</b> –
+    const html = `<p><b>Runde ${st.round + 1}/${rounds.length}: ${round.name}</b> –
       Bo ruft die Schichten durcheinander. Stapel sie in der <b>richtigen Reihenfolge</b>: unten anfangen (Basis zuerst)!
       <button id="stack-info" title="Erklärung nochmal ansehen" style="float:right;font-size:.85em">ℹ️ Erklärung</button></p>
       <div class="stack-area"><div class="stack-pile" id="stack-pile"></div>

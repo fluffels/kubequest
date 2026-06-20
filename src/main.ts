@@ -89,7 +89,9 @@ import { keys, clearKeys } from "./runtime";
     // Nur im Dev-Server aktiv – `import.meta.env.DEV` ist im Prod-Build `false`,
     // der ganze Block fällt beim Bauen weg (kein Gameplay-Einfluss, #81).
     if (import.meta.env.DEV) {
-      Promise.all([import("./content/validate"), import("./content")]).then(([{ validateContent }, { KQContent }]) => {
+      // Bewusst nicht awaiten (`void`): eine Dev-only-Diagnose, die nur in die
+      // Konsole loggt – sie soll den Boot nicht aufhalten (#389/no-floating-promises).
+      void Promise.all([import("./content/validate"), import("./content")]).then(([{ validateContent }, { KQContent }]) => {
         const probleme = validateContent(KQContent);
         if (probleme.length) console.error("⚠️ KubeQuest-Inhalte inkonsistent (#81):\n" + probleme.join("\n"));
       });
@@ -144,7 +146,9 @@ import { keys, clearKeys } from "./runtime";
     // toter Code und wird komplett rausgestrippt (das Panel-Modul mit Passwort-
     // Logik landet nie im ausgelieferten `build`/`build:offline`).
     if (import.meta.env.DEV || __KQ_DEVPANEL__) {
-      import("./devpanel").then(({ mountDevPanel }) => mountDevPanel());
+      // Bewusst nicht awaiten (`void`): der Panel-Mount ist eine optionale
+      // Komfortschicht und soll den Boot nicht serialisieren (#389).
+      void import("./devpanel").then(({ mountDevPanel }) => mountDevPanel());
     }
 
     UI.refreshHud();

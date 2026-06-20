@@ -12,7 +12,6 @@
  * Der Warp-Primitive (Warp + warpAt) wohnt schon in archipel.ts und ist generisch –
  * von dort wiederverwendet statt ein zweites Mal definiert.
  */
-import { TILE } from "./world";
 import { warpAt, type Warp } from "./archipel";
 import { npcSpawnForMap, type Spawn } from "./content/entities";
 

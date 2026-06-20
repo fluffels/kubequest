@@ -128,7 +128,7 @@ export function argoReconcile(host: ArgocdHost, app: ArgoApp): void {
     return;
   }
   const d = app.desired!.deployment;
-  let dep = host.deployments.find(x => x.name === d.name);
+  const dep = host.deployments.find(x => x.name === d.name);
   if (!dep) {
     host.deployments.push(host._makeDeployment(d.name, d.image, d.replicas));
   } else {

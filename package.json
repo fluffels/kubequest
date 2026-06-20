@@ -20,16 +20,21 @@
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc -p tsconfig.strict.json",
     "check:arch": "depcruise src --config .dependency-cruiser.cjs",
-    "check:size": "node scripts/check-size.mjs"
+    "check:size": "node scripts/check-size.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "phaser": "^3.87.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^25.9.3",
     "dependency-cruiser": "^17.4.3",
+    "eslint": "^9.39.4",
     "fake-indexeddb": "^6.2.5",
+    "globals": "^17.6.0",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.61.1",
     "vite": "^5.4.0",
     "vite-plugin-singlefile": "^2.0.0",
     "vitest": "^2.1.0"

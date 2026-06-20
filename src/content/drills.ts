@@ -84,11 +84,11 @@ function ensureArgoApp(sim: Sim, fresh = false): ArgoApp {
 export type DrillTask = { text: string; accept: RegExp[]; solution: string; hint: string; why: string; diag?: (input: string) => string | null };
 
 export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
-  "docker-pull": sim => {
+  "docker-pull": _sim => {
     const img = pick(IMAGES);
     return { text: "Lade das Image <code>" + img + "</code> aus der Registry.", accept: [new RegExp("^docker\\s+pull\\s+" + img + "(:\\S+)?$")], solution: "docker pull " + img, hint: "Muster: docker pull &lt;image&gt;", why: "pull holt ein fertiges Image aus der Registry auf deinen Rechner – Muster: docker pull &lt;image&gt;." };
   },
-  "docker-run": sim => {
+  "docker-run": _sim => {
     const img = pick(IMAGES);
     return { text: "Starte einen Container aus dem Image <code>" + img + "</code> (ohne Extras).", accept: [new RegExp("^docker\\s+run\\s+" + img + "(:\\S+)?$")], solution: "docker run " + img, hint: "Muster: docker run &lt;image&gt;", why: "run startet aus einem Image einen laufenden Container – Muster: docker run &lt;image&gt;." };
   },
@@ -253,7 +253,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     ensureGit(sim);
     const fn = "seekarte-" + sim.clock + "-" + rnd(100, 9999) + ".md";
     sim.files[fn] = "# Karte";
-    return { text: "Merke die neue Datei <code>" + fn + "</code> zum Commit vor.", accept: [new RegExp("^git\\s+add\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git add " + fn, hint: "Muster: git add &lt;datei&gt;", why: "add merkt eine Datei für den nächsten Commit vor (Staging) – erst auswählen, dann mit commit festhalten. Muster: git add &lt;datei&gt;." };
+    return { text: "Merke die neue Datei <code>" + fn + "</code> zum Commit vor.", accept: [new RegExp("^git\\s+add\\s+" + fn.replace(/[.-]/g, "\\$&") + "$")], solution: "git add " + fn, hint: "Muster: git add &lt;datei&gt;", why: "add merkt eine Datei für den nächsten Commit vor (Staging) – erst auswählen, dann mit commit festhalten. Muster: git add &lt;datei&gt;." };
   },
   "git-commit": sim => {
     ensureGit(sim);
@@ -307,7 +307,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     sim.exec("git merge " + br); // löst den Konflikt aus – jetzt steckt er in fn
     const side = pick(["--ours", "--theirs"]);
     const wer = side === "--ours" ? "<b>eigene</b>" : "<b>hereinkommende</b>";
-    return { text: "Merge-Konflikt in <code>" + fn + "</code>: übernimm die " + wer + " Version.", accept: [new RegExp("^git\\s+checkout\\s+" + side + "\\s+" + fn.replace(/[.\-]/g, "\\$&") + "$")], solution: "git checkout " + side + " " + fn, hint: "Muster: git checkout --ours/--theirs &lt;datei&gt;", why: "Im Konflikt wählst du eine Seite: --ours ist deine, --theirs die hereinkommende Version. Hier ist die " + wer + " gefragt – Muster: git checkout " + side + " &lt;datei&gt;." };
+    return { text: "Merge-Konflikt in <code>" + fn + "</code>: übernimm die " + wer + " Version.", accept: [new RegExp("^git\\s+checkout\\s+" + side + "\\s+" + fn.replace(/[.-]/g, "\\$&") + "$")], solution: "git checkout " + side + " " + fn, hint: "Muster: git checkout --ours/--theirs &lt;datei&gt;", why: "Im Konflikt wählst du eine Seite: --ours ist deine, --theirs die hereinkommende Version. Hier ist die " + wer + " gefragt – Muster: git checkout " + side + " &lt;datei&gt;." };
   },
   "k-get-netpol": sim => {
     ensureNetworkPolicy(sim);

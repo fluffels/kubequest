@@ -357,7 +357,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
         // Defensive Sanitisierung statt blindem Object.assign: kaputte/fremde
         // Feldwerte fallen auf Defaults zurück, statt ungeprüft ins Spiel zu kommen.
         this.state = sanitizeState(data);
-      } catch (e) {
+      } catch {
         this.state = makeDefaultState();
       }
       // Audio-Einstellungen aus dem Spielstand an die Präsentation geben – entkoppelt

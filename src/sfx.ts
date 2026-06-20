@@ -106,7 +106,7 @@ export const SFX = {
       // statt über einen globalen window-Shim.
       const Ctor = window.AudioContext ||
         (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      try { if (Ctor) this.ctx = new Ctor(); } catch (e) { /* kein Ton */ }
+      try { if (Ctor) this.ctx = new Ctor(); } catch { /* kein Ton */ }
     }
     // Browser starten den Context wegen der Autoplay-Policy oft "suspended";
     // erst eine User-Geste (Tastendruck/Klick) darf ihn fortsetzen.
@@ -229,7 +229,7 @@ export const SFX = {
     // Master-Gain hart auf 0 und trennen -> alle geplanten Stimmen verstummen
     // sofort, keine Resttöne.
     if (this.music.master) {
-      try { this.music.master.gain.value = 0; this.music.master.disconnect(); } catch (e) { /* egal */ }
+      try { this.music.master.gain.value = 0; this.music.master.disconnect(); } catch { /* egal */ }
       this.music.master = null;
     }
     this.music.playing = false;
@@ -241,7 +241,7 @@ export const SFX = {
     if (!this.ctx) {
       const Ctor = window.AudioContext ||
         (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      try { if (Ctor) this.ctx = new Ctor(); } catch (e) { /* kein Ton */ }
+      try { if (Ctor) this.ctx = new Ctor(); } catch { /* kein Ton */ }
     }
     if (this.ctx && this.ctx.state === "suspended") {
       this.ctx.resume().catch(() => { /* egal */ });
