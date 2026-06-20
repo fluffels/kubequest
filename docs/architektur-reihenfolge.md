@@ -4,6 +4,8 @@
 > Diese Liste **überschreibt** für Architektur-Tickets die generische Board-Auswahl (Prio→Nummer aus AGENTS.md):
 > Die Reihenfolge hier ist **abhängigkeitsbewusst** sortiert, nicht nur nach Prio-Label.
 
+> 🚧 **Umbau-Phase: ALLE Tickets dieser Liste landen auf `umbau/skalierungs-fundament`, nicht auf `main`** — inkl. der dazugehörigen Doku-Änderungen. Solange der ADR-0004-Umbau läuft, gilt das für jedes `area:architektur`-Ticket (nicht nur die mit ⚠️). Auf dem Branch aufsetzen, dorthin mergen, dort schließen (sobald fertig + verifiziert). Details: [AGENTS.md › 🚧-Notiz](../AGENTS.md). Die ⚠️-Flags unten markieren weiterhin **inhaltliche** Sonderfälle (Epic zerlegen, Optik abstimmen, harte Abhängigkeit), nicht den Branch.
+
 ## Vor JEDEM Ticket — bewusst zweifeln (über allem)
 
 Bevor irgendein Ticket dieser Liste angefasst wird, **zuerst zweifeln** — das steht über der Reihenfolge:
