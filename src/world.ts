@@ -234,6 +234,101 @@ export function npcSolidIndices(spawns: Spawn[], W: number, H: number): number[]
   return out;
 }
 
+/* ===== Autotile-Auswahl (Blob-/Wang-47er-Set, #340) =====
+ * Erster Schritt aus dem Vision-Ticket #256 (Übergangskacheln + weichere Wege/
+ * Wasserkanten): die PURE Auswahl-Mathematik, die beim Aufbau der Welt aus der
+ * 8er-Nachbarschaft einer Kachel die passende Übergangskachel wählt – gerade,
+ * Außen-/Innenkurve, Endstück, Kreuzung, Uferkante. Noch OHNE neue Assets: die
+ * Tilesets (Wege, Wasser) kommen in den Folge-Tickets aus #256 und müssen ihre
+ * Frames in der Reihenfolge von `BLOB_MASKS` anlegen (Frame-Index = Rückgabewert).
+ *
+ * Bewusst eigenständig neben dem bestehenden 16er-Corner-Wang (`corners()`/`WANG`
+ * in den Szenen): das ist Kanten-/8-Nachbar-Autotiling mit dem klassischen
+ * „47er-Blob"-Schema – das, was z.B. Stardew seine geschwungenen Wege gibt.
+ *
+ * Schema (Standard-Blob): von den 256 möglichen 8-Bit-Masken sind nur 47 wirklich
+ * verschiedene Kacheln, weil eine DIAGONALE nur zählt, wenn ihre BEIDEN
+ * angrenzenden Kanten auch gesetzt sind (eine Außenecke ohne ihre Kanten ist
+ * dieselbe Kachel wie ohne die Ecke). `reduceBlobMask` setzt genau diese Regel um;
+ * die 47 reduzierten Masken bilden – aufsteigend sortiert – die kanonische
+ * Varianten-Liste, und der Index einer Kachel ist die Position ihrer reduzierten
+ * Maske in dieser Liste. Deterministisch und damit voll im Node-Test prüfbar. */
+
+/** Bit-Flag je Nachbarrichtung. Kanten in den unteren vier Bits (N/E/S/W),
+ *  Diagonalen darüber (NE/SE/SW/NW) – passend zur Reduktions-Regel unten. */
+export const NB = { N: 1, E: 2, S: 4, W: 8, NE: 16, SE: 32, SW: 64, NW: 128 } as const;
+
+/** Die acht Nachbarn einer Kachel: true = derselbe Kacheltyp (Pfad/Wasser/…). */
+export interface Neighbors8 {
+  n: boolean; ne: boolean; e: boolean; se: boolean;
+  s: boolean; sw: boolean; w: boolean; nw: boolean;
+}
+
+/** Packt die 8er-Nachbarschaft in die 8-Bit-Maske (siehe `NB`). */
+export function maskFromNeighbors(nb: Neighbors8): number {
+  return (nb.n ? NB.N : 0) | (nb.e ? NB.E : 0) | (nb.s ? NB.S : 0) | (nb.w ? NB.W : 0) |
+         (nb.ne ? NB.NE : 0) | (nb.se ? NB.SE : 0) | (nb.sw ? NB.SW : 0) | (nb.nw ? NB.NW : 0);
+}
+
+/** Kernregel des 47er-Blob-Sets: eine Diagonale zählt nur, wenn ihre BEIDEN
+ *  angrenzenden Kanten gesetzt sind. So kollabieren die 256 rohen Masken auf die
+ *  47 optisch unterscheidbaren (eine Außenecke ohne Kanten ⇒ wie ohne die Ecke). */
+export function reduceBlobMask(mask: number): number {
+  let m = mask & (NB.N | NB.E | NB.S | NB.W);   // Kanten unverändert übernehmen
+  if ((mask & NB.NE) && (m & NB.N) && (m & NB.E)) m |= NB.NE;
+  if ((mask & NB.SE) && (m & NB.S) && (m & NB.E)) m |= NB.SE;
+  if ((mask & NB.SW) && (m & NB.S) && (m & NB.W)) m |= NB.SW;
+  if ((mask & NB.NW) && (m & NB.N) && (m & NB.W)) m |= NB.NW;
+  return m;
+}
+
+/** Die 47 kanonischen Blob-Varianten als reduzierte Masken, aufsteigend sortiert.
+ *  Aus allen 256 Masken abgeleitet statt handgetippt (kein 47-Zeilen-Tippfehler);
+ *  der Index einer Kachel ist die Position ihrer reduzierten Maske hier. */
+export const BLOB_MASKS: readonly number[] = (() => {
+  const set = new Set<number>();
+  for (let m = 0; m < 256; m++) set.add(reduceBlobMask(m));
+  return Array.from(set).sort((a, b) => a - b);
+})();
+
+/** Anzahl der Blob-Varianten (== 47; das Tileset braucht so viele Frames). */
+export const AUTOTILE_BLOB_COUNT = BLOB_MASKS.length;
+
+/** Vorberechnete Tabelle rohe Maske (0..255) → Varianten-Index (0..46). */
+const BLOB_INDEX: Uint8Array = (() => {
+  const pos = new Map<number, number>();
+  BLOB_MASKS.forEach((m, i) => pos.set(m, i));
+  const tbl = new Uint8Array(256);
+  for (let m = 0; m < 256; m++) tbl[m] = pos.get(reduceBlobMask(m)) ?? 0;
+  return tbl;
+})();
+
+/** Wählt aus einer rohen 8-Bit-Nachbarschaftsmaske den Blob-Varianten-Index
+ *  (0..46). Wirft bei ungültiger Maske (keine Ganzzahl 0..255) – ein kaputter
+ *  Aufruf soll laut werden, nicht stillschweigend Kachel 0 malen. */
+export function autotileIndexFromMask(mask: number): number {
+  if (!Number.isInteger(mask) || mask < 0 || mask > 255) {
+    throw new RangeError(`Autotile-Maske muss eine Ganzzahl 0..255 sein, war: ${mask}`);
+  }
+  return BLOB_INDEX[mask]!;
+}
+
+/** Bequeme Variante: wählt den Blob-Index direkt aus der 8er-Nachbarschaft. */
+export function autotileIndex(nb: Neighbors8): number {
+  return autotileIndexFromMask(maskFromNeighbors(nb));
+}
+
+/** Baut die 8er-Nachbarschaft einer Kachel (x,y) über ein „gleicher Typ?"-Prädikat
+ *  – so ruft scenes.ts es beim Bauen der Welt auf (z.B. `(x,y) => istPfad(x,y)`).
+ *  Außerhalb der Karte liefert das Prädikat schlicht false → der Kartenrand wird
+ *  zur Kante. Pur, damit die Auswahl im Node-Test prüfbar bleibt. */
+export function neighbors8(same: (x: number, y: number) => boolean, x: number, y: number): Neighbors8 {
+  return {
+    n:  same(x, y - 1), ne: same(x + 1, y - 1), e: same(x + 1, y), se: same(x + 1, y + 1),
+    s:  same(x, y + 1), sw: same(x - 1, y + 1), w: same(x - 1, y), nw: same(x - 1, y - 1),
+  };
+}
+
 /** Solid-Abfrage in Pixel-Koordinaten (in scenes.ts ist das `isSolidAt`). */
 export type SolidAt = (px: number, py: number) => boolean;
 
