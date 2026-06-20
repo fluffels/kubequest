@@ -672,9 +672,9 @@ test("secret tls: fehlende --cert/--key und Duplikat werden abgelehnt (Negativf�
 });
 
 test("ingress TLS: apply rüstet das bestehende Tor auf HTTPS nach (configured), get zeigt 443", () => {
-  // Erst das normale Tor, dann TLS nachrüsten – wie in der Quest (q23).
+  // Erst das normale Tor, dann TLS nachrüsten – wie in der Quest (secrets-encrypted).
   legeIngressManifest(sim, "ingress.yaml");
-  // legeIngressManifest zeigt auf service 'kasse'; für q23-Optik egal, wir prüfen nur TLS.
+  // legeIngressManifest zeigt auf service 'kasse'; für secrets-encrypted-Optik egal, wir prüfen nur TLS.
   sim.exec("kubectl apply -f ingress.yaml");
   assert.match(sim.exec("kubectl get ingress").output!, /\b80\b/);
   assert.doesNotMatch(sim.exec("kubectl get ingress").output!, /443/, "vor TLS kein 443");

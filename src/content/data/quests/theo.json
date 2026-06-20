@@ -1,6 +1,6 @@
 [
   {
-    "id": "q12",
+    "id": "terraform-intro",
     "title": "Neues Land",
     "giver": "theo",
     "rewardXp": 45,
@@ -119,7 +119,7 @@
     ]
   },
   {
-    "id": "q13",
+    "id": "terraform-state-destroy",
     "title": "Gedächtnis und Abriss",
     "giver": "theo",
     "rewardXp": 45,
@@ -156,7 +156,7 @@
             "accept": [
               "^terraform\\s+plan$"
             ],
-            "check": "q13/t-theo-2",
+            "check": "terraform-state-destroy/t-theo-2",
             "solution": "terraform plan",
             "hint": "Einfach nochmal plan."
           }

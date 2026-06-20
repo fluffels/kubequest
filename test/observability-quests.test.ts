@@ -1,5 +1,5 @@
 /* Phase 5 – Monitoring-Leuchtturm (#120): gezielte Tests für die Observability-Quests
- * (q32–q35) und die Monitoring-Sim, ergänzend zu den breiten Durchspiel-/Struktur-Tests
+ * (observability-metrics–observability-alerts) und die Monitoring-Sim, ergänzend zu den breiten Durchspiel-/Struktur-Tests
  * (quests.test.ts, content.test.ts, sim.test.ts, observability.test.ts).
  *
  * Schwerpunkte hier:
@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { Sim as KQSim } from "../src/sim";
 import { KQContent } from "../src/content";
 
-const PHASE5 = ["q32", "q33", "q34", "q35"];
+const PHASE5 = ["observability-metrics", "observability-grafana", "observability-logs", "observability-alerts"];
 
 function phase5Quests() {
   return KQContent.QUESTS.filter(q => PHASE5.includes(q.id));
@@ -76,11 +76,11 @@ test("kubectl get alert (Singular) funktioniert wie der Plural", () => {
   assert.match(r.output!, /HighPodCPU/);
 });
 
-/* ===================== 2. Quest-Integrität q32–q35 ===================== */
+/* ===================== 2. Quest-Integrität observability-metrics–observability-alerts ===================== */
 
 test("Phase 5: genau vier Quests, alle von Lumi, mit gesetzten Belohnungen", () => {
   const qs = phase5Quests();
-  assert.equal(qs.length, 4, "q32–q35 sind vorhanden");
+  assert.equal(qs.length, 4, "observability-metrics–observability-alerts sind vorhanden");
   for (const q of qs) {
     assert.equal(q.giver, "lumi", q.id + ": Geber ist Lumi");
     assert.ok(q.rewardXp > 0, q.id + ": rewardXp gesetzt");
@@ -114,7 +114,7 @@ test("Phase 5: jede Choice-Frage hat genau eine richtige Antwort + bekannte revi
 });
 
 test("Phase 5: die Musterlösungen laufen gegen die Sim ohne Fehler durch", () => {
-  // wie quests.test.ts, aber fokussiert auf q32–q35: Szenarien mergen, solution ausführen,
+  // wie quests.test.ts, aber fokussiert auf observability-metrics–observability-alerts: Szenarien mergen, solution ausführen,
   // check() prüfen. Platzhalter werden über die echten Pod-Namen der Sim aufgelöst.
   const sim = new KQSim({});
   const resolvePod = (cmd: string) => cmd.replace(/<([a-z]+)-pod>/, (_m, dep) => {
@@ -155,28 +155,28 @@ function task(id: string) {
   throw new Error("Aufgabe nicht gefunden: " + id);
 }
 
-test("Red-Green: scale-auf-0 (q35) akzeptiert NICHT --replicas=1", () => {
+test("Red-Green: scale-auf-0 (observability-alerts) akzeptiert NICHT --replicas=1", () => {
   const t = task("t-scale-zero");
   assert.ok(t.accept.some(re => re.test("kubectl scale deployment rechenknecht --replicas=0")), "0 ist richtig");
   assert.ok(!t.accept.some(re => re.test("kubectl scale deployment rechenknecht --replicas=1")), "1 darf NICHT akzeptiert werden");
   assert.ok(!t.accept.some(re => re.test("kubectl scale deployment rechenknecht --replicas=10")), "10 ebenfalls nicht");
 });
 
-test("Red-Green: logs-basic (q34) verlangt einen Pod-Namen", () => {
+test("Red-Green: logs-basic (observability-logs) verlangt einen Pod-Namen", () => {
   const t = task("t-logs-basic");
   assert.ok(t.accept.some(re => re.test("kubectl logs signalgeber-abc12-xyz12")), "mit Pod ist richtig");
   assert.ok(!t.accept.some(re => re.test("kubectl logs")), "ohne Pod-Namen NICHT akzeptiert");
   assert.ok(!t.accept.some(re => re.test("kubectl describe pod signalgeber-abc12-xyz12")), "describe ist kein logs");
 });
 
-test("Red-Green: logs --previous (q34) verlangt das Flag", () => {
+test("Red-Green: logs --previous (observability-logs) verlangt das Flag", () => {
   const t = task("t-logs-previous");
   assert.ok(t.accept.some(re => re.test("kubectl logs --previous bakenbote-abc12-xyz12")), "mit --previous richtig");
   assert.ok(t.accept.some(re => re.test("kubectl logs -p bakenbote-abc12-xyz12")), "Kurzform -p richtig");
   assert.ok(!t.accept.some(re => re.test("kubectl logs bakenbote-abc12-xyz12")), "ohne --previous NICHT akzeptiert");
 });
 
-test("Red-Green: alerts-get (q35) akzeptiert NICHT 'kubectl get pods'", () => {
+test("Red-Green: alerts-get (observability-alerts) akzeptiert NICHT 'kubectl get pods'", () => {
   const t = task("t-alerts-get");
   assert.ok(t.accept.some(re => re.test("kubectl get alerts")), "get alerts ist richtig");
   assert.ok(!t.accept.some(re => re.test("kubectl get pods")), "get pods ist falsch");

@@ -1,6 +1,6 @@
 [
   {
-    "id": "q15",
+    "id": "k8s-debug-imagepull",
     "title": "Sturmwarnung am Leuchtturm",
     "giver": "juno",
     "rewardXp": 50,
@@ -98,7 +98,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q15/t-j15-3",
+            "check": "k8s-debug-imagepull/t-j15-3",
             "solution": "kubectl get pods",
             "hint": "get pods – STATUS muss Running sein."
           }
@@ -134,7 +134,7 @@
     ]
   },
   {
-    "id": "q16",
+    "id": "k8s-debug-crashloop",
     "title": "Das Flackern",
     "giver": "juno",
     "rewardXp": 55,
@@ -247,7 +247,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q16/t-j16-4",
+            "check": "k8s-debug-crashloop/t-j16-4",
             "solution": "kubectl get pods",
             "hint": "STATUS muss Running sein."
           }
@@ -263,7 +263,7 @@
     ]
   },
   {
-    "id": "q17",
+    "id": "k8s-node-capacity",
     "title": "Kein Platz im Hafen",
     "giver": "juno",
     "rewardXp": 70,
@@ -384,7 +384,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(nodes|node|no)$"
             ],
-            "check": "q17/t-j17-6",
+            "check": "k8s-node-capacity/t-j17-6",
             "solution": "kubectl get nodes",
             "hint": "kubectl, nicht terraform!"
           },
@@ -394,7 +394,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q17/t-j17-7",
+            "check": "k8s-node-capacity/t-j17-7",
             "solution": "kubectl get pods",
             "hint": "get pods – STATUS lesen."
           }
@@ -429,7 +429,7 @@
     ]
   },
   {
-    "id": "q22",
+    "id": "network-policy",
     "title": "Die Hafenmauer",
     "giver": "juno",
     "rewardXp": 60,
@@ -501,7 +501,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(networkpolicies|networkpolicy|netpol|netpols)$"
             ],
-            "check": "q22/t-juno-np-3",
+            "check": "network-policy/t-juno-np-3",
             "solution": "kubectl get networkpolicies",
             "hint": "Kurzform 'netpol' geht auch."
           },
@@ -556,7 +556,7 @@
     ]
   },
   {
-    "id": "q24",
+    "id": "k8s-service-endpoints",
     "title": "Läuft – bedient aber niemanden",
     "giver": "juno",
     "rewardXp": 60,
@@ -640,7 +640,7 @@
             "accept": [
               "^kubectl\\s+expose\\s+deployment\\s+kombuese\\s+--port[=\\s]80$"
             ],
-            "check": "q24/t-j24-3",
+            "check": "k8s-service-endpoints/t-j24-3",
             "solution": "kubectl expose deployment kombuese --port=80",
             "hint": "Muster: kubectl expose deployment <name> --port=<zahl>"
           }
@@ -687,7 +687,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(endpoints|endpoint|ep)\\s+kombuese$"
             ],
-            "check": "q24/t-j24-5",
+            "check": "k8s-service-endpoints/t-j24-5",
             "solution": "kubectl get endpoints kombuese",
             "hint": "Gleicher Befehl wie eben – jetzt steht eine Pod-IP drin statt <none>."
           },
@@ -697,7 +697,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q24/t-j24-6",
+            "check": "k8s-service-endpoints/t-j24-6",
             "solution": "kubectl get pods",
             "hint": "READY 1/1, Status Running – ganz ohne Neustart."
           }
@@ -714,7 +714,7 @@
     ]
   },
   {
-    "id": "q27",
+    "id": "k8s-resource-limits",
     "title": "Der hungrige Kartograf",
     "giver": "juno",
     "rewardXp": 65,
@@ -840,7 +840,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q27/t-j26-4",
+            "check": "k8s-resource-limits/t-j26-4",
             "solution": "kubectl get pods",
             "hint": "STATUS muss Running sein, keine neuen Restarts."
           }

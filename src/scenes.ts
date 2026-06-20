@@ -1250,7 +1250,7 @@ import { getMapEntry } from "./mapregistry";
 
     /* ---------- Sturm: ein Deployment geht kaputt, du reparierst es ---------- */
     tryStartStorm() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q17")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("k8s-node-capacity")) return;
       const victims = Game.sim.deployments.filter(d => !d.broken);
       if (victims.length === 0 || UI.blocking()) { this.events.nextStorm += 25; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -1302,7 +1302,7 @@ import { getMapEntry } from "./mapregistry";
     }
 
     tryStartPirate() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q7")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("k8s-self-healing")) return;
       const victims = Game.sim.deployments.filter(d => d.replicas >= 2);
       if (victims.length === 0 || UI.blocking()) { this.events.nextPirate += 20; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -1349,7 +1349,7 @@ import { getMapEntry } from "./mapregistry";
     }
 
     tryStartKraken() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q14")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("kraken-boss")) return;
       if (UI.blocking()) { this.events.nextKraken += 20; return; }
       const baseline = Game.sim.secrets.length;
 

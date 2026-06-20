@@ -1,6 +1,6 @@
 [
   {
-    "id": "q36",
+    "id": "storage-statefulset",
     "title": "Stabile Lager: das StatefulSet",
     "giver": "knut",
     "rewardXp": 60,
@@ -87,7 +87,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+statefulset\\.yaml$"
           ],
-          "check": "q36/t-sts-apply",
+          "check": "storage-statefulset/t-sts-apply",
           "solution": "kubectl apply -f statefulset.yaml",
           "hint": "kubectl apply -f <datei>"
         }
@@ -102,7 +102,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(statefulset|statefulsets|sts)$"
             ],
-            "check": "q36/t-sts-get",
+            "check": "storage-statefulset/t-sts-get",
             "solution": "kubectl get statefulset",
             "hint": "kubectl get statefulset (oder sts)."
           },
@@ -112,7 +112,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q36/t-sts-pods",
+            "check": "storage-statefulset/t-sts-pods",
             "solution": "kubectl get pods",
             "hint": "kubectl get pods"
           }
@@ -128,7 +128,7 @@
           "accept": [
             "^kubectl\\s+delete\\s+pod\\s+speicher-datenbank-0$"
           ],
-          "check": "q36/t-sts-delete",
+          "check": "storage-statefulset/t-sts-delete",
           "solution": "kubectl delete pod speicher-datenbank-0",
           "hint": "kubectl delete pod <name> – nimm speicher-datenbank-0."
         }
@@ -166,7 +166,7 @@
     ]
   },
   {
-    "id": "q37",
+    "id": "storage-pvc",
     "title": "Speicher anfordern: PVC, PV & StorageClass",
     "giver": "knut",
     "rewardXp": 55,
@@ -239,7 +239,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+storageclass\\.yaml$"
           ],
-          "check": "q37/t-sc-apply",
+          "check": "storage-pvc/t-sc-apply",
           "solution": "kubectl apply -f storageclass.yaml",
           "hint": "kubectl apply -f <datei>"
         }
@@ -254,7 +254,7 @@
           "accept": [
             "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+pvc\\.yaml$"
           ],
-          "check": "q37/t-pvc-apply",
+          "check": "storage-pvc/t-pvc-apply",
           "solution": "kubectl apply -f pvc.yaml",
           "hint": "kubectl apply -f <datei>"
         }
@@ -269,7 +269,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$"
             ],
-            "check": "q37/t-pvc-get",
+            "check": "storage-pvc/t-pvc-get",
             "solution": "kubectl get pvc",
             "hint": "kubectl get pvc"
           },
@@ -279,7 +279,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pv|persistentvolume|persistentvolumes)$"
             ],
-            "check": "q37/t-pv-get",
+            "check": "storage-pvc/t-pv-get",
             "solution": "kubectl get pv",
             "hint": "kubectl get pv"
           }
@@ -295,7 +295,7 @@
             "accept": [
               "^kubectl\\s+create\\s+deployment\\s+datenbank\\s+--image[=\\s]postgres(:\\S+)?$"
             ],
-            "check": "q37/t-pvc-dep",
+            "check": "storage-pvc/t-pvc-dep",
             "solution": "kubectl create deployment datenbank --image=postgres",
             "hint": "kubectl create deployment <name> --image=<image>"
           },
@@ -305,7 +305,7 @@
             "accept": [
               "^kubectl\\s+delete\\s+deployment\\s+datenbank$"
             ],
-            "check": "q37/t-pvc-del",
+            "check": "storage-pvc/t-pvc-del",
             "solution": "kubectl delete deployment datenbank",
             "hint": "kubectl delete deployment <name>"
           },
@@ -315,7 +315,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pvc|persistentvolumeclaim|persistentvolumeclaims)$"
             ],
-            "check": "q37/t-pvc-still",
+            "check": "storage-pvc/t-pvc-still",
             "solution": "kubectl get pvc",
             "hint": "kubectl get pvc"
           }

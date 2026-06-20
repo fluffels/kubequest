@@ -53,23 +53,22 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#354** | Sprechende Quest-IDs (`harbor-first-crate` statt `q2b`) | Repo-weiter Rename + Save-Migration. Setzt auf die **ID-basierte Save** aus #353 (erledigt) auf → jetzt dran. |
-| 2 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. |
-| 3 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
-| 4 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
-| 5 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
-| 6 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
-| 7 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
-| 8 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
-| 9 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
-| 10 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
-| 11 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
-| 12 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 13 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`); wird dort geschlossen, sobald fertig (#350 noch offen; #349 erledigt). Erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
-| 14 | **#357** ⚠️ | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | **Umbau-/ADR-0004-gekoppelt:** baut auf der Entity-Registry aus #349 auf, die nur auf `umbau/skalierungs-fundament` liegt → dort umsetzen, nicht `main`. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. |
-| 15 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 16 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 17 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. Profitiert von den sprechenden Quest-IDs (#354, erledigt). |
+| 2 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
+| 3 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
+| 4 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
+| 5 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
+| 6 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
+| 7 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
+| 8 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
+| 9 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
+| 10 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
+| 11 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 12 | **#352** ⚠️ | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | **Gekoppelt an den laufenden ADR-0004-Umbau.** Gehört auf Branch `umbau/skalierungs-fundament` (nicht `main`); wird dort geschlossen, sobald fertig (#350 noch offen; #349 erledigt). Erst sinnvoll, wenn der Umbau-Branch bearbeitet wird. |
+| 13 | **#357** ⚠️ | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | **Umbau-/ADR-0004-gekoppelt:** baut auf der Entity-Registry aus #349 auf, die nur auf `umbau/skalierungs-fundament` liegt → dort umsetzen, nicht `main`. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. |
+| 14 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 15 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 16 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

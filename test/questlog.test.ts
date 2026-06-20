@@ -91,7 +91,7 @@ describe("buildQuestDetail – Dialoge/Hinweise nachlesen (#326)", () => {
 
   it("zerlegt einen Dialog-Schritt in einzelne Sprechzeilen mit Sprecher", () => {
     const q: Quest = {
-      id: "q1", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
+      id: "docker-first-container", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
       steps: [{ type: "dialog", npc: "bo", lines: ["Hallo Crew.", "Bo stapelt Fracht."] }],
     };
     const det = buildQuestDetail(q, name);
@@ -102,7 +102,7 @@ describe("buildQuestDetail – Dialoge/Hinweise nachlesen (#326)", () => {
 
   it("zeigt bei einer choice-Frage die richtige Antwort, nicht die falschen", () => {
     const q: Quest = {
-      id: "q1", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
+      id: "docker-first-container", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
       steps: [{
         type: "choice", npc: "bo", q: "Image oder Container?",
         options: [
@@ -121,7 +121,7 @@ describe("buildQuestDetail – Dialoge/Hinweise nachlesen (#326)", () => {
 
   it("nutzt bei drill den intro-Text, bei teach/terminal den brief", () => {
     const q: Quest = {
-      id: "q1", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
+      id: "docker-first-container", title: "T", giver: "bo", rewardXp: 0, rewardCoins: 0,
       steps: [
         { type: "teach", brief: "Lerne docker pull", cmd: { id: "t1", text: "Tippe docker pull", accept: [/pull/], solution: "docker pull nginx", hint: "pull", intro: "x" } },
         { type: "drill", brief: "Üben", pool: ["d1"], count: 1, intro: "Jetzt wird geübt." },

@@ -1,6 +1,6 @@
 [
   {
-    "id": "q9",
+    "id": "helm-intro",
     "title": "Das Steuerrad",
     "giver": "runa",
     "rewardXp": 35,
@@ -98,7 +98,7 @@
     ]
   },
   {
-    "id": "q10",
+    "id": "helm-release-install",
     "title": "Flagge hissen",
     "giver": "runa",
     "rewardXp": 40,
@@ -150,7 +150,7 @@
             "accept": [
               "^kubectl\\s+get\\s+(pods|pod|po)$"
             ],
-            "check": "q10/t-runa-4",
+            "check": "helm-release-install/t-runa-4",
             "solution": "kubectl get pods",
             "hint": "Kennst du im Schlaf."
           }
@@ -187,7 +187,7 @@
     ]
   },
   {
-    "id": "q11",
+    "id": "helm-upgrade-rollback",
     "title": "Auf und ab",
     "giver": "runa",
     "rewardXp": 45,
@@ -280,7 +280,7 @@
     ]
   },
   {
-    "id": "q21",
+    "id": "helm-umbrella-chart",
     "title": "Werft-Ausbau: dein eigenes Chart",
     "giver": "runa",
     "rewardXp": 60,
