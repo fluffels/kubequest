@@ -50,7 +50,7 @@ Sagt die Maintainerin **„nächstes Architektur"**, dann:
 
 1. **Fundament** – die Save-Decke heben (blockt Stardew-Scale-Stände). ✅ **erledigt** (#350 IndexedDB auf `main`).
 2. **KI-/Dev-Hebel** – Onboarding + schlanke Doku, damit alle weiteren Schritte (gerade KI-getrieben) billig & sicher werden.
-3. **Qualitätsnetz** – Arch-Wächter/Lint/Boot-Smoke, *bevor* groß refaktorisiert wird. (Arch-Wächter **#390 ✅ erledigt** – inkl. Zyklen-/Orphan-/Dateigröße-Wächter. **Boot-Smoke #391 ist nicht mehr `area:architektur`** (nur noch `area:tests`) → läuft über die generische Board-Auswahl, nicht über diese Liste. Im Netz bleibt hier nur **Lint #389**.)
+3. **Qualitätsnetz** – Arch-Wächter/Lint/CI-Härtung, *bevor* groß refaktorisiert wird. (Arch-Wächter **#390 ✅ erledigt** – inkl. Zyklen-/Orphan-/Dateigröße-Wächter; **Lint #389 ✅ erledigt** – ESLint + CI-Gate. **Boot-Smoke #391 ist nicht mehr `area:architektur`** (nur noch `area:tests`) → läuft über die generische Board-Auswahl, nicht über diese Liste. Offen bleiben hier die neu aufgetauchten CI-Netz-Tickets **#396** (Dependabot + npm-audit-Gate) und **#398** (Actions v4→v5).)
 4. **God-File-Splits** – unter dem Netz (Schritt 3) gefahrlos.
 5. **Skalierungs-Enabler** – Assets/Entities für viele Welten.
 6. **Features** – Save-Slots, Wiederspielen, Dev-Panel.
@@ -60,20 +60,21 @@ Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem d
 
 | # | Block | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|-------|--------|--------------|---------------------------|
-| 1 | Qualitätsnetz | **#389** | ESLint + CI-Gate | Netz für viel KI-Code, bevor groß refaktorisiert/ausgebaut wird. Letztes offenes Netz-Ticket (Arch-Wächter #390 ✅ erledigt). |
-| 2 | Splits | **#392** | game.ts aufteilen (793 LOC God-Object) | **prio:hoch.** Unter dem Netz. Fassade unverändert; ⚠️ **Saves/`sanitizeState`/Migration penibel grün halten** (Red-Green mit echtem Alt-Stand). |
-| 3 | Splits | **#393** | WorldScene.ts aufteilen (1344 LOC, größte Datei) | Token-Effizienz + Wartbarkeit; im Browser verifizieren. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` (#390) entfernen. |
-| 4 | Splits | **#397** | sim/kubectl.ts aufteilen (1220 LOC God-File) | **Befund aus #390** (Dateigröße-Budget 800). Zweitgrößte Datei; analog zum sim.ts-Split #346. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` entfernen. |
-| 5 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387 (✓ erledigt). Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
-| 6 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
-| 7 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
-| 8 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
-| 9 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
-| 10 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
-| 11 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
-| 12 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
-| 13 | Sonderfall | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen, zerlegen** (session-große Kinder, Übersichts-Kommentar, Epic auf done). Präzedenz: #316 (`Game.cmdHistoryUnlocked`). |
-| 14 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | Qualitätsnetz | **#396** | Dependabot + npm-audit-Gate in CI | Letztes Netz-Stück, bevor groß refaktorisiert wird: hält Dependencies aktuell + sicher (beim ESLint-Setup #389 tauchten bereits 5 npm-Vulnerabilities auf). Lint #389 ✅ + Arch-Wächter #390 ✅ erledigt. |
+| 2 | Qualitätsnetz | **#398** | CI: GitHub-Actions v4→v5 (Node-20-Deprecation) | Reine CI-Wartung (Deprecation-Warnungen), unabhängig + schnell; hält die Pipeline grün, bevor die Splits viel CI-Last erzeugen. |
+| 3 | Splits | **#392** | game.ts aufteilen (793 LOC God-Object) | **prio:hoch.** Unter dem Netz. Fassade unverändert; ⚠️ **Saves/`sanitizeState`/Migration penibel grün halten** (Red-Green mit echtem Alt-Stand). |
+| 4 | Splits | **#393** | WorldScene.ts aufteilen (1344 LOC, größte Datei) | Token-Effizienz + Wartbarkeit; im Browser verifizieren. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` (#390) entfernen. |
+| 5 | Splits | **#397** | sim/kubectl.ts aufteilen (1220 LOC God-File) | **Befund aus #390** (Dateigröße-Budget 800). Zweitgrößte Datei; analog zum sim.ts-Split #346. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` entfernen. |
+| 6 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387 (✓ erledigt). Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
+| 7 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
+| 8 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 9 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 10 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
+| 11 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 12 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 13 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 14 | Sonderfall | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen, zerlegen** (session-große Kinder, Übersichts-Kommentar, Epic auf done). Präzedenz: #316 (`Game.cmdHistoryUnlocked`). |
+| 15 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 
