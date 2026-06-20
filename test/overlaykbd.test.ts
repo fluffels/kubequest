@@ -6,7 +6,7 @@
  * leeres Overlay, irrelevante Tasten, Wrap), damit kein Maus-only-Knopf bleibt.
  */
 import { test, expect, describe } from "vitest";
-import { resolveOverlayKey, type OverlayButton } from "../src/overlaykbd";
+import { resolveOverlayKey, dialogueNav, type OverlayButton } from "../src/overlaykbd";
 
 // Kürzel zum Bauen von Button-Listen.
 const b = (o: Partial<OverlayButton> = {}): OverlayButton => ({ disabled: false, primary: false, ...o });
@@ -99,5 +99,38 @@ describe("resolveOverlayKey – Negativ-/Grenzfälle", () => {
     expect(resolveOverlayKey(btns, -1, "ArrowDown")).toEqual({ kind: "nav", sel: 0 });
     expect(resolveOverlayKey(btns, 0, "ArrowUp")).toEqual({ kind: "nav", sel: 0 });
     expect(resolveOverlayKey(btns, -1, "Enter")).toEqual({ kind: "activate", index: 0 });
+  });
+});
+
+describe("dialogueNav – mehrzeilige Lese-Dialoge vor/zurück (#310)", () => {
+  test("weiter geht Zeile für Zeile vorwärts", () => {
+    expect(dialogueNav(0, 3, 1)).toEqual({ kind: "show", idx: 1 });
+    expect(dialogueNav(1, 3, 1)).toEqual({ kind: "show", idx: 2 });
+  });
+
+  test("weiter auf der letzten Zeile beendet den Dialog (schließen + onDone)", () => {
+    expect(dialogueNav(2, 3, 1)).toEqual({ kind: "finish" });
+  });
+
+  test("zurück geht Zeile für Zeile rückwärts (Nachlesen)", () => {
+    expect(dialogueNav(2, 3, -1)).toEqual({ kind: "show", idx: 1 });
+    expect(dialogueNav(1, 3, -1)).toEqual({ kind: "show", idx: 0 });
+  });
+
+  test("zurück auf der ersten Zeile bleibt stehen (geclampt, kein Rückdrehen)", () => {
+    expect(dialogueNav(0, 3, -1)).toEqual({ kind: "stay" });
+  });
+
+  test("einzeiliger Dialog (Smalltalk): weiter beendet sofort, zurück bleibt stehen", () => {
+    expect(dialogueNav(0, 1, 1)).toEqual({ kind: "finish" });
+    expect(dialogueNav(0, 1, -1)).toEqual({ kind: "stay" });
+  });
+
+  test("Hin und Her ist verlustfrei: vor, dann zurück landet wieder auf derselben Zeile", () => {
+    const fwd = dialogueNav(0, 3, 1);
+    expect(fwd).toEqual({ kind: "show", idx: 1 });
+    if (fwd.kind === "show") {
+      expect(dialogueNav(fwd.idx, 3, -1)).toEqual({ kind: "show", idx: 0 });
+    }
   });
 });

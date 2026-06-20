@@ -82,3 +82,40 @@ export function resolveOverlayKey(
 
   return null;
 }
+
+/* ===== Mehrzeilige Lese-Dialoge: vor-/zurückblättern (#310) =====
+ * Pure Blätter-Logik für NPC-Gespräche UND Bo-Lernblöcke (beide laufen über
+ * `showDialogue`): mit „weiter" (E/Enter/Leer) vorwärts, mit „zurück" (←/
+ * Backspace) durch die schon gezeigten Zeilen nochmal lesen. Reiner Lese-
+ * Rückblick – es wird KEIN Spielzustand und KEINE getroffene Auswahl/Antwort
+ * zurückgedreht (eine laufende Frage/ein Menü blockt das in der DOM-Schicht).
+ * Die DOM-Anbindung liegt dünn in `ui/dialog.ts` (`advanceDialogue`/
+ * `dialogueBack`) + `main.ts` (Tastenwahl).
+ */
+
+/** Ergebnis von {@link dialogueNav}:
+ *  - `show`: die Zeile mit Index `idx` (neu) anzeigen
+ *  - `finish`: über die letzte Zeile hinaus vorwärts → Dialog beenden (schließen + onDone)
+ *  - `stay`: am Anfang zurück → nichts ändern (geclampt, reiner Lese-Rückblick) */
+export type DialogueNavAction =
+  | { kind: "show"; idx: number }
+  | { kind: "finish" }
+  | { kind: "stay" };
+
+/**
+ * Entscheidet, wohin ein Blättern in einem mehrzeiligen Lese-Dialog führt.
+ *
+ * @param idx        aktuell gezeigte Zeile (0-basiert)
+ * @param lineCount  Gesamtzahl der Zeilen (>= 1)
+ * @param dir        +1 = weiter (E/Enter/Leer), -1 = zurück (←/Backspace)
+ *
+ * - weiter: auf der letzten Zeile → `finish` (Dialog schließen), sonst `show idx+1`.
+ * - zurück: auf der ersten Zeile → `stay` (geclampt; eine Auswahl/Antwort wird
+ *   NIE zurückgedreht), sonst `show idx-1`.
+ */
+export function dialogueNav(idx: number, lineCount: number, dir: 1 | -1): DialogueNavAction {
+  if (dir === 1) {
+    return idx < lineCount - 1 ? { kind: "show", idx: idx + 1 } : { kind: "finish" };
+  }
+  return idx > 0 ? { kind: "show", idx: idx - 1 } : { kind: "stay" };
+}

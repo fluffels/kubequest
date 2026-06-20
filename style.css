@@ -243,6 +243,8 @@ button.danger:hover { background: var(--bad); color: #1a0606; filter: none; }
   color: var(--accent2);
 }
 .dlg-next { text-align: right; color: var(--text-dim); font-size: 0.8em; margin-top: 6px; animation: blink 1.2s infinite; }
+/* #310: Rückblick-Hinweis links neben dem „weiter"-Hinweis (beide rechtsbündig). */
+.dlg-back { margin-right: 14px; }
 @keyframes blink { 50% { opacity: 0.3; } }
 .dlg-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .dlg-choices button { text-align: left; line-height: 1.35; }

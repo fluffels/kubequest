@@ -27,7 +27,8 @@ Spielstand speichert automatisch im Browser.
 | Taste | Aktion |
 |---|---|
 | WASD / Pfeile | Laufen |
-| E | Reden / Benutzen |
+| E | Reden / Benutzen / im Dialog weiter |
+| ← / Backspace | Im Dialog eine Zeile zurück (nachlesen) |
 | T | 📻 Funkgerät (Terminal) |
 | J | 📜 Logbuch (Questlog) |
 | Esc | Fenster schließen |

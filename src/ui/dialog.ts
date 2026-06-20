@@ -1,6 +1,7 @@
 import { Game } from "../game";
 import { KQContent } from "../content";
 import { SFX } from "../sfx";
+import { dialogueNav } from "../overlaykbd";
 import { part, $, NPCS, shuffled } from "./shared";
 
 export const dialogUI = part({
@@ -18,19 +19,38 @@ export const dialogUI = part({
   renderDialogueLine() {
     const d = this.dialogue;
     $("dlg-text").innerHTML = KQContent.applyGlossary(d.lines[d.idx]);
-    $("dlg-next").textContent = d.idx < d.lines.length - 1 ? "▼ weiter (E)" : "✔ fertig (E)";
+    const fwd = d.idx < d.lines.length - 1 ? "▼ weiter (E)" : "✔ fertig (E)";
+    // #310: Lese-Rückblick – ab der zweiten Zeile sichtbar machen, dass man eine
+    // Zeile zurückblättern kann (analog zum „weiter"-Hinweis, rein per Tastatur).
+    const back = d.idx > 0 ? '<span class="dlg-back">◀ zurück (←)</span>' : "";
+    $("dlg-next").innerHTML = back + fwd;
     $("dlg-next").classList.remove("hidden");
   },
 
   advanceDialogue() {
     const d = this.dialogue;
     if (!d || d.choice) return;
-    d.idx++;
-    if (d.idx < d.lines.length) {
+    const act = dialogueNav(d.idx, d.lines.length, 1);
+    if (act.kind === "show") {
+      d.idx = act.idx;
       this.renderDialogueLine();
     } else {
       this.closeDialogue();
       if (d.onDone) d.onDone();
+    }
+  },
+
+  /** #310: In einem mehrzeiligen Lese-Dialog eine Zeile zurück, um Vorheriges
+   *  nochmal zu lesen. Reiner Lese-Rückblick: ändert keinen Spielzustand und
+   *  dreht keine Auswahl zurück (während einer Frage/eines Menüs ist `d.choice`
+   *  gesetzt → No-op); auf der ersten Zeile geclampt (`dialogueNav` → „stay"). */
+  dialogueBack() {
+    const d = this.dialogue;
+    if (!d || d.choice) return;
+    const act = dialogueNav(d.idx, d.lines.length, -1);
+    if (act.kind === "show") {
+      d.idx = act.idx;
+      this.renderDialogueLine();
     }
   },
 

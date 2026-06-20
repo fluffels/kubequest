@@ -47,6 +47,9 @@ import { keys, clearKeys } from "./runtime";
           if (["1", "2", "3", "4"].includes(k)) { UI.dlgPickNumber(parseInt(k, 10)); e.preventDefault(); return; }
           return;
         }
+        // #310: Lese-Rückblick – ← / Backspace blättert eine Zeile zurück (reines
+        // Nachlesen, ohne Spielzustand zu ändern), E/Enter/Leer wieder vorwärts.
+        if (k === "ArrowLeft" || k === "Backspace") { UI.dialogueBack(); e.preventDefault(); return; }
         if (k === "e" || k === "Enter" || k === " ") { UI.advanceDialogue(); e.preventDefault(); }
         return;
       }
