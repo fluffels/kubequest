@@ -3,6 +3,7 @@
     "id": "k8s-debug-imagepull",
     "title": "Sturmwarnung am Leuchtturm",
     "giver": "juno",
+    "topic": "troubleshooting",
     "rewardXp": 50,
     "rewardCoins": 40,
     "steps": [
@@ -137,6 +138,7 @@
     "id": "k8s-debug-crashloop",
     "title": "Das Flackern",
     "giver": "juno",
+    "topic": "troubleshooting",
     "rewardXp": 55,
     "rewardCoins": 40,
     "steps": [
@@ -266,6 +268,7 @@
     "id": "k8s-node-capacity",
     "title": "Kein Platz im Hafen",
     "giver": "juno",
+    "topic": "troubleshooting",
     "rewardXp": 70,
     "rewardCoins": 55,
     "steps": [
@@ -432,6 +435,7 @@
     "id": "network-policy",
     "title": "Die Hafenmauer",
     "giver": "juno",
+    "topic": "security",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
@@ -559,6 +563,7 @@
     "id": "k8s-service-endpoints",
     "title": "Läuft – bedient aber niemanden",
     "giver": "juno",
+    "topic": "troubleshooting",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
@@ -717,6 +722,7 @@
     "id": "k8s-resource-limits",
     "title": "Der hungrige Kartograf",
     "giver": "juno",
+    "topic": "troubleshooting",
     "rewardXp": 65,
     "rewardCoins": 50,
     "steps": [

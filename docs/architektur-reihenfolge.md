@@ -51,27 +51,26 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. Profitiert von den sprechenden Quest-IDs (#354, erledigt). |
-| 2 | **#372** | `sim.ts`-Split 1/7: `sim/state.ts` (gemeinsamer Cluster-State + Typen) | **Basis des gesamten `sim.ts`-Splits aus #346 (zerlegt → erledigt) — zuerst, blockiert #373–#378.** Pure Domäne, vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
-| 3 | **#373** | `sim.ts`-Split 2/7: `sim/docker.ts` (~155 Z.) | Setzt #372 voraus (gemeinsamer State). Danach unabhängig von den anderen Befehlsgruppen. |
-| 4 | **#374** | `sim.ts`-Split 3/7: `sim/kubectl.ts` (~1225 Z., größter Block) | Setzt #372 voraus. Größter Brocken — Red-Green über die vielen kubectl-Tests. |
-| 5 | **#375** | `sim.ts`-Split 4/7: `sim/helm.ts` (~200 Z.) | Setzt #372 voraus. |
-| 6 | **#376** | `sim.ts`-Split 5/7: `sim/terraform.ts` (~70 Z.) | Setzt #372 voraus. |
-| 7 | **#377** | `sim.ts`-Split 6/7: `sim/git.ts` (~350 Z.) | Setzt #372 voraus. |
-| 8 | **#378** | `sim.ts`-Split 7/7: `sim/argocd.ts` (~110 Z.) | Setzt #372 voraus. Danach ist `sim.ts` ein schlankes Barrel. |
-| 9 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
-| 10 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
-| 11 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
-| 12 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
-| 13 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
-| 14 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
-| 15 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
-| 16 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
-| 17 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 18 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
-| 19 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 20 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 21 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | **#372** | `sim.ts`-Split 1/7: `sim/state.ts` (gemeinsamer Cluster-State + Typen) | **Basis des gesamten `sim.ts`-Splits aus #346 (zerlegt → erledigt) — zuerst, blockiert #373–#378.** Pure Domäne, vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
+| 2 | **#373** | `sim.ts`-Split 2/7: `sim/docker.ts` (~155 Z.) | Setzt #372 voraus (gemeinsamer State). Danach unabhängig von den anderen Befehlsgruppen. |
+| 3 | **#374** | `sim.ts`-Split 3/7: `sim/kubectl.ts` (~1225 Z., größter Block) | Setzt #372 voraus. Größter Brocken — Red-Green über die vielen kubectl-Tests. |
+| 4 | **#375** | `sim.ts`-Split 4/7: `sim/helm.ts` (~200 Z.) | Setzt #372 voraus. |
+| 5 | **#376** | `sim.ts`-Split 5/7: `sim/terraform.ts` (~70 Z.) | Setzt #372 voraus. |
+| 6 | **#377** | `sim.ts`-Split 6/7: `sim/git.ts` (~350 Z.) | Setzt #372 voraus. |
+| 7 | **#378** | `sim.ts`-Split 7/7: `sim/argocd.ts` (~110 Z.) | Setzt #372 voraus. Danach ist `sim.ts` ein schlankes Barrel. |
+| 8 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
+| 9 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
+| 10 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
+| 11 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
+| 12 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
+| 13 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
+| 14 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
+| 15 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
+| 16 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 17 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
+| 18 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 19 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 20 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

@@ -3,6 +3,7 @@
     "id": "storage-statefulset",
     "title": "Stabile Lager: das StatefulSet",
     "giver": "knut",
+    "topic": "storage",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
@@ -169,6 +170,7 @@
     "id": "storage-pvc",
     "title": "Speicher anfordern: PVC, PV & StorageClass",
     "giver": "knut",
+    "topic": "storage",
     "rewardXp": 55,
     "rewardCoins": 40,
     "steps": [

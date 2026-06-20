@@ -207,6 +207,14 @@ export interface Quest {
   id: string;
   title: string;
   giver: string;
+  /** Themen-/Kapitel-Zuordnung (#327): die ID eines Themas aus
+   *  `content/data/quest-topics.json`. Gruppiert Quests fürs Logbuch-Accordion
+   *  (#326) entlang des README-Lernpfads. Bewusst ein **explizites Feld** und
+   *  nicht aus `giver` abgeleitet: ein Geber kann Quests aus mehreren Themen
+   *  geben (z.B. ole → Kubernetes-Grundlagen UND die Security-Krake; juno →
+   *  Troubleshooting UND die Security-Hafenmauer). Referenzielle Gültigkeit
+   *  (Thema existiert) + „kein totes Thema" prüft `content/validate.ts`. */
+  topic: string;
   rewardXp: number;
   rewardCoins: number;
   steps: QuestStep[];

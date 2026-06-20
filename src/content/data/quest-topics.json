@@ -1,0 +1,15 @@
+[
+  { "id": "onboarding", "label": "Einstieg" },
+  { "id": "docker", "label": "Docker" },
+  { "id": "k8s-basics", "label": "Kubernetes-Grundlagen" },
+  { "id": "yaml", "label": "YAML & Manifeste" },
+  { "id": "helm", "label": "Helm" },
+  { "id": "terraform", "label": "Terraform" },
+  { "id": "security", "label": "Security & Netzwerk" },
+  { "id": "troubleshooting", "label": "Troubleshooting" },
+  { "id": "git", "label": "Git" },
+  { "id": "ci-cd", "label": "CI/CD" },
+  { "id": "gitops", "label": "GitOps" },
+  { "id": "observability", "label": "Observability" },
+  { "id": "storage", "label": "Storage" }
+]

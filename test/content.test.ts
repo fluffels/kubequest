@@ -420,11 +420,42 @@ test("Red-Green: kaputte Quest-Referenz (unbekannter Questgeber) macht den Check
     ...KQContent,
     QUESTS: [
       ...KQContent.QUESTS,
-      { id: "q-bad", title: "Geister-Quest", giver: "niemand", rewardXp: 1, rewardCoins: 1, steps: [] },
+      { id: "q-bad", title: "Geister-Quest", giver: "niemand", topic: "docker", rewardXp: 1, rewardCoins: 1, steps: [] },
     ],
   };
   const errors = validateContent(kaputt);
   assert.ok(errors.some(e => e.includes("q-bad") && e.includes("niemand")), "kaputter Questgeber wurde NICHT gemeldet – Validator ohne Zähne:\n" + errors.join("\n"));
+});
+
+test("Red-Green: Quest mit unbekanntem Thema macht den Check rot (#327)", () => {
+  // Eine Quest mit einem topic, das nicht in der Taxonomie steht, würde ungruppiert
+  // durchs Logbuch-Accordion rutschen – das MUSS gemeldet werden.
+  const kaputt: ContentBundle = {
+    ...KQContent,
+    QUESTS: [
+      ...KQContent.QUESTS,
+      { id: "q-thema-weg", title: "Themenlos", giver: "ole", topic: "gibt-es-nicht", rewardXp: 1, rewardCoins: 1, steps: [] },
+    ],
+  };
+  const errors = validateContent(kaputt);
+  assert.ok(
+    errors.some(e => e.includes("q-thema-weg") && e.includes("gibt-es-nicht")),
+    "unbekanntes Quest-Thema wurde NICHT gemeldet:\n" + errors.join("\n"),
+  );
+});
+
+test("Red-Green: totes Thema ohne jede Quest macht den Check rot (#327)", () => {
+  // Ein Thema in der Taxonomie, das keine Quest benutzt, wäre eine leere
+  // Accordion-Sektion (Tippfehler im topic oder verwaistes Thema) – muss auffallen.
+  const kaputt: ContentBundle = {
+    ...KQContent,
+    QUEST_TOPICS: [...KQContent.QUEST_TOPICS, { id: "totes-thema", label: "Niemandsland" }],
+  };
+  const errors = validateContent(kaputt);
+  assert.ok(
+    errors.some(e => e.includes("totes-thema") && e.includes("keine einzige Quest")),
+    "totes Thema wurde NICHT gemeldet:\n" + errors.join("\n"),
+  );
 });
 
 test("Red-Green: unbekannter Drill in einem Übungs-Pool macht den Check rot", () => {

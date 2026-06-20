@@ -61,6 +61,7 @@ export interface ContentBundle {
   SHOP: { id: string }[];
   NPCS: Record<string, { name: string }>;
   QUESTS: Quest[];
+  QUEST_TOPICS: { id: string; label: string }[];
   CRAB_QUIZ: QuizCard[];
   CMD_CARDS: CmdCard[];
   DRILLS: Record<string, unknown>;
@@ -87,6 +88,9 @@ export function validateContent(c: ContentBundle): string[] {
   const questIds = new Set(c.QUESTS.map(q => q.id));
   const drillIds = new Set(Object.keys(c.DRILLS));
   const quizIds = new Set(c.CRAB_QUIZ.map(q => q.id));
+  const topicIds = new Set(c.QUEST_TOPICS.map(t => t.id));
+  // Welche Themen tatsächlich von einer Quest benutzt werden (für den Tot-Themen-Check #327).
+  const usedTopics = new Set<string>();
 
   // ---------- Ränge: aufsteigende XP-Schwellen ----------
   for (let i = 1; i < c.RANKS.length; i++) {
@@ -129,6 +133,11 @@ export function validateContent(c: ContentBundle): string[] {
     if (questSeen.has(quest.id)) err(`QUESTS: doppelte ID „${quest.id}"`);
     questSeen.add(quest.id);
     if (!npcIds.has(quest.giver)) err(`Quest ${quest.id}: unbekannter Questgeber „${quest.giver}"`);
+    // Thema referenziell prüfen (#327): muss in der Taxonomie stehen, sonst rutscht
+    // die Quest ungruppiert durchs Logbuch-Accordion. Wie beim Geber bewusst hier
+    // (Querverweis) statt im Loader (der prüft topic nur strukturell als Pflicht-String).
+    if (!topicIds.has(quest.topic)) err(`Quest ${quest.id}: unbekanntes Thema „${quest.topic}" (nicht in quest-topics.json)`);
+    else usedTopics.add(quest.topic);
 
     for (const step of quest.steps) {
       switch (step.type) {
@@ -170,6 +179,16 @@ export function validateContent(c: ContentBundle): string[] {
           break;
       }
     }
+  }
+
+  // ---------- Themen-Taxonomie: IDs eindeutig, kein totes Thema (#327) ----------
+  const topicSeen = new Set<string>();
+  for (const t of c.QUEST_TOPICS) {
+    if (topicSeen.has(t.id)) err(`QUEST_TOPICS: doppelte Themen-ID „${t.id}"`);
+    topicSeen.add(t.id);
+    // Ein Thema ohne jede Quest wäre eine leere Accordion-Sektion: entweder Tippfehler
+    // im topic einer Quest oder ein verwaistes Thema. Beides soll auffallen.
+    if (!usedTopics.has(t.id)) err(`QUEST_TOPICS: Thema „${t.id}" (${t.label}) hat keine einzige Quest`);
   }
 
   // ---------- Übungs-Pools: NPC, Drill und Folge-Quest existieren ----------

@@ -20,14 +20,17 @@ import {
   assembleCmdCards,
   parseQuizCards,
   assembleQuizCards,
+  parseQuestTopics,
+  QUEST_TOPICS,
+  groupQuestsByTopic,
   ContentValidationError,
   type CmdCard,
   type QuizCard,
 } from "../src/content/loader";
 import type { Quest } from "../src/types";
 
-/** Minimal-Quest für die Assembler-Tests (Inhalt egal, nur id/giver zählen). */
-const mkQuest = (id: string): Quest => ({ id, title: id, giver: "ole", rewardXp: 0, rewardCoins: 0, steps: [] });
+/** Minimal-Quest für die Assembler-Tests (Inhalt egal, nur id/giver/topic zählen). */
+const mkQuest = (id: string): Quest => ({ id, title: id, giver: "ole", topic: "docker", rewardXp: 0, rewardCoins: 0, steps: [] });
 
 /* ---------- Echte Daten: vollständig & konsistent geladen ---------- */
 
@@ -169,6 +172,7 @@ const minimalQuest = {
   id: "qx",
   title: "Test",
   giver: "ole",
+  topic: "docker",
   rewardXp: 10,
   rewardCoins: 5,
   steps: [
@@ -229,6 +233,75 @@ test("parseQuests: wirft bei choice ohne wohlgeformte Optionen", () => {
     () => parseQuests([{ ...minimalQuest, steps: [{ type: "choice", npc: "ole", q: "?", options: [{ t: "A", ok: "ja", reply: "R" }] }] }]),
     ContentValidationError,
   );
+});
+
+test("parseQuests: wirft bei fehlendem topic (struktureller Pflicht-String, #327, mit Pfad)", () => {
+  // topic ist strukturell Pflicht (wie title/giver) – fehlend MUSS hart scheitern,
+  // sonst rutschte eine Quest ohne Thema durch.
+  const { topic: _weg, ...ohneTopic } = minimalQuest;
+  assert.throws(
+    () => parseQuests([ohneTopic]),
+    (e: unknown) => e instanceof ContentValidationError && /\.topic/.test((e as Error).message),
+  );
+});
+
+/* ---------- parseQuestTopics: Themen-Taxonomie (#327) ---------- */
+
+test("parseQuestTopics: akzeptiert eine wohlgeformte, geordnete Liste", () => {
+  const ts = parseQuestTopics([{ id: "docker", label: "Docker" }, { id: "helm", label: "Helm" }]);
+  assert.deepEqual(ts.map((t) => t.id), ["docker", "helm"]);
+  assert.equal(ts[0].label, "Docker");
+});
+
+test("parseQuestTopics: wirft bei Nicht-Array bzw. leerer Liste", () => {
+  assert.throws(() => parseQuestTopics({}), ContentValidationError);
+  assert.throws(() => parseQuestTopics([]), ContentValidationError);
+});
+
+test("parseQuestTopics: wirft bei Eintrag ohne id/label (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuestTopics([{ id: "docker" }]),
+    (e: unknown) => e instanceof ContentValidationError && /\[0\]\.label/.test((e as Error).message),
+  );
+});
+
+test("parseQuestTopics: wirft bei doppelter Themen-ID", () => {
+  assert.throws(
+    () => parseQuestTopics([{ id: "docker", label: "Docker" }, { id: "docker", label: "Nochmal" }]),
+    (e: unknown) => e instanceof ContentValidationError && /doppelte Themen-ID/.test((e as Error).message),
+  );
+});
+
+test("loader: QUEST_TOPICS lädt die echte Taxonomie (geordnet, eindeutig, mit Labels)", () => {
+  assert.ok(QUEST_TOPICS.length >= 10, "unerwartet wenige Themen");
+  const ids = QUEST_TOPICS.map((t) => t.id);
+  assert.equal(new Set(ids).size, ids.length, "doppelte Themen-ID in der echten Taxonomie");
+  for (const t of QUEST_TOPICS) assert.ok(t.label.trim().length > 0, `Thema „${t.id}" ohne Label`);
+  // Stichprobe: der Lernpfad beginnt mit Einstieg → Docker.
+  assert.deepEqual(ids.slice(0, 2), ["onboarding", "docker"]);
+});
+
+/* ---------- groupQuestsByTopic: Gruppierung fürs Logbuch-Accordion (#327/#326) ---------- */
+
+test("groupQuestsByTopic: Themen in Taxonomie-Reihenfolge, Quests in Eingabe-Reihenfolge", () => {
+  const topics = [{ id: "docker", label: "Docker" }, { id: "helm", label: "Helm" }];
+  const quests: Quest[] = [
+    { ...mkQuest("d2"), topic: "docker" },
+    { ...mkQuest("h1"), topic: "helm" },
+    { ...mkQuest("d1"), topic: "docker" },
+  ];
+  const groups = groupQuestsByTopic(quests, topics);
+  assert.deepEqual(groups.map((g) => g.id), ["docker", "helm"]);
+  // Quests behalten ihre Eingabe-Reihenfolge innerhalb des Themas (d2 vor d1).
+  assert.deepEqual(groups[0].quests.map((q) => q.id), ["d2", "d1"]);
+  assert.deepEqual(groups[1].quests.map((q) => q.id), ["h1"]);
+});
+
+test("groupQuestsByTopic: echte Quests verteilen sich lückenlos auf die echten Themen", () => {
+  const groups = groupQuestsByTopic(QUESTS, QUEST_TOPICS);
+  const total = groups.reduce((n, g) => n + g.quests.length, 0);
+  assert.equal(total, QUESTS.length, "Quests gehen beim Gruppieren verloren oder doppelt");
+  for (const g of groups) assert.ok(g.quests.length > 0, `Thema „${g.id}" ist leer (totes Thema)`);
 });
 
 /* ---------- assembleQuests: Regionen + explizite Reihenfolge zusammenführen ---------- */

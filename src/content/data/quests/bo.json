@@ -3,6 +3,7 @@
     "id": "docker-first-container",
     "title": "Die erste Kiste",
     "giver": "bo",
+    "topic": "docker",
     "rewardXp": 25,
     "rewardCoins": 20,
     "steps": [
@@ -91,6 +92,7 @@
     "id": "docker-list-containers",
     "title": "Den Überblick behalten",
     "giver": "bo",
+    "topic": "docker",
     "rewardXp": 30,
     "rewardCoins": 22,
     "steps": [
@@ -202,6 +204,7 @@
     "id": "docker-stack-minigame",
     "title": "Bos Stapel-Spiel",
     "giver": "bo",
+    "topic": "docker",
     "rewardXp": 15,
     "rewardCoins": 10,
     "steps": [
@@ -225,6 +228,7 @@
     "id": "docker-run-options",
     "title": "Namen und Hintergrund",
     "giver": "bo",
+    "topic": "docker",
     "rewardXp": 35,
     "rewardCoins": 25,
     "steps": [
@@ -296,6 +300,7 @@
     "id": "docker-build-image",
     "title": "Dein eigener Bauplan",
     "giver": "bo",
+    "topic": "docker",
     "rewardXp": 40,
     "rewardCoins": 30,
     "steps": [

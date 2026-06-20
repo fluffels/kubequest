@@ -3,6 +3,7 @@
     "id": "terraform-intro",
     "title": "Neues Land",
     "giver": "theo",
+    "topic": "terraform",
     "rewardXp": 45,
     "rewardCoins": 35,
     "steps": [
@@ -122,6 +123,7 @@
     "id": "terraform-state-destroy",
     "title": "Gedächtnis und Abriss",
     "giver": "theo",
+    "topic": "terraform",
     "rewardXp": 45,
     "rewardCoins": 35,
     "steps": [

@@ -3,6 +3,7 @@
     "id": "gitops-argocd-intro",
     "title": "Das Logbuch der Insel",
     "giver": "argo",
+    "topic": "gitops",
     "rewardXp": 40,
     "rewardCoins": 30,
     "steps": [
@@ -82,6 +83,7 @@
     "id": "gitops-self-sync",
     "title": "Die selbstsegelnde Seekarte",
     "giver": "argo",
+    "topic": "gitops",
     "rewardXp": 55,
     "rewardCoins": 40,
     "steps": [
@@ -261,6 +263,7 @@
     "id": "gitops-drift-detection",
     "title": "Der stille Wächter",
     "giver": "argo",
+    "topic": "gitops",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
@@ -413,6 +416,7 @@
     "id": "gitops-app-of-apps",
     "title": "Die Flotte aus einer Hand",
     "giver": "argo",
+    "topic": "gitops",
     "rewardXp": 65,
     "rewardCoins": 50,
     "steps": [

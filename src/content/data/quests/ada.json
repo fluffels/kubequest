@@ -3,6 +3,7 @@
     "id": "k8s-apply-manifests",
     "title": "Adas Seekarten",
     "giver": "ada",
+    "topic": "yaml",
     "rewardXp": 45,
     "rewardCoins": 32,
     "steps": [
@@ -161,6 +162,7 @@
     "id": "git-version-control",
     "title": "Seekarten versionieren",
     "giver": "ada",
+    "topic": "git",
     "rewardXp": 45,
     "rewardCoins": 32,
     "steps": [
@@ -330,6 +332,7 @@
     "id": "git-feature-branch",
     "title": "Ein eigener Zweig",
     "giver": "ada",
+    "topic": "git",
     "rewardXp": 50,
     "rewardCoins": 38,
     "steps": [
@@ -501,6 +504,7 @@
     "id": "git-pipeline",
     "title": "Die Pipeline-Passage",
     "giver": "ada",
+    "topic": "ci-cd",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
@@ -691,6 +695,7 @@
     "id": "git-merge-branches",
     "title": "Zwei Karten, eine Linie",
     "giver": "ada",
+    "topic": "git",
     "rewardXp": 55,
     "rewardCoins": 40,
     "steps": [
@@ -913,6 +918,7 @@
     "id": "secrets-encrypted",
     "title": "Das verschlüsselte Hafentor",
     "giver": "ada",
+    "topic": "security",
     "rewardXp": 65,
     "rewardCoins": 50,
     "steps": [

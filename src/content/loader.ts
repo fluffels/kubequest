@@ -60,6 +60,7 @@
 import npcsData from "./data/npcs.json";
 import smalltalkData from "./data/smalltalk.json";
 import questOrder from "./data/quest-order.json";
+import questTopicsData from "./data/quest-topics.json";
 // Quests liegen pro Region/Geber in einer eigenen Datei (data/quests/<giver>.json) –
 // so wie ein Stardew-großes Spiel Content aufteilt (pro Ort/NPC, nicht ein Monolith):
 // navigierbar, merge-isolation pro Region, bereit für Lazy-Load pro Szene (#198).
@@ -303,6 +304,11 @@ function parseOneQuest(q: unknown, where: string): Quest {
     id,
     title: asNonEmptyString(o.title, `${path}.title`),
     giver: asNonEmptyString(o.giver, `${path}.giver`),
+    // `topic` wird hier nur STRUKTURELL geprüft (Pflicht-String, wie `giver`) –
+    // ob es ein bekanntes Thema ist (referenziell) prüft validateContent
+    // (content/validate.ts), genau wie beim Geber. Ein fehlendes/leeres topic
+    // ist dagegen ein struktureller Defekt und scheitert hart beim Laden.
+    topic: asNonEmptyString(o.topic, `${path}.topic`),
     rewardXp: asInt(o.rewardXp, `${path}.rewardXp`),
     rewardCoins: asInt(o.rewardCoins, `${path}.rewardCoins`),
     steps: asArray(o.steps, `${path}.steps`).map((s, j) => reviveStep(s, `${path}.steps[${j}]`)),
@@ -362,6 +368,64 @@ const QUEST_REGIONS: Quest[][] = Object.entries(questRegionModules)
 /** Validierte Quests in Laufzeit-Form, global geordnet – Quellen:
  *  `./data/quests/<giver>.json` + `./data/quest-order.json` + `./checks.ts`. */
 export const QUESTS: Quest[] = assembleQuests(QUEST_REGIONS, parseOrder(questOrder));
+
+/* ===================== Quest-Themen / Kapitel (Content-as-Data, #327) =====================
+ * Die Themen-Taxonomie (`./data/quest-topics.json`): eine GEORDNETE Liste von
+ * `{ id, label }`. Sie ist die SSOT der gültigen Quest-Themen und zugleich die
+ * Anzeigereihenfolge fürs Logbuch-Accordion (#326), angelehnt an den
+ * README-Lernpfad. Wie quest-order.json bewusst eigene Daten (nicht aus den
+ * Quests abgeleitet): ein Thema kann mehrere, im Lernpfad NICHT zusammenhängende
+ * Quests bündeln (z.B. Helm: Grundlagen früh + Umbrella-Chart deutlich später),
+ * und ein Geber kann Quests aus mehreren Themen geben.
+ *
+ * NICHT zu verwechseln mit der Datei-Aufteilung des Quiz (`./data/crabquiz/<thema>.json`):
+ * jene „Themen" sind nur eine Ordner-Konvention (auch ohne Quest/Geber gültig, z.B. RBAC),
+ * hier ist es die VALIDIERTE Pro-Quest-Registry für die Logbuch-Gruppierung. */
+
+/** Ein Quest-Thema: stabile ID (kebab-case) + Anzeige-Label. */
+export interface QuestTopic {
+  id: string;
+  label: string;
+}
+
+/** Validiert die rohe Themen-Taxonomie gegen das Schema und gibt sie geordnet
+ *  zurück. Wirft `ContentValidationError` bei leerer Liste, kaputtem Eintrag
+ *  oder doppelter ID (eine Dublette ließe zwei Themen kollidieren). */
+export function parseQuestTopics(raw: unknown, where = "quest-topics"): QuestTopic[] {
+  const arr = asArray(raw, where);
+  if (arr.length === 0) fail(where, "mindestens ein Thema erwartet");
+  const seen = new Set<string>();
+  return arr.map((t, i) => {
+    const o = asRecord(t, `${where}[${i}]`);
+    const id = asNonEmptyString(o.id, `${where}[${i}].id`);
+    if (seen.has(id)) fail(`${where}[${i}].id`, `doppelte Themen-ID „${id}"`);
+    seen.add(id);
+    return { id, label: asNonEmptyString(o.label, `${where}[${i}].label`) };
+  });
+}
+
+/** Validierte Themen-Taxonomie (geordnet) – Quelle: `./data/quest-topics.json`. */
+export const QUEST_TOPICS: QuestTopic[] = parseQuestTopics(questTopicsData);
+
+/** Eine Themen-Gruppe: das Thema + die ihm zugeordneten Quests (in Spielreihenfolge). */
+export interface TopicGroup {
+  id: string;
+  label: string;
+  quests: Quest[];
+}
+
+/** Gruppiert Quests nach Thema – Themen in Taxonomie-Reihenfolge, Quests INNERHALB
+ *  eines Themas in der übergebenen Reihenfolge (i.d.R. quest-order). Pure Funktion
+ *  (kein Spielzustand), Grundlage fürs Logbuch-Accordion (#326). Leere Themen
+ *  bleiben als Gruppe ohne Quests erhalten – dass kein Thema leer ist, sichert der
+ *  „kein totes Thema"-Check in validateContent (content/validate.ts) ab. */
+export function groupQuestsByTopic(quests: Quest[], topics: QuestTopic[]): TopicGroup[] {
+  return topics.map(t => ({
+    id: t.id,
+    label: t.label,
+    quests: quests.filter(q => q.topic === t.id),
+  }));
+}
 
 /* ===================== Befehls-Karten (Content-as-Data, #352) =====================
  * Die Spaced-Repetition-Drill-Karten: Aufgabe (`q`) + akzeptierte Eingaben

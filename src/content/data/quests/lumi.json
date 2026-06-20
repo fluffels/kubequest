@@ -3,6 +3,7 @@
     "id": "observability-metrics",
     "title": "Licht ins Dunkel: die ersten Metriken",
     "giver": "lumi",
+    "topic": "observability",
     "rewardXp": 50,
     "rewardCoins": 40,
     "steps": [
@@ -216,6 +217,7 @@
     "id": "observability-grafana",
     "title": "Zahlen in Bilder: das Grafana-Dashboard",
     "giver": "lumi",
+    "topic": "observability",
     "rewardXp": 55,
     "rewardCoins": 40,
     "steps": [
@@ -441,6 +443,7 @@
     "id": "observability-logs",
     "title": "Was die App zu sagen hat: kubectl logs",
     "giver": "lumi",
+    "topic": "observability",
     "rewardXp": 50,
     "rewardCoins": 35,
     "steps": [
@@ -619,6 +622,7 @@
     "id": "observability-alerts",
     "title": "Der Cluster ruft: Alerts & PrometheusRule",
     "giver": "lumi",
+    "topic": "observability",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [

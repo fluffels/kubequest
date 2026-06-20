@@ -3,6 +3,7 @@
     "id": "onboarding-sign-on",
     "title": "Anheuern in Port Kubernia",
     "giver": "ole",
+    "topic": "onboarding",
     "rewardXp": 15,
     "rewardCoins": 10,
     "steps": [
@@ -43,6 +44,7 @@
     "id": "k8s-first-deployment",
     "title": "Der Hafen wird ein Cluster",
     "giver": "ole",
+    "topic": "k8s-basics",
     "rewardXp": 30,
     "rewardCoins": 22,
     "steps": [
@@ -149,6 +151,7 @@
     "id": "k8s-inspect-pods",
     "title": "Genauer hinsehen",
     "giver": "ole",
+    "topic": "k8s-basics",
     "rewardXp": 30,
     "rewardCoins": 22,
     "steps": [
@@ -257,6 +260,7 @@
     "id": "k8s-service",
     "title": "Der Dauerauftrag",
     "giver": "ole",
+    "topic": "k8s-basics",
     "rewardXp": 35,
     "rewardCoins": 25,
     "steps": [
@@ -339,6 +343,7 @@
     "id": "k8s-self-healing",
     "title": "Der Sturm-Test",
     "giver": "ole",
+    "topic": "k8s-basics",
     "rewardXp": 45,
     "rewardCoins": 35,
     "steps": [
@@ -468,6 +473,7 @@
     "id": "kraken-boss",
     "title": "Die Hacker-Krake",
     "giver": "ole",
+    "topic": "security",
     "rewardXp": 60,
     "rewardCoins": 50,
     "steps": [
@@ -578,6 +584,7 @@
     "id": "k8s-configmap-secret",
     "title": "Truhe trifft Kombüse",
     "giver": "ole",
+    "topic": "security",
     "rewardXp": 55,
     "rewardCoins": 45,
     "steps": [

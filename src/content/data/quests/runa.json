@@ -3,6 +3,7 @@
     "id": "helm-intro",
     "title": "Das Steuerrad",
     "giver": "runa",
+    "topic": "helm",
     "rewardXp": 35,
     "rewardCoins": 25,
     "steps": [
@@ -101,6 +102,7 @@
     "id": "helm-release-install",
     "title": "Flagge hissen",
     "giver": "runa",
+    "topic": "helm",
     "rewardXp": 40,
     "rewardCoins": 30,
     "steps": [
@@ -190,6 +192,7 @@
     "id": "helm-upgrade-rollback",
     "title": "Auf und ab",
     "giver": "runa",
+    "topic": "helm",
     "rewardXp": 45,
     "rewardCoins": 35,
     "steps": [
@@ -283,6 +286,7 @@
     "id": "helm-umbrella-chart",
     "title": "Werft-Ausbau: dein eigenes Chart",
     "giver": "runa",
+    "topic": "helm",
     "rewardXp": 60,
     "rewardCoins": 45,
     "steps": [
