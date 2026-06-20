@@ -10,12 +10,25 @@
 |---|---|
 | `src/scenes/shared.ts` | Geteilte Szenen-Bausteine (#345): Karten-/Tile-Konstanten, In-Welt-Pixel-Bitmap-Font (#188, `buildPixelFont`/`pixelText`), Orts-Schilder (#254, `buildSign`), schwebende Belohnungstexte (`floatPixelText`), datengesteuertes Insel-NPC-Rendering (#349, `spawnIslandNpc`). |
 | `src/scenes/BootScene.ts` | Lädt alle Grafiken + Frame-Slicing aus `ASSET_MANIFEST`, backt Font/Münz-Icon, startet dann `World` (bzw. `MapTest` via `?maptest`). |
-| `src/scenes/WorldScene.ts` | Port Kubernia — **mit Abstand die größte Szene**: Karte, Spieler:in/NPCs, Cluster→Welt-Sync, Piraten-Überfälle, Hacker-Krake, Hafen-Wirtschaft, Warps in die Insel-/Innen-Szenen. (Aufteilung geplant: #393.) |
+| `src/scenes/WorldScene.ts` | Port Kubernia — seit dem Split (#393) **schlanker Orchestrator** (~460 LOC, vorher 1344): `create()` (Aufbau), `update()` (Per-Frame-Takt) plus die geteilten Render-Primitive (`set`/`get`/`deco`/`tree`/`objDeco`/`building`/`registerCullable`/`makeSign`/`makeTechTag`/`addShadow`/`makeFxTextures`), Spieler-/NPC-Setup, Kollision/Bewegung, Effekte und Off-screen-Culling. Die Spiel-Systeme liegen in `src/scenes/worldscene/*` (siehe unten). |
 | `src/scenes/InteriorScene.ts` | Betretbarer Hausinnenraum (#6), von `WorldScene.enterInterior()` gestartet; `INTERIORS` legt die Möbel je Haus-Thema fest. |
 | `src/scenes/ArchipelScene.ts` | GitOps-Archipel-Insel (#92); Geometrie/Kollision pur aus `src/archipel.ts`. |
 | `src/scenes/LighthouseScene.ts` | Monitoring-Leuchtturm-Klippe (#111); pur aus `src/lighthouse.ts`. |
 | `src/scenes/WarehouseScene.ts` | Lagerhallen-Viertel/Hafenkai (#124); pur aus `src/warehouse.ts`. |
 | `src/scenes/TilemapTestScene.ts` | Tiled-Loader-Testszene (#191), erreichbar über `?maptest`. |
+
+### WorldScene-Systeme (`src/scenes/worldscene/*`, Split #393)
+
+`WorldScene.ts` war mit 1344 LOC die mit Abstand größte Datei (God-Scene). Der Split (#393, analog zum `scenes.ts`-Split #345 und dem `sim.ts`-Split #346) zieht die einzelnen Spiel-Systeme in fokussierte Module: **freie Funktionen, die die laufende Szene als Parameter (`scene`) bekommen** — dasselbe „freie Funktion + Host"-Muster wie `sim/*`. Der Szenen-Zustand bleibt damit in EINER Hand (der `WorldScene`-Instanz), die Logik aber in eigenen, les-/wartbaren Modulen. Die Module kommunizieren ausschließlich über die Szene (gemeinsame Felder + die Render-Primitive der Klasse) — sie importieren `WorldScene.ts` bewusst **nicht** (das wäre ein Import-Zyklus, den der Arch-Wächter #390 verbietet; der lose Struktur-Typ `WorldSceneLike` aus `types.ts` ersetzt den Klassen-Import).
+
+| Modul | Inhalt |
+|---|---|
+| `src/scenes/worldscene/types.ts` | `WorldSceneLike` — loser Struktur-Typ der Szene ([key]: any, wie die Klasse), damit die Module Phaser über die Szene anfassen, ohne `WorldScene.ts` zu importieren (Zyklus-Vermeidung). |
+| `src/scenes/worldscene/terrain.ts` | Hafenkarte aus `harbor.tmj` laden (`loadHarborMap`), sichtbare Objekte/Gebäude/Warpschilder setzen (`placeHarborObjects`), Türen begehbar schneiden (`carveDoors`/`makeDoor`), Wang-Autotile-Boden zeichnen (`renderGround`). |
+| `src/scenes/worldscene/scenery.ts` | Rein optische Ausstattung: gestreute Deko (`spawnFlowers`/`spawnGrassDetail`/`scatter`), statische Props/Effekte (`renderStatics`: Schiff, Leuchtturm, Rauch, Schmetterlinge, Schilder, Terraform-Plateau, Warp-Marker), Möwen (`spawnGull`), Tag-Nacht-Schleier (`updateDayNight`). |
+| `src/scenes/worldscene/clustersync.ts` | Cluster (`Game.sim`) → Welt spiegeln: Pods als Kisten an den Stegen (`syncCluster`), Deployment-/Docker-/Helm-/Service-Tags neu bauen bei Änderung (`rebuildDynamic`), Nähe-Aufdeckung + Entzerrung der Tags (`revealNearbyLabels`, #207). |
+| `src/scenes/worldscene/events.ts` | Zufalls-Gefahren: Piraten-Überfall, Hacker-Krake, Sturmschaden (je `tryStart…`/`resolve…`), gemeinsame Terminierung (`scheduleEvents`/`anyEventActive`) und Per-Frame-Tick (`tickEvents`). EIN kohäsives Modul; wächst es bei Stardew-Scope über das Datei-Budget (#390), ist der Schnitt je Gefahr offensichtlich. |
+| `src/scenes/worldscene/warps.ts` | Übergänge: Haus/Schiff (`enterInterior`, #6), Archipel (#92), Leuchtturm (#111), Lager (#124) plus das Per-Frame-„Scharfmachen" der Anti-Pingpong-Gates + Tür-/Warp-Auslösung (`updateWarps`). |
 
 ## UI (`src/ui.ts` + `src/ui/*`, Split #356)
 
