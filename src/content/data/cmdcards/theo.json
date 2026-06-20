@@ -1,0 +1,32 @@
+[
+  {
+    "id": "c-ch6-1",
+    "chapter": "terraform-intro",
+    "q": "Initialisiere ein frisches Terraform-Projekt.",
+    "accept": [
+      "^terraform\\s+init$"
+    ],
+    "solution": "terraform init",
+    "explain": "init ist immer der erste Schritt: es lädt die nötigen Provider/Module ins Projekt."
+  },
+  {
+    "id": "c-ch6-2",
+    "chapter": "terraform-intro",
+    "q": "Zeige an, was Terraform tun WÜRDE – ohne es zu tun.",
+    "accept": [
+      "^terraform\\s+plan$"
+    ],
+    "solution": "terraform plan",
+    "explain": "plan ist die Generalprobe: es zeigt, was passieren würde – ohne es wirklich zu tun."
+  },
+  {
+    "id": "c-ch6-3",
+    "chapter": "terraform-state-destroy",
+    "q": "Setze die Terraform-Konfiguration wirklich um.",
+    "accept": [
+      "^terraform\\s+apply(\\s+-auto-approve)?$"
+    ],
+    "solution": "terraform apply",
+    "explain": "apply setzt die geplante Änderung wirklich um – erst plan lesen, dann apply."
+  }
+]

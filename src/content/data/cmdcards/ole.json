@@ -1,0 +1,92 @@
+[
+  {
+    "id": "c-ch2-1",
+    "chapter": "k8s-first-deployment",
+    "q": "Zeige alle Nodes deines Clusters an.",
+    "accept": [
+      "^kubectl\\s+get\\s+(nodes|node|no)$"
+    ],
+    "solution": "kubectl get nodes",
+    "explain": "get listet Ressourcen eines Typs – hier die Nodes (Server) des Clusters."
+  },
+  {
+    "id": "c-ch2-2",
+    "chapter": "k8s-first-deployment",
+    "q": "Zeige alle Pods an.",
+    "accept": [
+      "^kubectl\\s+get\\s+(pods|pod|po)$"
+    ],
+    "solution": "kubectl get pods",
+    "explain": "Gleiches Muster wie bei nodes: kubectl get pods listet alle Pods."
+  },
+  {
+    "id": "c-ch2-3",
+    "chapter": "k8s-inspect-pods",
+    "q": "Zeige die Pods im Namespace <code>kube-system</code>.",
+    "accept": [
+      "^kubectl\\s+get\\s+(pods|pod|po)\\s+(-n|--namespace)[=\\s]?kube-system$"
+    ],
+    "solution": "kubectl get pods -n kube-system",
+    "explain": "-n/--namespace wählt den Namespace; ohne ihn siehst du nur den aktuellen (default)."
+  },
+  {
+    "id": "c-ch3-1",
+    "chapter": "k8s-service",
+    "q": "Erstelle ein Deployment <code>shop</code> mit dem Image <code>nginx</code>.",
+    "accept": [
+      "^kubectl\\s+create\\s+deployment\\s+shop\\s+--image[=\\s]nginx(:\\S+)?$"
+    ],
+    "solution": "kubectl create deployment shop --image=nginx",
+    "explain": "create deployment legt den Dauerauftrag an; --image bestimmt, welches Image die Pods fahren."
+  },
+  {
+    "id": "c-ch3-2",
+    "chapter": "k8s-service",
+    "q": "Skaliere das Deployment <code>shop</code> auf 4 Kopien.",
+    "accept": [
+      "^kubectl\\s+scale\\s+deployment\\s+shop\\s+--replicas[=\\s]4$"
+    ],
+    "solution": "kubectl scale deployment shop --replicas=4",
+    "explain": "scale ändert die Soll-Zahl der Kopien; Kubernetes zieht das Ist sofort nach."
+  },
+  {
+    "id": "c-ch3-3",
+    "chapter": "k8s-self-healing",
+    "q": "Stelle einen Service vor das Deployment <code>shop</code>, Port 80.",
+    "accept": [
+      "^kubectl\\s+expose\\s+deployment\\s+shop\\s+--port[=\\s]80$"
+    ],
+    "solution": "kubectl expose deployment shop --port=80",
+    "explain": "expose stellt einen Service als feste Adresse vor das Deployment; --port ist der Port, unter dem er erreichbar ist."
+  },
+  {
+    "id": "c-sec-1",
+    "chapter": "kraken-boss",
+    "q": "Lege ein Secret <code>api-key</code> mit <code>--from-literal=key=abc123</code> an.",
+    "accept": [
+      "^kubectl\\s+create\\s+secret\\s+generic\\s+api-key\\s+--from-literal[=\\s][\\w.-]+=\\S+$"
+    ],
+    "solution": "kubectl create secret generic api-key --from-literal=key=abc123",
+    "explain": "Secrets halten Vertrauliches – statt Klartext in YAML; --from-literal=<schlüssel>=<wert> setzt einen Wert direkt."
+  },
+  {
+    "id": "c-sec-2",
+    "chapter": "k8s-configmap-secret",
+    "q": "Lege eine ConfigMap <code>app-config</code> mit <code>--from-literal=log_level=info</code> an.",
+    "accept": [
+      "^kubectl\\s+create\\s+configmap\\s+app-config\\s+--from-literal[=\\s][\\w.-]+=\\S+$"
+    ],
+    "solution": "kubectl create configmap app-config --from-literal=log_level=info",
+    "explain": "ConfigMaps halten harmlose Einstellungen (Klartext, z.B. Log-Level); Vertrauliches gehört stattdessen ins Secret."
+  },
+  {
+    "id": "c-sec-3",
+    "chapter": "k8s-configmap-secret",
+    "q": "Binde die ConfigMap <code>app-config</code> als Umgebung in das Deployment <code>shop</code> ein.",
+    "accept": [
+      "^kubectl\\s+set\\s+env\\s+deployment\\/shop\\s+--from[=\\s]configmap\\/app-config$"
+    ],
+    "solution": "kubectl set env deployment/shop --from=configmap/app-config",
+    "explain": "set env --from=configmap/<n> bindet die Werte als Umgebungsvariablen ins Deployment – sonst nützt die ConfigMap der App nichts."
+  }
+]

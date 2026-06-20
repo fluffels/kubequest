@@ -1,0 +1,52 @@
+[
+  {
+    "id": "c-ts-1",
+    "chapter": "k8s-debug-imagepull",
+    "q": "Tausche das Image des Deployments <code>shop</code> gegen <code>nginx</code> (Container heißt auch <code>shop</code>).",
+    "accept": [
+      "^kubectl\\s+set\\s+image\\s+deployment\\/shop\\s+\\S+=nginx(:\\S+)?$"
+    ],
+    "solution": "kubectl set image deployment/shop shop=nginx",
+    "explain": "set image tauscht das Image; das Muster ist <container>=<image> – der Containername steht links vom Gleichheitszeichen."
+  },
+  {
+    "id": "c-ts-2",
+    "chapter": "k8s-debug-crashloop",
+    "q": "Starte alle Pods des Deployments <code>shop</code> sauber neu.",
+    "accept": [
+      "^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]shop$"
+    ],
+    "solution": "kubectl rollout restart deployment shop",
+    "explain": "rollout restart ersetzt alle Pods rollierend – z.B. nachdem die Ursache eines Fehlers behoben ist."
+  },
+  {
+    "id": "c-np-1",
+    "chapter": "network-policy",
+    "q": "Zeige alle NetworkPolicies (Hafenmauern) im Cluster an.",
+    "accept": [
+      "^kubectl\\s+get\\s+(networkpolicies|networkpolicy|netpol|netpols)$"
+    ],
+    "solution": "kubectl get networkpolicies",
+    "explain": "Gleiches get-Muster: kubectl get networkpolicies (Kurzform netpol) listet die Hafenmauern."
+  },
+  {
+    "id": "c-np-2",
+    "chapter": "network-policy",
+    "q": "Beschreibe die NetworkPolicy <code>hafenmauer</code> – wer darf rein?",
+    "accept": [
+      "^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+hafenmauer$"
+    ],
+    "solution": "kubectl describe networkpolicy hafenmauer",
+    "explain": "describe zeigt, wen die Policy schützt (podSelector) und wer durchdarf (from)."
+  },
+  {
+    "id": "c-res-1",
+    "chapter": "k8s-resource-limits",
+    "q": "Gib dem Deployment <code>kartograf</code> ein memory-Limit von <code>256Mi</code> und einen Request von <code>128Mi</code>.",
+    "accept": [
+      "^kubectl\\s+set\\s+resources\\s+deployment\\/kartograf\\s+(?:--limits[=\\s][^\\s]*memory=256Mi\\s+--requests[=\\s][^\\s]*memory=128Mi|--requests[=\\s][^\\s]*memory=128Mi\\s+--limits[=\\s][^\\s]*memory=256Mi)$"
+    ],
+    "solution": "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi",
+    "explain": "requests reservieren Platz auf dem Node, limits sind die Obergrenze im Betrieb (Speicher drüber → OOMKilled)."
+  }
+]

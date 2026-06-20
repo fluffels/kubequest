@@ -1,0 +1,62 @@
+[
+  {
+    "id": "c-ch1-1",
+    "chapter": "docker-first-container",
+    "q": "Lade das Image <code>nginx</code> aus der Registry herunter.",
+    "accept": [
+      "^docker\\s+pull\\s+nginx(:\\S+)?$"
+    ],
+    "solution": "docker pull nginx",
+    "explain": "pull holt ein fertiges Image aus der Registry auf deinen Rechner – build dagegen stellt ein eigenes her."
+  },
+  {
+    "id": "c-ch1-2",
+    "chapter": "docker-list-containers",
+    "q": "Zeige alle laufenden Docker-Container an.",
+    "accept": [
+      "^docker\\s+ps$"
+    ],
+    "solution": "docker ps",
+    "explain": "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu."
+  },
+  {
+    "id": "c-ch1-3",
+    "chapter": "docker-list-containers",
+    "q": "Zeige ALLE Docker-Container – auch gestoppte.",
+    "accept": [
+      "^docker\\s+ps\\s+(-a|--all)$"
+    ],
+    "solution": "docker ps -a",
+    "explain": "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten."
+  },
+  {
+    "id": "c-ch1-4",
+    "chapter": "docker-run-options",
+    "q": "Starte aus <code>nginx</code> einen Container im Hintergrund namens <code>webserver</code>.",
+    "accept": [
+      "^docker\\s+run\\s+(?:(?:-d|--detach)\\s+--name\\s+webserver|--name\\s+webserver\\s+(?:-d|--detach))\\s+nginx(:\\S+)?$"
+    ],
+    "solution": "docker run -d --name webserver nginx",
+    "explain": "Die Optionen-Reihenfolge ist frei (-d --name oder --name -d, beides gilt) – nur: erst die Optionen, dann das Image (nginx) ganz zuletzt. <code>-d</code> hat auch die Langform <code>--detach</code> (gleichwertig)."
+  },
+  {
+    "id": "c-ch1-5",
+    "chapter": "docker-build-image",
+    "q": "Baue aus dem Dockerfile ein Image namens <code>hafenwache:1.0</code> (Baukontext: aktueller Ordner).",
+    "accept": [
+      "^docker\\s+build\\s+(?:-t|--tag)\\s+hafenwache:1\\.0\\s+\\.$"
+    ],
+    "solution": "docker build -t hafenwache:1.0 .",
+    "explain": "<code>build</code> baut nicht im Terminal, sondern in der <b>Docker-Engine</b> – einem eigenen Programm, das deine Ordner nicht sieht. Der Punkt am Ende ist der <b>Build-Kontext</b>: der Ordner, den du der Engine als Paket rüberreichst (<code>.</code> = der aktuelle) – die <b>Kiste mit Baumaterial</b>, die du der Werft gibst; ohne sie weiß sie nicht, woraus sie baut. Docker sucht darin das <code>Dockerfile</code>; alles, was <code>COPY</code> reinholt, muss in dieser Kiste liegen. <code>-t</code> (Langform <code>--tag</code>, beides gilt) vergibt den ganzen Namen <code>name:tag</code> – der Teil hinter dem <code>:</code> ist der Versions-Tag; nicht zu verwechseln mit dem eigenen Befehl <code>docker tag</code>, der einem fertigen Image nachträglich einen Zweitnamen gibt."
+  },
+  {
+    "id": "c-ch1-6",
+    "chapter": "docker-build-image",
+    "q": "Gib dem Image <code>hafenwache:1.0</code> zusätzlich das Etikett <code>hafenwache:latest</code>.",
+    "accept": [
+      "^docker\\s+tag\\s+hafenwache:1\\.0\\s+hafenwache:latest$"
+    ],
+    "solution": "docker tag hafenwache:1.0 hafenwache:latest",
+    "explain": "tag vergibt einen zweiten Namen fürs <b>gleiche</b> Image – kein neues Image, kein anderer Stand; <code>:latest</code> ist nur ein Konventions-Name, nicht automatisch die neueste Version. Reihenfolge ist Quelle → Ziel – wie beim Umetikettieren: erst die vorhandene Kiste (hafenwache:1.0), dann das neue Schild (hafenwache:latest)."
+  }
+]
