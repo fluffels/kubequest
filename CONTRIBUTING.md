@@ -23,6 +23,20 @@ npm run dev   # lokaler Server (Vite) – angezeigte Adresse im Browser öffnen
 
 > Lieber von Hand? Statt `npm run setup` reicht zum Loslegen `npm install`; die Checks unten dann bei Bedarf einzeln.
 
+## Im Container entwickeln (optional, ohne lokales Node)
+
+Wer **kein Node lokal installieren** will (oder eine garantiert reproduzierbare Umgebung braucht – auch für Cloud-/CI-KI-Agenten), entwickelt im Container. Zwei Wege, beide nur fürs **Entwickeln** (das ausgelieferte Spiel bleibt die offline-fähige Single-File-Web-App, kein Server-Betrieb – siehe [ADR 0002](docs/adr/0002-kein-backend-keine-db.md)):
+
+- **Schnell per docker compose:**
+  ```bash
+  docker compose up
+  ```
+  startet den Vite-Dev-Server im Container; danach **http://localhost:5173** im Browser öffnen. Das Repo ist live eingebunden – Edits auf dem Host wirken sofort. (Konfig: [`docker-compose.yml`](docker-compose.yml).)
+
+- **VS Code Dev Container:** Ordner öffnen → „Reopen in Container". VS Code baut die Umgebung aus [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) (Node 22 + `gh`-CLI), installiert die Abhängigkeiten automatisch und leitet Port 5173 weiter; den Dev-Server dann wie gewohnt mit `npm run dev` starten.
+
+> Beides ist reine Entwicklungs-Tooling. Node-Version (Node 22, aus [`.nvmrc`](.nvmrc)) und Dev-Port bleiben über einen Test ([`test/devcontainer.test.ts`](test/devcontainer.test.ts)) mit Container-Konfig und CI konsistent.
+
 ## Die wichtigsten Befehle
 
 | Zweck | Befehl |

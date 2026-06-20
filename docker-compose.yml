@@ -1,0 +1,39 @@
+# Reproduzierbare Dev-Umgebung für KubeQuest (#388) — NUR fürs Entwickeln.
+#
+# `docker compose up` startet den Vite-Dev-Server im Container, ohne dass lokal
+# Node installiert sein muss. Danach im Browser die angezeigte Adresse öffnen
+# (http://localhost:5173).
+#
+# ⚠️ Abgrenzung zu ADR 0002 (kein Backend/keine DB): Das hier ist reine
+# Entwicklungs-Tooling (Node + Vite zum Coden), NICHT Laufzeit-/Betriebs-
+# Infrastruktur des Spiels. Das ausgelieferte Spiel bleibt die offline-fähige
+# Single-File-Web-App (`npm run build:offline`) — kein Server, kein Docker im Betrieb.
+#
+# Hinweis: `version:` ist in Compose v2 überflüssig und bewusst weggelassen.
+
+services:
+  dev:
+    # An .nvmrc gepinnt (Node 22). `slim` reicht: der Dev-Server braucht nur Node,
+    # nicht git/gh (die stecken im VS-Code-devcontainer, siehe .devcontainer/).
+    image: node:22-bookworm-slim
+    working_dir: /app
+    # Bei jedem Start idempotent installieren (füllt das node_modules-Volume beim
+    # ersten Lauf) und dann den Dev-Server starten. `--host 0.0.0.0` ist nötig,
+    # sonst bindet Vite nur an localhost IM Container und ist vom Host-Browser nicht
+    # erreichbar.
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      # Vite-Default-Port; muss mit forwardPorts in .devcontainer/devcontainer.json übereinstimmen.
+      - "5173:5173"
+    volumes:
+      # Repo live in den Container spiegeln (Edits auf dem Host wirken sofort).
+      - .:/app
+      # node_modules als benanntes Volume DARÜBER legen: so überschreibt der
+      # (ggf. Windows-/leere) Host-Ordner nicht die im Linux-Container nativ
+      # gebauten Module — der Klassiker-Fallstrick beim Bind-Mount.
+      - node_modules:/app/node_modules
+    # Sauberes Signal-Handling (Strg-C beendet Vite ordentlich).
+    init: true
+
+volumes:
+  node_modules:

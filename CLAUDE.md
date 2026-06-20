@@ -155,6 +155,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Was | Wo |
 |---|---|
 | 🤝 Mitentwickeln (Einstieg + One-Command-Setup `npm run setup`) | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 🐳 Im Container entwickeln (devcontainer / `docker compose up`, #388) | [CONTRIBUTING.md › Im Container entwickeln](CONTRIBUTING.md) · [`.devcontainer/`](.devcontainer/devcontainer.json) · [`docker-compose.yml`](docker-compose.yml) |
 | 📖 Spiel-Doku (Story, Steuerung, Lernpfad) | [README.md](README.md) |
 | 📋 Agenten-Regeln, Board-Workflow, Konventionen | [AGENTS.md](AGENTS.md) |
 | 🎨 PixelLab-Assets (Liste + IDs) | [assets/pixellab/README.md](assets/pixellab/README.md) |
