@@ -51,7 +51,7 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach dem erledigten #340 (Autotile-Auswahl). |
+| 1 | **#386** | Sub-Tile-Hitboxen in Insel-/Lager-Szenen + Büsche/Laternen (Folge zu #343) | Welt/Tiles, direkte Fortsetzung von #256: die pure Hitbox-Logik (#343) ist fertig + getestet, hier nur noch das Verdrahten in den übrigen Präsentations-Szenen. Nach dem erledigten #340/#343. |
 | 2 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". (Funkgerät-Code liegt seit #356 in `src/ui/radio.ts`.) |
 | 3 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `src/ui/dialog.ts`/`overlaykbd.ts` (seit #356). |
 | 4 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |

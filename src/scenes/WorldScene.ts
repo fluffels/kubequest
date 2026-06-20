@@ -3,7 +3,7 @@ import { Game } from "../game";
 import { UI } from "../ui";
 import { KQContent } from "../content";
 import { SFX } from "../sfx";
-import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, type Door } from "../world";
+import { NPC_SPAWNS, npcSolidIndices, npcHitboxes, circleHitbox, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, type Door, type Hitbox } from "../world";
 import { type Spawn } from "../content/entities";
 import { warpAt, WORLD_TO_ARCHIPEL, WORLD_RETURN } from "../archipel";
 import { WORLD_TO_LIGHTHOUSE, WORLD_RETURN_LH } from "../lighthouse";
@@ -18,6 +18,12 @@ import { spreadLabelsVertically, type LayoutBox } from "../labellayout";
 import { getMapEntry } from "../mapregistry";
 import { T, DIRT, WOOD, ANVIL, TABLE, DEVICE, BOOK, WATER, FOAM, WANG, hashHue, hueColor, pixelText, SIGN_FONT, SIGN_SCALE, buildSign, floatPixelText } from "./shared";
 
+/* #343: Sub-Tile-Kollisionsradien (Pixel). Steine und NPCs prallen nicht mehr als
+ * volles 16×16-Quadrat ab, sondern als runde Hitbox um ihren Mittelpunkt – so
+ * gleitet man an der runden Silhouette weich vorbei statt eckig abzuprallen. */
+const NPC_HIT_R = 6;
+const ROCK_HIT_R = 6;
+
 export class WorldScene extends Phaser.Scene {
   [key: string]: any;
   // Das Spiel nutzt this.events als eigenen Event-/Timer-Beutel und überschreibt
@@ -31,6 +37,11 @@ export class WorldScene extends Phaser.Scene {
     this.W = 52; this.H = 40;
     this.ground = new Array(this.W * this.H).fill(0);
     this.solidGrid = new Uint8Array(this.W * this.H);
+    // #343: runde Sub-Tile-Hindernisse (Steine/NPCs) + ihre Kachel-Belegung. Das
+    // solidGrid bleibt für eckige Solids (Wände/Wasser/Gebäude/Büsche); softGrid
+    // hält nur die Belegung der runden Objekte für die Deko-Platzierung fest.
+    this.softGrid = new Uint8Array(this.W * this.H);
+    this.softObstacles = [] as Hitbox[];
     this.decoList = [];
     this.labels = [];
     this.signBoxes = [];   // feste Holz-Schilder als Hindernisse fürs Tag-Entzerren (#207)
@@ -72,7 +83,7 @@ export class WorldScene extends Phaser.Scene {
     this.spawnNpcs();
     this.spawnPlayer();
     this.scatter("bush", 16, 0.5, [0, 1, 2], true);      // Büsche: solide, nicht an Wegen
-    this.scatter("rock", 14, 0.45, [0, 1, 2, -3], true); // Steine: solide, auch am Strand
+    this.scatter("rock", 14, 0.45, [0, 1, 2, -3], false, ROCK_HIT_R); // Steine: runde Hitbox (#343), auch am Strand
     this.scatter("lamppost", 4, 0.55, [0, 1, 2], true);  // ein paar Hafenlaternen
     this.scatter("mushroom", 10, 0.28, [0, 1, 2]);       // Pilze: kleine Wald-/Wiesendeko, begehbar (#7)
     this.scatter("seashell", 8, 0.22, [-3]);             // Muscheln: nur am Sandstrand (#7)
@@ -452,7 +463,7 @@ export class WorldScene extends Phaser.Scene {
     // jedem Neuladen neu gewürfelt (#3): gleiche Welt → gleiche Blumen.
     const accept = (x: number, y: number) => {
       const v = this.ground[y * this.W + x];
-      return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
+      return (v === 0 || v === 1 || v === 2) && !this.occupied(x, y);
     };
     for (const p of pickPlacements({
       W: this.W, H: this.H, count: 30 * this.stress, seed: strSeed("flowers"), accept,
@@ -479,7 +490,7 @@ export class WorldScene extends Phaser.Scene {
     const BASE = 0.26;
     const accept = (x: number, y: number) => {
       const v = this.ground[y * this.W + x];
-      return (v === 0 || v === 1 || v === 2) && !this.solidGrid[y * this.W + x];
+      return (v === 0 || v === 1 || v === 2) && !this.occupied(x, y);
     };
     // Deutlich mehr Büschel als Blumen → die Wiese wirkt flächig bewachsen statt kahl.
     for (const p of pickPlacements({
@@ -502,14 +513,14 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  scatter(tex: string, count: number, scale: number, kinds: number[], solid = false) {
+  scatter(tex: string, count: number, scale: number, kinds: number[], solid = false, hitR = 0) {
     // PixelLab-Objekte streuen: nur passende Felder, nie auf/neben Wege, nicht auf Solids, Spieler-Start frei.
     // Platzierung ist deterministisch (#3) – Büsche/Steine/Laternen sitzen bei jedem Laden an festen Stellen.
     const isDirt = (x: number, y: number) => this.ground[y * this.W + x] === 25;
     const pcx = Math.round(this.playerPos.x / T), pcy = Math.round(this.playerPos.y / T);
     const accept = (x: number, y: number) => {
       const v = this.ground[y * this.W + x];
-      if (kinds.indexOf(v) < 0 || this.solidGrid[y * this.W + x]) return false;
+      if (kinds.indexOf(v) < 0 || this.occupied(x, y)) return false;
       if (isDirt(x, y - 1) || isDirt(x, y + 1) || isDirt(x - 1, y) || isDirt(x + 1, y)) return false; // nicht an Wege grenzen
       if (Math.abs(x - pcx) <= 1 && Math.abs(y - pcy) <= 1) return false;                             // Spieler-Start freihalten
       return true;
@@ -529,7 +540,15 @@ export class WorldScene extends Phaser.Scene {
         this.lampGlows.push(glow);
         this.registerCullable(glow, ox, oy);   // Glühen mit der Laterne mit-cullen (kein Floating-Glow)
       }
-      if (solid) this.solidGrid[p.y * this.W + p.x] = 1;
+      if (hitR > 0) {
+        // #343: runde Hitbox unter dem Objekt (Stein) statt voller Kachel – man
+        // gleitet weich vorbei. Die Kachel bleibt für die Deko-Platzierung belegt
+        // (softGrid), zählt aber NICHT als eckiges Solid in der Kollision.
+        this.softObstacles.push(circleHitbox(ox, oy, hitR));
+        this.softGrid[p.y * this.W + p.x] = 1;
+      } else if (solid) {
+        this.solidGrid[p.y * this.W + p.x] = 1;
+      }
     }
   }
 
@@ -689,9 +708,12 @@ export class WorldScene extends Phaser.Scene {
     // (SHIP_KRALLE, #205) eingefügt und steht bewusst NICHT im Objektlayer.
     const defs = [...this.npcSpawns];
     defs.splice(6, 0, { id: "kralle", x: SHIP_KRALLE.x, y: SHIP_KRALLE.y });
-    // #31: NPCs solide machen – man läuft nicht mehr durch sie hindurch.
-    // Reden (E) bleibt möglich, weil nearestNpc von der Nachbarkachel aus greift.
-    for (const idx of npcSolidIndices(defs, this.W, this.H)) this.solidGrid[idx] = 1;
+    // #31/#343: NPCs sind solide – man läuft nicht durch sie hindurch –, aber als
+    // RUNDE Hitbox (Kreis um den Standplatz) statt volles Kachel-Quadrat, sodass man
+    // weich an ihnen vorbeigleitet. Reden (E) bleibt möglich (nearestNpc greift von
+    // der Nachbarkachel). Die Kachel bleibt für die Deko-Platzierung belegt (softGrid).
+    for (const idx of npcSolidIndices(defs, this.W, this.H)) this.softGrid[idx] = 1;
+    this.softObstacles.push(...npcHitboxes(defs, NPC_HIT_R));
     this.npcs = defs.map(d => {
       const meta = KQContent.NPCS[d.id as keyof typeof KQContent.NPCS];
       this.addShadow(d.x * T + 8, d.y * T + 15);
@@ -725,6 +747,15 @@ export class WorldScene extends Phaser.Scene {
   get player() { return this.playerPos; }
 
   /* ============ Kollision & Bewegung ============ */
+  /** Kachel (x,y) belegt? – fürs Deko-Streuen (#3): eckige Solids (solidGrid:
+   *  Wände/Wasser/Gebäude/Büsche) ODER runde Objekte (softGrid: Steine/NPCs, #343).
+   *  Bewusst getrennt von der Kollision (isSolidAt), die runde Objekte als Hitbox
+   *  prüft, nicht als volle Kachel. */
+  occupied(x: number, y: number) {
+    const i = y * this.W + x;
+    return !!this.solidGrid[i] || !!this.softGrid[i];
+  }
+
   isSolidAt(px: number, py: number) {
     const tx = Math.floor(px / T), ty = Math.floor(py / T);
     if (tx < 0 || ty < 0 || tx >= this.W || ty >= this.H) return true;
@@ -739,7 +770,7 @@ export class WorldScene extends Phaser.Scene {
     const pl = this.playerPos;
     // Kollision + Anti-Wedge liegen pur in world.ts (resolveMove) und sind dort
     // getestet; #36: steckt die Figur in einer soliden Kachel, kommt sie raus.
-    const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx, dy);
+    const next = resolveMove((px, py) => this.isSolidAt(px, py), pl.x, pl.y, dx, dy, this.softObstacles);
     pl.x = next.x;
     pl.y = next.y;
   }

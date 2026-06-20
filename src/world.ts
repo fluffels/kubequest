@@ -332,12 +332,88 @@ export function neighbors8(same: (x: number, y: number) => boolean, x: number, y
 /** Solid-Abfrage in Pixel-Koordinaten (in scenes.ts ist das `isSolidAt`). */
 export type SolidAt = (px: number, py: number) => boolean;
 
+/* ===== Sub-Tile-Kollision: runde/kleinere Hitboxen (#343) =====
+ * Vierter Schritt aus dem Vision-Ticket #256. Bisher ist jede solide Kachel ein
+ * volles 16×16-Quadrat (`solidGrid` in scenes.ts, gesetzt über `npcSolidIndices`
+ * und die Deko-Streuung). Runde Objekte (Steine, NPCs) bekommen dadurch eckige
+ * Hitboxen – man prallt an der Kachel-Ecke ab, statt an der runden Silhouette weich
+ * vorbeizugleiten. Hier liegt die pure, testbare Lösung: Kollisionsformen als DATEN
+ * (Kreis ODER kleineres Rechteck) in Pixel-Koordinaten, gegen die der Figuren-
+ * Footprint (ein Achsen-Rechteck) robust geprüft wird. Wände/Wasser/Gebäude bleiben
+ * bewusst das volle Kachel-Quadrat über `solidAt` (sie SIND eckig) – nur Steine/NPCs
+ * werden rund. `footprintSolid`/`resolveMove` nehmen die Hitboxen als optionales,
+ * rückwärtskompatibles Zusatzargument. Phaser-frei, in test/hitbox.test.ts geprüft. */
+
+/** Kollisionsform eines soliden Objekts in Pixel-Koordinaten. */
+export type Hitbox =
+  | { readonly kind: "circle"; readonly cx: number; readonly cy: number; readonly r: number }
+  | { readonly kind: "rect"; readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+
+/** Runde Hitbox (z.B. Stein oder NPC): Mittelpunkt (cx,cy) + Radius r in Pixeln. */
+export function circleHitbox(cx: number, cy: number, r: number): Hitbox {
+  return { kind: "circle", cx, cy, r };
+}
+/** Rechteckige Hitbox (z.B. eine kleinere Teil-Kachel): linke obere Ecke (x,y) + Maße. */
+export function rectHitbox(x: number, y: number, w: number, h: number): Hitbox {
+  return { kind: "rect", x, y, w, h };
+}
+
+/** Der Figuren-Footprint als Achsen-Rechteck: ±5 px breit, von 2 px über bis 5 px
+ *  unter dem Mittelpunkt – exakt das umschließende Rechteck der vier Probe-Ecken
+ *  in footprintSolid, nur als Box, damit man robust gegen runde/kleinere Hitboxen
+ *  testen kann (unabhängig von deren Größe, statt nur vier Punkte zu sampeln). */
+export function playerFootprint(x: number, y: number): { x: number; y: number; w: number; h: number } {
+  return { x: x - 5, y: y - 2, w: 10, h: 7 };
+}
+
+/** Überlappt das Achsen-Rechteck (rx,ry,rw,rh) den Kreis (cx,cy,r)? Robust über den
+ *  nächstgelegenen Punkt des Rechtecks zum Kreismittelpunkt – auch wenn der Kreis
+ *  kleiner als das Rechteck ist (reines Eck-Sampling würde ihn dann verfehlen).
+ *  Strikt `<`: bloßes Berühren der Kante blockiert nicht. r<=0 blockiert nie. */
+function rectCircleOverlap(rx: number, ry: number, rw: number, rh: number, cx: number, cy: number, r: number): boolean {
+  if (r <= 0) return false;
+  const nx = Math.max(rx, Math.min(cx, rx + rw));
+  const ny = Math.max(ry, Math.min(cy, ry + rh));
+  const dx = cx - nx, dy = cy - ny;
+  return dx * dx + dy * dy < r * r;
+}
+
+/** Überlappen sich zwei Achsen-Rechtecke? Leere Fläche (w/h<=0) blockiert nie. */
+function rectRectOverlap(ax: number, ay: number, aw: number, ah: number, bx: number, by: number, bw: number, bh: number): boolean {
+  if (aw <= 0 || ah <= 0 || bw <= 0 || bh <= 0) return false;
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+/** Blockiert die Hitbox den Figuren-Footprint an Position (x,y)? */
+export function hitboxBlocks(box: Hitbox, x: number, y: number): boolean {
+  const f = playerFootprint(x, y);
+  return box.kind === "circle"
+    ? rectCircleOverlap(f.x, f.y, f.w, f.h, box.cx, box.cy, box.r)
+    : rectRectOverlap(f.x, f.y, f.w, f.h, box.x, box.y, box.w, box.h);
+}
+
+/** Blockiert IRGENDEINE der Hitboxen den Footprint an (x,y)? */
+export function blockedByHitboxes(boxes: readonly Hitbox[], x: number, y: number): boolean {
+  for (const b of boxes) if (hitboxBlocks(b, x, y)) return true;
+  return false;
+}
+
+/** Runde Hitboxen für eine NPC-Standplatzliste – je NPC ein Kreis um seinen
+ *  Kachel-Mittelpunkt (x*TILE+8 / y*TILE+8, passend zur Flooring-Logik von npcTile).
+ *  So gleitet man an NPCs weich vorbei, statt an der vollen Kachel eckig abzuprallen. */
+export function npcHitboxes(spawns: readonly Spawn[], r: number): Hitbox[] {
+  return spawns.map((s) => circleHitbox(s.x * TILE + 8, s.y * TILE + 8, r));
+}
+
 /** Kollisions-Footprint der Figur: vier Ecken um den Mittelpunkt – ±5 px breit,
  *  von 2 px über dem Mittelpunkt bis 5 px darunter (passend zum Sprite-Fuß).
- *  Identisch zur `probe`-Geometrie, die scenes.ts beim Laufen nutzt. */
-export function footprintSolid(solidAt: SolidAt, x: number, y: number): boolean {
-  return solidAt(x - 5, y - 2) || solidAt(x + 5, y - 2) ||
-         solidAt(x - 5, y + 5) || solidAt(x + 5, y + 5);
+ *  Identisch zur `probe`-Geometrie, die scenes.ts beim Laufen nutzt. Zusätzlich
+ *  optional gegen Sub-Tile-Hitboxen (#343: runde Steine/NPCs) – ohne das Argument
+ *  exakt das alte Verhalten (nur Kachelgitter). */
+export function footprintSolid(solidAt: SolidAt, x: number, y: number, obstacles?: readonly Hitbox[]): boolean {
+  if (solidAt(x - 5, y - 2) || solidAt(x + 5, y - 2) ||
+      solidAt(x - 5, y + 5) || solidAt(x + 5, y + 5)) return true;
+  return obstacles ? blockedByHitboxes(obstacles, x, y) : false;
 }
 
 /** Achsen-getrennte Bewegungsauflösung mit Anti-Wedge.
@@ -353,10 +429,10 @@ export function footprintSolid(solidAt: SolidAt, x: number, y: number): boolean 
  *  herausbewegen kann; sobald der Footprint frei ist, greift die normale
  *  Kollision von selbst wieder. */
 export function resolveMove(
-  solidAt: SolidAt, x: number, y: number, dx: number, dy: number,
+  solidAt: SolidAt, x: number, y: number, dx: number, dy: number, obstacles?: readonly Hitbox[],
 ): { x: number; y: number } {
-  const stuck = footprintSolid(solidAt, x, y);
-  if (stuck || !footprintSolid(solidAt, x + dx, y)) x += dx;
-  if (stuck || !footprintSolid(solidAt, x, y + dy)) y += dy;
+  const stuck = footprintSolid(solidAt, x, y, obstacles);
+  if (stuck || !footprintSolid(solidAt, x + dx, y, obstacles)) x += dx;
+  if (stuck || !footprintSolid(solidAt, x, y + dy, obstacles)) y += dy;
   return { x, y };
 }
