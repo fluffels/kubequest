@@ -85,6 +85,7 @@
   },
   {
     "id": "q-obs-prom-rule",
+    "chapter": "observability-alerts",
     "q": "Was definiert eine <b>PrometheusRule</b>?",
     "options": [
       "Eine Alert-Regel: <code>expr</code> (PromQL-Bedingung), <code>for</code> (Mindest-Dauer) und <code>severity</code> legen fest, wann Prometheus einen Alert an den Alertmanager schickt.",
@@ -121,6 +122,7 @@
   },
   {
     "id": "q-obs-targets",
+    "chapter": "observability-metrics",
     "q": "Im Prometheus-Sinn: Was ist ein <b>Target</b>, und was bedeutet sein Status <code>up</code> bzw. <code>down</code>?",
     "options": [
       "Ein Target ist ein Scrape-Ziel (ein <code>/metrics</code>-Endpunkt). <code>up</code> = die letzte Abfrage hat geklappt, <code>down</code> = Prometheus bekam keine Antwort.",
@@ -133,6 +135,7 @@
   },
   {
     "id": "q-obs-promql",
+    "chapter": "observability-alerts",
     "q": "Was ist <b>PromQL</b> – und wozu dient es?",
     "options": [
       "Die Abfragesprache von Prometheus: eine Metrik auswählen, per Label/Zeitfenster einschränken und rechnen (z.B. <code>rate(...)</code>) – die Basis für Dashboards und Alert-Bedingungen (<code>expr</code>).",
@@ -145,6 +148,7 @@
   },
   {
     "id": "q-obs-logs-follow",
+    "chapter": "observability-logs",
     "q": "Wozu dient das Flag <code>-f</code> (<code>--follow</code>) bei <code>kubectl logs</code>?",
     "options": [
       "Es hält den Log-Stream offen – neue Zeilen erscheinen live, bis du mit <code>^C</code> abbrichst.",
@@ -157,6 +161,7 @@
   },
   {
     "id": "q-obs-alertmanager",
+    "chapter": "observability-alerts",
     "q": "Prometheus feuert einen Alert. Was ist die Aufgabe des <b>Alertmanagers</b>?",
     "options": [
       "Er nimmt die feuernden Alerts entgegen und kümmert sich um die Zustellung: gruppieren, entdoppeln, stummschalten (Silences) und an die richtigen Kanäle routen (Slack, E-Mail, PagerDuty).",

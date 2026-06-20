@@ -685,6 +685,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
 
     registerQuestCards(questId: string) {
       for (const c of KQContent.CMD_CARDS.filter(c => c.chapter === questId)) this.ensureReviewItem(c.id);
+      for (const c of KQContent.CRAB_QUIZ.filter(c => c.chapter === questId)) this.ensureReviewItem(c.id);
       const quest = KQContent.QUESTS.find(q => q.id === questId);
       if (quest) {
         for (const step of quest.steps) {

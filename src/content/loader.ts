@@ -446,6 +446,8 @@ export const CMD_CARDS: CmdCard[] = assembleCmdCards(CMD_CARD_REGIONS);
 /** Quiz-Karteikarte in Laufzeit-Form (Multiple Choice). */
 export interface QuizCard {
   id: string;
+  /** Quest-ID, nach deren Abschluss diese Karte in den SR-Pool kommt (analog zu CmdCard.chapter). */
+  chapter?: string;
   q: string;
   options: string[];
   correct: number;
@@ -464,8 +466,10 @@ function parseOneQuizCard(v: unknown, where: string): QuizCard {
   if (correct < 0 || correct >= options.length) {
     fail(`${path}.correct`, `Index ${correct} außerhalb der ${options.length} Optionen`);
   }
+  const chapter = o.chapter !== undefined ? asNonEmptyString(o.chapter, `${path}.chapter`) : undefined;
   return {
     id,
+    ...(chapter !== undefined && { chapter }),
     q: asNonEmptyString(o.q, `${path}.q`),
     options,
     correct,

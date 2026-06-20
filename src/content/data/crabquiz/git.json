@@ -85,6 +85,7 @@
   },
   {
     "id": "q-ci-3",
+    "chapter": "git-pipeline",
     "q": "Wofür stehen CI und CD?",
     "options": [
       "Continuous Integration und Continuous Delivery/Deployment.",

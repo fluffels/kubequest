@@ -13,6 +13,7 @@
   },
   {
     "id": "q-sec-2",
+    "chapter": "kraken-boss",
     "q": "Warum sind Klartext-Passwörter in YAML-Dateien doppelt gefährlich?",
     "options": [
       "Jede:r mit Cluster- oder Git-Zugriff kann sie lesen – YAML landet ja in Git!",

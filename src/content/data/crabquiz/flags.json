@@ -1,6 +1,7 @@
 [
   {
     "id": "q-flag-ps-a",
+    "chapter": "docker-list-containers",
     "q": "Bei <code>docker ps</code> – was bewirkt das <code>-a</code>?",
     "options": [
       "Es zeigt ALLE Container, auch die gestoppten (<code>-a</code> = all).",
@@ -13,6 +14,7 @@
   },
   {
     "id": "q-flag-run-d",
+    "chapter": "docker-run-options",
     "q": "Bei <code>docker run</code> – was bewirkt das <code>-d</code>?",
     "options": [
       "Der Container läuft abgekoppelt im Hintergrund (<code>-d</code> = detached) – das Terminal ist sofort wieder frei.",
@@ -25,6 +27,7 @@
   },
   {
     "id": "q-flag-run-name",
+    "chapter": "docker-run-options",
     "q": "Bei <code>docker run</code> – wozu dient <code>--name meine-kiste</code>?",
     "options": [
       "Es gibt dem CONTAINER einen frei wählbaren Namen, statt eines zufälligen.",
@@ -37,6 +40,7 @@
   },
   {
     "id": "q-flag-build-t",
+    "chapter": "docker-build-image",
     "q": "Das Wörtchen „tag“ taucht bei Docker dreimal auf. Was macht das <code>-t</code> in <code>docker build -t hafenwache:1.0 .</code>?",
     "options": [
       "Es vergibt den ganzen Namen <code>name:tag</code> fürs neue Image (<code>-t</code> = <code>--tag</code>) – der Teil hinter dem <code>:</code> ist der Versions-Tag.",
@@ -49,6 +53,7 @@
   },
   {
     "id": "q-flag-kubectl-n",
+    "chapter": "k8s-inspect-pods",
     "q": "Bei <code>kubectl</code> – was macht <code>-n kube-system</code>?",
     "options": [
       "Es wählt den Namespace, in dem der Befehl arbeitet (hier: kube-system).",
@@ -61,6 +66,7 @@
   },
   {
     "id": "q-flag-apply-f",
+    "chapter": "k8s-apply-manifests",
     "q": "Bei <code>kubectl apply</code> – was bedeutet <code>-f app.yaml</code>?",
     "options": [
       "„from file“: Wende an, was in der Datei app.yaml steht.",
@@ -73,6 +79,7 @@
   },
   {
     "id": "q-flag-helm-set",
+    "chapter": "helm-upgrade-rollback",
     "q": "Bei <code>helm upgrade</code> – was macht <code>--set replicaCount=3</code>?",
     "options": [
       "Es überschreibt einen einzelnen Wert aus der values.yaml direkt auf der Kommandozeile.",
@@ -85,6 +92,7 @@
   },
   {
     "id": "q-flag-git-commit-m",
+    "chapter": "git-version-control",
     "q": "Bei <code>git commit</code> – wofür ist <code>-m \"Text\"</code>?",
     "options": [
       "Es gibt die Commit-Nachricht direkt mit an (<code>-m</code> = message).",
@@ -97,6 +105,7 @@
   },
   {
     "id": "q-flag-git-checkout-b",
+    "chapter": "git-feature-branch",
     "q": "Bei <code>git checkout</code> – was bewirkt das <code>-b</code> in <code>git checkout -b feature</code>?",
     "options": [
       "Es LEGT einen neuen Branch an und wechselt direkt hinein (<code>-b</code> = branch).",
@@ -109,6 +118,7 @@
   },
   {
     "id": "q-flag-git-add-dot",
+    "chapter": "git-pipeline",
     "q": "Bei <code>git add</code> – was bedeutet der Punkt in <code>git add .</code>?",
     "options": [
       "Der Punkt merkt ALLE neuen/geänderten Dateien im Ordner auf einmal vor.",

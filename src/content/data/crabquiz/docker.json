@@ -25,6 +25,7 @@
   },
   {
     "id": "q-ch1-3",
+    "chapter": "docker-first-container",
     "q": "Was ist Docker Hub?",
     "options": [
       "Eine Registry – ein öffentlicher „Supermarkt“ für fertige Images.",
@@ -49,6 +50,7 @@
   },
   {
     "id": "q-ch1-5",
+    "chapter": "docker-list-containers",
     "q": "Woraus besteht ein Docker-Image intern?",
     "options": [
       "Aus übereinandergestapelten Schichten (Layern) – unten die Basis, oben die App.",
@@ -73,6 +75,7 @@
   },
   {
     "id": "q-ch1-7",
+    "chapter": "docker-run-options",
     "q": "Was bewirkt <code>-d</code> (detached) bei <code>docker run</code>?",
     "options": [
       "Der Container läuft abgekoppelt im Hintergrund weiter – das Terminal ist sofort wieder frei.",
@@ -85,6 +88,7 @@
   },
   {
     "id": "q-ch1-8",
+    "chapter": "docker-run-options",
     "q": "Bei <code>docker run -d --name webserver nginx</code> – was ist <code>webserver</code> und was <code>nginx</code>?",
     "options": [
       "webserver = dein frei gewählter Container-Name (--name), nginx = das Image, aus dem der Container entsteht.",
@@ -97,6 +101,7 @@
   },
   {
     "id": "q-ch1-9",
+    "chapter": "docker-first-container",
     "q": "Du willst sehen, welche Dateien im aktuellen Ordner liegen. Welcher Befehl?",
     "options": [
       "<code>ls</code> – listet den Inhalt des aktuellen Ordners auf.",

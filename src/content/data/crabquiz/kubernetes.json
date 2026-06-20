@@ -1,6 +1,7 @@
 [
   {
     "id": "q-ch2-1",
+    "chapter": "k8s-first-deployment",
     "q": "Wofür braucht man Kubernetes, wenn es Docker gibt?",
     "options": [
       "Es verwaltet viele Container auf vielen Servern automatisch: neu starten, verteilen, skalieren.",
@@ -49,6 +50,7 @@
   },
   {
     "id": "q-ch2-4",
+    "chapter": "k8s-self-healing",
     "q": "Ein Container stürzt nachts um 3 Uhr ab. Was passiert?",
     "options": [
       "Kubernetes merkt es und startet automatisch Ersatz.",
@@ -61,6 +63,7 @@
   },
   {
     "id": "q-ch2-5",
+    "chapter": "k8s-inspect-pods",
     "q": "Ein Pod heißt <code>kantine-9f4c2-x7k1</code>. Woher kommt das kryptische Anhängsel?",
     "options": [
       "Kubernetes vergibt es automatisch, damit jeder Pod einen eindeutigen Namen hat.",
@@ -85,6 +88,7 @@
   },
   {
     "id": "q-ch3-2",
+    "chapter": "k8s-self-healing",
     "q": "Du löschst einen Pod eines Deployments (replicas: 3). Was passiert?",
     "options": [
       "Kubernetes startet sofort einen neuen – es sollen ja 3 sein.",
@@ -109,6 +113,7 @@
   },
   {
     "id": "q-ch4-1",
+    "chapter": "k8s-apply-manifests",
     "q": "Imperativ vs. deklarativ?",
     "options": [
       "Imperativ = einzelne Befehle rufen. Deklarativ = Wunschzustand in eine Datei schreiben.",
@@ -121,6 +126,7 @@
   },
   {
     "id": "q-ch4-2",
+    "chapter": "k8s-apply-manifests",
     "q": "Was gibt das Feld kind in einem Manifest an?",
     "options": [
       "Welche Art von Ressource beschrieben wird – z.B. Deployment oder Service.",
@@ -133,6 +139,7 @@
   },
   {
     "id": "q-ch4-3",
+    "chapter": "k8s-apply-manifests",
     "q": "Worauf musst du bei YAML besonders achten?",
     "options": [
       "Einrückung mit Leerzeichen – niemals Tabs.",
@@ -157,6 +164,7 @@
   },
   {
     "id": "q-res-1",
+    "chapter": "k8s-resource-limits",
     "q": "Was ist der Unterschied zwischen <code>requests</code> und <code>limits</code> bei den Ressourcen eines Containers?",
     "options": [
       "requests = was der Scheduler fest reserviert (Platzwahl auf dem Node), limits = harte Obergrenze (beim Speicher: drüber → OOMKilled).",

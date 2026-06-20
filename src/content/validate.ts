@@ -36,6 +36,8 @@ import type { Quest } from "../types";
 /** Karteikarte der Quiz-Krabbe (Multiple Choice). */
 export interface QuizCard {
   id: string;
+  /** Quest-ID, nach deren Abschluss diese Karte in den SR-Pool kommt (analog zu CmdCard.chapter). */
+  chapter?: string;
   q: string;
   options: string[];
   correct: number;
@@ -108,6 +110,7 @@ export function validateContent(c: ContentBundle): string[] {
     if (q.options.length < 2) err(`CRAB_QUIZ ${q.id}: braucht mindestens 2 Optionen`);
     if (!(q.correct >= 0 && q.correct < q.options.length)) err(`CRAB_QUIZ ${q.id}: correct-Index ${q.correct} außerhalb der Optionen`);
     if (!isNonEmptyString(q.explain)) err(`CRAB_QUIZ ${q.id}: Erklärung fehlt`);
+    if (q.chapter !== undefined && !questIds.has(q.chapter)) err(`CRAB_QUIZ ${q.id}: unbekannte Quest „${q.chapter}" in chapter`);
   }
 
   // ---------- Befehls-Karten: ID eindeutig, Lösung matcht accept, chapter existiert ----------

@@ -37,6 +37,7 @@
   },
   {
     "id": "q-ch5-3",
+    "chapter": "helm-release-install",
     "q": "Wozu dient values.yaml in einem Chart?",
     "options": [
       "Die einstellbaren Werte (Drehknöpfe) – z.B. Anzahl Kopien – ohne die Vorlage zu ändern.",
@@ -73,6 +74,7 @@
   },
   {
     "id": "q-helm-lint",
+    "chapter": "helm-umbrella-chart",
     "q": "Wofür ist helm lint da?",
     "options": [
       "Es prüft ein Chart auf Fehler und Stil, bevor man es ausrollt oder teilt.",
@@ -85,6 +87,7 @@
   },
   {
     "id": "q-helm-package",
+    "chapter": "helm-umbrella-chart",
     "q": "Was macht helm package <chart>?",
     "options": [
       "Es schnürt das Chart in ein versioniertes .tgz-Archiv – zum Teilen oder in ein Repo legen.",
@@ -97,6 +100,7 @@
   },
   {
     "id": "q-helm-version-app",
+    "chapter": "helm-umbrella-chart",
     "q": "Im <code>Chart.yaml</code> stehen <code>version</code> UND <code>appVersion</code> – was ist der Unterschied?",
     "options": [
       "version = Version des Charts (der Verpackung), appVersion = Version der ausgelieferten App – beide ändern sich unabhängig.",
@@ -109,6 +113,7 @@
   },
   {
     "id": "q-helm-semver",
+    "chapter": "helm-umbrella-chart",
     "q": "Du änderst dein Chart so, dass alte Werte-Dateien NICHT mehr passen (Breaking Change). Welche Stelle der Chart-<code>version</code> (z.B. 2.4.1 = Major.Minor.Patch) ziehst du hoch?",
     "options": [
       "Die erste – Major (2 → 3). Breaking Change = Major-Bump.",
@@ -121,6 +126,7 @@
   },
   {
     "id": "q-helm-deps",
+    "chapter": "helm-umbrella-chart",
     "q": "Ein Produkt-Chart bündelt backend, keycloak und geoserver als <code>dependencies:</code> – jedes mit fester Version. Wie nennt man dieses Muster?",
     "options": [
       "Umbrella-Chart: ein Eltern-Chart zieht mehrere Subcharts (jeweils gepinnt) als ein Paket zusammen.",
@@ -133,6 +139,7 @@
   },
   {
     "id": "q-helm-lock",
+    "chapter": "helm-umbrella-chart",
     "q": "Wozu dienen <code>helm dependency update</code> und <code>Chart.lock</code>?",
     "options": [
       "Sie holen die Subcharts in den gepinnten Versionen und schreiben sie fest – reproduzierbar, überall gleich.",
@@ -145,6 +152,7 @@
   },
   {
     "id": "q-helm-umbrella-term",
+    "chapter": "helm-umbrella-chart",
     "q": "Ist „Umbrella Chart“ ein offizieller Helm-Begriff?",
     "options": [
       "Nein – Industrie-Sprech (auch „Wrapper“/„Bundle“); offiziell heißt es nur parent chart / subcharts / dependencies.",
@@ -157,6 +165,7 @@
   },
   {
     "id": "q-helm-condition",
+    "chapter": "helm-umbrella-chart",
     "q": "Wozu dient <code>condition:</code> bei einem Subchart im <code>dependencies:</code>-Block?",
     "options": [
       "Es schaltet das Subchart per Wert an/aus – so bedient EIN Umbrella-Chart verschiedene Setups.",
@@ -169,6 +178,7 @@
   },
   {
     "id": "q-helm-subchart-source",
+    "chapter": "helm-umbrella-chart",
     "q": "Woher kommen die Subcharts eines Umbrella-Charts?",
     "options": [
       "Entweder „vendored“ (mit im Ordner unter charts/) oder per repository:-URL aus einer Chart-Registry gezogen (helm dependency update).",
@@ -181,6 +191,7 @@
   },
   {
     "id": "q-helm-values-overlay",
+    "chapter": "helm-umbrella-chart",
     "q": "<code>helm install app ./chart -f base.yaml -f prod.yaml</code> – beide Dateien setzen <code>replicas</code>. Welcher Wert zählt?",
     "options": [
       "Der aus prod.yaml – das spätere -f überlagert das frühere.",

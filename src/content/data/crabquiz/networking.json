@@ -13,6 +13,7 @@
   },
   {
     "id": "q-netpol-2",
+    "chapter": "network-policy",
     "q": "Was bestimmt der <code>podSelector</code> einer NetworkPolicy?",
     "options": [
       "WELCHE Pods die Regel schützt (auf wen sie wirkt).",

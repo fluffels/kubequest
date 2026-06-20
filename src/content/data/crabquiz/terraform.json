@@ -1,6 +1,7 @@
 [
   {
     "id": "q-ch6-1",
+    "chapter": "terraform-intro",
     "q": "Was bedeutet „Infrastructure as Code“?",
     "options": [
       "Server, Netze & Co. werden als Textdateien beschrieben statt zusammengeklickt.",
@@ -37,6 +38,7 @@
   },
   {
     "id": "q-ch6-4",
+    "chapter": "terraform-state-destroy",
     "q": "Kubernetes und Terraform sind beide deklarativ. Unterschied?",
     "options": [
       "Kubernetes verwaltet Container im Cluster – Terraform baut die Infrastruktur drumherum.",

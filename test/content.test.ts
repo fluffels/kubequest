@@ -51,6 +51,27 @@ test("Quiz-Karten: IDs eindeutig, correct-Index gültig, Erklärung vorhanden", 
   }
 });
 
+test("#371 Wächter: jede CRAB_QUIZ-Karte ist über reviewId oder chapter im SR-Pool erreichbar", () => {
+  // 10 RBAC-Karten warten auf Wachturm-Region #130
+  const WARTEN_AUF_130 = new Set([
+    "q-sa-1", "q-sa-2",
+    "q-rbac-1", "q-rbac-2", "q-rbac-3", "q-rbac-4",
+    "q-podsec-1", "q-podsec-2", "q-podsec-3", "q-podsec-4",
+  ]);
+  const reviewIds = new Set<string>();
+  for (const q of KQContent.QUESTS) {
+    for (const step of q.steps as { type: string; reviewId?: string }[]) {
+      if (step.type === "choice" && step.reviewId) reviewIds.add(step.reviewId);
+    }
+  }
+  const waisen = KQContent.CRAB_QUIZ
+    .filter(c => !reviewIds.has(c.id))
+    .filter(c => !c.chapter)
+    .filter(c => !WARTEN_AUF_130.has(c.id))
+    .map(c => c.id);
+  assert.deepEqual(waisen, [], "Quiz-Karten ohne reviewId und ohne chapter:\n" + waisen.join(", "));
+});
+
 test("Befehls-Karten: Lösung matcht die eigene accept-Regex", () => {
   for (const card of KQContent.CMD_CARDS) {
     const norm = card.solution.trim().replace(/\s+/g, " ");

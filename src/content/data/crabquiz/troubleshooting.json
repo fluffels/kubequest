@@ -49,6 +49,7 @@
   },
   {
     "id": "q-ts-5",
+    "chapter": "k8s-debug-crashloop",
     "q": "Wann hilft kubectl rollout restart?",
     "options": [
       "Wenn die Ursache behoben ist (z.B. Secret angelegt) und die Pods sauber neu starten sollen.",

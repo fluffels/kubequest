@@ -64,6 +64,8 @@ function introOrder(): Record<string, number> {
   };
   // CMD-Karten: chapter = Lehr-Quest
   for (const c of KQContent.CMD_CARDS) consider(c.id, c.chapter);
+  // Quiz-Karten mit chapter: ebenfalls per Konstruktion in-order (#371)
+  for (const c of KQContent.CRAB_QUIZ) if (c.chapter) consider(c.id, c.chapter);
   // Choice-Fragen: die Quest, in deren Ablauf sie gestellt werden
   for (const q of KQContent.QUESTS) {
     for (const step of q.steps as { type: string; reviewId?: string }[]) {
@@ -82,8 +84,11 @@ test("Kralle fragt keine Karte ab, deren Konzept noch nicht eingeführt wurde (#
 
 test("jede über EXTRA_CARDS platzierte Konzept-Karte hat eine Einführungs-Quest (#235)", () => {
   // EXTRA-only = im Pool, aber weder CMD-Karte noch Choice-Frage (also nur über die
-  // EXTRA_CARDS-Map freigeschaltet). Genau diese Karten MÜSSEN in CONCEPT_INTRO stehen.
+  // EXTRA_CARDS-Map freigeschaltet). Genau diese Karten MÜSSEN in CONCEPT_INTRO stehen –
+  // AUSNAHME: Quiz-Karten mit chapter (#371) sind per Konstruktion in-order, brauchen
+  // keinen CONCEPT_INTRO-Eintrag.
   const cmdIds = new Set(KQContent.CMD_CARDS.map(c => c.id));
+  const quizWithChapter = new Set(KQContent.CRAB_QUIZ.filter(c => c.chapter).map(c => c.id));
   const choiceIds = new Set<string>();
   for (const q of KQContent.QUESTS) {
     for (const step of q.steps as { type: string; reviewId?: string }[]) {
@@ -91,7 +96,7 @@ test("jede über EXTRA_CARDS platzierte Konzept-Karte hat eine Einführungs-Ques
     }
   }
   const fehlend = Object.keys(unlockOrder())
-    .filter(id => !cmdIds.has(id) && !choiceIds.has(id))
+    .filter(id => !cmdIds.has(id) && !choiceIds.has(id) && !quizWithChapter.has(id))
     .filter(id => !(id in CONCEPT_INTRO));
   expect(fehlend, "EXTRA-Karten ohne CONCEPT_INTRO-Eintrag: " + fehlend.join(", ")).toEqual([]);
 });

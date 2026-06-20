@@ -1,6 +1,7 @@
 [
   {
     "id": "q-tools-ingress",
+    "chapter": "k8s-self-healing",
     "q": "Ein Service ist nur im Cluster erreichbar. Wie kommen Besucher aus dem Internet rein?",
     "options": [
       "Über einen Ingress – das Hafentor, das z.B. hafen.de/kasse an den richtigen Service weiterleitet.",
@@ -13,6 +14,7 @@
   },
   {
     "id": "q-tools-keycloak",
+    "chapter": "helm-intro",
     "q": "Deine App braucht Login. Was nimmst du, statt selbst eine Benutzerverwaltung zu bauen?",
     "options": [
       "Keycloak – einen fertigen Auth-/IDP-Server für Anmeldung, Tokens und Rechte.",
@@ -25,6 +27,7 @@
   },
   {
     "id": "q-tools-monitoring",
+    "chapter": "helm-intro",
     "q": "Wofür stehen Prometheus und Grafana im Cluster?",
     "options": [
       "Prometheus sammelt Messwerte (Metriken), Grafana macht daraus Dashboards.",
@@ -37,6 +40,7 @@
   },
   {
     "id": "q-tools-stack",
+    "chapter": "helm-intro",
     "q": "PostgreSQL und Redis – welches Tool ist wofür?",
     "options": [
       "PostgreSQL = Datenbank (Daten dauerhaft), Redis = schneller Zwischenspeicher (Cache).",
