@@ -11,25 +11,26 @@
  * `exec`-Dispatch in `sim.ts` per `gitCommand(this, …)`.
  *
  * Phaser-frei (pure Domäne): die Domänentypen kommen aus ./state – kein
- * Rückimport nach sim.ts (kein Zyklus). Die CI-Pipeline-Maschinerie
- * (`_runPipeline`) bleibt bewusst bei der `glab`-Familie in `sim.ts`; `git push`
- * stößt sie nur über das Host-Interface an (eine .gitlab-ci.yml startet beim
- * Push automatisch eine Pipeline).
+ * Rückimport nach sim.ts (kein Zyklus). Die CI-Pipeline-Maschinerie liegt seit
+ * #385 bei der `glab`-Familie (sim/glab.ts); `git push` stößt sie über den
+ * direkten Import `runPipeline` an (eine .gitlab-ci.yml startet beim Push
+ * automatisch eine Pipeline) – früher lief das über die Host-Methode `_runPipeline`.
  */
-import type { ClusterState, Pipeline } from "./state";
+import type { ClusterState, Deployment, Broken } from "./state";
+import { runPipeline } from "./glab";
 
 /** Was die git-Befehle vom Simulator brauchen (von der `Sim`-Klasse erfüllt).
  *  Bewusst ein schmales Interface statt der ganzen `Sim`-Klasse: es dokumentiert
  *  die Kopplung von git an den Cluster-Zustand und vermeidet einen Import-Zyklus
- *  git ↔ sim. Die Daten-Felder (`git`/`files`) kommen über `extends ClusterState`
- *  (sim/state.ts, #372); hinzu kommen die in `sim.ts` verbleibenden Helfer, die
- *  git ruft: Fehlerausgabe, „Meintest du …?"-Vorschlag und die CI-Pipeline. */
+ *  git ↔ sim. Die Daten-Felder (`git`/`files`/`ci`/`deployments`) kommen über
+ *  `extends ClusterState` (sim/state.ts, #372); hinzu kommen die in `sim.ts`
+ *  verbleibenden Helfer, die git ruft: Fehlerausgabe, „Meintest du …?"-Vorschlag
+ *  und – für die beim `git push` ausgelöste CI-Pipeline (`runPipeline`, sim/glab.ts) –
+ *  die Deployment-Fabrik (`runPipeline` rollt die deploy-Stage auf `main` aus). */
 export interface GitHost extends ClusterState {
   _err(msg: string, tip?: string): string;
   _suggest(word: string, list: string[]): string | null;
-  /** Startet die CI-Pipeline (GitLab-Runner). Bleibt bei `glab`/CI in sim.ts;
-   *  `git push` ruft sie nur, wenn eine .gitlab-ci.yml im Repo liegt. */
-  _runPipeline(): Pipeline;
+  _makeDeployment(name: string, image: string, replicas: number, broken?: Broken | null, envFrom?: { configMaps: string[]; secrets: string[] }, cpuHeavy?: boolean): Deployment;
 }
 
 export function gitCommand(host: GitHost, t: string[], raw: string): string {
@@ -232,7 +233,7 @@ function gitPush(host: GitHost): string {
   let msg = "Schiebe nach origin/" + g.branch + " … ✅ Deine Commits liegen jetzt auf dem Server (z.B. GitLab) – sichtbar fürs Team.";
   // Liegt eine .gitlab-ci.yml im Repo, startet der Runner bei jedem Push automatisch eine Pipeline.
   if (host.files[".gitlab-ci.yml"]) {
-    const p = host._runPipeline();
+    const p = runPipeline(host);
     msg += "\n🏃 Eine .gitlab-ci.yml liegt im Repo – der Runner startet Pipeline #" + p.id +
       " (build → test → deploy). Status checken mit 'glab ci status'.";
   }
