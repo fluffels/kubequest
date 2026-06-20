@@ -79,6 +79,29 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     return Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
   }
 
+  /* ---------- Quest-Fortschritt: ID <-> Laufzeit-Index (#353) ----------
+   * Persistiert wird die Quest-ID (currentQuestId), gespielt wird mit dem Index. Diese
+   * beiden Helfer sind die einzige Brücke dazwischen – so bleibt der Index ein rein
+   * abgeleiteter Laufzeitwert und Quests einschieben/umsortieren bricht keinen Stand. */
+
+  /** Sentinel für „alle Quests durch" (Index === QUESTS.length): kein aktiver Quest,
+   *  daher leere ID. Ein FEHLENDES Feld heißt dagegen „Alt-Stand vor #353" (→ aus questIdx
+   *  migrieren) – bewusst unterscheidbar von "" (= bewusst am Ende). */
+  const QUEST_DONE_ID = "";
+
+  /** Quest-ID für einen Laufzeit-Index. Endzustand (QUESTS.length) → "" (= durch). */
+  function questIdForIndex(idx: number): string {
+    return KQContent.QUESTS[idx]?.id ?? QUEST_DONE_ID;
+  }
+
+  /** Laufzeit-Index für eine gespeicherte Quest-ID. "" → Endzustand (QUESTS.length).
+   *  Unbekannte ID (z.B. Quest später entfernt) → -1; der Aufrufer entscheidet den Fallback,
+   *  damit ein Stand nie kommentarlos auf Quest 0 zurückfällt. */
+  function questIndexForId(id: string): number {
+    if (id === QUEST_DONE_ID) return KQContent.QUESTS.length;
+    return KQContent.QUESTS.findIndex(q => q.id === id);
+  }
+
   /** Frischer Spielstand – genau die Form von GameState. */
   function makeDefaultState(): GameState {
     return {
@@ -92,6 +115,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       // links davon (Pixel), begehbar und innerhalb der Redeweite (1,7 Kacheln).
       // Returning-Spieler überschreiben das mit ihrer gespeicherten Position.
       player: { x: 400, y: 248 },
+      currentQuestId: questIdForIndex(0), // erste Quest; Persistenz-Autorität (#353)
       questIdx: 0,
       questStep: 0,
       taskIdx: 0,
@@ -219,12 +243,30 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       unlockedAbbrev = hatFortschritt ? [ALL_ABBREV_UNLOCKED] : [];
     }
 
+    // Quest-Fortschritt auflösen (#353): die Quest-ID ist die Autorität, der numerische
+    // questIdx nur abgeleitet. So bricht das Einfügen/Umsortieren von Quests keinen Stand.
+    //   - currentQuestId vorhanden (Stand ab #353): ID gewinnt -> Index daraus auflösen.
+    //       Unbekannte ID (Quest entfernt) -> Fallback auf den (geklemmten) Zahl-Index,
+    //       damit Fortschritt nicht still auf Quest 0 zurückfällt.
+    //   - currentQuestId fehlt (Alt-Stand VOR #353): aus dem numerischen questIdx ableiten.
+    // Danach wird die ID kanonisch aus dem aufgelösten Index neu gesetzt (Endzustand -> "").
+    let questIdx: number;
+    if (typeof raw.currentQuestId === "string") {
+      const resolved = questIndexForId(raw.currentQuestId);
+      questIdx = resolved >= 0 ? resolved : safeCount(raw.questIdx, def.questIdx);
+    } else {
+      questIdx = safeCount(raw.questIdx, def.questIdx);
+    }
+    if (questIdx > KQContent.QUESTS.length) questIdx = KQContent.QUESTS.length; // nie über den Endzustand
+    const currentQuestId = questIdForIndex(questIdx);
+
     return {
       xp: safeCount(raw.xp, def.xp),
       coins: safeCount(raw.coins, def.coins),
       character: typeof raw.character === "number" && Number.isFinite(raw.character) ? raw.character : null,
       player: { x: safeNum(player.x, def.player.x), y: safeNum(player.y, def.player.y) },
-      questIdx: safeCount(raw.questIdx, def.questIdx),
+      currentQuestId,
+      questIdx,
       questStep: safeCount(raw.questStep, def.questStep),
       taskIdx: safeCount(raw.taskIdx, def.taskIdx),
       completedQuests: safeStrArray(raw.completedQuests),
@@ -486,6 +528,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       if (this.state.questStep >= q.steps.length) {
         this.state.completedQuests.push(q.id);
         this.state.questIdx++;
+        this.state.currentQuestId = questIdForIndex(this.state.questIdx); // ID synchron halten (#353)
         this.state.questStep = 0;
         this.state.questsSinceGate++;
         this.save();
@@ -542,6 +585,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       if (!Number.isInteger(questIdx) || questIdx < 0 || questIdx > quests.length) return false;
 
       this.state.questIdx = questIdx;
+      this.state.currentQuestId = questIdForIndex(questIdx); // ID synchron halten (#353)
       this.state.questStep = 0;
       this.state.taskIdx = 0;
       this.state.completedQuests = quests.slice(0, questIdx).map(q => q.id);

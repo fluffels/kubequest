@@ -64,7 +64,7 @@
    *   2. Eine Migration migrations[n] ergänzen, die `data` von Version n auf n+1 bringt.
    * Die Kette läuft dann automatisch jede Zwischenstufe der Reihe nach durch.
    */
-  export const CURRENT_SAVE_VERSION = 1;
+  export const CURRENT_SAVE_VERSION = 2;
 
   /** Migration von Format-Version n auf n+1 (reine Funktion auf dem `data`-Objekt). */
   type Migration = (data: unknown) => unknown;
@@ -74,6 +74,16 @@
     //         Inhaltlich identisch zum heutigen Format – wir übernehmen ihn unverändert
     //         und packen ihn nur in die neue Versions-Hülle.
     0: (data) => data,
+    // 1 -> 2 (#353): Quest-Fortschritt wird zusätzlich als Quest-ID (currentQuestId) statt
+    //         nur als Zahl-Index geführt, damit Einfügen/Umsortieren von Quests keinen
+    //         Spielstand mehr bricht. Strukturell ein No-op: die Ableitung der ID aus dem
+    //         alten questIdx (und das Auflösen ID -> Index) passiert ZENTRAL in
+    //         game.ts › sanitizeState, weil sie ALLE Ladewege gleich treffen muss
+    //         (localStorage UND der rohe JSON-Import via Game.importData umgeht diese
+    //         Migrationskette). Der Versions-Bump sorgt hier dafür, dass jeder bestehende
+    //         v1-Stand vor dem ersten Überschreiben in den Backup-Slot gesichert wird
+    //         (readState) – kein Spieler verliert beim Update seinen Fortschritt.
+    1: (data) => data,
   };
 
   /** Hebt `data` von `version` schrittweise auf CURRENT_SAVE_VERSION. */

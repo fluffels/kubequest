@@ -639,3 +639,73 @@ test("jumpToQuest: Giver-Position überlebt eine LAUFENDE WorldScene (#335, glei
   const saved = JSON.parse(SaveStore.read()!);
   expect(saved.data.player).toEqual(giverPos);
 });
+
+/* ---------- #353: Quest-Fortschritt per ID statt Zahl-Index (Save-Robustheit) ----------
+ * Persistiert wird die Quest-ID (currentQuestId); der numerische questIdx ist nur noch ein
+ * abgeleiteter Laufzeitwert. So verschiebt das Einfügen/Umsortieren von Quests keinen
+ * bestehenden Fortschritt mehr. Alt-Stände ohne currentQuestId werden aus questIdx migriert.
+ * Niemand verliert beim Update seinen Stand. */
+
+test("#353 currentQuestId: frischer Stand zeigt auf die erste Quest", () => {
+  Game.reset();
+  expect(Game.state.questIdx).toBe(0);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[0].id);
+});
+
+test("#353 Migration: Alt-Stand OHNE currentQuestId leitet die ID aus dem questIdx ab", () => {
+  // Stand wie vor #353: nur numerischer Index, kein currentQuestId.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 50, questIdx: 3 } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(3);                       // Index erhalten
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[3].id); // ID ergänzt
+});
+
+test("#353 Autorität ID: bei veraltetem questIdx gewinnt currentQuestId (Quest-Einfügen bricht nichts)", () => {
+  // Kernschutz: der gespeicherte Zahl-Index ist veraltet (0, z.B. weil vorher Quests
+  // eingeschoben wurden), currentQuestId zeigt aber auf die Quest, die AKTUELL an Index 3
+  // steht. Nach dem Laden muss der Fortschritt bei DIESER Quest liegen (Index 3 aufgelöst),
+  // nicht beim veralteten Zahl-Index 0.
+  const ziel = KQContent.QUESTS[3].id;
+  Game.importData(JSON.stringify({ v: 2, data: { xp: 50, questIdx: 0, currentQuestId: ziel } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(3);
+  expect(Game.state.currentQuestId).toBe(ziel);
+});
+
+test("#353 unbekannte currentQuestId (Quest entfernt) -> Fallback auf questIdx, kein Verlust", () => {
+  Game.importData(JSON.stringify({ v: 2, data: { questIdx: 2, currentQuestId: "gibt-es-nicht-mehr" } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(2);                       // Fallback rettet den Fortschritt
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[2].id); // kanonisiert auf die echte ID
+});
+
+test("#353 Endzustand: alle Quests durch -> currentQuestId leer, round-trippt", () => {
+  setWorldScene(null);
+  const end = KQContent.QUESTS.length;
+  Game.jumpToQuest(end);
+  expect(Game.state.currentQuestId).toBe("");
+  Game.load(); // persistiert + zurückgelesen
+  expect(Game.state.questIdx).toBe(end);
+  expect(Game.state.currentQuestId).toBe("");
+  expect(Game.allQuestsDone()).toBe(true);
+});
+
+test("#353 jumpToQuest hält currentQuestId synchron zum Index (auch über load)", () => {
+  setWorldScene(null);
+  Game.jumpToQuest(5);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[5].id);
+  Game.load();
+  expect(Game.state.questIdx).toBe(5);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[5].id);
+});
+
+test("#353 advanceStep: Quest-Abschluss zieht currentQuestId auf die nächste Quest", () => {
+  setWorldScene(null);
+  Game.jumpToQuest(0);
+  const stepCount = KQContent.QUESTS[0].steps.length;
+  let result: ReturnType<typeof Game.advanceStep> = {};
+  for (let i = 0; i < stepCount; i++) result = Game.advanceStep();
+  expect(result).toMatchObject({ questDone: KQContent.QUESTS[0] }); // Quest 0 abgeschlossen
+  expect(Game.state.questIdx).toBe(1);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[1].id);
+});
