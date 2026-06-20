@@ -51,7 +51,7 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#352** | CMD_CARDS auf Content-as-Data migrieren (prio:mittel) | Content-as-Data-Folge zu #348 (erledigt) – durch den main-Merge **entblockt**. Höchste offene Prio (mittel), foundational: bringt die Befehls-Karten ins Daten-Schema. Normaler Ablauf über `main`. |
+| 1 | **#368** ⚠️ | CRAB_QUIZ auf Content-as-Data migrieren (Folge zu #352) | Letztes Content-as-Data-Stück (ADR 0004), schließt die Inhalts-Migration ab; baut auf #352 (erledigt) auf. **Vor der Umsetzung die Aufteilungs-Frage klären** (CRAB_QUIZ hat kein `chapter`-Feld – pro Region/Geber splitten wie #348/#352, nicht als Monolith). Low-Risk, normaler Ablauf über `main`. |
 | 2 | **#327** | Quests mit Thema/Kapitel (Datenmodell + Gruppierung) | Selbstpflege-Test, Grundlage fürs Logbuch-Accordion. Niedriges Risiko, foundational. Profitiert von den sprechenden Quest-IDs (#354, erledigt). |
 | 3 | **#346** | `sim.ts` intern nach Befehlsdomäne gliedern (2982 Z.) | Großer Refactor — jetzt vom Wächter (#347, erledigt) abgesichert. ~500 sim-Tests: Red-Green beachten. |
 | 4 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
