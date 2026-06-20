@@ -14,6 +14,14 @@ export interface GameState {
   coins: number;
   character: number | null;
   player: { x: number; y: number };
+  /** Aktive Quest als **ID** – die Persistenz-Autorität für den Quest-Fortschritt (#353).
+   *  Quests einschieben/umsortieren verschiebt damit keinen Spielstand mehr. Leerer
+   *  String = alle Quests durch (Endzustand). `questIdx` ist nur der daraus abgeleitete
+   *  Laufzeit-Index; bei Konflikt gewinnt diese ID. Alt-Stände ohne dieses Feld werden
+   *  aus `questIdx` migriert (game.ts › sanitizeState). */
+  currentQuestId: string;
+  /** Abgeleiteter Laufzeit-Index der aktiven Quest in `QUESTS` (= Index in quest-order.json).
+   *  Wird beim Laden aus `currentQuestId` aufgelöst – NICHT die Persistenz-Autorität (#353). */
   questIdx: number;
   questStep: number;
   taskIdx: number;
