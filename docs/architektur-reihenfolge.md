@@ -51,21 +51,20 @@ Sortier-Logik: erst das **Skalierungs-/Save-Fundament** (schützt direkt den Sta
 
 | # | Ticket | Worum's geht | Warum hier / Abhängigkeit |
 |---|--------|--------------|---------------------------|
-| 1 | **#385** | glab/CI-Familie (`_glab` + `_runPipeline`) aus `sim.ts` nach `sim/glab.ts` auslagern (~50 Z.) | Folge zum sim.ts-Split (#346). Letzte Nicht-Befehls-Familie in sim.ts (Observability #384 ist ✓). **Vor #383.** ⚠️ `runPipeline` wird seit #377 von `git push` (sim/git.ts) angestoßen → wandert mit nach glab.ts, git.ts importiert es dann direkt (raus aus `GitHost`). |
-| 2 | **#383** | `test/sim.test.ts` entlang der `sim/`-Module aufteilen (Test-Split zu #346) | **Nach #385** — erst wenn der ganze Code-Split fertig ist (#378 ✓ + #384 ✓ + #385) und die Modulgrenzen final stehen. Befund aus #374: `test/sim.test.ts` (1408 Z.) ist der Test-Monolith zum Code-Split; gespiegelte Dateien (kubectl/docker/helm/…), gleiche Test-Anzahl, Red-Green je Block. |
-| 3 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
-| 4 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
-| 5 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
-| 6 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
-| 7 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
-| 8 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
-| 9 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
-| 10 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
-| 11 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
-| 12 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
-| 13 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
-| 14 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
-| 15 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
+| 1 | **#383** | `test/sim.test.ts` entlang der `sim/`-Module aufteilen (Test-Split zu #346) | Der ganze Code-Split ist jetzt fertig (#378 ✓ + #384 ✓ + #385 ✓), die Modulgrenzen stehen final — jetzt dran. Befund aus #374: `test/sim.test.ts` (>1400 Z.) ist der Test-Monolith zum Code-Split; gespiegelte Dateien (kubectl/docker/helm/glab/…), gleiche Test-Anzahl, Red-Green je Block. |
+| 2 | **#345** | `scenes.ts` aufteilen (7 Phaser-Szenen, 2275 Z.) | Großer Refactor, Präsentationsschicht. Browser-Smoke-Test. |
+| 3 | **#356** | `ui.ts` aufteilen (ein Modul pro UI-Domäne, 1533 Z.) | Großer Refactor, Präsentationsschicht — drittgrößte Datei, Schwester zu #345/#346 (Befund #292). `UI`-API bleibt als Barrel unverändert. Browser-Smoke-Test. |
+| 4 | **#340** | Autotile-Auswahl-Funktion in `world.ts` + Tests | Pure Domäne, „erster Schritt" aus #256. Datengrundlage für Übergangs-Kacheln. |
+| 5 | **#343** | Sub-Tile-Kollision (runde/kleinere Hitboxen) | Pure Domäne, „vierter Schritt" aus #256. Reihenfolge innerhalb #256: nach #340. |
+| 6 | **#316** | Funkgerät: Befehlshistorie mit Pfeil-hoch | Klein, eigenständig, Maintainerin wünscht „gern früh". |
+| 7 | **#310** | In Dialogen zurückblättern (Lese-Rückblick) | Eigenständige UX, `ui.ts`/`overlaykbd.ts`. |
+| 8 | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf erledigtem #325/#326 auf; arbeitet mit `questIdx`/`questStep`-Lesezeichen. Die ID-basierte Save (#353) ist jetzt vorhanden. |
+| 9 | **#306** | Mehrere Spielstände / Save-Slots (lokal) | SaveStore-Arbeit → Save-Format (#353) sitzt jetzt. |
+| 10 | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Explorations-/Lern-Ticket, niedrige Dringlichkeit. Baut auf erledigtem #325 + #331. |
+| 11 | **#357** | Entity-Registry auf Objekte/Interaktables erweitern (Folge zu #349) | Baut auf der Entity-Registry (#349, erledigt) auf. Kein Blocker (reine Skalierungs-Verbesserung) — erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt. Normaler Ablauf über `main`. |
+| 12 | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen**, nicht selbst das Design festlegen. Übergreift #223. |
+| 13 | **#317** ⚠️ | EPIC: Komfort-Funktionen im Shop kaufen | **Epic — NICHT umsetzen.** Beim Bearbeiten in session-große Kinder-Tickets zerlegen (Shop-Redesign, Kauf-/Freischalt-Mechanik, einzelne Funktionen, Quest-Hinweise), Übersichts-Kommentar posten, Epic auf done schließen. #316 ist ein Baustein davon. |
+| 14 | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — laut Ticket-Anweisung erst angehen, wenn der restliche Backlog weitgehend erledigt ist (sonst veraltet das Review sofort). Anlegendes Review: erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

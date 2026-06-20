@@ -39,7 +39,8 @@ import { terraformCommand } from "./sim/terraform";
 import { gitCommand } from "./sim/git";
 import { argocdCommand, reconcileAutoSync, cloneArgoApp } from "./sim/argocd";
 import { podMetrics as obsPodMetrics, nodeMetrics as obsNodeMetrics, scrapeTargets as obsScrapeTargets, alerts as obsAlerts, evaluateAlerts as obsEvaluateAlerts } from "./sim/observability";
-import { randSuffix, pad, table, makePodName } from "./sim/util";
+import { glabCommand } from "./sim/glab";
+import { randSuffix, makePodName } from "./sim/util";
 
   class Sim implements ClusterState {
     // `!` = definite assignment: alle Felder werden in reset() gesetzt, das der
@@ -515,7 +516,7 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
           case "terraform": out = terraformCommand(this, tokens, raw); break;
           case "git": out = gitCommand(this, tokens, raw); break;
           case "argocd": out = argocdCommand(this, tokens); break;
-          case "glab": out = this._glab(tokens); break;
+          case "glab": out = glabCommand(this, tokens); break;
           case "ls": out = this._ls(); break;
           case "cat": out = this._cat(tokens); break;
           case "clear": return { output: null, error: false, clear: true };
@@ -608,56 +609,10 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
     scrapeTargets(): ScrapeTarget[] { return obsScrapeTargets(this); }
     alerts(): Alert[] { return obsAlerts(this); }
 
-    /** Baut eine Pipeline für den aktuellen Branch und lässt ihre Stages laufen. */
-    _runPipeline() {
-      const g = this.git;
-      const onMain = g.branch === "main";
-      const stages = [
-        { name: "build", status: "passed" },
-        { name: "test", status: "passed" },
-        { name: "deploy", status: onMain ? "passed" : "skipped" }, // 'only: main' – Feature-Branches werden nicht ausgerollt
-      ];
-      const p = { id: 1001 + this.ci.pipelines.length, ref: g.branch, status: "passed", stages, created: this.clock };
-      this.ci.pipelines.push(p);
-      // Die deploy-Stage rollt den Dienst automatisch in den Cluster (nur auf main).
-      if (this.ci.deploy && onMain) {
-        const d = this.ci.deploy;
-        if (!this.deployments.some(x => x.name === d.name)) {
-          this.deployments.push(this._makeDeployment(d.name, d.image, d.replicas));
-        }
-      }
-      return p;
-    }
-
-    /* ===================== glab (GitLab CLI) ===================== */
-    _glab(t: string[]) {
-      if (t[1] !== "ci") return this._err("Der Simulator kann nur 'glab ci ...'.", "z.B. 'glab ci status' oder 'glab ci list'.");
-      const action = t[2];
-
-      if (action === "status" || action === "view") {
-        const p = this.ci.pipelines[this.ci.pipelines.length - 1];
-        if (!p) return this._err("Keine Pipeline gefunden.", "Eine Pipeline entsteht beim 'git push' – wenn eine .gitlab-ci.yml im Repo liegt.");
-        const icon = (s: string) => (s === "passed" ? "✓" : s === "skipped" ? "–" : "•");
-        const lines = [
-          "Pipeline #" + p.id + "  (Branch " + p.ref + ")   Status: " + (p.status === "passed" ? "passed ✅" : p.status),
-        ];
-        for (const s of p.stages) lines.push("  " + icon(s.status) + " " + pad(s.name, 8) + s.status);
-        if (p.stages.some(s => s.name === "deploy" && s.status === "passed")) {
-          lines.push("🚀 Die deploy-Stage hat den Dienst automatisch ausgerollt – schau mit 'kubectl get pods'.");
-        } else if (p.ref !== "main") {
-          lines.push("ℹ️  deploy übersprungen ('only: main') – auf diesem Branch wird gebaut & getestet, aber nicht deployt.");
-        }
-        return lines.join("\n");
-      }
-
-      if (action === "list") {
-        if (!this.ci.pipelines.length) return "Keine Pipelines. (Entstehen beim 'git push' mit .gitlab-ci.yml im Repo.)";
-        return table(["ID", "BRANCH", "STATUS"],
-          this.ci.pipelines.slice().reverse().map(p => ["#" + p.id, p.ref, p.status]));
-      }
-
-      return this._err("glab ci: unbekannte Aktion '" + (action || "") + "'", "z.B. 'glab ci status' oder 'glab ci list'.");
-    }
+    // glab/CI (GitLab-CLI + Pipeline-Maschinerie) liegt seit #385 in ./sim/glab.ts –
+    // die letzte Nicht-Befehls-Familie des sim.ts-Splits (#346). `exec` ruft
+    // glabCommand(this, …); die Pipeline startet beim `git push` direkt aus sim/git.ts
+    // (runPipeline), nicht mehr über eine Host-Methode hier.
 
     _ls() {
       const names = Object.keys(this.files);
