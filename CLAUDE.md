@@ -97,7 +97,15 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/runtime.ts`](src/runtime.ts) | Anwendung | Laufzeit-Singletons (ersetzt den früheren `window`-Shim; bricht Import-Zyklen) |
 | [`src/devpanel.ts`](src/devpanel.ts) | Anwendung | Dev-/Test-Panel (#325): klickbares Panel zum Springen auf beliebigen Quest-Stand (Jump-API #329), Erststart und Reset – nur aktiv wenn `__KQ_DEVPANEL__` true (Devpanel-Build #331); Phaser-frei, DOM-Anbindung in `ui.ts` |
 | [`src/store.ts`](src/store.ts) | Persistenz | SaveStore (kapselt localStorage; Andockpunkt fürs spätere Backend) |
-| [`src/scenes.ts`](src/scenes.ts) | Präsentation | Phaser-Welt: Karte, Cluster-Sync, Piraten, Krake |
+| [`src/scenes.ts`](src/scenes.ts) | Präsentation | **Barrel** (#345): bündelt die Szenen-Module zu `KQScenes` (von `main.ts` registriert). Die 7 Phaser-Szenen liegen seit dem Split eine Datei je Klasse unter `src/scenes/`, gemeinsame Helfer in `src/scenes/shared.ts` |
+| [`src/scenes/shared.ts`](src/scenes/shared.ts) | Präsentation | Geteilte Szenen-Bausteine (#345): Karten-/Tile-Konstanten, die In-Welt-Pixel-Bitmap-Font (#188, `buildPixelFont`/`pixelText`), Orts-Schilder (#254, `buildSign`), schwebende Belohnungstexte (`floatPixelText`) und das datengesteuerte Insel-NPC-Rendering (#349, `spawnIslandNpc`) |
+| [`src/scenes/BootScene.ts`](src/scenes/BootScene.ts) | Präsentation | Lädt alle Grafiken + Frame-Slicing aus `ASSET_MANIFEST`, backt Font/Münz-Icon, startet dann `World` (bzw. `MapTest` via `?maptest`) |
+| [`src/scenes/WorldScene.ts`](src/scenes/WorldScene.ts) | Präsentation | Port Kubernia (mit Abstand die größte): Karte, Spieler:in/NPCs, Cluster→Welt-Sync, Piraten-Überfälle, Hacker-Krake, Hafen-Wirtschaft, Warps in die Insel-/Innen-Szenen |
+| [`src/scenes/InteriorScene.ts`](src/scenes/InteriorScene.ts) | Präsentation | Betretbarer Hausinnenraum (#6), von `WorldScene.enterInterior()` gestartet; `INTERIORS` legt die Möbel je Haus-Thema fest |
+| [`src/scenes/ArchipelScene.ts`](src/scenes/ArchipelScene.ts) | Präsentation | GitOps-Archipel-Insel (#92); Geometrie/Kollision pur aus [`archipel.ts`](src/archipel.ts) |
+| [`src/scenes/LighthouseScene.ts`](src/scenes/LighthouseScene.ts) | Präsentation | Monitoring-Leuchtturm-Klippe (#111); Geometrie/Kollision pur aus [`lighthouse.ts`](src/lighthouse.ts) |
+| [`src/scenes/WarehouseScene.ts`](src/scenes/WarehouseScene.ts) | Präsentation | Lagerhallen-Viertel/Hafenkai (#124); Geometrie/Kollision pur aus [`warehouse.ts`](src/warehouse.ts) |
+| [`src/scenes/TilemapTestScene.ts`](src/scenes/TilemapTestScene.ts) | Präsentation | Tiled-Loader-Testszene (#191), erreichbar über `?maptest` |
 | [`src/ui.ts`](src/ui.ts) | Präsentation | Dialoge, Funkgerät, Shop, Quiz, Minispiel |
 | [`src/sfx.ts`](src/sfx.ts) | Präsentation | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
 | [`src/assets-data.ts`](src/assets-data.ts) | Assets | `ASSET_MANIFEST` – die eine Quelle pro Grafik (Key/Pfad/Typ/Spalten); BootScene leitet Laden+Slicing daraus ab (Host-Build: eigene Dateien; Offline-Build inlinet sie als Data-URI) |

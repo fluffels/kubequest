@@ -14,8 +14,10 @@
 // Wächter bei Stardew-Scope mitwächst: jedes NEUE Domänen-Modul ist automatisch geschützt,
 // ohne dass man es hier nachträgt.
 
-/** Präsentationsschicht – darf Phaser + alles andere anfassen. */
-const PRESENTATION = "^src/(scenes|ui|sfx)\\.ts$";
+/** Präsentationsschicht – darf Phaser + alles andere anfassen. Deckt sowohl die
+ *  Einzeldatei (src/ui.ts, src/sfx.ts) als auch die Modul-Ordner ab (src/scenes/*
+ *  seit dem scenes.ts-Split #345; analog künftig src/ui/*). */
+const PRESENTATION = "^src/(scenes|ui|sfx)(\\.ts$|/)";
 /** Anwendungs-/Persistenzschicht – muss phaser- und präsentationsfrei bleiben. */
 const APPLICATION = "^src/(game|runtime|devpanel|store)\\.ts$";
 /** Einstieg/Assets – main bootet bewusst Phaser + Szenen; assets-data hält PNG-Imports. */
