@@ -17,8 +17,8 @@ Bevor irgendein Ticket dieser Liste angefasst wird, **zuerst zweifeln** — das 
 
 Diese Tickets sind **keine „bau-X"-Tickets**, sondern Entscheidungen, die man *reviewt und offen hält* — sie färben alle anderen:
 
-- **#355** ⚠️ — **Auslieferungsform: Web-App vs. Desktop-Download (wie Stardew).** Bewusst **nicht** auf eine Option festlegen. Die alten Spikes #83/#197 (Tauri, geschlossen) nehmen die Web-Basis als gesetzt an — genau das hier anzweifeln. Recherchieren, ob ein Spiel dieser Größe als reine Web-Anwendung überhaupt trägt; Ergebnis als **ergebnisoffener ADR** (`docs/adr/0005-auslieferungsform.md`) mit Trigger, *wann* neu zu entscheiden ist. Kein Code, kein Lock-in. → bei jeder save-/asset-/build-nahen Änderung mitdenken.
-- **#400** ⚠️ — **Backend-Frage: Braucht KubeQuest bei Stardew-Scope ein Backend?** Recherchieren, wofür vergleichbare große Singleplayer-Spiele ein Backend nutzen (Cloud-Saves, Achievements, Updates, DLC) und was davon für KubeQuest realistisch ist. Save-Architektur bei echter Stardew-Größe prüfen (reicht IndexedDB?). Ergebnis als **ergebnisoffener ADR** (`docs/adr/0006-backend-und-skalierung.md`) mit Re-Evaluierungs-Trigger. Kein Code. → verwandt mit #355; bei jeder Save-/Asset-/Build-Änderung mitdenken.
+- **#355** ⚠️ — **Auslieferungsform: Web-App vs. Desktop-Download (wie Stardew).** Bewusst **nicht** auf eine Option festlegen. Die alten Spikes #83/#197 (Tauri, geschlossen) nehmen die Web-Basis als gesetzt an — genau das hier anzweifeln. Recherchieren, ob ein Spiel dieser Größe als reine Web-Anwendung überhaupt trägt; Ergebnis als **ergebnisoffener ADR** (`docs/adr/0005-auslieferungsform.md`) mit Trigger, *wann* neu zu entscheiden ist. Kein Code, kein Lock-in. → bei jeder save-/asset-/build-nahen Änderung mitdenken. **Backend-Implikation liegt jetzt in [ADR 0006](adr/0006-backend-und-skalierung.md):** Desktop-via-Plattform liefert Cloud-Save/Achievements/Updates gratis, eine reine Web-Auslieferung nicht — die Auslieferungs-Entscheidung trägt also auch die Backend-Frage. ADR 0006 stuft zudem den Single-File-Offline-Build vom „Kern-Wert" zur größen-abhängigen Option herab (hier mitentscheiden).
+- **#400 ✅ erledigt (2026-06-21) → [ADR 0006 – Backend & Skalierung](adr/0006-backend-und-skalierung.md).** Befund: **kein eigenes Backend** bei Stardew-Scope nötig — Cloud-Save/Achievements/Updates kommen über die **Vertriebsplattform** (→ hängt an #355); die Entscheidung bleibt über die Re-Eval-Trigger im ADR offen. Korrigiert nebenbei die IndexedDB-Begründung von ADR 0004 (echter Engpass ist **Eviction**, nicht Save-Kapazität) → Folge-Ticket **#401** (`navigator.storage.persist()`, in der Tabelle unten). Das **lebende** Dokument ist jetzt ADR 0006, nicht mehr dieses Ticket.
 
 ## Was „nächstes Architektur" heißt
 
@@ -65,14 +65,15 @@ Erst **danach** der große Content-Ausbau (Quests/Orte/Charaktere) – auf dem d
 | 2 | Qualitätsnetz | **#398** | CI: GitHub-Actions v4→v5 (Node-20-Deprecation) | Reine CI-Wartung (Deprecation-Warnungen), unabhängig + schnell; hält die Pipeline grün, bevor die Splits viel CI-Last erzeugen. |
 | 3 | Splits | **#397** | sim/kubectl.ts aufteilen (1220 LOC God-File) | **Befund aus #390** (Dateigröße-Budget 800). Größte verbliebene Datei; analog zum sim.ts-Split #346 und zum WorldScene.ts-Split #393. Nach dem Split den Allowlist-Eintrag in `scripts/check-size.mjs` entfernen. |
 | 4 | Dev-Umgebung | **#388** | devcontainer + docker-compose (nur Dev) | Reproduzierbare Umgebung; baut auf #387 (✓ erledigt). Kein Widerspruch zu ADR 0002 (reine Dev-Tooling, nicht das Spiel). |
-| 5 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
-| 6 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
-| 7 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
-| 8 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
-| 9 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
-| 10 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
-| 11 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
-| 12 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
+| 5 | Skalierungs-Enabler | **#401** | `navigator.storage.persist()` + Quota-Monitoring (Eviction-Schutz) | **Befund aus ADR 0006/#400.** Härtet das Save-Fundament (#350 ✓), auf dem alle Skalierung steht: schützt Stände vor stillem LRU-Löschen durch den Browser. Klein, unabhängig, client-seitig — vor der Asset-/Entity-Erweiterung, weil Datenverlust-Schutz dringlicher ist als Optimierung. |
+| 6 | Skalierungs-Enabler | **#357** | Entity-Registry auf Objekte/Interaktables (Folge zu #349) | Erst sinnvoll, wenn ein Bereich viele platzierte Objekte/Trigger bekommt — vor dem Content-Push. |
+| 7 | Skalierungs-Enabler | **#198** | Lazy-Asset-Loading pro Insel/Szene *(reaktiviert)* | Vor dem großen Asset-Wachstum, sonst eager-Lade-Bottleneck. |
+| 8 | Skalierungs-Enabler | **#339** | Texture-Atlas statt Einzel-Assets *(reaktiviert)* | Draw-Calls/Ladezeit bei vielen Sprites; nach Lazy-Loading. |
+| 9 | Features | **#306** | Mehrere Spielstände / Save-Slots | Baut auf IndexedDB (#350 ✓ erledigt). |
+| 10 | Features | **#332** | Abgeschlossene Quests wiederspielen (Sandbox) | Baut auf #325/#326; ID-basierte Save (#353) vorhanden. |
+| 11 | Features | **#334** | Dev-Panel per Docker, Passwort zur Laufzeit | Niedrige Dringlichkeit; baut auf #325/#331. |
+| 12 | Sonderfall | **#314** ⚠️ | Zentrales Feier-Popup-System (Konfetti + Spruch) | **Optik-Ticket: erst Vorstellung + Referenzbilder mit der Maintainerin abstimmen.** Übergreift #223. |
+| 13 | Sonderfall | **#293** ⚠️ | Spiellogik-Review (anlegend) | **ZULETZT** — erst wenn der restliche Backlog weitgehend leer ist (sonst veraltet das Review sofort). Erzeugt Folge-Tickets, kein direkter Fix. |
 
 ## Zurückgestellt — werden ignoriert
 

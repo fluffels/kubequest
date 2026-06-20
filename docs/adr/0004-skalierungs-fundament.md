@@ -87,3 +87,4 @@ localStorage: 5–10 MB je Browser. Stardew-Scale-Spielstände (Inventar, Welt-Z
 - [ADR 0001 – Engine-Wahl Phaser 3](0001-engine-phaser.md): Re-Eval-Trigger um „Content-Pipeline erfordert eigenen Server-Prozess" ergänzt
 - [ADR 0002 – Kein Backend](0002-kein-backend-keine-db.md): bleibt gültig; Content-as-Data und Entity-Registry sind Client-seitig umsetzbar
 - [ADR 0003 – Kein Multiplayer](0003-multiplayer-coop-out-of-scope.md): bleibt gültig
+- [ADR 0006 – Backend & Skalierung](0006-backend-und-skalierung.md) (#400): **präzisiert die IndexedDB-Begründung oben.** Der Stardew-Scope-Engpass ist *nicht* die Save-Kapazität (ein Stardew-Save ist selbst nur ~5–10 MB), sondern **Eviction** (der Browser löscht best-effort-Stände per LRU). IndexedDB allein schützt nicht – nötig ist `navigator.storage.persist()` (Folge-Ticket #401).

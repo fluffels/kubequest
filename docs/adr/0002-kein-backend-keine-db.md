@@ -42,6 +42,8 @@ Diese Entscheidung wird **neu bewertet**, sobald eines davon zwingend wird:
 
 Erst dann ist Backend + DB (und ggf. ein Service-Split) erneut zu prüfen – als bewusste, dokumentierte Neuentscheidung, nicht als schleichende Erweiterung.
 
+> **Vertiefung bei Stardew-Scope:** [ADR 0006](0006-backend-und-skalierung.md) (#400) stresstestet diese Entscheidung gegen echten Stardew-Scope. Ergebnis: trägt – mit der Präzisierung, dass die „Backend-Features" (Cloud-Save/Achievements/Updates) bei dieser Größe über die **Vertriebsplattform** (#355) kommen, nicht über Eigenbau. Die Backend-Frage ist daher **nicht unabhängig von der Auslieferungsform** (#355) entscheidbar.
+
 ## Bestätigte Re-Evaluierung – 2026-06-19 (#291)
 
 Alle drei Trigger geprüft – **kein Trigger erfüllt**, Entscheidung bestätigt:
