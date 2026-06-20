@@ -17,13 +17,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "typecheck:strict": "tsc -p tsconfig.strict.json"
+    "typecheck:strict": "tsc -p tsconfig.strict.json",
+    "check:arch": "depcruise src --config .dependency-cruiser.cjs"
   },
   "dependencies": {
     "phaser": "^3.87.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
+    "dependency-cruiser": "^17.4.3",
     "typescript": "^5.6.0",
     "vite": "^5.4.0",
     "vite-plugin-singlefile": "^2.0.0",

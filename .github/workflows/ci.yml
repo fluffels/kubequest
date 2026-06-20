@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck (strict)
         run: npm run typecheck
 
+      - name: Architektur-Wächter (Schichtung, #347)
+        run: npm run check:arch
+
       - name: Host-Build
         run: npm run build
 
