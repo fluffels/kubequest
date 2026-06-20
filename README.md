@@ -16,7 +16,7 @@ Ein **2D-Lernspiel** (gebaut mit **Phaser 3**) für Docker, Kubernetes, Helm, Te
 
 ## Spielstart
 
-**Entwickeln:** einmalig `npm install`, dann `npm run dev` – startet einen lokalen Server mit Auto-Reload (Vite). Im Browser unter der angezeigten Adresse öffnen.
+**Entwickeln:** einmalig `npm install`, dann `npm run dev` – startet den lokalen Vite-Server. Im Browser unter der angezeigten Adresse öffnen. CSS-Änderungen werden live übernommen; nach Code-Änderungen kurz mit **F5** neu laden (ein Toast erinnert daran, Spielstand bleibt erhalten).
 
 **Offline spielen / weitergeben:** `npm run build:offline` erzeugt **eine einzige, in sich geschlossene Datei** `dist-offline/index.html` (Code, Grafiken und Engine sind eingebettet). Die kann man **doppelklicken** – läuft komplett offline, ohne Server.
 
@@ -140,14 +140,14 @@ Das Spiel deckt aktuell **Phase 1 – das Fundament** ab. Senior wird man durch 
 | 4 | GitOps (Argo CD), App-of-Apps, Pull-Prinzip | ✅ im Spiel: Insel „GitOps-Archipel“ (Anleger/Warp per Steg) mit GitOps-Lotsin Argo – 4 Quests: GitOps-Prinzip & Single Source of Truth → Argo-CD-Application anlegen & syncen (Pull) → Self-Heal & Drift → App-of-Apps |
 | 5 | Observability: Prometheus, Grafana, Logs, Alerts | ✅ im Spiel: Klippe „Monitoring-Leuchtturm“ (Aufgang/Warp am Turmfuß, Dashboard-Tafel & Alarm-Glocke) mit Leuchtturmwärterin Lumi – 4 Quests: Metriken scrapen (Prometheus & `kubectl top`, ServiceMonitor) → Grafana-Dashboard (Datasource & Panels lesen) → Logs lesen (`kubectl logs`, `-f`, `--previous`) → Alerts & PrometheusRule (feuern, verstehen, auflösen); dazu Observability-Drills & Quiz-Karten |
 | 6 | RBAC, ServiceAccounts, Pod-Security | 🔜 geplant: „Wachturm-Quartier“ |
-| 7 | StatefulSets, Volumes, Backups, Datenbanken im Cluster | 🟡 Region begehbar: Hafenkai „Lagerhallen-Viertel“ (Holz-Anleger am Westkai, Verladekräne, Frachtcontainer-Stapel) + Sim-Grundlage (StatefulSet/PVC/PV/StorageClass); NPC + stateful-Quests folgen |
+| 7 | StatefulSets, Volumes, Backups, Datenbanken im Cluster | 🟡 im Spiel: Hafenkai „Lagerhallen-Viertel“ (Holz-Anleger am Westkai, Verladekräne, Frachtcontainer-Stapel) mit Speicher-Verwalter **Knut** – 2 Quests: StatefulSet & stabile Identität → PVC/PV & StorageClass (Speicher anfordern); Backups & DB-Betrieb noch offen |
 | 8 | Troubleshooting-Methodik (CrashLoop, ImagePull, Pending, Service-Endpoints, OOMKilled …) | ✅ im Spiel („Sturm-Saison“ + Service-Debugging + Resource-Management: 5 Quests + Zufalls-Stürme) |
 | 9 | Terraform-Module, Remote State, Cloud-Provider | 🔜 geplant: „Expeditions-Flotte“ |
 | 10 | Eigenes Backend für das Spiel bauen & selbst in K8s deployen | 🔜 der Meister-Abschluss: Spiel trifft Realität |
 
 ## Roadmap (nächste Ausbaustufen)
 
-- Weitere Lernpfad-Inseln (siehe Tabelle oben) – Monitoring-Leuchtturm, Wachturm-Quartier u.a., je Insel eigene NPCs, Quests und Drills
+- Weitere Lernpfad-Inseln (siehe Tabelle oben) – **Wachturm-Quartier** (RBAC, Phase 6) und Ausbau des Lagerhallen-Viertels (Backups/Datenbank-Betrieb) u.a., je Insel eigene NPCs, Quests und Drills
 - **DNS** als letzter offener Baustein von Phase 3 (Ingress, TLS & NetworkPolicies sind schon im Spiel)
 - **Echter Modus**: dieselben Quests gegen ein lokales kind/minikube-Cluster
 - Mehr Grafik: weitere CC0-Packs, z.B. Innenräume für betretbare Gebäude
