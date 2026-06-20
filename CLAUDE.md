@@ -106,7 +106,18 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/scenes/LighthouseScene.ts`](src/scenes/LighthouseScene.ts) | Präsentation | Monitoring-Leuchtturm-Klippe (#111); Geometrie/Kollision pur aus [`lighthouse.ts`](src/lighthouse.ts) |
 | [`src/scenes/WarehouseScene.ts`](src/scenes/WarehouseScene.ts) | Präsentation | Lagerhallen-Viertel/Hafenkai (#124); Geometrie/Kollision pur aus [`warehouse.ts`](src/warehouse.ts) |
 | [`src/scenes/TilemapTestScene.ts`](src/scenes/TilemapTestScene.ts) | Präsentation | Tiled-Loader-Testszene (#191), erreichbar über `?maptest` |
-| [`src/ui.ts`](src/ui.ts) | Präsentation | Dialoge, Funkgerät, Shop, Quiz, Minispiel |
+| [`src/ui.ts`](src/ui.ts) | Präsentation | **Orchestrator/Barrel** (#356): deklariert den veränderlichen UI-Zustand (`this.*`) und komponiert das öffentliche `UI`-Objekt aus den Domänen-Bündeln unter `src/ui/` (`export const UI = { …state, ...overlayUI, ...dialogUI, … }`). API unverändert → `main.ts`/`scenes/*` importieren weiter `{ UI }` |
+| [`src/ui/shared.ts`](src/ui/shared.ts) | Präsentation | Geteilte UI-Helfer (#356): `$`/`esc`/`NPCS`/`SMALLTALK`/`shuffled`/`CMD_MAX_ATTEMPTS`, vorab geladene Porträt-/Shop-Bilder (`sheetImgs`) + der `part()`-Helper, der die Methodenbündel typisiert (`this = UISelf`, permissiv, ohne Methoden-Signaturen zu verlieren – ThisType-Muster) |
+| [`src/ui/overlay.ts`](src/ui/overlay.ts) | Präsentation | UI-Bündel `overlayUI` (#356): Event-Delegation, Blockierung, generische Modal-Tastatur (#283), Menü/Pause |
+| [`src/ui/hud.ts`](src/ui/hud.ts) | Präsentation | UI-Bündel `hudUI` (#356): HUD/Toasts/Alarm, Interaktion, Tastatur-Navigation der Antwort-Buttons |
+| [`src/ui/quest.ts`](src/ui/quest.ts) | Präsentation | UI-Bündel `questUI` (#356): Quest-Maschine + Begrüßung/Intro (#288) |
+| [`src/ui/dialog.ts`](src/ui/dialog.ts) | Präsentation | UI-Bündel `dialogUI` (#356): NPC-/Bo-Dialoge |
+| [`src/ui/radio.ts`](src/ui/radio.ts) | Präsentation | UI-Bündel `radioUI` (#356): Funkgerät-Terminal (teach/drill/terminal) + freies Üben |
+| [`src/ui/minigame.ts`](src/ui/minigame.ts) | Präsentation | UI-Bündel `minigameUI` (#356): Stapel-Minispiel |
+| [`src/ui/questlog.ts`](src/ui/questlog.ts) | Präsentation | UI-Bündel `questlogUI` (#356): Logbuch-Übersicht & -Detail (#326); pure Logik liegt in [`questlog.ts`](src/questlog.ts) |
+| [`src/ui/shop.ts`](src/ui/shop.ts) | Präsentation | UI-Bündel `shopUI` (#356): Shop |
+| [`src/ui/quiz.ts`](src/ui/quiz.ts) | Präsentation | UI-Bündel `quizUI` (#356): Krabben-Quiz (Spaced-Repetition) |
+| [`src/ui/save.ts`](src/ui/save.ts) | Präsentation | UI-Bündel `saveUI` (#356): Spielstand-Export/Import + `resetGame` |
 | [`src/sfx.ts`](src/sfx.ts) | Präsentation | WebAudio-Sounds (synthetisiert, keine Audio-Dateien) |
 | [`src/assets-data.ts`](src/assets-data.ts) | Assets | `ASSET_MANIFEST` – die eine Quelle pro Grafik (Key/Pfad/Typ/Spalten); BootScene leitet Laden+Slicing daraus ab (Host-Build: eigene Dateien; Offline-Build inlinet sie als Data-URI) |
 
