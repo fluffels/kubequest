@@ -1,6 +1,6 @@
 # Architektur-Reihenfolge
 
-> **Stand: 2026-06-21.** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
+> **Stand: 2026-06-21 (aktualisiert: 2026-06-21).** Kuratierte Umsetzungs-Reihenfolge für alle offenen Tickets mit Label `area:architektur`.
 > Diese Liste **überschreibt** für Architektur-Tickets die generische Board-Auswahl (Prio→Nummer aus AGENTS.md):
 > Die Reihenfolge hier ist **abhängigkeitsbewusst** sortiert, nicht nur nach Prio-Label.
 
@@ -18,6 +18,7 @@ Bevor irgendein Ticket dieser Liste angefasst wird, **zuerst zweifeln** — das 
 Diese Tickets sind **keine „bau-X"-Tickets**, sondern Entscheidungen, die man *reviewt und offen hält* — sie färben alle anderen:
 
 - **#355** ⚠️ — **Auslieferungsform: Web-App vs. Desktop-Download (wie Stardew).** Bewusst **nicht** auf eine Option festlegen. Die alten Spikes #83/#197 (Tauri, geschlossen) nehmen die Web-Basis als gesetzt an — genau das hier anzweifeln. Recherchieren, ob ein Spiel dieser Größe als reine Web-Anwendung überhaupt trägt; Ergebnis als **ergebnisoffener ADR** (`docs/adr/0005-auslieferungsform.md`) mit Trigger, *wann* neu zu entscheiden ist. Kein Code, kein Lock-in. → bei jeder save-/asset-/build-nahen Änderung mitdenken.
+- **#400** ⚠️ — **Backend-Frage: Braucht KubeQuest bei Stardew-Scope ein Backend?** Recherchieren, wofür vergleichbare große Singleplayer-Spiele ein Backend nutzen (Cloud-Saves, Achievements, Updates, DLC) und was davon für KubeQuest realistisch ist. Save-Architektur bei echter Stardew-Größe prüfen (reicht IndexedDB?). Ergebnis als **ergebnisoffener ADR** (`docs/adr/0006-backend-und-skalierung.md`) mit Re-Evaluierungs-Trigger. Kein Code. → verwandt mit #355; bei jeder Save-/Asset-/Build-Änderung mitdenken.
 
 ## Was „nächstes Architektur" heißt
 
