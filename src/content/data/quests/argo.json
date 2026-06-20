@@ -1,0 +1,588 @@
+[
+  {
+    "id": "gitops-argocd-intro",
+    "title": "Das Logbuch der Insel",
+    "giver": "argo",
+    "rewardXp": 40,
+    "rewardCoins": 30,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Willkommen auf dem <b>GitOps-Archipel</b>! Ich bin <b>Argo</b>, die Lotsin hier draußen. Schön ruhig, was? Das hat einen Grund.",
+          "Drüben im Hafen rennst du ans Funkgerät und rufst dem Cluster jeden Befehl einzeln zu – <code>apply</code> hier, <code>scale</code> da. Sogar deine Pipeline <b>schiebt</b> den neuen Stand von außen hinein. Funktioniert. Aber: Wer weiß morgen noch, was wirklich laufen SOLL?",
+          "Auf meiner Insel machen wir es andersherum. Hier gibt es <b>ein</b> Logbuch – und das Logbuch hat immer recht."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Das Logbuch ist dein <b>Git-Repo</b>. Dort hinein schreibst du den <b>Soll-Zustand</b> – deklarativ als Manifeste, genau wie Ada es dir beigebracht hat: welche Dienste, welche Version, wie viele Kopien.",
+          "Git ist damit die <b>einzige Quelle der Wahrheit</b> (engl. <i>single source of truth</i>). Nicht der Cluster, nicht dein Gedächtnis, nicht ein mühsam zusammengeklicktes Etwas – sondern <b>das Repo</b>. Willst du wissen, was laufen soll? Lies das Logbuch."
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "argo",
+        "reviewId": "q-gitops-truth",
+        "q": "Was ist bei GitOps die <b>einzige Quelle der Wahrheit</b> für den Soll-Zustand?",
+        "options": [
+          {
+            "t": "Das Git-Repo – dort steht deklarativ, was laufen soll.",
+            "ok": true,
+            "reply": "Genau! Ein Blick ins Logbuch und du weißt, was sein soll – kein „ich glaube, da lief noch irgendwas…“."
+          },
+          {
+            "t": "Der aktuelle Zustand im Cluster – was läuft, ist die Wahrheit.",
+            "ok": false,
+            "reply": "Vorsicht: Das ist der <b>Ist</b>-Zustand, und der driftet. Jemand ändert von Hand etwas, ein Pod stirbt … Die Wahrheit über das SOLL steht im Repo, nicht im Cluster."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Und jetzt der Clou – das <b>Pull-Prinzip</b>. Drüben <b>pusht</b> jemand von außen in den Cluster: du am Funkgerät, oder die Pipeline. Der Cluster ist passiv, er lässt mit sich machen.",
+          "Hier wohnt ein Crewmitglied <b>im</b> Cluster: <b>Argo CD</b>, mein Namensvetter. Es schaut unermüdlich ins Logbuch und <b>zieht</b> sich den Soll-Zustand selbst heran (<i>pull</i>). Niemand drückt von außen etwas rein – der Cluster holt sich seine Wahrheit ab.",
+          "Push heißt also: von außen reingeschoben. Pull heißt: der Cluster zieht es sich selbst. Klingt nach einer Kleinigkeit – ist aber der ganze Unterschied."
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "argo",
+        "reviewId": "q-gitops-pull",
+        "q": "<b>Push</b>- gegen <b>Pull</b>-Deployment – was trifft zu?",
+        "options": [
+          {
+            "t": "Pull: ein Agent IM Cluster zieht den Soll-Zustand aus Git. Push: jemand von außen drückt ihn hinein (kubectl/Pipeline).",
+            "ok": true,
+            "reply": "Sitzt! Beim Pull lebt der Abgleich im Cluster und läuft von allein weiter – auch wenn niemand am Funkgerät sitzt."
+          },
+          {
+            "t": "Push und Pull sind nur zwei Wörter für dasselbe – am Ende läuft derselbe Befehl.",
+            "ok": false,
+            "reply": "Nein – die Richtung ist der Punkt: von außen hineindrücken (push) oder vom Cluster selbst abholen lassen (pull). Das verändert, wer die Kontrolle hat."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Drei Sätze zum Mitnehmen: <b>1.</b> Das Repo ist die einzige Quelle der Wahrheit. <b>2.</b> Der Soll-Zustand steht deklarativ darin. <b>3.</b> Der Cluster <b>zieht</b> ihn sich selbst – statt dass jemand pusht.",
+          "Das ist <b>GitOps</b>. Mehr Theorie brauchst du nicht – ab jetzt wird es praktisch. Komm wieder her, dann richten wir gemeinsam <b>Argo CD</b> ein und lassen es seine erste Application aus dem Logbuch ziehen. 🧭"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "gitops-self-sync",
+    "title": "Die selbstsegelnde Seekarte",
+    "giver": "argo",
+    "rewardXp": 55,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "scenario": {
+          "files": {
+            "application.yaml": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: hafen-lager\n  namespace: argocd\nspec:\n  project: default\n  source:                       # die Seekarte: Soll-Zustand im Git-Repo\n    repoURL: https://github.com/port-kubernia/seekarten.git\n    path: lager\n    targetRevision: main\n  destination:                  # wohin Argo den Soll-Zustand segelt\n    server: https://kubernetes.default.svc\n    namespace: hafen\n  # (noch) keine syncPolicy.automated → du synchronisierst von Hand:\n  #   argocd app sync hafen-lager"
+          },
+          "applyEffects": {
+            "application.yaml": {
+              "application": {
+                "name": "hafen-lager",
+                "repo": "https://github.com/port-kubernia/seekarten.git",
+                "path": "lager",
+                "autoSync": false,
+                "selfHeal": false,
+                "deployment": {
+                  "name": "hafen-lager",
+                  "image": "nginx:1.27",
+                  "replicas": 2
+                }
+              }
+            }
+          }
+        },
+        "lines": [
+          "Willkommen auf dem <b>GitOps-Archipel</b>, Lotse. Hier oben gilt eine eiserne Regel: <b>Git ist die Quelle der Wahrheit.</b> Was im Repo steht, IST der Soll-Zustand – kein Mensch tippt mehr <code>kubectl</code>-Befehle von Hand in den Cluster.",
+          "Mein Werkzeug heißt <b>Argo CD</b>. Du gibst ihm eine <b>Application</b> – einen Auftrag, der sagt: „Diese Seekarte (dieser Git-Pfad) gehört in jenen Hafen (Namespace).“ Argo vergleicht dann laufend <b>Soll</b> (Git) mit <b>Ist</b> (Cluster).",
+          "Ich habe dir den Auftrag schon hingelegt: <code>application.yaml</code>. Schau ihn dir an, bevor wir ihn ausrollen!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Die Seekarte lesen",
+        "tasks": [
+          {
+            "id": "t-argo-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-argo-cat",
+            "text": "Lies den Auftrag: <code>cat application.yaml</code>. Findest du <code>kind: Application</code> und den <code>source</code>-Block (das Git-Repo + der Pfad)?",
+            "accept": [
+              "^cat\\s+application\\.yaml$"
+            ],
+            "solution": "cat application.yaml",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Auftrag ausrollen",
+        "cmd": {
+          "id": "t-argo-apply",
+          "intro": "🆕 Die <b>Application</b> selbst ist ein ganz normales Manifest – du wendest sie mit dem längst bekannten <code>kubectl apply -f</code> an. Damit kennt Argo ab jetzt deinen Auftrag.",
+          "text": "Lege die Application im Cluster an: wende <code>application.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+application\\.yaml$"
+          ],
+          "solution": "kubectl apply -f application.yaml",
+          "hint": "Der vertraute Befehl aus dem Kartenhaus: kubectl apply -f <datei>."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Angelegt! Aber Achtung: Diese Seekarte hat <b>keine</b> automatische Sync-Politik. Argo <i>kennt</i> jetzt den Soll-Zustand, hat ihn aber noch <b>nicht</b> in den Cluster gesegelt. Lass uns nachschauen, was Argo über den Auftrag weiß."
+        ]
+      },
+      {
+        "type": "terminal",
+        "unlockAbbrev": "argocd-app-list",
+        "brief": "Was sagt Argo?",
+        "tasks": [
+          {
+            "id": "t-argo-list",
+            "text": "Verschaff dir den Überblick: <code>argocd app list</code>. In der Spalte SYNC STATUS steht <code>OutOfSync</code> – Ist und Soll klaffen noch auseinander.",
+            "accept": [
+              "^argocd\\s+app\\s+(list|ls)$"
+            ],
+            "solution": "argocd app list",
+            "hint": "argocd app list (oder ls)."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "In die Akte schauen",
+        "cmd": {
+          "id": "t-argo-get",
+          "intro": "🆕 Neuer Befehl: <code>argocd app get &lt;name&gt;</code> – die volle Akte einer Application: <b>Sync Status</b> (Synced/OutOfSync) und <b>Health</b> (läuft die Workload gesund?).",
+          "text": "Öffne die Akte von <code>hafen-lager</code>. Lies Sync Status (noch <b>OutOfSync</b>) und Health.",
+          "accept": [
+            "^argocd\\s+app\\s+get\\s+hafen-lager$"
+          ],
+          "check": "gitops-self-sync/t-argo-get",
+          "solution": "argocd app get hafen-lager",
+          "hint": "argocd app get <name> – den Namen zeigt 'argocd app list'."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "<b>OutOfSync</b> heißt: Im Git steht etwas, das der Cluster noch nicht hat (hier: das Deployment <code>hafen-lager</code> fehlt). Weil diese Application keinen Auto-Sync hat, segelst <b>du</b> den Soll-Zustand jetzt von Hand in den Cluster.",
+          "Das ist das <b>Pull-Prinzip</b>: Argo <i>zieht</i> sich den im Git deklarierten Stand – niemand <i>pusht</i> von außen in den Cluster."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Soll in den Cluster ziehen",
+        "cmd": {
+          "id": "t-argo-sync",
+          "intro": "🆕 Neuer Befehl: <code>argocd app sync &lt;name&gt;</code> – Argo zieht den im Git deklarierten Soll-Zustand in den Cluster (Pull) und legt die fehlenden Ressourcen an.",
+          "text": "Synchronisiere <code>hafen-lager</code> – und schau danach, wie das Deployment entsteht!",
+          "accept": [
+            "^argocd\\s+app\\s+sync\\s+hafen-lager$"
+          ],
+          "check": "gitops-self-sync/t-argo-sync",
+          "solution": "argocd app sync hafen-lager",
+          "hint": "argocd app sync <name>."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Verifizieren",
+        "tasks": [
+          {
+            "id": "t-argo-verify",
+            "text": "Beweis: <code>kubectl get deployments</code> – <code>hafen-lager</code> läuft jetzt, genau wie die Seekarte es deklariert.",
+            "accept": [
+              "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
+            ],
+            "check": "gitops-self-sync/t-argo-verify",
+            "solution": "kubectl get deployments",
+            "hint": "kubectl get deployments (oder deploy)."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "argo",
+        "reviewId": "q-gitops-sync",
+        "q": "Frische <code>argocd app get hafen-lager</code> nochmal ab: Was bedeutet jetzt <b>Synced</b> statt OutOfSync?",
+        "options": [
+          {
+            "t": "Cluster-Ist und Git-Soll stimmen überein – Argo hat den deklarierten Zustand hergestellt.",
+            "ok": true,
+            "reply": "Genau! Synced = Ist deckt sich mit dem Git-Soll. OutOfSync hieß: es gab eine Differenz. Argo gleicht beides per Pull ab – das Repo bleibt die Quelle der Wahrheit. ⚓"
+          },
+          {
+            "t": "Die Application-Datei wurde erfolgreich auf die Festplatte gespeichert.",
+            "ok": false,
+            "reply": "Nein – Synced sagt nichts über Dateien, sondern über den Abgleich: Cluster-Ist == Git-Soll. Vorher (OutOfSync) fehlte das Deployment im Cluster."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Du hast deine erste Application von Hand synchronisiert. Beim nächsten Mal zeige ich dir, wie Argo das <b>ganz allein</b> macht – und sogar heimliche Änderungen am Cluster zurückdreht. <i>Self-Heal</i> nennt sich das."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "gitops-drift-detection",
+    "title": "Der stille Wächter",
+    "giver": "argo",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Du hast hafen-lager erfolgreich von Hand synchronisiert – super. Aber jetzt kommt die eigentliche Frage: Was passiert, wenn jemand am Cluster <b>herumschraubt</b>? Im echten Betrieb gibt es immer jemanden, der 'eben schnell' etwas skaliert oder einen Pod löscht. Manchmal auch du selbst, im Stress.",
+          "GitOps hat eine Antwort darauf: <b>Self-Heal</b>. Argo beobachtet den Cluster laufend. Sobald der Ist-Zustand vom Git-Soll abweicht – also <b>Drift</b> entsteht –, dreht Argo die Änderung automatisch zurück. Der Cluster kann gar nicht dauerhaft von der Seekarte abweichen.",
+          "Ich habe dir eine aktualisierte Seekarte vorbereitet. Die schaltet Auto-Sync und Self-Heal für hafen-lager ein. Schau sie dir an."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Seekarte lesen",
+        "scenario": {
+          "files": {
+            "application-selfheal.yaml": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: hafen-lager\n  namespace: argocd\nspec:\n  project: default\n  source:                       # die Seekarte: Soll-Zustand im Git-Repo\n    repoURL: https://github.com/port-kubernia/seekarten.git\n    path: lager\n    targetRevision: main\n  destination:                  # wohin Argo den Soll-Zustand segelt\n    server: https://kubernetes.default.svc\n    namespace: hafen\n  syncPolicy:\n    automated:                  # Pull-Prinzip: Argo gleicht selbst ab\n      prune: true               # entfernt, was aus der Seekarte verschwand\n      selfHeal: true            # Drift zurücksetzen: Git gewinnt immer"
+          },
+          "applyEffects": {
+            "application-selfheal.yaml": {
+              "application": {
+                "name": "hafen-lager",
+                "repo": "https://github.com/port-kubernia/seekarten.git",
+                "path": "lager",
+                "autoSync": true,
+                "selfHeal": true,
+                "deployment": {
+                  "name": "hafen-lager",
+                  "image": "nginx:1.27",
+                  "replicas": 2
+                }
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-sh-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-sh-cat",
+            "text": "Lies die neue Seekarte: <code>cat application-selfheal.yaml</code>. Findest du <code>syncPolicy.automated</code> und <code>selfHeal: true</code>?",
+            "accept": [
+              "^cat\\s+application-selfheal\\.yaml$"
+            ],
+            "solution": "cat application-selfheal.yaml",
+            "hint": "cat application-selfheal.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Self-Heal aktivieren",
+        "cmd": {
+          "id": "t-sh-apply",
+          "intro": "🆕 <code>kubectl apply -f</code> ist idempotent: ändert sich die Konfiguration, gibt Kubernetes <b>configured</b> zurück (statt <i>unchanged</i>). So schaltest du Self-Heal für eine bestehende Application ein, ohne sie neu anlegen zu müssen.",
+          "text": "Aktiviere Self-Heal: wende <code>application-selfheal.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+application-selfheal\\.yaml$"
+          ],
+          "check": "gitops-drift-detection/t-sh-apply",
+          "solution": "kubectl apply -f application-selfheal.yaml",
+          "hint": "kubectl apply -f <datei> – der vertraute Befehl."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Self-Heal ist jetzt aktiv. Prüf die Sync-Policy – und dann stell den stillen Wächter auf die Probe."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Drift erzeugen & beobachten",
+        "tasks": [
+          {
+            "id": "t-sh-get-before",
+            "text": "Prüf den Status: <code>argocd app get hafen-lager</code>. In der Sync-Policy steht jetzt <b>Automated (self-heal)</b>.",
+            "accept": [
+              "^argocd\\s+app\\s+get\\s+hafen-lager$"
+            ],
+            "check": "gitops-drift-detection/t-sh-get-before",
+            "solution": "argocd app get hafen-lager",
+            "hint": "argocd app get hafen-lager"
+          },
+          {
+            "id": "t-sh-scale",
+            "text": "Erzeuge Drift: <code>kubectl scale deployment hafen-lager --replicas=0</code>. Das ist eine absichtlich <i>falsche</i> Hand-Änderung.",
+            "accept": [
+              "^kubectl\\s+scale\\s+(deployment\\/hafen-lager|deployment\\s+hafen-lager)\\s+--replicas[=\\s]+0$"
+            ],
+            "check": "gitops-drift-detection/t-sh-scale",
+            "solution": "kubectl scale deployment hafen-lager --replicas=0",
+            "hint": "kubectl scale deployment hafen-lager --replicas=0"
+          },
+          {
+            "id": "t-sh-get-after",
+            "text": "Und jetzt schau, was wirklich läuft: <code>kubectl get deployments</code>. Erwartest du 0 – aber was zeigt der Cluster?",
+            "accept": [
+              "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
+            ],
+            "check": "gitops-drift-detection/t-sh-get-after",
+            "solution": "kubectl get deployments",
+            "hint": "kubectl get deployments"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "<b>2 Replikas</b> – genau wie die Seekarte deklariert. Du hast auf null skaliert, aber Argo hat den Drift in demselben Atemzug erkannt und rückgängig gemacht. Bevor du nachschauen konntest, war der Git-Soll bereits wiederhergestellt.",
+          "Das ist das Pull-Prinzip in seiner schärfsten Form: <b>manuelle Änderungen am Cluster sind vergänglich</b>. Egal was du tippst – solange die Seekarte etwas anderes sagt, ist die Hand-Änderung nur ein kurzes Zucken. <i>Git gewinnt immer.</i> 🧭"
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "argo",
+        "reviewId": "q-gitops-heal",
+        "q": "Was tut Argo CD, wenn <b>Self-Heal</b> aktiv ist und jemand ein Deployment manuell skaliert?",
+        "options": [
+          {
+            "t": "Es erkennt den Drift und stellt den im Git deklarierten Soll-Zustand automatisch wieder her.",
+            "ok": true,
+            "reply": "Genau! Self-Heal = Drift automatisch zurückdrehen. Git ist die Quelle der Wahrheit, kein manueller Eingriff kann das dauerhaft ändern. ⚓"
+          },
+          {
+            "t": "Es sendet eine Warnung, damit ein Admin manuell eingreifen kann.",
+            "ok": false,
+            "reply": "Nein – das wäre nur passives Monitoring. Self-Heal ist <i>aktiv</i>: Argo dreht den Drift von selbst zurück, ohne auf einen Menschen zu warten."
+          },
+          {
+            "t": "Es aktualisiert das Git-Repo, damit es dem neuen Cluster-Stand entspricht.",
+            "ok": false,
+            "reply": "Genau umgekehrt! Argo schreibt nie in Git. Git ist die Quelle der Wahrheit – Argo liest nur daraus und gleicht den Cluster daran an, nicht andersherum."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "gitops-app-of-apps",
+    "title": "Die Flotte aus einer Hand",
+    "giver": "argo",
+    "rewardXp": 65,
+    "rewardCoins": 50,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Du beherrschst jetzt eine einzelne Application: anlegen, syncen, sogar Self-Heal. Aber schau mal raus auf den Archipel – das sind nicht eine, sondern <b>ein Dutzend Dienste</b>: Lager, Funk, Kran, Lotsen … und es werden mehr.",
+          "Jeden davon von Hand als eigene <code>Application</code> anzulegen und einzeln zu syncen? Das ist genau die Fummelei, vor der GitOps uns eigentlich bewahren soll. Du vergisst einen, ein anderer driftet weg – und keiner hat den Überblick.",
+          "Dafür gibt es das <b>App-of-Apps-Muster</b>: <b>eine einzige Wurzel-Application</b>, die selbst <i>nichts</i> ausrollt. Sie zeigt nur auf einen <b>Ordner voller weiterer Applications</b> – die <code>flotte/</code>. Synchronisierst du die Wurzel, legt Argo jede Application aus dem Ordner an, und die rollen wiederum ihre Dienste aus. Eine Hand am Steuer, die ganze Flotte fährt mit. Ich hab dir die Seekarte dafür hingelegt – schau sie dir an."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Seekarte der Flotte lesen",
+        "scenario": {
+          "files": {
+            "app-of-apps.yaml": "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: hafen-flotte\n  namespace: argocd\nspec:\n  project: default\n  source:                       # zeigt nur auf einen Ordner voller weiterer Applications\n    repoURL: https://github.com/port-kubernia/seekarten.git\n    path: flotte\n    targetRevision: main\n  destination:\n    server: https://kubernetes.default.svc\n    namespace: argocd\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true"
+          },
+          "applyEffects": {
+            "app-of-apps.yaml": {
+              "application": {
+                "name": "hafen-flotte",
+                "repo": "https://github.com/port-kubernia/seekarten.git",
+                "path": "flotte",
+                "autoSync": true,
+                "selfHeal": true,
+                "childApps": [
+                  {
+                    "name": "flotte-lager",
+                    "path": "flotte/lager",
+                    "deployment": {
+                      "name": "flotte-lager",
+                      "image": "nginx:1.27",
+                      "replicas": 2
+                    }
+                  },
+                  {
+                    "name": "flotte-funk",
+                    "path": "flotte/funk",
+                    "deployment": {
+                      "name": "flotte-funk",
+                      "image": "nginx:1.27",
+                      "replicas": 2
+                    }
+                  },
+                  {
+                    "name": "flotte-kran",
+                    "path": "flotte/kran",
+                    "deployment": {
+                      "name": "flotte-kran",
+                      "image": "nginx:1.27",
+                      "replicas": 1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-aoa-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-aoa-cat",
+            "text": "Lies die Wurzel-Seekarte: <code>cat app-of-apps.yaml</code>. Sie ist selbst <code>kind: Application</code> – aber ihr <code>source.path</code> zeigt auf den Sammel-Ordner <code>flotte</code>, nicht auf einen einzelnen Dienst.",
+            "accept": [
+              "^cat\\s+app-of-apps\\.yaml$"
+            ],
+            "solution": "cat app-of-apps.yaml",
+            "hint": "cat app-of-apps.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Die Flotte auslaufen lassen",
+        "cmd": {
+          "id": "t-aoa-apply",
+          "intro": "🆕 Das App-of-Apps-Muster: du wendest <b>eine</b> Wurzel-Application an – und weil sie auf einen Ordner voller weiterer Applications zeigt (und <code>automated</code> aktiv ist), legt Argo die <b>ganze Flotte</b> in einem Rutsch an. Ein <code>apply</code> statt n einzelner.",
+          "text": "Lass die Flotte auslaufen: wende <code>app-of-apps.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+app-of-apps\\.yaml$"
+          ],
+          "check": "gitops-app-of-apps/t-aoa-apply",
+          "solution": "kubectl apply -f app-of-apps.yaml",
+          "hint": "kubectl apply -f app-of-apps.yaml – der vertraute Befehl, diesmal für die Wurzel."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Spürst du das? <b>Ein</b> Befehl – und die Wurzel hat den ganzen <code>flotte/</code>-Ordner ausgerollt. Schau dir an, was jetzt alles fährt."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Die ganze Flotte erscheint",
+        "tasks": [
+          {
+            "id": "t-aoa-list",
+            "text": "Verschaff dir den Überblick: <code>argocd app list</code>. Aus einer Wurzel-Application ist die ganze Flotte geworden – <code>hafen-flotte</code> plus <code>flotte-lager</code>, <code>flotte-funk</code> und <code>flotte-kran</code>.",
+            "accept": [
+              "^argocd\\s+app\\s+(list|ls)$"
+            ],
+            "check": "gitops-app-of-apps/t-aoa-list",
+            "solution": "argocd app list",
+            "hint": "argocd app list (oder ls)."
+          },
+          {
+            "id": "t-aoa-get",
+            "text": "Sieh dir die Wurzel genauer an: <code>argocd app get hafen-flotte</code>. Unter <b>Managed Apps</b> stehen die Kinder, die sie verwaltet – die Wurzel selbst rollt keinen eigenen Dienst aus.",
+            "accept": [
+              "^argocd\\s+app\\s+get\\s+hafen-flotte$"
+            ],
+            "check": "gitops-app-of-apps/t-aoa-get",
+            "solution": "argocd app get hafen-flotte",
+            "hint": "argocd app get hafen-flotte"
+          },
+          {
+            "id": "t-aoa-deploys",
+            "text": "Und der Beweis im Cluster: <code>kubectl get deployments</code>. Jede Kind-Application hat ihren Dienst ausgerollt – ohne dass du sie einzeln anlegen musstest.",
+            "accept": [
+              "^kubectl\\s+get\\s+(deployments|deployment|deploy)$"
+            ],
+            "check": "gitops-app-of-apps/t-aoa-deploys",
+            "solution": "kubectl get deployments",
+            "hint": "kubectl get deployments"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "argo",
+        "lines": [
+          "Das ist die Skalier-Idee in Reinform: <b>eine Wurzel statt n Einzel-Anlagen</b>. Kommt ein neuer Dienst dazu, legst du eine weitere <code>Application</code>-Datei in den <code>flotte/</code>-Ordner – und beim nächsten Abgleich zieht die Wurzel sie automatisch mit rein. Du fasst nie wieder jede App einzeln an.",
+          "Und weil alles in Git steht, gilt der Überblick für die ganze Flotte auf einen Blick: <code>argocd app list</code> zeigt dir den Sync- und Health-Status <i>jeder</i> App – verwaltet von einer einzigen Wurzel. So segelt der ganze Archipel im Gleichschritt. 🧭⚓"
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "argo",
+        "reviewId": "q-gitops-appofapps",
+        "q": "Warum skaliert das <b>App-of-Apps-Muster</b> besser als jede Application einzeln von Hand anzulegen?",
+        "options": [
+          {
+            "t": "Eine einzige Wurzel-Application zeigt auf einen Ordner voller weiterer Applications – ein Sync legt die ganze Flotte an, neue Dienste kommen als Datei im Ordner automatisch dazu.",
+            "ok": true,
+            "reply": "Genau! Eine Wurzel statt n Hand-Anlagen. Neue App = eine Datei mehr im Ordner, die Wurzel zieht sie beim nächsten Abgleich von selbst mit. ⚓"
+          },
+          {
+            "t": "Es macht jede Application schneller, weil Argo die Manifeste komprimiert.",
+            "ok": false,
+            "reply": "Nein, mit Geschwindigkeit oder Kompression hat es nichts zu tun. Der Gewinn ist <i>organisatorisch</i>: eine Wurzel verwaltet viele Apps, statt jede einzeln anzulegen."
+          },
+          {
+            "t": "Die Wurzel-Application rollt selbst alle Dienste aus und macht die Kind-Applications überflüssig.",
+            "ok": false,
+            "reply": "Andersherum: Die Wurzel rollt <i>keinen</i> eigenen Dienst aus. Sie zeigt nur auf die Kind-Applications – die rollen ihre Dienste selbst aus. Genau diese Trennung ist der Kern des Musters."
+          }
+        ]
+      }
+    ]
+  }
+]

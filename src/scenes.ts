@@ -11,6 +11,7 @@ import { KQContent } from "./content";
 import { ASSET_MANIFEST } from "./assets-data";
 import { SFX } from "./sfx";
 import { NPC_SPAWNS, npcSolidIndices, resolveMove, ENTRANCES, findDoorAt, doorsFromObjectGroup, npcsFromObjectGroup, SHIP, SHIP_DOOR, SHIP_KRALLE, TALK_RANGE, interiorEAction, interiorEFlank, type Door } from "./world";
+import { npcSpawnsForMap, type Spawn } from "./content/entities";
 import {
   WATER as A_WATER, SAND as A_SAND, PATH as A_PATH, DOCK as A_DOCK,
   buildArchipel, warpAt,
@@ -30,7 +31,7 @@ import {
   buildWarehouse,
   WORLD_JETTY_WH, WORLD_TO_WAREHOUSE, WORLD_RETURN_WH,
   WAREHOUSE_TO_WORLD, WAREHOUSE_ARRIVAL,
-  WAREHOUSE_NPC, WAREHOUSE_QUEST_TRIGGER, WAREHOUSE_CRANES, WAREHOUSE_CONTAINERS,
+  WAREHOUSE_QUEST_TRIGGER, WAREHOUSE_CRANES, WAREHOUSE_CONTAINERS,
 } from "./warehouse";
 import { keys, setWorldScene, setInteriorOpen, type WorldSceneRef } from "./runtime";
 import { pickPlacements, strSeed, hash01, grassTuftStyle } from "./decor";
@@ -133,6 +134,25 @@ import { getMapEntry } from "./mapregistry";
     if (opts.depth !== undefined) t.setDepth(opts.depth);
     if (opts.shadow) t.setDropShadow(0, 1, 0x000000, 0.6);
     return t;
+  }
+
+  /** Rendert einen Insel-NPC (Argo/Lumi/Knut) an seinem Registry-Standplatz und gibt
+   *  die Laufzeit-Referenz {id,x,y,sprite,marker} zurück: Schatten-Ellipse, tex-Figur
+   *  (Origin 0.81 = Fußlinie), sanfter Schwebe-Tween und ein „!"-Marker, der erst
+   *  sichtbar wird, wenn eine Quest ansteht (revealNearbyLabels/questMarkerFor schalten
+   *  ihn). Identisches Render-Schema für alle drei Insel-Szenen – seit #349 datengesteuert
+   *  über `npcSpawnsForMap` (eine Schleife statt drei kopierter Blöcke), damit ein neuer
+   *  Insel-NPC nur ein JSON-Eintrag in entities.json ist, kein Code-Edit. */
+  function spawnIslandNpc(scene: Phaser.Scene, s: Spawn) {
+    const meta = KQContent.NPCS[s.id as keyof typeof KQContent.NPCS];
+    const px = s.x * T + 8, baseY = s.y * T + 15;
+    scene.add.ellipse(px, baseY, 12, 5, 0x000000, 0.26).setDepth(baseY - 1);
+    const sprite = scene.add.image(px, baseY, meta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(s.y * T + T);
+    scene.tweens.add({ targets: sprite, y: baseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+    const marker = pixelText(scene, px, s.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
+    marker.setVisible(false);
+    scene.tweens.add({ targets: marker, y: s.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+    return { id: s.id, x: s.x, y: s.y, sprite, marker };
   }
 
   // --- Orts-Schild (#254) -------------------------------------------------
@@ -1230,7 +1250,7 @@ import { getMapEntry } from "./mapregistry";
 
     /* ---------- Sturm: ein Deployment geht kaputt, du reparierst es ---------- */
     tryStartStorm() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q17")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("k8s-node-capacity")) return;
       const victims = Game.sim.deployments.filter(d => !d.broken);
       if (victims.length === 0 || UI.blocking()) { this.events.nextStorm += 25; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -1282,7 +1302,7 @@ import { getMapEntry } from "./mapregistry";
     }
 
     tryStartPirate() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q7")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("k8s-self-healing")) return;
       const victims = Game.sim.deployments.filter(d => d.replicas >= 2);
       if (victims.length === 0 || UI.blocking()) { this.events.nextPirate += 20; return; }
       const dep = Phaser.Utils.Array.GetRandom(victims);
@@ -1329,7 +1349,7 @@ import { getMapEntry } from "./mapregistry";
     }
 
     tryStartKraken() {
-      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("q14")) return;
+      if (!Game.eventProfile().enabled || this.anyEventActive() || !Game.state.completedQuests.includes("kraken-boss")) return;
       if (UI.blocking()) { this.events.nextKraken += 20; return; }
       const baseline = Game.sim.secrets.length;
 
@@ -1718,20 +1738,14 @@ import { getMapEntry } from "./mapregistry";
       this.objStatue(ARCHIPEL_QUEST_TRIGGER.x, ARCHIPEL_QUEST_TRIGGER.y);
       this.makeSign(ARCHIPEL_QUEST_TRIGGER.x * T + 8, (ARCHIPEL_QUEST_TRIGGER.y - 1) * T, "GitOps");
 
-      // GitOps-NPC „Argo" (#93): die GitOps-Lotsin des Archipels, die ab #94 die
-      // Phase-4-Quests vergibt. Gleiches Render-Schema wie die NPCs der WorldScene
-      // (tex-Figur an den Schatten verankert, Origin 0.81 = Fußlinie, „!"-Marker).
-      // Reden läuft über E → UI.interact() → nearestNpc(); bis #94 zeigt sie Smalltalk.
-      const argoMeta = KQContent.NPCS.argo;
-      const npx = ARCHIPEL_NPC.x * T + 8, npBaseY = ARCHIPEL_NPC.y * T + 15;
-      this.solid[ARCHIPEL_NPC.y * this.W + ARCHIPEL_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
-      this.add.ellipse(npx, npBaseY, 12, 5, 0x000000, 0.26).setDepth(npBaseY - 1);
-      const argoSpr = this.add.image(npx, npBaseY, argoMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(ARCHIPEL_NPC.y * T + T);
-      this.tweens.add({ targets: argoSpr, y: npBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      const argoMarker = pixelText(this, npx, ARCHIPEL_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
-      argoMarker.setVisible(false);
-      this.tweens.add({ targets: argoMarker, y: ARCHIPEL_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.npcs = [{ id: ARCHIPEL_NPC.id, x: ARCHIPEL_NPC.x, y: ARCHIPEL_NPC.y, sprite: argoSpr, marker: argoMarker }];
+      // Insel-NPCs datengesteuert aus der Entity-Registry (#349): u.a. die GitOps-Lotsin
+      // „Argo" (#93), die ab #94 die Phase-4-Quests vergibt. Eine Schleife über
+      // npcSpawnsForMap("archipel") statt den NPC hier hart zu setzen – ein neuer
+      // Insel-NPC ist damit nur ein JSON-Eintrag (entities.json), kein Code-Edit. Reden
+      // läuft über E → UI.interact() → nearestNpc(); bis Quests andocken, zeigt sie Smalltalk.
+      const archipelNpcs = npcSpawnsForMap("archipel");
+      for (const s of archipelNpcs) this.solid[s.y * this.W + s.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.npcs = archipelNpcs.map(s => spawnIslandNpc(this, s));
 
       // Spieler am Ankunfts-Steg (eine Kachel landwärts vom Rück-Warp).
       this.pl = { x: ARCHIPEL_ARRIVAL.tx * T + 8, y: ARCHIPEL_ARRIVAL.ty * T + 8, face: "north", moving: false };
@@ -2001,21 +2015,13 @@ import { getMapEntry } from "./mapregistry";
       this.objSprite(LIGHTHOUSE_BELL.x, LIGHTHOUSE_BELL.y, "alert_bell", 0.32, 18, 7);
       this.makeSign(LIGHTHOUSE_QUEST_TRIGGER.x * T + 8, (LIGHTHOUSE_QUEST_TRIGGER.y + 1) * T, "Monitoring");
 
-      // Observability-Wärterin „Lumi" (#112): steht am reservierten Standplatz und
-      // gibt ab den Phase-5-Quests (#113–116) das Monitoring aus. Gleiches Render-
-      // Schema wie Argo auf dem Archipel (tex-Figur am Schatten verankert,
-      // Origin 0.81 = Fußlinie, „!"-Marker). Reden läuft über E → UI.interact() →
-      // nearestNpc(); bis die Quests andocken, zeigt sie Smalltalk.
-      const lumiMeta = KQContent.NPCS.lumi;
-      const lnx = LIGHTHOUSE_NPC.x * T + 8, lnBaseY = LIGHTHOUSE_NPC.y * T + 15;
-      this.solid[LIGHTHOUSE_NPC.y * this.W + LIGHTHOUSE_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
-      this.add.ellipse(lnx, lnBaseY, 12, 5, 0x000000, 0.26).setDepth(lnBaseY - 1);
-      const lumiSpr = this.add.image(lnx, lnBaseY, lumiMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(LIGHTHOUSE_NPC.y * T + T);
-      this.tweens.add({ targets: lumiSpr, y: lnBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      const lumiMarker = pixelText(this, lnx, LIGHTHOUSE_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
-      lumiMarker.setVisible(false);
-      this.tweens.add({ targets: lumiMarker, y: LIGHTHOUSE_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.npcs = [{ id: LIGHTHOUSE_NPC.id, x: LIGHTHOUSE_NPC.x, y: LIGHTHOUSE_NPC.y, sprite: lumiSpr, marker: lumiMarker }];
+      // Observability-Wärterin „Lumi" (#112) & künftige Klippen-NPCs datengesteuert aus
+      // der Entity-Registry (#349): eine Schleife über npcSpawnsForMap("lighthouse") statt
+      // den NPC hier hart zu setzen – neuer NPC = nur JSON-Eintrag. Reden läuft über
+      // E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt sie Smalltalk.
+      const lighthouseNpcs = npcSpawnsForMap("lighthouse");
+      for (const s of lighthouseNpcs) this.solid[s.y * this.W + s.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.npcs = lighthouseNpcs.map(s => spawnIslandNpc(this, s));
 
       // Rück-Warp am südlichen Klippenrand sichtbar markieren (Abstiegs-Pfeil + Schild).
       const rx = LIGHTHOUSE_TO_WORLD.tx * T + 8, ry = LIGHTHOUSE_TO_WORLD.ty * T + 8;
@@ -2255,20 +2261,13 @@ import { getMapEntry } from "./mapregistry";
       // Quest-Trigger = das Lager-Kontor (Schild; die Phase-7-Quests #127/#129 docken hier an).
       this.makeSign(WAREHOUSE_QUEST_TRIGGER.x * T + 8, (WAREHOUSE_QUEST_TRIGGER.y + 1) * T, "Lager-Kontor");
 
-      // Speicher-Verwalter „Knut" (#125): steht am reservierten Standplatz und gibt ab den
-      // stateful-Quests die Hands-on-Aufgaben aus. Gleiches Render-Schema wie Lumi/Argo
-      // (tex-Figur am Schatten verankert, Origin 0.81 = Fußlinie, „!"-Marker). Reden läuft
-      // über E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt er Smalltalk.
-      const knutMeta = KQContent.NPCS.knut;
-      const knx = WAREHOUSE_NPC.x * T + 8, knBaseY = WAREHOUSE_NPC.y * T + 15;
-      this.solid[WAREHOUSE_NPC.y * this.W + WAREHOUSE_NPC.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
-      this.add.ellipse(knx, knBaseY, 12, 5, 0x000000, 0.26).setDepth(knBaseY - 1);
-      const knutSpr = this.add.image(knx, knBaseY, knutMeta.tex).setOrigin(0.5, 0.81).setScale(0.6).setDepth(WAREHOUSE_NPC.y * T + T);
-      this.tweens.add({ targets: knutSpr, y: knBaseY - 1, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      const knutMarker = pixelText(this, knx, WAREHOUSE_NPC.y * T - 6, "!", { color: "#ffc857", origin: [0.5, 1], depth: 10000, shadow: true });
-      knutMarker.setVisible(false);
-      this.tweens.add({ targets: knutMarker, y: WAREHOUSE_NPC.y * T - 9, duration: 500, yoyo: true, repeat: -1, ease: "Sine.inOut" });
-      this.npcs = [{ id: WAREHOUSE_NPC.id, x: WAREHOUSE_NPC.x, y: WAREHOUSE_NPC.y, sprite: knutSpr, marker: knutMarker }];
+      // Speicher-Verwalter „Knut" (#125) & künftige Quay-NPCs datengesteuert aus der
+      // Entity-Registry (#349): eine Schleife über npcSpawnsForMap("warehouse") statt den
+      // NPC hier hart zu setzen – neuer NPC = nur JSON-Eintrag. Reden läuft über
+      // E → UI.interact() → nearestNpc(); bis die Quests andocken, zeigt er Smalltalk.
+      const warehouseNpcs = npcSpawnsForMap("warehouse");
+      for (const s of warehouseNpcs) this.solid[s.y * this.W + s.x] = 1;   // #31: nicht durch die Figur laufen (Reden geht von der Nachbarkachel)
+      this.npcs = warehouseNpcs.map(s => spawnIslandNpc(this, s));
 
       // Rück-Anleger im Süden sichtbar markieren (Abstiegs-Pfeil + Schild).
       const rx = WAREHOUSE_TO_WORLD.tx * T + 8, ry = WAREHOUSE_TO_WORLD.ty * T + 8;

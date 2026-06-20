@@ -7,6 +7,7 @@
  * Hauptkarte (resolveMove/footprintSolid aus world.ts) – nichts dupliziert.
  */
 import { TILE } from "./world";
+import { npcSpawnForMap, type Spawn } from "./content/entities";
 
 /** Inselraster (Kacheln). Kleiner als die Hauptkarte – eine kompakte, voll
  *  umrundbare Insel, die in einer Session sauber gefüllt werden kann. */
@@ -20,8 +21,11 @@ export const WATER = -2, SAND = -3, PATH = 25, DOCK = -10;
 
 const CX = 14, CY = 9;   // Inselmittelpunkt (Lichtung mit NPC/Quest-Trigger)
 
-/** Reservierter Standplatz des neuen Insel-NPC (#93 setzt hier den Sprite). */
-export const ARCHIPEL_NPC = { id: "argo", x: 12, y: 8 } as const;
+/** Reservierter Standplatz des Insel-NPC „Argo" – seit #349 aus der datengesteuerten
+ *  Entity-Registry (`content/data/entities.json`, Karte "archipel") gelesen statt hier
+ *  hartcodiert. ArchipelScene loopt über `npcSpawnsForMap("archipel")`; diese Konstante
+ *  ist der primäre Standplatz (Pfad-/Erreichbarkeits-Geometrie + scatterDecor). */
+export const ARCHIPEL_NPC: Spawn = npcSpawnForMap("archipel");
 
 /** Quest-Trigger der Insel (#94–97 hängen hier ihre GitOps-Quests ein). Bis
  *  dahin steht hier ein Wegweiser als sichtbarer, bewusster Platzhalter. */

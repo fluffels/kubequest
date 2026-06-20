@@ -1,0 +1,206 @@
+[
+  {
+    "id": "terraform-intro",
+    "title": "Neues Land",
+    "giver": "theo",
+    "rewardXp": 45,
+    "rewardCoins": 35,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "theo",
+        "lines": [
+          "Die Funk-Legende persönlich! Theo, Landvermessung. Eine Frage: Wer hat eigentlich den Hafen <b>gebaut</b>, auf dem deine Kisten stehen?",
+          "Früher: zusammengeklickt und vergessen. Heute: <b>Infrastructure as Code</b> – die ganze Infrastruktur als Textdatei! Werkzeug: <b>Terraform</b>. Deklarativ, wie Adas Karten – nur baut es <b>den Hafen selbst</b>.",
+          "Der Bauplan für die Ost-Erweiterung liegt schon da. Drei Schritte trennen uns von neuem Land: <code>init</code> → <code>plan</code> → <code>apply</code>. Eins nach dem anderen!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Bauplan lesen",
+        "scenario": {
+          "files": {
+            "main.tf": "terraform {\n  required_providers {\n    hafen = {\n      source = \"kubequest/hafen\"\n    }\n  }\n}\n\n# Ein neues Ost-Plateau für Port Kubernia\nresource \"hafen_plateau\" \"ost\" {\n  name   = \"ost-erweiterung\"\n  breite = 12\n}\n\n# Zwei Server für den wachsenden Cluster\nresource \"hafen_server\" \"worker\" {\n  count   = 2\n  name    = \"worker-${count.index + 3}\"\n  groesse = \"mittel\"\n}"
+          },
+          "tfResources": [
+            {
+              "addr": "hafen_plateau.ost",
+              "desc": "name = \"ost-erweiterung\""
+            },
+            {
+              "addr": "hafen_server.worker[0]",
+              "desc": "name = \"worker-3\""
+            },
+            {
+              "addr": "hafen_server.worker[1]",
+              "desc": "name = \"worker-4\""
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-theo-1",
+            "text": "Lies den Bauplan: <code>cat main.tf</code>. Wie viele <code>resource</code>-Blöcke siehst du?",
+            "accept": [
+              "^cat\\s+main\\.tf$"
+            ],
+            "solution": "cat main.tf",
+            "hint": "Wie bei Ada."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Werkzeug laden",
+        "cmd": {
+          "id": "t-init",
+          "intro": "🆕 Neuer Befehl: <code>terraform init</code> – lädt die Provider-Plugins. Immer Schritt 1!",
+          "text": "Initialisiere das Projekt.",
+          "accept": [
+            "^terraform\\s+init$"
+          ],
+          "solution": "terraform init",
+          "hint": "Der allererste Befehl jedes Terraform-Projekts."
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Generalprobe",
+        "cmd": {
+          "id": "t-plan",
+          "intro": "🆕 Neuer Befehl: <code>terraform plan</code> – zeigt, was passieren WÜRDE. Profis lesen IMMER erst den Plan!",
+          "text": "Lass dir den Plan zeigen – ohne dass etwas passiert.",
+          "accept": [
+            "^terraform\\s+plan$"
+          ],
+          "solution": "terraform plan",
+          "hint": "Die Generalprobe."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "theo",
+        "reviewId": "q-ch6-2",
+        "q": "Bevor du baust – plan vs. apply?",
+        "options": [
+          {
+            "t": "plan zeigt nur, was passieren würde – apply führt es wirklich aus.",
+            "ok": true,
+            "reply": "Korrekt! Und jetzt … BAU DAS LAND! Ich kann nicht hinsehen. Doch. Ich sehe hin!"
+          },
+          {
+            "t": "plan ist für kleine, apply für große Projekte.",
+            "ok": false,
+            "reply": "Nein: plan = Generalprobe (passiert nichts), apply = Aufführung. IMMER in der Reihenfolge."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "LAND IN SICHT!",
+        "cmd": {
+          "id": "t-apply-tf",
+          "intro": "🆕 Neuer Befehl: <code>terraform apply</code> – der Plan wird Wirklichkeit.",
+          "text": "Baue die Ost-Erweiterung – und schau nach Osten aufs Wasser!! 🏗️",
+          "accept": [
+            "^terraform\\s+apply(\\s+-auto-approve)?$"
+          ],
+          "solution": "terraform apply",
+          "hint": "Nach der Generalprobe die Aufführung."
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "theo",
+        "lines": [
+          "DA! NEUES LAND! Du hast mit einer TEXTDATEI eine Insel gebaut! <i>*wischt sich eine Träne weg*</i> Geh ruhig mal drauf spazieren. Morgen zeige ich dir Terraforms Gedächtnis."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "terraform-state-destroy",
+    "title": "Gedächtnis und Abriss",
+    "giver": "theo",
+    "rewardXp": 45,
+    "rewardCoins": 35,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "theo",
+        "lines": [
+          "Terraform führt Buch über alles, was es gebaut hat: den <b>State</b> – sein Gedächtnis. Beim nächsten plan vergleicht es: Was steht in den Dateien (Soll)? Was existiert (Ist)? Nur die <b>Differenz</b> wird umgesetzt."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Ins Gedächtnis schauen",
+        "cmd": {
+          "id": "t-state",
+          "intro": "🆕 Neuer Befehl: <code>terraform state list</code> – was steht im Gedächtnis?",
+          "text": "Zeig den State an – alle drei gebauten Ressourcen sollten drinstehen.",
+          "accept": [
+            "^terraform\\s+state\\s+list$"
+          ],
+          "solution": "terraform state list",
+          "hint": "terraform state …"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Der Beweis",
+        "tasks": [
+          {
+            "id": "t-theo-2",
+            "text": "Führe nochmal <code>terraform plan</code> aus. Es muss „No changes“ melden – Soll = Ist!",
+            "accept": [
+              "^terraform\\s+plan$"
+            ],
+            "check": "terraform-state-destroy/t-theo-2",
+            "solution": "terraform plan",
+            "hint": "Einfach nochmal plan."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Kontrollierter Abriss",
+        "cmd": {
+          "id": "t-destroy",
+          "intro": "🆕 Neuer Befehl: <code>terraform destroy</code> – reißt ALLES wieder ab, was Terraform gebaut hat.",
+          "text": "Der Rat baut erst nächstes Jahr, und Übungs-Land kostet Miete: Reiß die Erweiterung ab!",
+          "accept": [
+            "^terraform\\s+destroy(\\s+-auto-approve)?$"
+          ],
+          "solution": "terraform destroy",
+          "hint": "Das Gegenteil von apply."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "theo",
+        "reviewId": "q-ch6-3",
+        "q": "Was ist der Terraform-State?",
+        "options": [
+          {
+            "t": "Terraforms Gedächtnis: eine Datei mit allem, was es bereits gebaut hat.",
+            "ok": true,
+            "reply": "Perfekt! Soll (Dateien) vs. Ist (State) → nur die Differenz wird gebaut. Du hast den ganzen Zyklus drauf: init → plan → apply → destroy!"
+          },
+          {
+            "t": "Das Fehlerprotokoll von Terraform.",
+            "ok": false,
+            "reply": "Nein – das Gedächtnis! Es weiß, was schon existiert. Deshalb meldete plan eben „No changes“."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "theo",
+        "lines": [
+          "Docker, Kubernetes, YAML, Helm, Terraform – fast geschafft! Eine Sache fehlt noch, und sie ist <b>brandgefährlich</b>. Ole wartet schon. Es geht um … die <b>Krake</b>. 🐙"
+        ]
+      }
+    ]
+  }
+]

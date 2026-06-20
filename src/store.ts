@@ -64,7 +64,7 @@
    *   2. Eine Migration migrations[n] ergänzen, die `data` von Version n auf n+1 bringt.
    * Die Kette läuft dann automatisch jede Zwischenstufe der Reihe nach durch.
    */
-  export const CURRENT_SAVE_VERSION = 1;
+  export const CURRENT_SAVE_VERSION = 3;
 
   /** Migration von Format-Version n auf n+1 (reine Funktion auf dem `data`-Objekt). */
   type Migration = (data: unknown) => unknown;
@@ -74,6 +74,23 @@
     //         Inhaltlich identisch zum heutigen Format – wir übernehmen ihn unverändert
     //         und packen ihn nur in die neue Versions-Hülle.
     0: (data) => data,
+    // 1 -> 2 (#353): Quest-Fortschritt wird zusätzlich als Quest-ID (currentQuestId) statt
+    //         nur als Zahl-Index geführt, damit Einfügen/Umsortieren von Quests keinen
+    //         Spielstand mehr bricht. Strukturell ein No-op: die Ableitung der ID aus dem
+    //         alten questIdx (und das Auflösen ID -> Index) passiert ZENTRAL in
+    //         game.ts › sanitizeState, weil sie ALLE Ladewege gleich treffen muss
+    //         (localStorage UND der rohe JSON-Import via Game.importData umgeht diese
+    //         Migrationskette). Der Versions-Bump sorgt hier dafür, dass jeder bestehende
+    //         v1-Stand vor dem ersten Überschreiben in den Backup-Slot gesichert wird
+    //         (readState) – kein Spieler verliert beim Update seinen Fortschritt.
+    1: (data) => data,
+    // 2 -> 3 (#354): Quest-IDs von numerisch (q5, q2b) auf sprechende Slugs umbenannt
+    //         (harbor-/k8s-/git-… ). Quest-IDs sind persistiert (completedQuests +
+    //         currentQuestId), also remappt die Migration alt -> neu. Wie bei 1->2 strukturell
+    //         ein No-op auf store-Ebene: das eigentliche Remapping liegt in game.ts ›
+    //         sanitizeState (LEGACY_QUEST_ID_MAP), damit es ALLE Ladewege trifft (auch der
+    //         rohe JSON-Import). Der Bump sichert jeden v2-Stand vor dem Überschreiben.
+    2: (data) => data,
   };
 
   /** Hebt `data` von `version` schrittweise auf CURRENT_SAVE_VERSION. */

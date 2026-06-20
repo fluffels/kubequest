@@ -14,6 +14,14 @@ export interface GameState {
   coins: number;
   character: number | null;
   player: { x: number; y: number };
+  /** Aktive Quest als **ID** – die Persistenz-Autorität für den Quest-Fortschritt (#353).
+   *  Quests einschieben/umsortieren verschiebt damit keinen Spielstand mehr. Leerer
+   *  String = alle Quests durch (Endzustand). `questIdx` ist nur der daraus abgeleitete
+   *  Laufzeit-Index; bei Konflikt gewinnt diese ID. Alt-Stände ohne dieses Feld werden
+   *  aus `questIdx` migriert (game.ts › sanitizeState). */
+  currentQuestId: string;
+  /** Abgeleiteter Laufzeit-Index der aktiven Quest in `QUESTS` (= Index in quest-order.json).
+   *  Wird beim Laden aus `currentQuestId` aufgelöst – NICHT die Persistenz-Autorität (#353). */
   questIdx: number;
   questStep: number;
   taskIdx: number;
@@ -50,7 +58,7 @@ export interface GameState {
   /** Serialisierter Cluster-Zustand (genau die Form von Sim.snapshot()). */
   clusterSnapshot: Scenario | null;
   /** Audio-Einstellungen (Musik & Sounds getrennt schaltbar, je mit Lautstärke; track = gewähltes Musikstück). */
-  audio: { music: boolean; sfx: boolean; musicVol: number; sfxVol: number; track: string };
+  audio: AudioConfig;
   /** Spiel-Feel: Frequenz/Härte der Zufalls-Events (Anti-Frust, #71). */
   settings: { events: EventMode };
   /** Abgeschlossene Quests seit dem letzten Review-Gate-Feuern (#323).
@@ -63,6 +71,21 @@ export interface GameState {
  *  `normal` = volle Härte, `cozy` = seltener/sanfter + gemilderter Malus,
  *  `off` = keine Zufalls-Events und kein Malus. */
 export type EventMode = "normal" | "cozy" | "off";
+
+/** Audio-Einstellungen (Teil von GameState.audio). Liegt bewusst in der
+ *  Typ-/Domänen-Schicht, NICHT in `sfx.ts` (Präsentation): so können Anwendung
+ *  (game.ts) und das Laufzeit-Wiring (runtime.ts) den Typ nutzen, ohne auf die
+ *  Präsentations-Schicht zu zeigen. `sfx.ts` re-exportiert ihn nur. */
+export interface AudioConfig {
+  music: boolean;
+  sfx: boolean;
+  /** Lautstärke 0..1 */
+  musicVol: number;
+  /** Lautstärke 0..1 */
+  sfxVol: number;
+  /** ID des aktuell gewählten Musikstücks (siehe MUSIC_THEMES in sfx.ts). */
+  track: string;
+}
 
 /** Ergebnis einer simulierten Befehlszeile (Sim.exec). */
 export interface ExecResult {

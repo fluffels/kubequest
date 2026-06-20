@@ -4,6 +4,8 @@
 > Die **ausführliche Arbeitsanweisung** (harte Regeln, Board-Workflow, Konventionen) steht in **[AGENTS.md](AGENTS.md)** – diese Datei ist der schnelle Einstieg, der dorthin führt.
 > Was das Spiel **ist** (Story, Steuerung, Lernpfad), steht in der **[README.md](README.md)** – die ist spielerseitig, nicht für dich als Agent.
 
+> ⭐ **Oberste Regel vor JEDER Änderung:** „Ist das okay, wenn KubeQuest ein Spiel in **Stardew-Valley-Größe** wird?" Nur machen, wenn ja — diese Frage steht über allen ADRs/Konventionen. Was auffällt, aber gerade nicht dran ist → **Ticket anlegen**. Details: [AGENTS.md › Oberste Regel](AGENTS.md#-oberste-regel--über-allem-auch-über-den-adrs).
+
 ## ⚡ Schnellstart (in <1 Minute zum ersten Schritt)
 
 ```
@@ -48,6 +50,7 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | Dev-Panel-Build (#331, Panel MIT, passwortgated, `dist-devpanel/`) | `npm run build:devpanel` |
 | Tests | `npm test` (Vitest) |
 | Typen prüfen (voll strict) | `npm run typecheck` |
+| Architektur-Wächter (Schichtung, #347) | `npm run check:arch` |
 
 > ⚠️ **Code-Änderungen laden im Dev-Server NICHT automatisch neu** (#301). Eine JS/TS-Änderung löst bewusst keinen Auto-Reload aus (der riss sonst mitten im Spielen laufende Gespräche weg + blaues Flackern, v.a. wenn parallele Agenten editieren). Stattdessen erscheint ein Toast „🔄 Code geändert – neu laden (F5)". Zum Übernehmen also **F5 / Seite neu laden** (Spielstand bleibt im localStorage). CSS-Edits swappen weiterhin live.
 
@@ -60,6 +63,10 @@ Im Repo liegen fertige npm-Run-Configs unter [`.idea/runConfigurations/`](.idea/
 | [`src/main.ts`](src/main.ts) | Einstieg | Start & Tastatursteuerung |
 | [`src/sim.ts`](src/sim.ts) | pure Domäne | Cluster-Simulator (docker, kubectl inkl. `top`/`logs -f`/`--previous`, helm, terraform, git, argocd/GitOps); Observability-Grundlage #109: Pod-/Node-Metriken, Alert-State (firing→resolved), Prometheus-Scrape-Targets – via `podMetrics()`/`nodeMetrics()`/`alerts()`/`scrapeTargets()`; Monitoring-CRDs (ServiceMonitor/PrometheusRule/Grafana) via `kubectl apply`/`get` #110 (Manifeste in [`src/content/manifests.ts`](src/content/manifests.ts)); RBAC/ServiceAccounts/Pod-Security #126: ServiceAccounts + Role/ClusterRole + RoleBinding/ClusterRoleBinding via `kubectl create`, `kubectl auth can-i <verb> <resource> [--as=…]` (deterministisch yes/no), Pod-Security-Admission-Stufe via `kubectl label namespace … pod-security.kubernetes.io/enforce=<stufe>` (lehnt unsichere Pods beim Anlegen ab); RBAC-Objekte zusätzlich deklarativ via `kubectl apply -f` #128 (Manifest-Vorlagen in [`src/content/manifests.ts`](src/content/manifests.ts)) |
 | [`src/content.ts`](src/content.ts) | pure Domäne | Fassade: bündelt `src/content/*` (Quests, Drills, Quiz, NPCs, Progression, Minispiel) zum `KQContent`-Objekt |
+| [`src/content/loader.ts`](src/content/loader.ts) | pure Domäne | Content-as-Data-Loader (#348, ADR 0004): lädt **NPCs, Smalltalk und alle 40 Quests** aus `src/content/data/*.json` und validiert sie zur Laufzeit gegen ein handgeschriebenes Schema (wirft `ContentValidationError`, kein Zod – zero Runtime-Dep). Kompiliert Quest-`accept` (String-Pattern → `RegExp`) und löst `check`-Keys → Funktionen aus `checks.ts` auf; gibt `Quest[]` in der gewohnten Laufzeit-Form zurück. Phaser-frei, unit-getestet (`test/loader.test.ts`) |
+| [`src/content/checks.ts`](src/content/checks.ts) | pure Domäne | `QUEST_CHECKS`-Registry (#348): die `check`-Prädikate der Quests (Sim-Zustand prüfen) als benannte Funktionen – die „Mechanik bleibt Code"-Seite von Content-as-Data. `data/quests.json` referenziert sie per Key (`<questId>/<cmd|task-id>`) |
+| [`src/content/entities.ts`](src/content/entities.ts) | pure Domäne | Entity-Registry (#349, ADR 0004): datengesteuerte **NPC-Platzierung** aus `data/entities.json` (welcher NPC, welche Karte, welche Kachel) – validiert zur Laufzeit (`ContentValidationError`, referenzielle Integrität gegen `npcs.json`). `npcSpawnsForMap(map)`/`npcSpawnForMap(map)` lösen die Standplätze je Szene auf; `world.ts` (Hafen) und die Insel-Module/-Szenen leiten ihre Standplätze daraus ab statt sie hartzucodieren. Neuer NPC = neuer JSON-Eintrag. Phaser-frei, unit-getestet (`test/entities.test.ts`) |
+| [`src/content/data/`](src/content/data/) | Daten | Content-as-Data-Quelle (#348/#349): `npcs.json` (NPC-Identität), `smalltalk.json`, `entities.json` (NPC-Standplätze je Karte, #349) + **Quests pro Region/Geber** in `data/quests/<giver>.json` (eine Datei je NPC, wie Stardew) plus `data/quest-order.json` (die load-bearing Spielreihenfolge, `questIdx`). Vom Loader geladen + validiert, von Vite gebündelt; kein Runtime-`fetch`, Offline-Build bleibt heil |
 | [`src/content/abbrev.ts`](src/content/abbrev.ts) | pure Domäne | Baustein-Katalog (#287/#298): SSOT aller Langform↔Kürzel-Paare (`-a`/`--all`, `pods`/`po` …) mit Freischalt-ID + `findAbbrevByShort` – Grundlage der „verdiente Abkürzung"-Mechanik (Gating #299, Lernpfad #300); validiert in `test/abbrev.test.ts` gegen den echten Content |
 | [`src/world.ts`](src/world.ts) | pure Domäne | Welt-Geometrie (Kachelraster, NPC-Standplätze, Solid-Kacheln) – Phaser-frei, von `scenes.ts` genutzt |
 | [`src/archipel.ts`](src/archipel.ts) | pure Domäne | GitOps-Archipel: Insel-Geometrie + Anleger/Warp (Hauptkarte ⇄ Insel), reservierter NPC-/Quest-Trigger-Standplatz – Phaser-frei, von `ArchipelScene` in `scenes.ts` genutzt |

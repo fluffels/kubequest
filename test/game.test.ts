@@ -78,7 +78,7 @@ test("unlockAbbrev: schaltet gezielt frei, ist idempotent und persistiert über 
 
 test("Migration: Alt-Stand MIT Fortschritt ohne unlockedAbbrev wird grandfathered (alles frei)", () => {
   // Stand wie vor der Mechanik: Fortschritt vorhanden, Feld fehlt ganz.
-  Game.importData(JSON.stringify({ v: 1, data: { xp: 120, questIdx: 5, completedQuests: ["q1", "q2"] } }));
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 120, questIdx: 5, completedQuests: ["docker-first-container", "docker-list-containers"] } }));
   Game.load();
   expect(Game.isAbbrevUnlocked("-a")).toBe(true);      // beliebige ID -> frei
   expect(Game.isAbbrevUnlocked("--irgendwas")).toBe(true);
@@ -350,17 +350,17 @@ test("freeReviewItems: liefert ALLE Karten (auch nicht fällige) und ändert den
 });
 
 test("registerQuestCards: hängt die EXTRA_CARDS des Kapitels in die Wiederholung ein", () => {
-  Game.registerQuestCards("q10");
-  // aus EXTRA_CARDS q10 (inkl. der in #5 ergänzten Tool-Karten)
+  Game.registerQuestCards("helm-release-install");
+  // aus EXTRA_CARDS helm-release-install (inkl. der in #5 ergänzten Tool-Karten)
   expect(Game.state.review["q-tools-stack"]).toBeTruthy();
   expect(Game.state.review["q-tools-monitoring"]).toBeTruthy();
 });
 
 test("registerQuestCards: die Baustein-Karten (#231) landen an ihrer Einführungs-Quest", () => {
   const cases: [string, string][] = [
-    ["q2", "q-flag-ps-a"], ["q3", "q-flag-run-d"], ["q3", "q-flag-run-name"],
-    ["q5", "q-flag-kubectl-n"], ["q8", "q-flag-apply-f"], ["q11", "q-flag-helm-set"],
-    ["q18", "q-flag-git-commit-m"], ["q19", "q-flag-git-checkout-b"], ["q20", "q-flag-git-add-dot"],
+    ["docker-list-containers", "q-flag-ps-a"], ["docker-run-options", "q-flag-run-d"], ["docker-run-options", "q-flag-run-name"],
+    ["k8s-inspect-pods", "q-flag-kubectl-n"], ["k8s-apply-manifests", "q-flag-apply-f"], ["helm-upgrade-rollback", "q-flag-helm-set"],
+    ["git-version-control", "q-flag-git-commit-m"], ["git-feature-branch", "q-flag-git-checkout-b"], ["git-pipeline", "q-flag-git-add-dot"],
   ];
   for (const [quest, card] of cases) {
     Game.reset();
@@ -416,7 +416,7 @@ test("load: kaputte Zahlenfelder (String-Münzen, negative XP) fallen auf Defaul
 
 test("load: kaputte Sammlungen/Typen werden gefiltert oder verworfen", () => {
   SaveStore.writeState({
-    completedQuests: "q1,q2",                       // String statt Array
+    completedQuests: "docker-first-container,docker-list-containers",                       // String statt Array
     owned: ["pet-1", 42, null, "flag"],             // fremde Einträge
     inventory: { potion: 3, ghost: -1, bad: "x" },  // negativ/Nicht-Zahl raus
     character: "Hans",                              // soll number|null sein
@@ -448,7 +448,7 @@ test("load: ein VOLLSTÄNDIG valider Stand überlebt unverändert (kein Over-San
   SaveStore.writeState({
     xp: 320, coins: 99, character: 2, player: { x: 100, y: 200 },
     questIdx: 4, questStep: 1, taskIdx: 0,
-    completedQuests: ["q1", "q2"], inventory: { potion: 2 }, owned: ["pet-cat"],
+    completedQuests: ["docker-first-container", "docker-list-containers"], inventory: { potion: 2 }, owned: ["pet-cat"],
     activePet: "pet-cat", activeFlag: null,
     review: { "q-ch1-1": { box: 3, due: 10 } },
     streak: { count: 5, lastDay: 999999 }, streakHintShown: true,
@@ -462,7 +462,7 @@ test("load: ein VOLLSTÄNDIG valider Stand überlebt unverändert (kein Over-San
   expect(Game.state.character).toBe(2);
   expect(Game.state.player).toEqual({ x: 100, y: 200 });
   expect(Game.state.questIdx).toBe(4);
-  expect(Game.state.completedQuests).toEqual(["q1", "q2"]);
+  expect(Game.state.completedQuests).toEqual(["docker-first-container", "docker-list-containers"]);
   expect(Game.state.owned).toEqual(["pet-cat"]);
   expect(Game.state.inventory).toEqual({ potion: 2 });
   expect(Game.state.review["q-ch1-1"]).toEqual({ box: 3, due: 10 });
@@ -638,4 +638,119 @@ test("jumpToQuest: Giver-Position überlebt eine LAUFENDE WorldScene (#335, glei
   // Und der persistierte Stand ebenso, sonst holt der reload die alte Position zurück.
   const saved = JSON.parse(SaveStore.read()!);
   expect(saved.data.player).toEqual(giverPos);
+});
+
+/* ---------- #353: Quest-Fortschritt per ID statt Zahl-Index (Save-Robustheit) ----------
+ * Persistiert wird die Quest-ID (currentQuestId); der numerische questIdx ist nur noch ein
+ * abgeleiteter Laufzeitwert. So verschiebt das Einfügen/Umsortieren von Quests keinen
+ * bestehenden Fortschritt mehr. Alt-Stände ohne currentQuestId werden aus questIdx migriert.
+ * Niemand verliert beim Update seinen Stand. */
+
+test("#353 currentQuestId: frischer Stand zeigt auf die erste Quest", () => {
+  Game.reset();
+  expect(Game.state.questIdx).toBe(0);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[0].id);
+});
+
+test("#353 Migration: Alt-Stand OHNE currentQuestId leitet die ID aus dem questIdx ab", () => {
+  // Stand wie vor #353: nur numerischer Index, kein currentQuestId.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 50, questIdx: 3 } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(3);                       // Index erhalten
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[3].id); // ID ergänzt
+});
+
+test("#353 Autorität ID: bei veraltetem questIdx gewinnt currentQuestId (Quest-Einfügen bricht nichts)", () => {
+  // Kernschutz: der gespeicherte Zahl-Index ist veraltet (0, z.B. weil vorher Quests
+  // eingeschoben wurden), currentQuestId zeigt aber auf die Quest, die AKTUELL an Index 3
+  // steht. Nach dem Laden muss der Fortschritt bei DIESER Quest liegen (Index 3 aufgelöst),
+  // nicht beim veralteten Zahl-Index 0.
+  const ziel = KQContent.QUESTS[3].id;
+  Game.importData(JSON.stringify({ v: 2, data: { xp: 50, questIdx: 0, currentQuestId: ziel } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(3);
+  expect(Game.state.currentQuestId).toBe(ziel);
+});
+
+test("#353 unbekannte currentQuestId (Quest entfernt) -> Fallback auf questIdx, kein Verlust", () => {
+  Game.importData(JSON.stringify({ v: 2, data: { questIdx: 2, currentQuestId: "gibt-es-nicht-mehr" } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(2);                       // Fallback rettet den Fortschritt
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[2].id); // kanonisiert auf die echte ID
+});
+
+test("#353 Endzustand: alle Quests durch -> currentQuestId leer, round-trippt", () => {
+  setWorldScene(null);
+  const end = KQContent.QUESTS.length;
+  Game.jumpToQuest(end);
+  expect(Game.state.currentQuestId).toBe("");
+  Game.load(); // persistiert + zurückgelesen
+  expect(Game.state.questIdx).toBe(end);
+  expect(Game.state.currentQuestId).toBe("");
+  expect(Game.allQuestsDone()).toBe(true);
+});
+
+test("#353 jumpToQuest hält currentQuestId synchron zum Index (auch über load)", () => {
+  setWorldScene(null);
+  Game.jumpToQuest(5);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[5].id);
+  Game.load();
+  expect(Game.state.questIdx).toBe(5);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[5].id);
+});
+
+test("#353 advanceStep: Quest-Abschluss zieht currentQuestId auf die nächste Quest", () => {
+  setWorldScene(null);
+  Game.jumpToQuest(0);
+  const stepCount = KQContent.QUESTS[0].steps.length;
+  let result: ReturnType<typeof Game.advanceStep> = {};
+  for (let i = 0; i < stepCount; i++) result = Game.advanceStep();
+  expect(result).toMatchObject({ questDone: KQContent.QUESTS[0] }); // Quest 0 abgeschlossen
+  expect(Game.state.questIdx).toBe(1);
+  expect(Game.state.currentQuestId).toBe(KQContent.QUESTS[1].id);
+});
+
+/* ---------- #354: Save-Migration alter (numerischer) Quest-IDs -> sprechende Slugs ----------
+ * Quest-IDs sind in Spielständen persistiert (completedQuests + currentQuestId). Beim Umbenennen
+ * darf KEIN bestehender Stand brechen: alte IDs (q5, q14, q2b …) werden beim Laden auf die neuen
+ * Slugs gehoben. Bestehende Spieler behalten ihren exakten Fortschritt. */
+
+test("#354 Migration: Alt-Stand (post-#353) mit alten IDs -> neue Slugs, Fortschritt bleibt", () => {
+  // Stand vor #354: completedQuests + currentQuestId tragen alte numerische IDs.
+  Game.importData(JSON.stringify({ v: 2, data: { xp: 100, questIdx: 7, completedQuests: ["q0", "q1", "q2", "q2b", "q3", "q3b", "q4"], currentQuestId: "q5" } }));
+  Game.load();
+  // currentQuestId auf neuen Slug gemappt, Index bleibt korrekt (q5 = Index 7):
+  expect(Game.state.currentQuestId).toBe("k8s-inspect-pods");
+  expect(Game.state.questIdx).toBe(7);
+  // completedQuests vollständig auf neue Slugs gehoben – nichts verloren:
+  expect(Game.state.completedQuests).toEqual([
+    "onboarding-sign-on", "docker-first-container", "docker-list-containers",
+    "docker-stack-minigame", "docker-run-options", "docker-build-image", "k8s-first-deployment",
+  ]);
+});
+
+test("#354 Migration: Alt-Stand (pre-#353, nur questIdx) mit alten completedQuests migriert auch", () => {
+  // Noch älter: kein currentQuestId, Fortschritt nur über questIdx + alte completedQuests.
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 50, questIdx: 2, completedQuests: ["q0", "q1"] } }));
+  Game.load();
+  expect(Game.state.questIdx).toBe(2);
+  expect(Game.state.currentQuestId).toBe("docker-list-containers"); // Index 2 -> neuer Slug
+  expect(Game.state.completedQuests).toEqual(["onboarding-sign-on", "docker-first-container"]);
+});
+
+test("#354 Migration: ein eingeschobener alter Slug (q2b/q26) wird korrekt übersetzt", () => {
+  // q2b und q26 sind Einschübe – ihre Reihenfolge kommt aus quest-order.json, nicht der Nummer.
+  Game.importData(JSON.stringify({ v: 2, data: { questIdx: 3, completedQuests: ["q14", "q26"], currentQuestId: "q2b" } }));
+  Game.load();
+  expect(Game.state.currentQuestId).toBe("docker-stack-minigame");          // q2b
+  expect(Game.state.completedQuests).toEqual(["kraken-boss", "k8s-configmap-secret"]); // q14, q26
+});
+
+test("#354 Migration: neue Slugs bleiben unverändert (idempotent, kein Doppel-Mapping)", () => {
+  // Ein bereits migrierter Stand (neue Slugs) darf nicht erneut angefasst werden.
+  Game.importData(JSON.stringify({ v: 3, data: { questIdx: 7, completedQuests: ["onboarding-sign-on", "docker-first-container"], currentQuestId: "k8s-inspect-pods" } }));
+  Game.load();
+  expect(Game.state.currentQuestId).toBe("k8s-inspect-pods");
+  expect(Game.state.questIdx).toBe(7);
+  expect(Game.state.completedQuests).toEqual(["onboarding-sign-on", "docker-first-container"]);
 });

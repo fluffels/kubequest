@@ -6,6 +6,7 @@
  * Bewusst OHNE Phaser-/UI-Importe (nur ein struktureller Typ), damit zwischen
  * scenes.ts, ui.ts, main.ts und game.ts kein zyklischer Import entsteht.
  */
+import type { AudioConfig } from "./types";
 
 /* ---------- Tastenzustand ----------
  * main.ts schreibt (keydown/keyup/blur), scenes.ts liest in der Update-Schleife.
@@ -55,4 +56,22 @@ export function setInteriorOpen(v: boolean): void {
 
 export function interiorOpen(): boolean {
   return _interiorOpen;
+}
+
+/* ---------- Audio-Sink (#344) ----------
+ * Bricht die Schichtverletzung „Anwendung→Präsentation": game.ts (Anwendung) darf
+ * `sfx.ts` (Präsentation) nicht importieren. Stattdessen registriert die
+ * Präsentation hier ihren Handler (`setAudioSink`), und die Anwendung schiebt die
+ * Audio-Settings entkoppelt über `applyAudioConfig`. Ist (noch) kein Sink gesetzt
+ * – z.B. im Node-Test ohne geladenes sfx-Modul –, ist das Anwenden ein No-op. */
+let _audioSink: ((cfg: AudioConfig) => void) | null = null;
+
+/** Von der Präsentation (sfx.ts) beim Modul-Laden gesetzt. */
+export function setAudioSink(fn: ((cfg: AudioConfig) => void) | null): void {
+  _audioSink = fn;
+}
+
+/** Audio-Settings an die Präsentation geben (No-op, solange kein Sink registriert ist). */
+export function applyAudioConfig(cfg: AudioConfig): void {
+  _audioSink?.(cfg);
 }

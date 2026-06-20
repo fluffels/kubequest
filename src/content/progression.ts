@@ -1,6 +1,8 @@
-/* ===== Inhalte: Fortschritt, Shop & Figuren =====
- * Ränge (XP-Schwellen), Shop-Angebot, NPC-Stammdaten und Spieler-Sprites.
- * Reine Daten, ohne Logik.
+/* ===== Inhalte: Fortschritt & Shop =====
+ * Ränge (XP-Schwellen) und Shop-Angebot. Reine Daten, ohne Logik.
+ *
+ * NPC-Stammdaten sind seit #348 Content-as-Data und leben als JSON in
+ * `./data/npcs.json` (geladen vom validierenden `./loader.ts`), nicht mehr hier.
  */
 
 /* ---------- Ränge (geschlechtsneutral) ---------- */
@@ -37,21 +39,3 @@ export const SHOP = [
   { id: "kanone", icon: "💣", name: "Hafen-Kanone", price: 300, type: "upgrade",
     desc: "Steht danach am Dock. Piraten-Überfälle bringen dir +50% Kopfgeld." },
 ];
-
-/* ---------- NPCs ---------- */
-export const NPCS = {
-  ole:    { name: "Ole",           title: "Hafenmeister",    sprite: 100, tex: "char_ole" },
-  bo:     { name: "Bo",            title: "Dock-Golem",      sprite: 109, tex: "char_bo" },
-  ada:    { name: "Ada",           title: "Kartenhaus",      sprite: 84,  tex: "char_ada" },
-  runa:   { name: "Runa",          title: "Werftchefin",     sprite: 87, tex: "char_runa" },
-  theo:   { name: "Theo",          title: "Landvermessung",  sprite: 111, tex: "char_theo" },
-  pelle:  { name: "Pelle",         title: "Handelsposten",   sprite: 86, tex: "char_pelle" },
-  kralle: { name: "Krabbe Kralle", title: "Quiz-Krabbe",     sprite: 110, tex: "char_kralle" },
-  juno:   { name: "Juno",          title: "Sturmwache",      sprite: 97,  tex: "char_juno" },
-  // GitOps-Archipel-Lotsin (Standplatz: archipel.ts ARCHIPEL_NPC, id "argo"; #93).
-  argo:   { name: "Argo",          title: "GitOps-Lotsin",   sprite: 84,  tex: "char_argos" },
-  // Monitoring-Leuchtturm-Wärterin (Standplatz: lighthouse.ts LIGHTHOUSE_NPC, id "lumi"; #112).
-  lumi:   { name: "Lumi",          title: "Leuchtturmwärterin", sprite: 97, tex: "char_lumi" },
-  // Lagerhallen-Viertel-Speicher-Verwalter (Standplatz: warehouse.ts WAREHOUSE_NPC, id "knut"; #125).
-  knut:   { name: "Knut",          title: "Speicher-Verwalter", sprite: 100, tex: "char_knut" },
-};

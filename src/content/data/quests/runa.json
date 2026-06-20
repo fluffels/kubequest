@@ -1,0 +1,432 @@
+[
+  {
+    "id": "helm-intro",
+    "title": "Das Steuerrad",
+    "giver": "runa",
+    "rewardXp": 35,
+    "rewardCoins": 25,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Ahoi! Runa, Werftchefin. Lass mich raten – bei <b>Helm</b> dachtest du an das Ding für den Kopf? HA! Helm ist Englisch für <b>Steuerrad</b> – und der <b>Paketmanager für Kubernetes</b>.",
+          "Bei Ada: 2 Karten für eine Mini-App. Eine ECHTE App: 30 Manifeste, mal drei Umgebungen. 90 Dateien?! NIEMALS. Helm bündelt alles in ein <b>Chart</b> – ein Paket mit Drehknöpfen.",
+          "Und woher der Name <b>Chart</b>? Englisch für <b>Seekarte</b> – genau wie Adas Karten! Das fügt sich ins ganze Bild: <b>Kubernetes</b> = der Steuermann, <b>Helm</b> = sein Steuerrad, <b>Chart</b> = die Seekarte, nach der er navigiert. <i>(Nicht verwechseln mit „Chart“ als Diagramm/Balkengrafik – gleiches Wort, andere Bedeutung; bei Helm ist IMMER die Seekarte = das Paket gemeint.)</i>",
+          "Charts liegen in <b>Repos</b> (wie Docker Hub für Images). Schritt eins: ein Repo hinzufügen.",
+          "Was da alles drinliegt? Fast die ganze Werft: <b>nginx</b> (Webserver), <b>postgresql</b> (Datenbank), <b>redis</b> (schneller Zwischenspeicher), <b>keycloak</b> (Login & Rechte) und <b>prometheus</b> + <b>grafana</b> fürs Überwachen. Echte Tools – die siehst du im Job alle wieder."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Chart-Quelle anzapfen",
+        "cmd": {
+          "id": "t-repoadd",
+          "intro": "🆕 Neuer Befehl: <code>helm repo add</code> – eine Chart-Quelle hinzufügen.",
+          "text": "Füge das Repo <code>bitnami</code> hinzu (URL: <code>https://charts.bitnami.com/bitnami</code>).",
+          "accept": [
+            "^helm\\s+repo\\s+add\\s+bitnami\\s+https:\\/\\/charts\\.bitnami\\.com\\/bitnami$"
+          ],
+          "solution": "helm repo add bitnami https://charts.bitnami.com/bitnami",
+          "hint": "Muster: helm repo add <name> <url>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Repo aktualisieren",
+        "cmd": {
+          "id": "t-repoupdate",
+          "intro": "🆕 Neuer Befehl: <code>helm repo update</code> – holt die aktuelle Chart-Liste aller hinzugefügten Repos (wie ein „Katalog aktualisieren“). Direkt nach <code>helm repo add</code> sinnvoll.",
+          "text": "Aktualisiere die Repo-Infos mit <code>helm repo update</code>.",
+          "accept": [
+            "^helm\\s+repo\\s+update$"
+          ],
+          "solution": "helm repo update",
+          "hint": "helm repo …"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Charts suchen",
+        "cmd": {
+          "id": "t-reposearch",
+          "intro": "🆕 Neuer Befehl: <code>helm search repo &lt;begriff&gt;</code> – durchsucht die hinzugefügten Repos nach passenden Charts (statt blind den Namen zu raten).",
+          "text": "Suche mit <code>helm search repo nginx</code> nach einem Webserver-Chart.",
+          "accept": [
+            "^helm\\s+search\\s+repo\\s+nginx$"
+          ],
+          "solution": "helm search repo nginx",
+          "hint": "helm search repo <begriff>"
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "runa",
+        "reviewId": "q-ch5-1",
+        "q": "Einmal festnageln: Was IST Helm?",
+        "options": [
+          {
+            "t": "Der Paketmanager für Kubernetes – installiert komplette Apps als Charts.",
+            "ok": true,
+            "reply": "Genau! Wie ein App-Store für den Cluster. Morgen hissen wir die erste Flagge!"
+          },
+          {
+            "t": "Ein Kopfschutz für die Werft.",
+            "ok": false,
+            "reply": "HA! Reingefallen. Steuerrad! Paketmanager! Schau aufs Logo!"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "runa",
+        "reviewId": "q-helm-chart-name",
+        "q": "Und warum heißt das Paket ausgerechnet „Chart“?",
+        "options": [
+          {
+            "t": "„chart“ = Seekarte – passt zu Steuermann (K8s) und Steuerrad (Helm).",
+            "ok": true,
+            "reply": "Genau! Steuermann, Steuerrad, Seekarte – alles aus einem Guss. Nicht mit „Chart = Diagramm“ verwechseln."
+          },
+          {
+            "t": "„chart“ = Balkendiagramm – es zeigt die App-Auslastung.",
+            "ok": false,
+            "reply": "Nein – das ist dasselbe Wort in anderer Bedeutung. Bei Helm meint Chart die Seekarte = das Paket."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "helm-release-install",
+    "title": "Flagge hissen",
+    "giver": "runa",
+    "rewardXp": 40,
+    "rewardCoins": 30,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Jetzt wird installiert! Eine Installation eines Charts heißt <b>Release</b> und bekommt einen eigenen Namen. Für jedes Release weht hier an der Werft eine <b>Flagge</b> – gleich siehst du's!"
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Erste Installation",
+        "cmd": {
+          "id": "t-install",
+          "intro": "🆕 Neuer Befehl: <code>helm install</code> – ein Chart als Release installieren.",
+          "text": "Installiere <code>bitnami/nginx</code> als Release <code>mein-web</code>. Flaggen-Blick zur Werft!",
+          "accept": [
+            "^helm\\s+install\\s+mein-web\\s+bitnami\\/nginx$"
+          ],
+          "solution": "helm install mein-web bitnami/nginx",
+          "hint": "Muster: helm install <release-name> <repo>/<chart>"
+        }
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "helm-list",
+        "brief": "Releases auflisten",
+        "cmd": {
+          "id": "t-helmlist",
+          "intro": "🆕 Neuer Befehl: <code>helm list</code> (kurz <code>helm ls</code>) – zeigt alle <b>Releases</b>, also die installierten Charts mit Name, Revision und Status.",
+          "text": "Zeig die Releases mit <code>helm list</code>.",
+          "accept": [
+            "^helm\\s+(list|ls)$"
+          ],
+          "solution": "helm list",
+          "hint": "Englisch für „auflisten“."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Was ist da passiert?",
+        "tasks": [
+          {
+            "id": "t-runa-4",
+            "text": "Und jetzt der Aha-Moment: Schau mit <b>kubectl</b> nach den Pods – Helm hat ganz normale Kubernetes-Ressourcen gebaut!",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "helm-release-install/t-runa-4",
+            "solution": "kubectl get pods",
+            "hint": "Kennst du im Schlaf."
+          }
+        ]
+      },
+      {
+        "type": "drill",
+        "brief": "Runas Übungsrunde",
+        "pool": [
+          "helm-install",
+          "helm-list"
+        ],
+        "count": 2,
+        "intro": "Noch ein Release zum Festigen – mehr Flaggen!"
+      },
+      {
+        "type": "choice",
+        "npc": "runa",
+        "reviewId": "q-ch5-2",
+        "q": "Chart und Release – was ist der Unterschied?",
+        "options": [
+          {
+            "t": "Chart = das Paket (Vorlage), Release = eine installierte Instanz davon.",
+            "ok": true,
+            "reply": "Sauber! Wie Image und Container bei Docker. Ein Chart, viele Releases, viele Flaggen!"
+          },
+          {
+            "t": "Release = die Vorlage, Chart = die Installation.",
+            "ok": false,
+            "reply": "Andersrum: Das Chart liegt im Regal, das Release weht am Mast."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "helm-upgrade-rollback",
+    "title": "Auf und ab",
+    "giver": "runa",
+    "rewardXp": 45,
+    "rewardCoins": 35,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Heute das Beste an Helm. Apps ändern sich: mehr Kopien, neue Version … Dafür gibt's <code>helm upgrade</code> mit <code>--set</code> – die Drehknöpfe aus <code>values.yaml</code> direkt verstellen."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Drehknopf verstellen",
+        "cmd": {
+          "id": "t-upgrade",
+          "intro": "🆕 Neuer Befehl: <code>helm upgrade --set</code> – ein Release ändern.",
+          "text": "Stelle <code>mein-web</code> per <code>--set replicaCount=3</code> auf 3 Kopien.",
+          "accept": [
+            "^helm\\s+upgrade\\s+mein-web\\s+bitnami\\/nginx\\s+--set\\s+replicaCount=3$"
+          ],
+          "solution": "helm upgrade mein-web bitnami/nginx --set replicaCount=3",
+          "hint": "Muster: helm upgrade <release> <chart> --set replicaCount=3"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Und wenn ein Upgrade alles kaputt macht? <b>Keine Panik!</b> Helm merkt sich jede Revision. <code>helm rollback</code> bringt dich zurück. Dieser Befehl hat mir mal ein Wochenende gerettet."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Der Lebensretter",
+        "cmd": {
+          "id": "t-rollback",
+          "intro": "🆕 Neuer Befehl: <code>helm rollback</code> – zurück zu einer früheren Revision.",
+          "text": "Befehl von oben: doch wieder zurück! Rolle <code>mein-web</code> auf Revision <b>1</b>.",
+          "accept": [
+            "^helm\\s+rollback\\s+mein-web(\\s+1)?$"
+          ],
+          "solution": "helm rollback mein-web 1",
+          "hint": "Muster: helm rollback <release> <revision>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Aufräumen",
+        "cmd": {
+          "id": "t-uninstall",
+          "intro": "🆕 Neuer Befehl: <code>helm uninstall</code> – Release komplett entfernen.",
+          "text": "Übung vorbei: Deinstalliere <code>mein-web</code>. (Die Flagge wird eingeholt …)",
+          "accept": [
+            "^helm\\s+uninstall\\s+mein-web$"
+          ],
+          "solution": "helm uninstall mein-web",
+          "hint": "Das Gegenteil von install."
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Runas Übungsrunde",
+        "pool": [
+          "helm-upgrade",
+          "helm-rollback"
+        ],
+        "count": 2,
+        "intro": "Upgrade & Rollback – das Power-Duo, nochmal:"
+      },
+      {
+        "type": "choice",
+        "npc": "runa",
+        "reviewId": "q-ch5-4",
+        "q": "Dein Upgrade hat alles zerschossen. Panik?",
+        "options": [
+          {
+            "t": "Nein – helm rollback bringt das Release auf eine frühere Revision zurück.",
+            "ok": true,
+            "reply": "Eingebrannt! Revisions-Historie = dein Sicherheitsnetz. Jetzt ab zu <b>Theo</b> östlich vom Markt – der Rat plant GROSSES."
+          },
+          {
+            "t": "Ja – Cluster löschen und neu aufsetzen.",
+            "ok": false,
+            "reply": "Bloß nicht! helm rollback <release> <revision> – zwei Sekunden, gerettet."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "helm-umbrella-chart",
+    "title": "Werft-Ausbau: dein eigenes Chart",
+    "giver": "runa",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Zurück an der Werft? Gut! Bisher hast du <b>fremde</b> Charts installiert (bitnami/nginx & Co.). Heute baust du dein <b>EIGENES</b> – echter Werft-Ausbau!",
+          "Ein Chart ist nur ein Ordner mit fester Struktur: <code>Chart.yaml</code> (der Steckbrief – Name, Version), <code>values.yaml</code> (die Drehknöpfe) und <code>templates/</code> (die Vorlagen, die zu echten Manifesten rendern). <code>helm create</code> legt dir das Gerüst fertig hin."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Chart-Gerüst anlegen",
+        "cmd": {
+          "id": "t-create-chart",
+          "intro": "🆕 Neuer Befehl: <code>helm create</code> – ein komplettes Chart-Gerüst anlegen.",
+          "text": "Bau dir ein eigenes Chart namens <code>funkdienst</code>. (Tipp danach: <code>ls</code> und <code>cat funkdienst/Chart.yaml</code> – schau dir an, was entstanden ist!)",
+          "accept": [
+            "^helm\\s+create\\s+funkdienst$"
+          ],
+          "solution": "helm create funkdienst",
+          "hint": "Muster: helm create <chart-name>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Sieh dir <code>cat funkdienst/values.yaml</code> an – das sind die Drehknöpfe (Anzahl Kopien, Image …). Bevor du ein Chart teilst oder ausrollst, prüfst du es auf Fehler. Dafür gibt's <code>helm lint</code>."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Chart prüfen",
+        "cmd": {
+          "id": "t-lint",
+          "intro": "🆕 Neuer Befehl: <code>helm lint</code> – ein Chart auf Fehler & Stil prüfen.",
+          "text": "Prüfe dein Chart <code>funkdienst</code>.",
+          "accept": [
+            "^helm\\s+lint\\s+(\\.\\/)?funkdienst$"
+          ],
+          "solution": "helm lint funkdienst",
+          "hint": "Muster: helm lint <chart>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Chart einpacken",
+        "cmd": {
+          "id": "t-package",
+          "intro": "🆕 Neuer Befehl: <code>helm package</code> – ein Chart in ein <code>.tgz</code>-Archiv packen (zum Teilen / in ein Repo legen).",
+          "text": "Pack <code>funkdienst</code> in ein verteilbares Archiv.",
+          "accept": [
+            "^helm\\s+package\\s+(\\.\\/)?funkdienst$"
+          ],
+          "solution": "helm package funkdienst",
+          "hint": "Muster: helm package <chart>"
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Eigenes Chart hissen",
+        "cmd": {
+          "id": "t-install-local",
+          "intro": "🆕 Jetzt aus dem EIGENEN Chart installieren – ein lokaler <b>Pfad</b> statt <code>repo/chart</code>.",
+          "text": "Installiere aus <code>./funkdienst</code> ein Release namens <code>mein-funk</code>. (Flaggen-Blick zur Werft!)",
+          "accept": [
+            "^helm\\s+install\\s+mein-funk\\s+\\.\\/funkdienst$"
+          ],
+          "solution": "helm install mein-funk ./funkdienst",
+          "hint": "Muster: helm install <release> ./<chart>"
+        }
+      },
+      {
+        "type": "drill",
+        "brief": "Runas Werft-Übung",
+        "pool": [
+          "helm-create",
+          "helm-lint",
+          "helm-package",
+          "helm-install-local"
+        ],
+        "count": 4,
+        "intro": "Einmal die ganze Kette selbst: create → lint → package → install."
+      },
+      {
+        "type": "choice",
+        "npc": "runa",
+        "reviewId": "q-helm-create",
+        "q": "Woraus besteht ein Helm-Chart?",
+        "options": [
+          {
+            "t": "Aus Chart.yaml (Steckbrief), values.yaml (Drehknöpfe) und templates/ (Vorlagen).",
+            "ok": true,
+            "reply": "Sitzt! Gerüst mit <code>helm create</code>, prüfen mit <code>lint</code>, packen mit <code>package</code> – jetzt baust du selbst, statt nur fertige Charts zu hissen. ⎈"
+          },
+          {
+            "t": "Aus einer einzigen großen YAML-Datei mit allem drin.",
+            "ok": false,
+            "reply": "Nein – gerade NICHT. Die Stärke ist die Trennung: Vorlage (templates) und Werte (values.yaml) getrennt, Steckbrief in Chart.yaml."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "runa",
+        "lines": [
+          "Drei Werft-Kniffe noch fürs echte Leben, Lotse: Im <code>Chart.yaml</code> stehen ZWEI Versionen – <code>version</code> ist die der <b>Verpackung</b> (SemVer: Major bricht was, Minor = neue Property, Patch = Kleinkram), <code>appVersion</code> die der <b>Fracht</b> (deiner App). Bei jeder Änderung die Chart-version hochziehen, sonst sind Rollback und Diffs blind.",
+          "Charts können andere Charts <b>mitschleppen</b>: Unter <code>dependencies:</code> bündelt ein <b>Eltern-Chart</b> ganze Subcharts (backend, keycloak …), jedes mit gepinnter Version – eine <b>Sammelkiste, die mehrere Pakete enthält</b>. Im Job sagt man <b>Umbrella-Chart</b> (auch „Wrapper“ oder „Bundle“) dazu – aber Achtung: das ist <b>kein offizieller Helm-Begriff</b>, das Spec kennt nur <i>parent chart / subcharts / dependencies</i>. Gängiger Sprech ≠ Doku!",
+          "Die Subcharts liegen entweder <b>mit im Ordner</b> (unter <code>charts/</code> – „vendored“) oder werden per <code>repository:</code>-URL <b>aus einer Registry gezogen</b>: <code>helm dependency update</code> holt sie und zurrt sie in <code>Chart.lock</code> fest (reproduzierbar, überall gleich). Der Clou für viele Setups: einzelne Subcharts per <code>condition:</code> an-/abschalten (z.B. <code>condition: permit.enabled</code>) – Kunde mit Permit → an, ohne → aus, alles aus EINEM Chart.",
+          "Und statt EINER <code>values.yaml</code> legst du mehrere übereinander: <code>helm install … -f base.yaml -f prod.yaml</code> – das spätere <code>-f</code> gewinnt. Gleiches Chart, andere Werte je Hafen (Test, Prod, je Region). Kralle drillt dich dazu ab! ⎈"
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "helm-values",
+        "brief": "Werte überschreiben",
+        "cmd": {
+          "id": "t-upgrade-values",
+          "intro": "🆕 Flag <code>--values</code> (kurz <code>-f</code>): beim Upgrade eine eigene Werte-Datei mitgeben – überschreibt die Defaults aus <code>values.yaml</code>.",
+          "text": "Upgrade <code>mein-funk</code> mit der Chart-eigenen Werte-Datei: <code>helm upgrade mein-funk ./funkdienst --values funkdienst/values.yaml</code>.",
+          "accept": [
+            "^helm\\s+upgrade\\s+mein-funk\\s+\\.\\/funkdienst\\s+(--values|-f)\\s+funkdienst\\/values\\.yaml$"
+          ],
+          "solution": "helm upgrade mein-funk ./funkdienst --values funkdienst/values.yaml",
+          "hint": "Muster: helm upgrade <release> <chart> --values <datei>"
+        }
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "helm-dependency",
+        "brief": "Subcharts holen",
+        "cmd": {
+          "id": "t-helm-dep-update",
+          "intro": "🆕 Neuer Befehl: <code>helm dependency update</code> (kurz <code>dep</code>) – zieht alle in <code>Chart.yaml</code> deklarierten Subcharts und schreibt <code>Chart.lock</code>.",
+          "text": "Hole die Abhängigkeiten von <code>funkdienst</code>: <code>helm dependency update funkdienst</code>.",
+          "accept": [
+            "^helm\\s+(dependency|dep)\\s+(update|up)\\s+(\\.\\/)?funkdienst$"
+          ],
+          "solution": "helm dependency update funkdienst",
+          "hint": "Muster: helm dependency update <chart>"
+        }
+      }
+    ]
+  }
+]

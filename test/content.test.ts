@@ -108,10 +108,10 @@ test("docker build: -t UND --tag gelten gleichwertig in Teach-Schritt, Karte & D
     assert.ok(!ok(`docker build ${nameTag} .`), "Drill: ohne -t/--tag muss scheitern (" + task.solution + ")");
   }
 
-  // 3) Teach-Schritt t-build in q3b (erster Tipp-Ort) akzeptiert beide Formen
-  const q3b = KQContent.QUESTS.find(q => q.id === "q3b");
-  assert.ok(q3b, "q3b nicht gefunden");
-  const teach = (q3b!.steps as any[]).find(s => s.type === "teach" && s.cmd?.id === "t-build");
+  // 3) Teach-Schritt t-build in docker-build-image (erster Tipp-Ort) akzeptiert beide Formen
+  const buildQuest = KQContent.QUESTS.find(q => q.id === "docker-build-image");
+  assert.ok(buildQuest, "docker-build-image nicht gefunden");
+  const teach = (buildQuest!.steps as any[]).find(s => s.type === "teach" && s.cmd?.id === "t-build");
   assert.ok(teach, "Teach-Schritt t-build nicht gefunden");
   const teachOk = (s: string) => teach.cmd.accept.some((re: RegExp) => re.test(norm(s)));
   assert.ok(teachOk("docker build -t hafenwache:1.0 ."), "Teach: -t muss gelten");
@@ -409,7 +409,7 @@ test("Red-Green: kaputte Quest-Referenz (unbekannter Questgeber) macht den Check
 test("Red-Green: unbekannter Drill in einem Übungs-Pool macht den Check rot", () => {
   const kaputt: ContentBundle = {
     ...KQContent,
-    PRACTICE: { ...KQContent.PRACTICE, ole: [{ drill: "gibt-es-nicht", after: "q4" }] },
+    PRACTICE: { ...KQContent.PRACTICE, ole: [{ drill: "gibt-es-nicht", after: "k8s-first-deployment" }] },
   };
   const errors = validateContent(kaputt);
   assert.ok(errors.some(e => e.includes("gibt-es-nicht")), "unbekannter Drill wurde NICHT gemeldet:\n" + errors.join("\n"));
@@ -516,7 +516,7 @@ test("docker-run-named: diag benennt falsches Image gezielt (#321)", () => {
 });
 
 /* ===== GitOps-Archipel: False-Positive-Schutz (#101) =====
- * Die accept-Regexes der GitOps-Quests (q29–q31) müssen falsche Eingaben
+ * Die accept-Regexes der GitOps-Quests (gitops-self-sync–gitops-app-of-apps) müssen falsche Eingaben
  * zuverlässig ablehnen – ein zu breiter Regex würde das Lernziel aushebeln. */
 
 function gitopsTask(questId: string, taskId: string) {
@@ -538,8 +538,8 @@ function accepts(task: { accept: RegExp[] }, input: string): boolean {
   return task.accept.some(re => re.test(norm));
 }
 
-test("#101 q29: argocd app list akzeptiert 'ls'-Alias, lehnt falschen Subcommand ab", () => {
-  const task = gitopsTask("q29", "t-argo-list");
+test("#101 gitops-self-sync: argocd app list akzeptiert 'ls'-Alias, lehnt falschen Subcommand ab", () => {
+  const task = gitopsTask("gitops-self-sync", "t-argo-list");
   assert.ok(accepts(task, "argocd app list"), "argocd app list muss gelten");
   assert.ok(accepts(task, "argocd app ls"),   "argocd app ls (Alias) muss GENAUSO gelten");
   assert.ok(!accepts(task, "argocd app get hafen-lager"), "'get' statt 'list' muss scheitern");
@@ -547,58 +547,58 @@ test("#101 q29: argocd app list akzeptiert 'ls'-Alias, lehnt falschen Subcommand
   assert.ok(!accepts(task, "argocd app list hafen-lager"), "extra Argument muss scheitern");
 });
 
-test("#101 q29: argocd app get hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
-  const task = gitopsTask("q29", "t-argo-get");
+test("#101 gitops-self-sync: argocd app get hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
+  const task = gitopsTask("gitops-self-sync", "t-argo-get");
   assert.ok(accepts(task, "argocd app get hafen-lager"), "korrekte Eingabe muss gelten");
   assert.ok(!accepts(task, "argocd app get"),              "fehlender Name muss scheitern");
   assert.ok(!accepts(task, "argocd app get hafen-funk"),   "falscher App-Name muss scheitern");
 });
 
-test("#101 q29: argocd app sync hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
-  const task = gitopsTask("q29", "t-argo-sync");
+test("#101 gitops-self-sync: argocd app sync hafen-lager lehnt falschen/fehlenden App-Namen ab", () => {
+  const task = gitopsTask("gitops-self-sync", "t-argo-sync");
   assert.ok(accepts(task, "argocd app sync hafen-lager"), "korrekte Eingabe muss gelten");
   assert.ok(!accepts(task, "argocd app sync"),             "fehlender Name muss scheitern");
   assert.ok(!accepts(task, "argocd app sync hafen-flotte"), "falscher App-Name muss scheitern");
 });
 
-test("#101 q29: kubectl apply -f application.yaml akzeptiert --filename, lehnt falsche Datei ab", () => {
-  const task = gitopsTask("q29", "t-argo-apply");
+test("#101 gitops-self-sync: kubectl apply -f application.yaml akzeptiert --filename, lehnt falsche Datei ab", () => {
+  const task = gitopsTask("gitops-self-sync", "t-argo-apply");
   assert.ok(accepts(task, "kubectl apply -f application.yaml"),         "kurze Form -f muss gelten");
   assert.ok(accepts(task, "kubectl apply --filename application.yaml"), "--filename muss GENAUSO gelten");
   assert.ok(!accepts(task, "kubectl apply application.yaml"),           "ohne -f/--filename muss scheitern");
   assert.ok(!accepts(task, "kubectl apply -f app.yaml"),                "falscher Dateiname muss scheitern");
 });
 
-test("#101 q30: kubectl apply -f application-selfheal.yaml lehnt die alte Datei ab", () => {
-  const task = gitopsTask("q30", "t-sh-apply");
+test("#101 gitops-drift-detection: kubectl apply -f application-selfheal.yaml lehnt die alte Datei ab", () => {
+  const task = gitopsTask("gitops-drift-detection", "t-sh-apply");
   assert.ok(accepts(task, "kubectl apply -f application-selfheal.yaml"), "korrekte Eingabe muss gelten");
   assert.ok(!accepts(task, "kubectl apply -f application.yaml"),         "alte Datei (ohne -selfheal) muss scheitern");
 });
 
-test("#101 q30: kubectl scale auf 0 lehnt andere --replicas-Werte ab", () => {
-  const task = gitopsTask("q30", "t-sh-scale");
+test("#101 gitops-drift-detection: kubectl scale auf 0 lehnt andere --replicas-Werte ab", () => {
+  const task = gitopsTask("gitops-drift-detection", "t-sh-scale");
   assert.ok(accepts(task, "kubectl scale deployment hafen-lager --replicas=0"),   "--replicas=0 muss gelten");
   assert.ok(accepts(task, "kubectl scale deployment/hafen-lager --replicas=0"),   "deployment/-Schreibweise muss gelten");
   assert.ok(!accepts(task, "kubectl scale deployment hafen-lager --replicas=1"),  "replicas=1 (falscher Wert) muss scheitern");
   assert.ok(!accepts(task, "kubectl scale hafen-lager --replicas=0"),             "ohne 'deployment' muss scheitern");
 });
 
-test("#101 q31: argocd app get hafen-flotte lehnt anderen App-Namen ab", () => {
-  const task = gitopsTask("q31", "t-aoa-get");
+test("#101 gitops-app-of-apps: argocd app get hafen-flotte lehnt anderen App-Namen ab", () => {
+  const task = gitopsTask("gitops-app-of-apps", "t-aoa-get");
   assert.ok(accepts(task, "argocd app get hafen-flotte"),    "korrekte Eingabe muss gelten");
   assert.ok(!accepts(task, "argocd app get hafen-lager"),    "hafen-lager (falsche App) muss scheitern");
   assert.ok(!accepts(task, "argocd app get hafen-flotte2"),  "ähnlicher Name muss scheitern");
 });
 
-test("#101 q31: kubectl apply -f app-of-apps.yaml lehnt andere yaml-Datei ab", () => {
-  const task = gitopsTask("q31", "t-aoa-apply");
+test("#101 gitops-app-of-apps: kubectl apply -f app-of-apps.yaml lehnt andere yaml-Datei ab", () => {
+  const task = gitopsTask("gitops-app-of-apps", "t-aoa-apply");
   assert.ok(accepts(task, "kubectl apply -f app-of-apps.yaml"),         "korrekte Eingabe muss gelten");
   assert.ok(!accepts(task, "kubectl apply -f application.yaml"),         "falsche Datei muss scheitern");
   assert.ok(!accepts(task, "kubectl apply -f app-of-apps"),              "ohne .yaml-Endung muss scheitern");
 });
 
-test("#101 GitOps-Quests (q28–q31): Belohnungen gesetzt und ansteigend", () => {
-  const ids = ["q28", "q29", "q30", "q31"];
+test("#101 GitOps-Quests (gitops-argocd-intro–gitops-app-of-apps): Belohnungen gesetzt und ansteigend", () => {
+  const ids = ["gitops-argocd-intro", "gitops-self-sync", "gitops-drift-detection", "gitops-app-of-apps"];
   const quests = ids.map(id => {
     const q = KQContent.QUESTS.find(x => x.id === id);
     assert.ok(q, id + " fehlt in QUESTS");
@@ -609,11 +609,11 @@ test("#101 GitOps-Quests (q28–q31): Belohnungen gesetzt und ansteigend", () =>
     assert.ok(q.rewardCoins > 0, q.id + ": rewardCoins muss > 0 sein");
   }
   // Letzte Quest bringt mehr als erste
-  assert.ok(quests[3].rewardXp > quests[0].rewardXp, "q31 muss mehr XP bringen als q28");
+  assert.ok(quests[3].rewardXp > quests[0].rewardXp, "gitops-app-of-apps muss mehr XP bringen als gitops-argocd-intro");
 });
 
 /* ===== Monitoring-Leuchtturm: False-Positive-Schutz (#120) =====
- * Die accept-Regexes der Observability-Quests (q32–q35) müssen falsche Eingaben
+ * Die accept-Regexes der Observability-Quests (observability-metrics–observability-alerts) müssen falsche Eingaben
  * zuverlässig ablehnen – ein zu breiter Regex würde das Lernziel aushebeln. */
 
 function obsTask(questId: string, taskId: string) {
@@ -630,8 +630,8 @@ function obsTask(questId: string, taskId: string) {
   throw new Error(questId + "/" + taskId + " nicht gefunden");
 }
 
-test("#120 q32: kubectl top pods akzeptiert po-Kürzel, lehnt 'kubectl top' ohne Ressource und 'get pods' ab", () => {
-  const task = obsTask("q32", "t-top-pods");
+test("#120 observability-metrics: kubectl top pods akzeptiert po-Kürzel, lehnt 'kubectl top' ohne Ressource und 'get pods' ab", () => {
+  const task = obsTask("observability-metrics", "t-top-pods");
   assert.ok(accepts(task, "kubectl top pods"),  "kubectl top pods muss gelten");
   assert.ok(accepts(task, "kubectl top pod"),   "kubectl top pod muss gelten");
   assert.ok(accepts(task, "kubectl top po"),    "kubectl top po (Kurzform) muss gelten");
@@ -640,8 +640,8 @@ test("#120 q32: kubectl top pods akzeptiert po-Kürzel, lehnt 'kubectl top' ohne
   assert.ok(!accepts(task, "kubectl top nodes"),"'top nodes' statt 'top pods' muss scheitern");
 });
 
-test("#120 q32: kubectl top nodes lehnt 'top pods' und bloßes 'top' ab", () => {
-  const task = obsTask("q32", "t-top-nodes");
+test("#120 observability-metrics: kubectl top nodes lehnt 'top pods' und bloßes 'top' ab", () => {
+  const task = obsTask("observability-metrics", "t-top-nodes");
   assert.ok(accepts(task, "kubectl top nodes"), "kubectl top nodes muss gelten");
   assert.ok(accepts(task, "kubectl top node"),  "kubectl top node muss gelten");
   assert.ok(accepts(task, "kubectl top no"),    "kubectl top no (Kurzform) muss gelten");
@@ -649,8 +649,8 @@ test("#120 q32: kubectl top nodes lehnt 'top pods' und bloßes 'top' ab", () => 
   assert.ok(!accepts(task, "kubectl top"),      "bloßes 'kubectl top' muss scheitern");
 });
 
-test("#120 q32: kubectl apply -f servicemonitor.yaml lehnt falsche Datei und fehlendes -f ab", () => {
-  const task = obsTask("q32", "t-sm-apply");
+test("#120 observability-metrics: kubectl apply -f servicemonitor.yaml lehnt falsche Datei und fehlendes -f ab", () => {
+  const task = obsTask("observability-metrics", "t-sm-apply");
   assert.ok(accepts(task, "kubectl apply -f servicemonitor.yaml"),         "kurze Form -f muss gelten");
   assert.ok(accepts(task, "kubectl apply --filename servicemonitor.yaml"), "--filename muss gelten");
   assert.ok(!accepts(task, "kubectl apply servicemonitor.yaml"),           "ohne -f/--filename muss scheitern");
@@ -658,8 +658,8 @@ test("#120 q32: kubectl apply -f servicemonitor.yaml lehnt falsche Datei und feh
   assert.ok(!accepts(task, "kubectl apply -f servicemonitor"),             "ohne .yaml-Endung muss scheitern");
 });
 
-test("#120 q32: kubectl get servicemonitors akzeptiert Kurzform smon, lehnt andere Ressourcen ab", () => {
-  const task = obsTask("q32", "t-sm-get");
+test("#120 observability-metrics: kubectl get servicemonitors akzeptiert Kurzform smon, lehnt andere Ressourcen ab", () => {
+  const task = obsTask("observability-metrics", "t-sm-get");
   assert.ok(accepts(task, "kubectl get servicemonitors"),  "kubectl get servicemonitors muss gelten");
   assert.ok(accepts(task, "kubectl get servicemonitor"),   "kubectl get servicemonitor (Singular) muss gelten");
   assert.ok(accepts(task, "kubectl get smon"),             "kubectl get smon (Kurzform) muss gelten");
@@ -667,9 +667,9 @@ test("#120 q32: kubectl get servicemonitors akzeptiert Kurzform smon, lehnt ande
   assert.ok(!accepts(task, "kubectl describe servicemonitors"), "'describe' statt 'get' muss scheitern");
 });
 
-test("#120 q35: kubectl get alerts akzeptiert nur 'alerts' (Plural), lehnt Singular und anderen Verb ab", () => {
-  const taskFiring   = obsTask("q35", "t-alerts-get");
-  const taskResolved = obsTask("q35", "t-alerts-resolved");
+test("#120 observability-alerts: kubectl get alerts akzeptiert nur 'alerts' (Plural), lehnt Singular und anderen Verb ab", () => {
+  const taskFiring   = obsTask("observability-alerts", "t-alerts-get");
+  const taskResolved = obsTask("observability-alerts", "t-alerts-resolved");
   for (const task of [taskFiring, taskResolved]) {
     assert.ok(accepts(task, "kubectl get alerts"),          "kubectl get alerts muss gelten");
     assert.ok(!accepts(task, "kubectl get alert"),          "'alert' (Singular) muss scheitern");
@@ -678,8 +678,8 @@ test("#120 q35: kubectl get alerts akzeptiert nur 'alerts' (Plural), lehnt Singu
   }
 });
 
-test("#120 q35: kubectl scale deployment rechenknecht --replicas=0 lehnt anderen Replicas-Wert und fehlendes Deployment ab", () => {
-  const task = obsTask("q35", "t-scale-zero");
+test("#120 observability-alerts: kubectl scale deployment rechenknecht --replicas=0 lehnt anderen Replicas-Wert und fehlendes Deployment ab", () => {
+  const task = obsTask("observability-alerts", "t-scale-zero");
   assert.ok(accepts(task, "kubectl scale deployment rechenknecht --replicas=0"),  "--replicas=0 muss gelten");
   assert.ok(accepts(task, "kubectl scale deployment rechenknecht --replicas 0"),  "--replicas 0 (Leerzeichen) muss gelten");
   assert.ok(!accepts(task, "kubectl scale deployment rechenknecht --replicas=1"), "replicas=1 (falscher Wert) muss scheitern");
@@ -688,24 +688,24 @@ test("#120 q35: kubectl scale deployment rechenknecht --replicas=0 lehnt anderen
   assert.ok(!accepts(task, "kubectl scale deployment dampfwinde --replicas=0"),   "falscher Deployment-Name muss scheitern");
 });
 
-test("#120 q34: kubectl logs akzeptiert Pod-Präfix signalgeber, lehnt -f-Variante als Basis-Log ab", () => {
-  const taskBasic = obsTask("q34", "t-logs-basic");
+test("#120 observability-logs: kubectl logs akzeptiert Pod-Präfix signalgeber, lehnt -f-Variante als Basis-Log ab", () => {
+  const taskBasic = obsTask("observability-logs", "t-logs-basic");
   assert.ok(accepts(taskBasic, "kubectl logs signalgeber"),         "exakter Deployment-Name muss gelten");
   assert.ok(accepts(taskBasic, "kubectl logs signalgeber-abc12"),   "voller Pod-Name muss gelten");
   assert.ok(!accepts(taskBasic, "kubectl logs -f signalgeber"),     "'-f signalgeber' passt nicht zum Basis-Log-Schritt");
   assert.ok(!accepts(taskBasic, "kubectl log signalgeber"),         "Tippfehler 'log' statt 'logs' muss scheitern");
 });
 
-test("#120 q34: kubectl logs -f verlangt explizit -f oder --follow, lehnt bloßes 'logs' ab", () => {
-  const taskFollow = obsTask("q34", "t-logs-follow");
+test("#120 observability-logs: kubectl logs -f verlangt explizit -f oder --follow, lehnt bloßes 'logs' ab", () => {
+  const taskFollow = obsTask("observability-logs", "t-logs-follow");
   assert.ok(accepts(taskFollow, "kubectl logs -f signalgeber"),          "'-f' vor Pod-Name muss gelten");
   assert.ok(accepts(taskFollow, "kubectl logs signalgeber -f"),          "'-f' nach Pod-Name muss gelten");
   assert.ok(accepts(taskFollow, "kubectl logs --follow signalgeber"),    "'--follow' muss gelten");
   assert.ok(!accepts(taskFollow, "kubectl logs signalgeber"),            "ohne -f/-follow muss scheitern");
 });
 
-test("#120 Phase-5-Quests (q32–q35): Belohnungen gesetzt und ansteigend", () => {
-  const ids = ["q32", "q33", "q34", "q35"];
+test("#120 Phase-5-Quests (observability-metrics–observability-alerts): Belohnungen gesetzt und ansteigend", () => {
+  const ids = ["observability-metrics", "observability-grafana", "observability-logs", "observability-alerts"];
   const quests = ids.map(id => {
     const q = KQContent.QUESTS.find(x => x.id === id);
     assert.ok(q, id + " fehlt in QUESTS");
@@ -716,5 +716,5 @@ test("#120 Phase-5-Quests (q32–q35): Belohnungen gesetzt und ansteigend", () =
     assert.ok(q.rewardCoins > 0, q.id + ": rewardCoins muss > 0 sein");
     assert.ok(q.giver === "lumi", q.id + ": Giver muss 'lumi' sein");
   }
-  assert.ok(quests[3].rewardXp >= quests[0].rewardXp, "q35 soll mindestens so viel XP bringen wie q32");
+  assert.ok(quests[3].rewardXp >= quests[0].rewardXp, "observability-alerts soll mindestens so viel XP bringen wie observability-metrics");
 });

@@ -1,0 +1,845 @@
+[
+  {
+    "id": "observability-metrics",
+    "title": "Licht ins Dunkel: die ersten Metriken",
+    "giver": "lumi",
+    "rewardXp": 50,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Ahoi und herauf auf die Klippe! Ich bin <b>Lumi</b>, ich halte hier oben den <b>Monitoring-Leuchtturm</b> am Brennen. Schön, dass du den Aufstieg gewagt hast.",
+          "Mein Wahlspruch: <b>Erst messen, dann meckern.</b> Drüben im Hafen läuft alles – aber <i>woher</i> weißt du das eigentlich? Was du nicht <b>siehst</b>, kannst du nicht reparieren. Genau dafür gibt es <b>Observability</b>: den Hafen sichtbar machen.",
+          "Mein wichtigstes Werkzeug heißt <b>Prometheus</b>. Stell es dir wie meinen Leuchtturm-Blick vor: In festem Takt – etwa alle 15 Sekunden – schaut Prometheus bei jedem Dienst vorbei und liest dessen Zahlen ab."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Und merk dir die Richtung, das ist der Knackpunkt: Prometheus <b>holt</b> sich die Zahlen selbst – es <b>scrapt</b> (engl. <i>to scrape</i> = abkratzen/abgrasen) jeden Dienst über dessen <code>/metrics</code>-Seite. Das ist <b>Pull</b>: der Wächter geht zu den Diensten, nicht die Dienste zum Wächter.",
+          "Jeden Dienst, den Prometheus abgrast, nennen wir ein <b>Target</b> (Scrape-Ziel). Antwortet es, steht das Target auf <b>up</b>; schweigt es, auf <b>down</b> – und ein stummes Target ist oft das erste Zeichen, dass etwas im Argen liegt."
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-scrape",
+        "q": "Wie kommt <b>Prometheus</b> an die Zahlen eines Dienstes?",
+        "options": [
+          {
+            "t": "Es <b>scrapt</b> sie im Takt selbst ab – es ruft die <code>/metrics</code>-Seite des Dienstes auf (Pull). Antwortet das Target, ist es <b>up</b>.",
+            "ok": true,
+            "reply": "Genau! Pull-Prinzip: Prometheus geht von sich aus bei jedem Target vorbei und liest <code>/metrics</code>. Schweigt eins, steht es auf <b>down</b> – das erste Warnsignal."
+          },
+          {
+            "t": "Jeder Dienst schickt seine Zahlen von sich aus an Prometheus (Push), sobald sich etwas ändert.",
+            "ok": false,
+            "reply": "Nicht beim klassischen Prometheus: Es <i>holt</i> (pull) die Metriken selbst über <code>/metrics</code> ab, statt sie zugeschickt zu bekommen. Die Richtung ist genau andersherum."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Genug Theorie – schau selbst hin. Die schnellste Sofort-Ansicht der Last bekommst du mit <code>kubectl top</code>: Es zeigt dir live, wie viel <b>CPU</b> und <b>Speicher</b> gerade verbraucht wird. Fang bei den Pods an."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Last der Pods lesen",
+        "cmd": {
+          "id": "t-top-pods",
+          "intro": "🆕 Neuer Befehl: <code>kubectl top pods</code> – zeigt die <b>aktuelle</b> CPU- (in Millicores, <code>m</code>) und Speicher-Last (in <code>Mi</code>) je laufendem Pod. Die Zahlen liefert der metrics-server, dieselbe Quelle, aus der auch Prometheus schöpft.",
+          "text": "Lies die Pod-Last: <code>kubectl top pods</code>. Welcher Pod zieht am meisten?",
+          "accept": [
+            "^kubectl\\s+top\\s+(pods|pod|po)$"
+          ],
+          "solution": "kubectl top pods",
+          "hint": "kubectl top pods (Kurzform: po)."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Auch die Stege messen",
+        "tasks": [
+          {
+            "id": "t-top-nodes",
+            "text": "Zoom eine Ebene raus: <code>kubectl top nodes</code> zeigt die Last pro <b>Node</b> (Steg) – CPU/Speicher absolut und in Prozent. So siehst du, ob ein ganzer Server an seine Grenze kommt.",
+            "accept": [
+              "^kubectl\\s+top\\s+(nodes|node|no)$"
+            ],
+            "solution": "kubectl top nodes",
+            "hint": "kubectl top nodes (Kurzform: no)."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-top",
+        "q": "Was zeigt dir <code>kubectl top pods</code>?",
+        "options": [
+          {
+            "t": "Die <b>aktuelle</b> CPU- und Speicher-Last je laufendem Pod (CPU in <code>m</code>, Speicher in <code>Mi</code>).",
+            "ok": true,
+            "reply": "Richtig! Ein Live-Blick auf den Verbrauch – ideal, um schnell den heißen Pod zu finden. <code>kubectl top nodes</code> macht dasselbe für die ganzen Stege."
+          },
+          {
+            "t": "Die <b>Logs</b> jedes Pods, also die Textausgaben des Programms.",
+            "ok": false,
+            "reply": "Das wären <code>kubectl logs</code>. <code>top</code> zeigt keine Texte, sondern Zahlen: wie viel CPU und Speicher gerade verbraucht wird."
+          },
+          {
+            "t": "Ob ein Pod <b>läuft</b> oder abgestürzt ist (Status Running/CrashLoop).",
+            "ok": false,
+            "reply": "Den Status zeigt <code>kubectl get pods</code>. <code>top</code> geht eine Stufe tiefer: nicht <i>ob</i>, sondern <i>wie viel</i> er gerade verbraucht."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "files": {
+            "servicemonitor.yaml": "apiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\nmetadata:\n  name: lager-monitor\n  labels:\n    release: prometheus        # über dieses Label findet Prometheus den ServiceMonitor\nspec:\n  selector:\n    matchLabels:\n      app: lager               # dieser Service wird gescrapt\n  endpoints:\n    - port: metrics            # benannter Port, unter dem /metrics liegt\n      path: /metrics\n      interval: 30s            # wie oft Prometheus scrapt"
+          },
+          "applyEffects": {
+            "servicemonitor.yaml": {
+              "serviceMonitor": {
+                "name": "lager-monitor",
+                "selector": "lager",
+                "port": "metrics",
+                "interval": "30s"
+              }
+            }
+          }
+        },
+        "lines": [
+          "<code>top</code> ist der schnelle Blick. Damit Prometheus einen Dienst aber <b>dauerhaft</b> im Takt abgrast, muss ich ihm sagen: „Diesen Service bitte scrapen.“ Dafür gibt es ein eigenes Manifest – den <b>ServiceMonitor</b>.",
+          "Ein ServiceMonitor ist ein deklaratives Stück YAML (eine CRD des Prometheus-Operators): sein <code>selector</code> wählt per Label den Service aus, seine <code>endpoints</code> sagen, an welchem Port und in welchem Takt <code>/metrics</code> abgegrast wird.",
+          "Ich hab dir einen vorbereitet: <code>servicemonitor.yaml</code> für unseren <b>lager</b>-Service. Schau ihn dir erst an, dann grasen wir ihn an Prometheus an."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Den Scrape-Auftrag lesen",
+        "tasks": [
+          {
+            "id": "t-sm-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-sm-cat",
+            "text": "Lies den Auftrag: <code>cat servicemonitor.yaml</code>. Findest du <code>kind: ServiceMonitor</code>, den <code>selector</code> (welcher Service) und das <code>interval</code> (wie oft gescrapt wird)?",
+            "accept": [
+              "^cat\\s+servicemonitor\\.yaml$"
+            ],
+            "solution": "cat servicemonitor.yaml",
+            "hint": "cat servicemonitor.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Service ins Monitoring nehmen",
+        "cmd": {
+          "id": "t-sm-apply",
+          "intro": "🆕 Der ServiceMonitor ist ein ganz normales Manifest – du wendest ihn mit dem vertrauten <code>kubectl apply -f</code> an. Ab jetzt weiß Prometheus, dass es den <b>lager</b>-Service scrapen soll.",
+          "text": "Nimm den Service ins Monitoring: wende <code>servicemonitor.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+servicemonitor\\.yaml$"
+          ],
+          "check": "observability-metrics/t-sm-apply",
+          "solution": "kubectl apply -f servicemonitor.yaml",
+          "hint": "kubectl apply -f <datei> – der vertraute Befehl aus dem Kartenhaus."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Nachschauen, was gescrapt wird",
+        "tasks": [
+          {
+            "id": "t-sm-get",
+            "text": "Prüf, dass der Auftrag steht: <code>kubectl get servicemonitors</code>. Dein <code>lager-monitor</code> taucht jetzt auf – Prometheus grast den Service ab.",
+            "accept": [
+              "^kubectl\\s+get\\s+(servicemonitors|servicemonitor|smon)$"
+            ],
+            "check": "observability-metrics/t-sm-get",
+            "solution": "kubectl get servicemonitors",
+            "hint": "kubectl get servicemonitors (Kurzform: smon)."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-servicemonitor",
+        "q": "Wozu dient ein <b>ServiceMonitor</b>?",
+        "options": [
+          {
+            "t": "Er sagt Prometheus deklarativ, <b>welchen</b> Service es scrapen soll – per <code>selector</code> (Label) plus Port & Intervall in <code>endpoints</code>.",
+            "ok": true,
+            "reply": "Genau! Der ServiceMonitor ist der deklarative Scrape-Auftrag: Selector wählt den Service, endpoints legen Port und Takt fest. Kein Prometheus-Config-Gefummel von Hand. 🔦"
+          },
+          {
+            "t": "Er startet einen neuen Pod, der den Service überwacht und bei Fehlern neu startet.",
+            "ok": false,
+            "reply": "Nein – er startet nichts. Ein ServiceMonitor ist nur eine Beschreibung für Prometheus: <i>welchen</i> Service grase ich ab und wie. Das Scrapen macht Prometheus selbst."
+          },
+          {
+            "t": "Er verschickt die Metriken per Push an einen externen Server.",
+            "ok": false,
+            "reply": "Andersherum: Prometheus <i>holt</i> sich die Metriken (Pull). Der ServiceMonitor legt nur fest, <b>welches</b> Target dafür in Frage kommt – verschickt selbst nichts."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Sieh an – du misst, statt zu raten. <code>top</code> für den schnellen Blick, ein <b>ServiceMonitor</b>, damit Prometheus dauerhaft dranbleibt. Das Fundament steht.",
+          "Beim nächsten Mal machen wir die Zahlen <b>hübsch</b>: ein <b>Grafana</b>-Dashboard, das den Hafen auf einen Blick zeigt – schöner als jeder Sonnenuntergang. Komm wieder hoch auf die Klippe! 🔦"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observability-grafana",
+    "title": "Zahlen in Bilder: das Grafana-Dashboard",
+    "giver": "lumi",
+    "rewardXp": 55,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Willkommen zurück auf der Klippe! Prometheus sammelt fleißig Zahlen – aber ein endloser Strom aus Messwerten ist wie ein Logbuch ohne Schaubilder: informativ, aber schwer zu lesen.",
+          "Genau hier kommt <b>Grafana</b> ins Spiel. Grafana ist unser Kartentisch: Es nimmt die Rohdaten aus Prometheus und verwandelt sie in <b>Dashboards</b> – Bildschirmseiten mit Graphen, Tabellen und Ampeln, die du auf einen Blick ablesen kannst.",
+          "Bevor Grafana aber überhaupt eine Zahl anzeigen kann, muss es wissen, <i>woher</i> es die Daten holt. Diese Verbindung nennt sich <b>Datasource</b> – die Datenquelle. Ohne Datasource: leere Graphen."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "files": {
+            "grafanadatasource.yaml": "apiVersion: grafana.integreatly.org/v1beta1\nkind: GrafanaDatasource\nmetadata:\n  name: prometheus-quelle\nspec:\n  datasource:\n    name: Prometheus\n    type: prometheus\n    access: proxy\n    url: http://prometheus-server.monitoring.svc:9090   # die Prometheus-Adresse im Cluster"
+          },
+          "applyEffects": {
+            "grafanadatasource.yaml": {
+              "grafanaDatasource": {
+                "name": "prometheus-quelle",
+                "dsType": "prometheus",
+                "url": "http://prometheus-server.monitoring.svc:9090"
+              }
+            }
+          }
+        },
+        "lines": [
+          "Ich habe dir eine <code>grafanadatasource.yaml</code> vorbereitet. Sie beschreibt eine <b>GrafanaDatasource</b> – eine CRD des Grafana-Operators. Darin steht: <i>Typ Prometheus, Adresse im Cluster, Zugriff über Proxy</i>.",
+          "Sobald du das Manifest anwendest, weiß Grafana: „Meine Datenquelle heißt <b>Prometheus</b>, und ich finde sie unter <code>prometheus-server.monitoring.svc:9090</code>.“ Dann kann jedes Dashboard darauf zugreifen."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Datasource-Manifest lesen",
+        "tasks": [
+          {
+            "id": "t-ds-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-ds-cat",
+            "text": "Lies die Datenquelle: <code>cat grafanadatasource.yaml</code>. Findest du <code>kind: GrafanaDatasource</code>, den <code>type: prometheus</code> und die Cluster-URL?",
+            "accept": [
+              "^cat\\s+grafanadatasource\\.yaml$"
+            ],
+            "solution": "cat grafanadatasource.yaml",
+            "hint": "cat grafanadatasource.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Datasource anbinden",
+        "cmd": {
+          "id": "t-ds-apply",
+          "intro": "🆕 Neuer Befehl: <code>kubectl apply -f grafanadatasource.yaml</code> – wie alle Manifeste, nur dass hier eine CRD des Grafana-Operators entsteht. Ab jetzt hat Grafana eine Datenquelle.",
+          "text": "Bind die Datenquelle an: wende <code>grafanadatasource.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+grafanadatasource\\.yaml$"
+          ],
+          "check": "observability-grafana/t-ds-apply",
+          "solution": "kubectl apply -f grafanadatasource.yaml",
+          "hint": "kubectl apply -f <datei> – der vertraute Befehl."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Datasource prüfen",
+        "tasks": [
+          {
+            "id": "t-ds-get",
+            "text": "Prüf, dass Grafana die Quelle kennt: <code>kubectl get grafanadatasources</code>. Deine <code>prometheus-quelle</code> taucht jetzt auf.",
+            "accept": [
+              "^kubectl\\s+get\\s+(grafanadatasources|grafanadatasource|grafanadatasrc)$"
+            ],
+            "check": "observability-grafana/t-ds-get",
+            "solution": "kubectl get grafanadatasources",
+            "hint": "kubectl get grafanadatasources (Kurzform: grafanadatasrc)."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-datasource",
+        "q": "Wozu braucht Grafana eine <b>GrafanaDatasource</b>?",
+        "options": [
+          {
+            "t": "Sie sagt Grafana, <b>woher</b> es die Metriken holt – Typ (Prometheus), Adresse im Cluster und Zugriffsweg.",
+            "ok": true,
+            "reply": "Genau! Die Datasource ist die Brücke: Grafana weiß jetzt, unter welcher Adresse es Prometheus findet und wie es anfragen soll. Ohne sie: leere Graphen. 🔦"
+          },
+          {
+            "t": "Sie startet Prometheus und sorgt dafür, dass es Metriken scrapt.",
+            "ok": false,
+            "reply": "Nein – Prometheus läuft bereits. Die GrafanaDatasource konfiguriert nur Grafana: <i>wo</i> es seine Daten abholt. Das Scrapen macht weiterhin Prometheus selbst."
+          },
+          {
+            "t": "Sie legt fest, welche Dashboards angezeigt werden und wie viele Panels sie haben.",
+            "ok": false,
+            "reply": "Das ist die Aufgabe der GrafanaDashboard-CRD. Die GrafanaDatasource kümmert sich nur um die <i>Datenquelle</i> – die Frage, woher die Zahlen kommen."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Datasource steht – Grafana hat jetzt einen Draht zu Prometheus. Jetzt bauen wir das <b>Dashboard</b> selbst.",
+          "Ein <b>GrafanaDashboard</b> ist wieder eine CRD: Das eigentliche Dashboard-JSON (das Grafana sonst per Hand über die Oberfläche speichern würde) steckt direkt im Manifest. Deklarativ, versionierbar, reproduzierbar – genau wie alles andere im Cluster.",
+          "Unser <b>Hafen-Übersicht</b>-Dashboard hat drei Panels: <b>CPU pro Pod</b> (Zeitreihe), <b>Aktive Alerts</b> (Zahl) und <b>Scrape-Targets up/down</b> (Tabelle). Kurz, aber alles, was du auf der Klippe brauchst."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "files": {
+            "grafanadashboard.yaml": "apiVersion: grafana.integreatly.org/v1beta1\nkind: GrafanaDashboard\nmetadata:\n  name: hafen-uebersicht\nspec:\n  resyncPeriod: 30s\n  datasources:\n    - inputName: DS_PROMETHEUS\n      datasourceName: Prometheus\n  json: |\n    {\n      \"title\": \"Hafen-Übersicht\",\n      \"panels\": [\n        { \"title\": \"CPU pro Pod (kubectl top)\", \"type\": \"timeseries\" },\n        { \"title\": \"Aktive Alerts\", \"type\": \"stat\" },\n        { \"title\": \"Scrape-Targets up/down\", \"type\": \"table\" }\n      ]\n    }"
+          },
+          "applyEffects": {
+            "grafanadashboard.yaml": {
+              "grafanaDashboard": {
+                "name": "hafen-uebersicht",
+                "title": "Hafen-Übersicht",
+                "panels": 3
+              }
+            }
+          }
+        },
+        "lines": [
+          "Hier liegt <code>grafanadashboard.yaml</code>. Schau sie dir an – du findest darin den <code>title</code> und die <code>panels</code>-Liste. Dann wenden wir das Dashboard an."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Dashboard-Manifest lesen",
+        "tasks": [
+          {
+            "id": "t-gd-cat",
+            "text": "Lies das Dashboard: <code>cat grafanadashboard.yaml</code>. Findest du <code>kind: GrafanaDashboard</code>, den <code>title</code> und die drei Panel-Titel?",
+            "accept": [
+              "^cat\\s+grafanadashboard\\.yaml$"
+            ],
+            "solution": "cat grafanadashboard.yaml",
+            "hint": "cat grafanadashboard.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Dashboard anlegen",
+        "cmd": {
+          "id": "t-gd-apply",
+          "intro": "🆕 Neuer Befehl: <code>kubectl apply -f grafanadashboard.yaml</code> – legt das Dashboard deklarativ an. Grafana liest das JSON aus dem Manifest und zeigt es sofort in seiner Oberfläche.",
+          "text": "Leg das Dashboard an: wende <code>grafanadashboard.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+grafanadashboard\\.yaml$"
+          ],
+          "check": "observability-grafana/t-gd-apply",
+          "solution": "kubectl apply -f grafanadashboard.yaml",
+          "hint": "kubectl apply -f <datei> – wie immer."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Dashboard prüfen",
+        "tasks": [
+          {
+            "id": "t-gd-get",
+            "text": "Prüf, dass das Dashboard registriert ist: <code>kubectl get grafanadashboards</code>. Du siehst <code>hafen-uebersicht</code> mit Titel und Panel-Anzahl.",
+            "accept": [
+              "^kubectl\\s+get\\s+(grafanadashboards|grafanadashboard|grafanadash)$"
+            ],
+            "check": "observability-grafana/t-gd-get",
+            "solution": "kubectl get grafanadashboards",
+            "hint": "kubectl get grafanadashboards (Kurzform: grafanadash)."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-dashboard-panel",
+        "q": "Im Panel <b>Scrape-Targets up/down</b> siehst du plötzlich ein Target auf <code>down</code>. Was bedeutet das – und was ist dein nächster Schritt?",
+        "options": [
+          {
+            "t": "Der betroffene Dienst antwortet nicht auf <code>/metrics</code> – Prometheus kann ihn nicht scrapen. Nächster Schritt: <code>kubectl get pods</code>, um den Pod-Status zu prüfen.",
+            "ok": true,
+            "reply": "Genau! Ein <code>down</code>-Target heißt: Prometheus hat beim Scrapen keine Antwort bekommen. Der Pod läuft vielleicht nicht, horcht am falschen Port oder hat einen Fehler. <code>kubectl get pods</code> + <code>kubectl describe pod</code> sind dein Einstieg. 🔦"
+          },
+          {
+            "t": "Grafana hat die Verbindung zur Datasource verloren. Nächster Schritt: <code>kubectl apply -f grafanadatasource.yaml</code> erneut ausführen.",
+            "ok": false,
+            "reply": "Nicht ganz. Wenn die Datasource fehlen würde, wären <i>alle</i> Panels leer oder fehlerhaft – nicht nur ein Target in der Tabelle. Ein einzelnes <code>down</code>-Target zeigt ein Problem beim <i>Dienst</i> selbst, nicht bei Grafana."
+          },
+          {
+            "t": "Das Target wurde bewusst deaktiviert. Es muss kein Handlungsbedarf bestehen.",
+            "ok": false,
+            "reply": "Im Zweifel lieber nachschauen als ignorieren! Ein <code>down</code>-Target ist immer ein Warnsignal: Prometheus bekommt keine Metriken mehr. Der Dienst könnte abgestürzt sein oder am falschen Port horchen."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Sieh an – du liest Dashboards wie Seekarten. Datasource verknüpft, Dashboard angelegt, Panels verstanden.",
+          "Das ist Observability: nicht raten, sondern <b>sehen</b>. Prometheus sammelt, Grafana zeigt – und du weißt sofort, wo der Hafen brennt. Meld dich wieder, wenn du die <b>Alerts</b> aufschalten willst – dann nicht nur sehen, sondern <i>benachrichtigt</i> werden. 🔦"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observability-logs",
+    "title": "Was die App zu sagen hat: kubectl logs",
+    "giver": "lumi",
+    "rewardXp": 50,
+    "rewardCoins": 35,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Schön, dass du wieder rauf auf die Klippe gestiegen bist! Metriken zeigen uns <i>Zahlen</i> – wie viel CPU, wie viele Fehler, wie oft. Aber manchmal reichen die Zahlen nicht: Du weißt, ein Pod ist abgestürzt. <i>Warum?</i> Die Metriken sagen nur: Er ist weg.",
+          "Hier kommen <b>Logs</b> ins Spiel – der zweite Pfeiler der Observability. Jede App schreibt ihren eigenen Text: Meldungen, Fehlermeldungen, Statuszeilen. Das ist ihr <b>Logbuch</b>, und <code>kubectl logs</code> ist der direkte Draht hinein."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "signalgeber",
+              "image": "nginx",
+              "replicas": 1
+            }
+          ]
+        },
+        "lines": [
+          "Wichtig: <code>kubectl logs</code> zeigt, was <b>die App selbst</b> ausgibt – ihr <code>stdout</code> und <code>stderr</code>. Das sind reine Text-Zeilen, die das Programm schreibt.",
+          "Das ist etwas anderes als <code>kubectl describe pod</code>: Describe zeigt die <b>Kubernetes-Sicht</b> (Zustand, Events, Scheduling). Logs zeigen die <b>App-Sicht</b>. Beides zusammen ergibt das vollständige Bild.",
+          "Unser <b>signalgeber</b>-Dienst läuft gerade. Lies seine Logs – sieh selbst, was er zu berichten hat."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Pod-Logs lesen",
+        "cmd": {
+          "id": "t-logs-basic",
+          "intro": "🆕 Neuer Befehl: <code>kubectl logs &lt;pod&gt;</code> – zeigt die Textausgaben (stdout/stderr) des Containers. Den Pod-Namen bekommst du mit <code>kubectl get pods</code>.",
+          "text": "Lies die Logs des signalgeber-Pods: <code>kubectl logs &lt;pod-name&gt;</code>.",
+          "accept": [
+            "^kubectl\\s+logs\\s+(signalgeber|signalgeber-\\S+)$"
+          ],
+          "solution": "kubectl logs <signalgeber-pod>",
+          "hint": "kubectl logs <pod-name> – den Namen siehst du mit kubectl get pods."
+        }
+      },
+      {
+        "type": "teach",
+        "brief": "Logs live verfolgen",
+        "cmd": {
+          "id": "t-logs-follow",
+          "intro": "🆕 Flag <code>-f</code> (<code>--follow</code>): Hält den Log-Stream offen – neue Zeilen erscheinen live. Ideal, um zu sehen, was gerade passiert. Mit <code>^C</code> beenden.",
+          "text": "Folge den Logs live: <code>kubectl logs -f &lt;pod-name&gt;</code>.",
+          "accept": [
+            "^kubectl\\s+logs\\s+(-f|--follow)\\s+(signalgeber|signalgeber-\\S+)$",
+            "^kubectl\\s+logs\\s+(signalgeber|signalgeber-\\S+)\\s+(-f|--follow)$"
+          ],
+          "solution": "kubectl logs -f <signalgeber-pod>",
+          "hint": "kubectl logs -f <pod-name> – das -f steht für follow."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-logs-basic",
+        "q": "Was zeigt dir <code>kubectl logs &lt;pod&gt;</code>?",
+        "options": [
+          {
+            "t": "Die Textausgaben der App – stdout/stderr des laufenden Containers.",
+            "ok": true,
+            "reply": "Genau! Logs zeigen, was die App selbst schreibt – Meldungen, Fehler, Statuszeilen. Die Kubernetes-Sicht (Scheduling, Events) zeigt dagegen kubectl describe. Beides zusammen ergibt das vollständige Bild. 🔦"
+          },
+          {
+            "t": "Die Kubernetes-Events des Pods (Scheduling, ImagePull, Neustart).",
+            "ok": false,
+            "reply": "Das zeigt kubectl describe pod. kubectl logs zeigt die App-Ausgabe – was das Programm selbst schreibt (stdout/stderr), nicht was Kubernetes darüber notiert."
+          },
+          {
+            "t": "Die aktuelle CPU- und Speicher-Last des Pods.",
+            "ok": false,
+            "reply": "Die Last zeigt kubectl top pods. kubectl logs zeigt Text: was die App als Ausgabe produziert – ihr Logbuch, Zeile für Zeile."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "bakenbote",
+              "image": "nginx",
+              "replicas": 1,
+              "broken": {
+                "type": "crashloop",
+                "needsSecret": "baken-config"
+              }
+            }
+          ]
+        },
+        "lines": [
+          "Jetzt der Ernst. Siehst du das rote Aufflackern am Hafen? Die <b>bakenbote</b> – unser Signaldienst – stürzt immer wieder ab. <b>CrashLoopBackOff</b>.",
+          "Bei einem CrashLoop sagt <code>kubectl describe pod</code> nur: <i>er stirbt, immer wieder</i>. Den echten Grund – was die App kurz vor dem Absturz geschrieben hat – zeigen nur die <b>Logs</b>."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Status und Absturz-Logs lesen",
+        "tasks": [
+          {
+            "id": "t-logs-get-pods",
+            "text": "Schau dir den Status an: <code>kubectl get pods</code>. Wie viele Restarts hat die bakenbote bereits?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "kubectl get pods – oder kurz: po."
+          },
+          {
+            "id": "t-logs-crash",
+            "text": "Lies die Logs der bakenbote: <code>kubectl logs &lt;pod-name&gt;</code>. Schau dir die letzte Zeile an – was steht da?",
+            "accept": [
+              "^kubectl\\s+logs\\s+(bakenbote|bakenbote-\\S+)$"
+            ],
+            "solution": "kubectl logs <bakenbote-pod>",
+            "hint": "kubectl logs <pod-name> – den Namen aus kubectl get pods kopieren."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Absturz-Log des Vorgängers lesen",
+        "cmd": {
+          "id": "t-logs-previous",
+          "intro": "🆕 Flag <code>--previous</code> (auch: <code>-p</code>): Zeigt die Logs des <b>letzten abgestürzten</b> Containers – genau das, was er kurz vor dem Exit ausgegeben hat. Nur sinnvoll, wenn der Pod schon neugestartet ist (also bei CrashLoop).",
+          "text": "Lies den Absturz-Log: <code>kubectl logs --previous &lt;bakenbote-pod&gt;</code>.",
+          "accept": [
+            "^kubectl\\s+logs\\s+(--previous|-p)\\s+(bakenbote|bakenbote-\\S+)$",
+            "^kubectl\\s+logs\\s+(bakenbote|bakenbote-\\S+)\\s+(--previous|-p)$"
+          ],
+          "solution": "kubectl logs --previous <bakenbote-pod>",
+          "hint": "kubectl logs --previous <pod-name> – oder: -p als Kurzform."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-logs-previous",
+        "q": "Die Logs der bakenbote zeigen: <code>FATAL: Secret 'baken-config' nicht gefunden – Dienst kann nicht starten!</code>. Was ist die Ursache des Absturzes?",
+        "options": [
+          {
+            "t": "Das Secret <b>baken-config</b> fehlt im Cluster – die App bricht beim Lesen der Konfiguration ab.",
+            "ok": true,
+            "reply": "Genau! Die FATAL-Zeile lügt nicht: Die App braucht das Secret baken-config, findet es nicht und beendet sich sauber mit Code 1. Jetzt weißt du, wo du ansetzen musst – Secret anlegen oder den Namen im Deployment korrigieren. 🔦"
+          },
+          {
+            "t": "Das Container-Image existiert nicht – Kubernetes kann es nicht laden (ImagePullBackOff).",
+            "ok": false,
+            "reply": "ImagePullBackOff bedeutet: das Image fehlt schon im Registry. Dann startet der Container gar nicht erst – keine Logs. Hier gibt es aber Logs mit einer klaren FATAL-Meldung: die App startet, liest die Konfiguration – und bricht dann ab."
+          },
+          {
+            "t": "Der Pod hat zu wenig Speicher und wird vom Kernel abgewürgt (OOMKilled).",
+            "ok": false,
+            "reply": "Bei OOMKilled endet das Log abrupt – kein Fehler, kein Stacktrace (der Kernel killt den Prozess von außen). Hier steht aber eine klare FATAL-Zeile: Die App findet ihr Secret nicht und beendet sich selbst."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Sieh an – Logs gelesen wie ein echter Wächter. Basis-Ausgabe, live folgen, Absturz-Log des Vorgängers: das Dreigespann trägt dich durch die meisten Nächte auf der Klippe.",
+          "Metriken zeigen <i>was</i>, Logs zeigen <i>warum</i>. Ein letztes Werkzeug fehlt noch: <b>Alerts</b> – damit der Cluster dich weckt, bevor du überhaupt auf das Dashboard schauen musst. Komm wieder hoch! 🔦"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observability-alerts",
+    "title": "Der Cluster ruft: Alerts & PrometheusRule",
+    "giver": "lumi",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Willkommen zurück! Metriken zeigen <i>was</i>, Logs zeigen <i>warum</i> – aber wer weckt dich nachts, wenn etwas brennt? Das ist die dritte Säule der Observability: <b>Alerts</b>.",
+          "Prometheus wertet deine <b>Alert-Regeln</b> laufend gegen seine Metriken aus. Trifft eine Bedingung zu – und bleibt wahr – feuert ein Alert. Der <b>Alertmanager</b> entscheidet dann, wen er benachrichtigt.",
+          "Du schreibst die Regeln nicht in Textdateien: Du deklarierst sie als <b>PrometheusRule</b> – eine CRD des Prometheus-Operators – und der Cluster lernt selbst zu rufen."
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "rechenknecht",
+              "image": "python",
+              "replicas": 1,
+              "cpuHeavy": true
+            }
+          ],
+          "files": {
+            "prometheusrule.yaml": "apiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata:\n  name: hafen-alarme\n  labels:\n    release: prometheus\nspec:\n  groups:\n    - name: hafen.rules\n      rules:\n        - alert: HighPodCPU                                     # Name des Alarms\n          expr: rate(container_cpu_usage_seconds_total[5m]) > 0.5   # Schwelle (PromQL)\n          for: 5m                                               # erst nach 5 min Dauerlast feuern\n          labels:\n            severity: warning\n          annotations:\n            summary: \"Pod zieht ungewöhnlich viel CPU\""
+          },
+          "applyEffects": {
+            "prometheusrule.yaml": {
+              "prometheusRule": {
+                "name": "hafen-alarme",
+                "alert": "HighPodCPU",
+                "severity": "warning",
+                "expr": "rate(container_cpu_usage_seconds_total[5m]) > 0.5",
+                "forDuration": "5m"
+              }
+            }
+          }
+        },
+        "lines": [
+          "Sieh an – da ist ein <b>rechenknecht</b>-Pod, der ungewöhnlich viel CPU zieht. Ich habe dir eine <code>prometheusrule.yaml</code> vorbereitet: Sie definiert die Regel, die Prometheus auf genau diesen Fall aufmerksam macht.",
+          "Schau rein, was da steht – und bringe sie dann in den Cluster."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Alert-Regel lesen",
+        "tasks": [
+          {
+            "id": "t-pr-ls",
+            "text": "Was liegt hier? <code>ls</code>.",
+            "accept": [
+              "^ls$"
+            ],
+            "solution": "ls",
+            "hint": "Zwei Buchstaben."
+          },
+          {
+            "id": "t-pr-cat",
+            "text": "Lies die Regel: <code>cat prometheusrule.yaml</code>. Findest du <code>alert: HighPodCPU</code>, den <code>expr</code> (die Bedingung in PromQL) und <code>for: 5m</code> (Wartezeit)?",
+            "accept": [
+              "^cat\\s+prometheusrule\\.yaml$"
+            ],
+            "solution": "cat prometheusrule.yaml",
+            "hint": "cat prometheusrule.yaml"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Alert-Regel aktivieren",
+        "cmd": {
+          "id": "t-pr-apply",
+          "intro": "🆕 Eine <code>PrometheusRule</code> ist ein normales Manifest – du wendest sie mit <code>kubectl apply -f</code> an wie jede andere Ressource. Ab jetzt kennt Prometheus die Regel und prüft sie gegen seine Metriken.",
+          "text": "Aktiviere die Regel: wende <code>prometheusrule.yaml</code> an.",
+          "accept": [
+            "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+prometheusrule\\.yaml$"
+          ],
+          "check": "observability-alerts/t-pr-apply",
+          "solution": "kubectl apply -f prometheusrule.yaml",
+          "hint": "kubectl apply -f <datei> – der vertraute Befehl."
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Regel prüfen",
+        "tasks": [
+          {
+            "id": "t-pr-get",
+            "text": "Prüf, dass die Regel steht: <code>kubectl get prometheusrules</code>. Deine <code>hafen-alarme</code> taucht jetzt auf.",
+            "accept": [
+              "^kubectl\\s+get\\s+(prometheusrules|prometheusrule|promrule|promrules)$"
+            ],
+            "check": "observability-alerts/t-pr-get",
+            "solution": "kubectl get prometheusrules",
+            "hint": "kubectl get prometheusrules (Kurzform: promrules)."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Aktive Alerts sehen",
+        "cmd": {
+          "id": "t-alerts-get",
+          "intro": "🆕 Neuer Befehl: <code>kubectl get alerts</code> – zeigt dir alle aktiven Alerts des Alertmanagers: Name, Schwere und ob sie gerade feuern (<code>firing</code>) oder bereits gelöst sind (<code>resolved</code>).",
+          "text": "Sieh dir die Alerts an: <code>kubectl get alerts</code>. Feuert <code>HighPodCPU</code>?",
+          "accept": [
+            "^kubectl\\s+get\\s+alerts$"
+          ],
+          "check": "observability-alerts/t-alerts-get",
+          "solution": "kubectl get alerts",
+          "hint": "kubectl get alerts"
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-alert-firing",
+        "q": "Ein Alert steht auf <code>firing</code>. Was bedeutet das?",
+        "options": [
+          {
+            "t": "Die Bedingung (<code>expr</code>) ist wahr und hält lang genug an – der Alarm feuert aktiv.",
+            "ok": true,
+            "reply": "Genau! Prometheus prüft laufend: Sobald der PromQL-Ausdruck wahr bleibt, feuert der Alert. Der Alertmanager entscheidet dann, wen er weckt – Slack, PagerDuty, E-Mail. Du hast die Semantik! 🔦"
+          },
+          {
+            "t": "Ein Mensch hat den Alert manuell ausgelöst, weil ihm etwas im Dashboard auffiel.",
+            "ok": false,
+            "reply": "Alerts feuern nicht manuell – das wäre Monitoring zum Selbst-Anrufen. Prometheus beobachtet die Metriken kontinuierlich und feuert von selbst, wenn eine Bedingung wahr bleibt. Kein Mensch muss dabei sein."
+          },
+          {
+            "t": "Prometheus ist abgestürzt und kann keine Metriken mehr scrapen.",
+            "ok": false,
+            "reply": "Wenn Prometheus selbst abgestürzt wäre, gäbe es gar keine Alerts. Ein firing-Alert zeigt das Gegenteil: Prometheus läuft, scrapt fleißig – und sieht dabei eine Bedingung, die zutrifft."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Der <b>rechenknecht</b>-Pod dreht auf Hochtouren. Sieh selbst – <code>kubectl top pods</code> zeigt, wie viel er zieht.",
+          "Dann skalierst du ihn auf null Replicas: keine Pods, keine Last, Bedingung erfüllt sich nicht mehr. Prometheus sieht es – und der Alert wechselt auf <b>resolved</b>."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Heißen Pod identifizieren",
+        "tasks": [
+          {
+            "id": "t-top-hot",
+            "text": "Sieh, wer die CPU dominiert: <code>kubectl top pods</code>. Der <b>rechenknecht</b> liegt weit über der 500m-Schwelle.",
+            "accept": [
+              "^kubectl\\s+top\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl top pods",
+            "hint": "kubectl top pods – zeigt CPU und Memory je laufendem Pod."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Ursache beheben – Alert auflösen",
+        "cmd": {
+          "id": "t-scale-zero",
+          "intro": "Keine Pods mehr – keine CPU-Last. Prometheus sieht die Bedingung nicht mehr und markiert den Alert als <code>resolved</code>. In der Praxis ist das eine Sofort-Maßnahme, während man die eigentliche Ursache behebt.",
+          "text": "Stoppe den heißen Dienst: <code>kubectl scale deployment rechenknecht --replicas=0</code>.",
+          "accept": [
+            "^kubectl\\s+scale\\s+deployment\\s+rechenknecht\\s+--replicas[=\\s]0$"
+          ],
+          "check": "observability-alerts/t-scale-zero",
+          "solution": "kubectl scale deployment rechenknecht --replicas=0",
+          "hint": "kubectl scale deployment rechenknecht --replicas=0"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Auflösung prüfen",
+        "tasks": [
+          {
+            "id": "t-alerts-resolved",
+            "text": "Prüfe den neuen Status: <code>kubectl get alerts</code>. Der <code>HighPodCPU</code>-Alert steht jetzt auf <b>resolved</b>.",
+            "accept": [
+              "^kubectl\\s+get\\s+alerts$"
+            ],
+            "solution": "kubectl get alerts",
+            "hint": "kubectl get alerts"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "lumi",
+        "reviewId": "q-obs-alert-resolved",
+        "q": "Ein Alert wechselt von <b>firing</b> auf <b>resolved</b>. Was ist passiert?",
+        "options": [
+          {
+            "t": "Die Bedingung ist nicht mehr wahr – die Ursache wurde behoben, Prometheus stellt keine Verletzung mehr fest.",
+            "ok": true,
+            "reply": "Genau! Resolved heißt: Prometheus hat geprüft – die Bedingung trifft nicht mehr zu. Der Alert bleibt kurz sichtbar, damit du weißt, dass er da war und wieder weg ist. Kein stilles Verschwinden, sondern ein klares Signal. 🔦"
+          },
+          {
+            "t": "Jemand hat den Alert manuell auf resolved gesetzt, um ihn zum Schweigen zu bringen.",
+            "ok": false,
+            "reply": "Alerts resolved setzt niemand von Hand – das wäre Symptom-Verstecken statt Ursachen-Beheben. Resolved kommt automatisch, wenn Prometheus sieht, dass die Bedingung nicht mehr wahr ist."
+          },
+          {
+            "t": "Der Alert wurde gelöscht und taucht erst wieder auf, wenn man ihn erneut anwendet.",
+            "ok": false,
+            "reply": "Gelöscht ist nicht resolved: Gelöscht bedeutet, der Alert verschwindet vollständig aus dem System. Resolved ist ein Zustandsübergang – die Regel bleibt, der Alert wechselt den Status, und beim nächsten Feuern kommt er wieder."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "lumi",
+        "lines": [
+          "Metriken, Dashboards, Logs, Alerts – du hast alle vier Werkzeuge in der Hand. Jetzt wacht der Cluster selbst und ruft dich, wenn etwas brennt. Das ist echte Observability.",
+          "Du bist bereit für alles, was der Hafen dir schickt. Viel Wind in den Segeln – und gute Wacht! 🔦"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,894 @@
+[
+  {
+    "id": "k8s-debug-imagepull",
+    "title": "Sturmwarnung am Leuchtturm",
+    "giver": "juno",
+    "rewardXp": 50,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Da bist du ja endlich! Juno, Sturmwache. Während die anderen dir beigebracht haben, Dinge zu <b>bauen</b>, lernst du bei mir, sie zu <b>reparieren</b> – das ist die halbe Miete in diesem Job.",
+          "Der Sturm letzte Nacht hat das <b>leuchtfeuer</b>-Deployment erwischt. Erste Debugging-Regel: <b>STATUS lesen, nicht raten.</b> Schau dir die Pods an!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Diagnose",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "leuchtfeuer",
+              "image": "ngnix:latest",
+              "replicas": 1,
+              "broken": {
+                "type": "imagepull",
+                "badImage": "ngnix:latest"
+              }
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-j15-1",
+            "text": "Zeig die Pods – und lies die STATUS-Spalte genau!",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "Der Übersichts-Befehl."
+          },
+          {
+            "id": "t-j15-2",
+            "text": "<code>ImagePullBackOff</code>! Zweite Regel: <b>describe lesen.</b> Beschreibe den <code>leuchtfeuer</code>-Pod und lies die Events ganz unten.",
+            "accept": [
+              "^kubectl\\s+describe\\s+pods?\\s+leuchtfeuer-\\S+$"
+            ],
+            "solution": "kubectl describe pod <leuchtfeuer-pod>",
+            "hint": "kubectl describe pod <name> – Name aus get pods."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-2",
+        "q": "In den Events steht: Failed to pull image „ngnix:latest“ – repository does not exist. Was ist die Ursache?",
+        "options": [
+          {
+            "t": "Ein Tippfehler im Image-Namen: „ngnix“ statt „nginx“!",
+            "ok": true,
+            "reply": "Scharfes Auge! ImagePullBackOff heißt fast immer: Tippfehler im Namen, falscher Tag oder fehlende Zugriffsrechte auf die Registry."
+          },
+          {
+            "t": "Der Node ist kaputt.",
+            "ok": false,
+            "reply": "Nein – lies die Events nochmal: Das IMAGE kann nicht geladen werden. „ngnix“ … fällt dir was auf? Tippfehler!"
+          },
+          {
+            "t": "Zu wenig Speicher im Cluster.",
+            "ok": false,
+            "reply": "Das wäre ein anderes Fehlerbild (Pending/OOM). Hier steht klar: repository does not exist – das Image „ngnix“ gibt es nicht. Tippfehler!"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Die Reparatur",
+        "cmd": {
+          "id": "t-setimage",
+          "intro": "🆕 Neuer Befehl: <code>kubectl set image</code> – tauscht das Image eines Deployments aus.",
+          "text": "Setze das richtige Image: <code>kubectl set image deployment/leuchtfeuer leuchtfeuer=nginx</code>",
+          "accept": [
+            "^kubectl\\s+set\\s+image\\s+deployment\\/leuchtfeuer\\s+\\S+=nginx(:\\S+)?$"
+          ],
+          "solution": "kubectl set image deployment/leuchtfeuer leuchtfeuer=nginx",
+          "hint": "Muster: kubectl set image deployment/<name> <container>=<richtiges-image>"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Verifizieren",
+        "tasks": [
+          {
+            "id": "t-j15-3",
+            "text": "Dritte Regel: <b>Fix immer verifizieren!</b> Laufen die Pods wieder?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "k8s-debug-imagepull/t-j15-3",
+            "solution": "kubectl get pods",
+            "hint": "get pods – STATUS muss Running sein."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Sauber repariert! Merk dir das Mantra für IMMER: <b>get pods → describe → logs.</b> Erst gucken, dann verstehen, dann fixen, dann verifizieren.",
+          "„<code>describe</code> UND <code>logs</code> – wo ist der Unterschied?“ Gute Frage, die verwechseln viele. <b><code>describe</code> = die Sicht von Kubernetes</b> auf den Pod: Zustand, Image, Limits und vor allem die <b>Events</b> – also <i>warum</i> er (nicht) läuft: ImagePullBackOff, Pending, OOMKilled, fehlgeschlagene Probe. <b><code>logs</code> = was die App selbst ausgibt</b> (stdout/stderr): ihre eigenen Meldungen, Stacktraces, Fehler.",
+          "<b>Faustregel:</b> erst <code>describe</code> (läuft er überhaupt? was sagen die Events?), dann <code>logs</code> (was meldet die App?). Startet der Container nie – ImagePullBackOff, Pending, OOMKilled –, helfen Logs nicht, da steht nichts; das verrät nur <code>describe</code>. Crasht die App beim Start (CrashLoop), sagt <code>describe</code> nur <i>dass</i> sie stirbt – den echten Grund zeigen die <code>logs</code>. Morgen zeige ich dir den fiesesten Fehler von allen …"
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-8",
+        "q": "Ein Pod hängt in <code>ImagePullBackOff</code> – der Container ist nie gestartet. Womit kommst du ans Warum: <code>describe</code> oder <code>logs</code>?",
+        "options": [
+          {
+            "t": "<code>describe</code> – die Events zeigen, warum das Image nicht geladen wird.",
+            "ok": true,
+            "reply": "Genau! Kein gestarteter Container = keine App-Ausgabe, also auch keine Logs. Das Warum steht in den Events – die liefert describe."
+          },
+          {
+            "t": "<code>logs</code> – da steht doch immer der Fehler drin.",
+            "ok": false,
+            "reply": "Diesmal nicht: Der Container ist nie gelaufen, die App hat nie etwas ausgegeben – die Logs sind leer. Bei Pull-/Scheduling-/OOM-Problemen ist describe dran (die Events)."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "k8s-debug-crashloop",
+    "title": "Das Flackern",
+    "giver": "juno",
+    "rewardXp": 55,
+    "rewardCoins": 40,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Siehst du die <b>funkboje</b> da draußen flackern? Der Pod startet, stürzt ab, startet, stürzt ab … Das nennt sich <b>CrashLoopBackOff</b> – der Klassiker unter den Cluster-Fehlern.",
+          "Das Tückische: Das Image ist OK, der Node ist OK – die <b>App selbst</b> stirbt beim Start. Und warum sie stirbt, verrät nur eines: <b>die Logs.</b> Dritte Stufe des Mantras!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Überblick verschaffen",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "funkboje",
+              "image": "nginx",
+              "replicas": 1,
+              "broken": {
+                "type": "crashloop",
+                "needsSecret": "funk-schluessel"
+              }
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-j16-1",
+            "text": "Verschaff dir den Überblick: get pods. Beachte auch die RESTARTS-Spalte!",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "Wie immer zuerst."
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Logs lesen",
+        "cmd": {
+          "id": "t-logs",
+          "intro": "🆕 Neuer Befehl: <code>kubectl logs &lt;pod&gt;</code> – zeigt, was die <b>App selbst</b> ausgegeben hat (stdout/stderr): ihre Meldungen, Fehler, Stacktraces. Das ist die <b>dritte Stufe</b> des Mantras <code>get pods → describe → logs</code>. Merke den Unterschied: <code>describe</code> zeigt die <b>Kubernetes-Sicht</b> (Zustand + Events, das <i>Warum</i>), <code>logs</code> die <b>App-Ausgabe</b> selbst.",
+          "text": "Jetzt die Wahrheit: Lies die <b>Logs</b> des <code>funkboje</code>-Pods!",
+          "accept": [
+            "^kubectl\\s+logs\\s+funkboje-\\S+$"
+          ],
+          "solution": "kubectl logs <funkboje-pod>",
+          "hint": "Muster: kubectl logs <pod-name> – Namen aus der Liste oben abtippen."
+        }
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-1",
+        "q": "Das Log sagt: FATAL: Secret 'funk-schluessel' nicht gefunden. Was ist der Plan?",
+        "options": [
+          {
+            "t": "Das fehlende Secret anlegen, dann die Pods neu starten.",
+            "ok": true,
+            "reply": "Exakt! Die App braucht das Secret zum Start. Erst die Ursache beheben, DANN neu starten – andersrum bringt nichts."
+          },
+          {
+            "t": "Ein anderes Image installieren.",
+            "ok": false,
+            "reply": "Nein – das Image ist in Ordnung! Lies das Log: Der App fehlt das Secret 'funk-schluessel'. Das legen wir an und starten neu."
+          }
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Ursache beheben",
+        "tasks": [
+          {
+            "id": "t-j16-3",
+            "text": "Lege das fehlende Secret <code>funk-schluessel</code> an (Wert frei wählbar).",
+            "accept": [
+              "^kubectl\\s+create\\s+secret\\s+generic\\s+funk-schluessel\\s+--from-literal[=\\s][\\w.-]+=\\S+$"
+            ],
+            "solution": "kubectl create secret generic funk-schluessel --from-literal=code=blinkblink1",
+            "hint": "kubectl create secret generic <name> --from-literal=k=v"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Sauberer Neustart",
+        "cmd": {
+          "id": "t-rollout",
+          "intro": "🆕 Neuer Befehl: <code>kubectl rollout restart</code> – startet alle Pods eines Deployments sauber neu.",
+          "text": "Starte das Deployment <code>funkboje</code> neu – jetzt findet es sein Secret!",
+          "accept": [
+            "^kubectl\\s+rollout\\s+restart\\s+deployment[\\/\\s]funkboje$"
+          ],
+          "solution": "kubectl rollout restart deployment funkboje",
+          "hint": "Muster: kubectl rollout restart deployment <name>"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Verifizieren",
+        "tasks": [
+          {
+            "id": "t-j16-4",
+            "text": "Verifizieren! Leuchtet die funkboje wieder stabil?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "k8s-debug-crashloop/t-j16-4",
+            "solution": "kubectl get pods",
+            "hint": "STATUS muss Running sein."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Ursache → Fix → Neustart → Verifikation. Du debuggst wie eine alte Sturmwache! Eine Prüfung fehlt noch – und für die brauchen wir … mehr Hafen. Wortwörtlich."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "k8s-node-capacity",
+    "title": "Kein Platz im Hafen",
+    "giver": "juno",
+    "rewardXp": 70,
+    "rewardCoins": 55,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Großauftrag! Die Reederei will ihren <b>frachtplaner</b> bei uns laufen lassen. Aber irgendetwas stimmt nicht – die Pods kommen einfach nicht hoch. Kein Absturz, kein Image-Fehler … sie <b>warten</b> nur."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Diagnose",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "frachtplaner",
+              "image": "nginx",
+              "replicas": 2,
+              "broken": {
+                "type": "pending"
+              }
+            }
+          ],
+          "files": {
+            "main.tf": "terraform {\n  required_providers {\n    hafen = {\n      source = \"kubequest/hafen\"\n    }\n  }\n}\n\n# Ein neues Ost-Plateau für Port Kubernia\nresource \"hafen_plateau\" \"ost\" {\n  name   = \"ost-erweiterung\"\n  breite = 12\n}\n\n# Zwei Server für den wachsenden Cluster\nresource \"hafen_server\" \"worker\" {\n  count   = 2\n  name    = \"worker-${count.index + 3}\"\n  groesse = \"mittel\"\n}"
+          },
+          "tfResources": [
+            {
+              "addr": "hafen_plateau.ost",
+              "desc": "name = \"ost-erweiterung\""
+            },
+            {
+              "addr": "hafen_server.worker[0]",
+              "desc": "name = \"ahoi-worker-3\""
+            },
+            {
+              "addr": "hafen_server.worker[1]",
+              "desc": "name = \"ahoi-worker-4\""
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-j17-1",
+            "text": "Du kennst das Mantra: get pods. Was sagt der STATUS?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "Schritt 1, immer."
+          },
+          {
+            "id": "t-j17-2",
+            "text": "<code>Pending</code> – die Pods warten auf einen Platz. Warum? describe verrät es in den Events!",
+            "accept": [
+              "^kubectl\\s+describe\\s+pods?\\s+frachtplaner-\\S+$"
+            ],
+            "solution": "kubectl describe pod <frachtplaner-pod>",
+            "hint": "describe + Events lesen."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-3",
+        "q": "Events: „0/3 nodes are available: insufficient capacity“. Diagnose?",
+        "options": [
+          {
+            "t": "Der Cluster ist voll – wir brauchen mehr Nodes!",
+            "ok": true,
+            "reply": "Genau! Kein Bug, kein Tippfehler – schlicht kein Platz. Und wer baut Infrastruktur? Na? … TERRAFORM! Theos Bauplan für die Ost-Erweiterung liegt noch bereit."
+          },
+          {
+            "t": "Das Image ist kaputt.",
+            "ok": false,
+            "reply": "Nein – dann stünde da ImagePullBackOff. „insufficient capacity“ = kein Platz auf den Nodes. Wir brauchen MEHR HAFEN!"
+          }
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Mehr Hafen bauen!",
+        "tasks": [
+          {
+            "id": "t-j17-3",
+            "text": "Der Bauplan liegt bereit (<code>main.tf</code>). Initialisiere Terraform!",
+            "accept": [
+              "^terraform\\s+init$"
+            ],
+            "solution": "terraform init",
+            "hint": "Schritt 1 jedes Terraform-Projekts."
+          },
+          {
+            "id": "t-j17-4",
+            "text": "Generalprobe – was wird gebaut?",
+            "accept": [
+              "^terraform\\s+plan$"
+            ],
+            "solution": "terraform plan",
+            "hint": "Immer erst lesen."
+          },
+          {
+            "id": "t-j17-5",
+            "text": "BAUEN! Und dann beobachte: Ost-Plateau + zwei neue Nodes … 🏗️",
+            "accept": [
+              "^terraform\\s+apply(\\s+-auto-approve)?$"
+            ],
+            "solution": "terraform apply",
+            "hint": "Die Aufführung."
+          },
+          {
+            "id": "t-j17-6",
+            "text": "Zähl nach: Wie viele Nodes hat dein Cluster jetzt?",
+            "accept": [
+              "^kubectl\\s+get\\s+(nodes|node|no)$"
+            ],
+            "check": "k8s-node-capacity/t-j17-6",
+            "solution": "kubectl get nodes",
+            "hint": "kubectl, nicht terraform!"
+          },
+          {
+            "id": "t-j17-7",
+            "text": "Und der Moment der Wahrheit: Haben die frachtplaner-Pods jetzt Platz gefunden?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "k8s-node-capacity/t-j17-7",
+            "solution": "kubectl get pods",
+            "hint": "get pods – STATUS lesen."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-4",
+        "q": "Letzte Prüfungsfrage: Wie lautet das Debugging-Mantra?",
+        "options": [
+          {
+            "t": "get pods → describe → logs. Erst gucken, dann verstehen, dann fixen, dann verifizieren.",
+            "ok": true,
+            "reply": "PERFEKT. Damit löst du draußen 80% aller Cluster-Probleme. Das ist keine Übertreibung."
+          },
+          {
+            "t": "Erstmal alles neu starten und hoffen.",
+            "ok": false,
+            "reply": "HA! Der Klassiker – und manchmal klappt's sogar. Aber Profis diagnostizieren erst: get pods → describe → logs. Dann fixen. Dann verifizieren."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Hiermit ernenne ich dich zur <b>Sturmwache ehrenhalber</b>! 🌩️ Die Ost-Erweiterung bleibt stehen – Port Kubernia ist gewachsen, dank dir.",
+          "Ab jetzt gilt: Wenn ein Sturm aufzieht und etwas kaputtgeht, bist DU dran. Du hast das Mantra, du hast die Befehle. Und zwischen den Stürmen? Übe bei mir, halte den Streak, füttere die Krabbe. Der Hafen zählt auf dich, Admiral-Anwärter:in! ⚓"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "network-policy",
+    "title": "Die Hafenmauer",
+    "giver": "juno",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Sturmwache Juno. Schön, dass du da bist – wir haben ein Sicherheitsproblem. Dein <b>Hafentor</b> (der Ingress) hat den Hafen zum <b>offenen Meer</b> geöffnet. Gut für Besucher … aber jetzt kann <b>jeder Pod mit jedem reden</b>, quer durch den ganzen Cluster.",
+          "Das ist die unbequeme Wahrheit über Kubernetes: <b>standardmäßig ist alles offen</b>. Kein Zaun, keine Mauer. Schleicht sich ein böser Pod ein, klopft er ungestört an jeder Tür – auch beim <code>lager</code> mit den wertvollen Daten.",
+          "Dagegen bauen wir eine <b>Hafenmauer</b>: eine <b>NetworkPolicy</b>. Sie wählt per Label Pods aus und sagt: <i>Zu DENEN darf nur, wen ich ausdrücklich erlaube</i> – alles andere prallt ab. Im Job nennt man das <b>default-deny</b>. Lass uns erst schauen, was schon steht."
+        ]
+      },
+      {
+        "type": "teach",
+        "unlockAbbrev": "kubectl-netpol",
+        "brief": "Mauern zählen",
+        "cmd": {
+          "id": "t-get-netpol",
+          "intro": "🆕 Neue Ressource: <code>kubectl get networkpolicies</code> (kurz <code>netpol</code>) – zeigt alle Hafenmauern.",
+          "text": "Schau nach, welche NetworkPolicies schon stehen – noch ist der Hafen schutzlos!",
+          "accept": [
+            "^kubectl\\s+get\\s+(networkpolicies|networkpolicy|netpol|netpols)$"
+          ],
+          "solution": "kubectl get networkpolicies",
+          "hint": "Kurzform: kubectl get netpol"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Mauer hochziehen",
+        "scenario": {
+          "files": {
+            "netpol.yaml": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: hafenmauer\nspec:\n  podSelector:\n    matchLabels:\n      app: lager\n  policyTypes:\n    - Ingress\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              app: hafentor"
+          },
+          "applyEffects": {
+            "netpol.yaml": {
+              "networkPolicy": {
+                "name": "hafenmauer",
+                "podSelector": "lager",
+                "allowFrom": "hafentor"
+              }
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-juno-np-1",
+            "text": "Ich habe dir die Karte <code>netpol.yaml</code> hingelegt. Lies sie mit <code>cat</code> – achte auf <code>podSelector</code> (WEN schützt die Mauer?) und <code>ingress.from</code> (WER darf rein?).",
+            "accept": [
+              "^cat\\s+netpol\\.yaml$"
+            ],
+            "solution": "cat netpol.yaml",
+            "hint": "cat <datei>"
+          },
+          {
+            "id": "t-juno-np-2",
+            "text": "Zieh die Mauer hoch: wende <code>netpol.yaml</code> an. Ab jetzt darf nur noch das <code>hafentor</code> ans <code>lager</code>.",
+            "accept": [
+              "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+netpol\\.yaml$"
+            ],
+            "solution": "kubectl apply -f netpol.yaml",
+            "hint": "Gleicher apply wie bei Adas Karten, Datei netpol.yaml."
+          },
+          {
+            "id": "t-juno-np-3",
+            "text": "Prüf die frische Mauer: <code>kubectl get networkpolicies</code> – jetzt steht <code>hafenmauer</code> in der Liste.",
+            "accept": [
+              "^kubectl\\s+get\\s+(networkpolicies|networkpolicy|netpol|netpols)$"
+            ],
+            "check": "network-policy/t-juno-np-3",
+            "solution": "kubectl get networkpolicies",
+            "hint": "Kurzform 'netpol' geht auch."
+          },
+          {
+            "id": "t-juno-np-4",
+            "text": "Schau genau hin: <code>kubectl describe networkpolicy hafenmauer</code> – die Zeile <b>Allowing ingress traffic</b> verrät, wer durchdarf.",
+            "accept": [
+              "^kubectl\\s+describe\\s+(networkpolicy|networkpolicies|netpol|netpols)\\s+hafenmauer$"
+            ],
+            "solution": "kubectl describe networkpolicy hafenmauer",
+            "hint": "kubectl describe networkpolicy <name>"
+          }
+        ]
+      },
+      {
+        "type": "drill",
+        "brief": "Junos Mauer-Übung",
+        "pool": [
+          "k-apply-netpol",
+          "k-get-netpol",
+          "k-describe-netpol",
+          "k-delete-netpol"
+        ],
+        "count": 4,
+        "intro": "Einmal die ganze Kette: anwenden → auflisten → beschreiben → wieder einreißen."
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-netpol",
+        "q": "Ohne jede NetworkPolicy – wer darf im Cluster mit wem reden?",
+        "options": [
+          {
+            "t": "Jeder mit jedem. Das Netzwerk ist offen, bis eine NetworkPolicy es einschränkt.",
+            "ok": true,
+            "reply": "Genau – und genau das ist die Gefahr. Eine NetworkPolicy schaltet für die gewählten Pods auf <b>default-deny</b> und lässt nur durch, was du erlaubst. So sichert man im Job Datenbanken & Co. ab. ⚓"
+          },
+          {
+            "t": "Niemand. Jede Verbindung muss erst freigegeben werden.",
+            "ok": false,
+            "reply": "Andersrum! Kubernetes ist von Haus aus <b>offen</b>. Erst eine NetworkPolicy macht für die ausgewählten Pods dicht – vorher kann jeder mit jedem reden."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Merk dir die Faustregel: <b>Selektor sagt WEN man schützt, die from-Regel sagt WER rein darf.</b> Fehlt die Policy, ist alles offen. Hafen gesichert – gut gemacht, Lotse!"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "k8s-service-endpoints",
+    "title": "Läuft – bedient aber niemanden",
+    "giver": "juno",
+    "rewardXp": 60,
+    "rewardCoins": 45,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Sturmwache Juno – kniffliger Fall heute. Die <b>Kombüse</b> (Deployment <code>kombuese</code>) soll die Crew verköstigen, aber die Gäste am Service bekommen … <b>nichts</b>. Dabei ist KEIN Pod abgestürzt!",
+          "Genau das ist die fiese Sorte Fehler: Der Pod <b>läuft</b> – und liefert trotzdem nicht aus. Heute lernst du die zwei Wächter jedes Pods kennen: <b>liveness</b> (lebt er noch?) und <b>readiness</b> (kann er schon bedienen?). Schau erst mal nach den Pods."
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Das seltsame Bild",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "kombuese",
+              "image": "nginx",
+              "replicas": 1,
+              "broken": {
+                "type": "notready",
+                "needsSecret": "kombuese-menue"
+              }
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-j24-1",
+            "text": "Mantra-Schritt 1: <code>get pods</code>. Lies STATUS <b>und</b> READY genau – fällt dir was auf?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "Der Übersichts-Befehl. STATUS = Running, aber die READY-Spalte …?"
+          },
+          {
+            "id": "t-j24-2",
+            "text": "<code>Running</code>, aber <code>0/1</code> READY – er läuft, ist aber nicht <b>bereit</b>. Schritt 2: <code>describe</code> den kombuese-Pod und lies die Events unten.",
+            "accept": [
+              "^kubectl\\s+describe\\s+pods?\\s+kombuese-\\S+$"
+            ],
+            "solution": "kubectl describe pod <kombuese-pod>",
+            "hint": "kubectl describe pod <name> – Name aus get pods."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-6",
+        "q": "Die Events sagen: <code>Readiness probe failed</code>, aber der Container ist gestartet. Was bedeutet READY 0/1 bei Status Running?",
+        "options": [
+          {
+            "t": "Die Readiness-Probe ist rot – der Pod läuft, wird aber aus dem Service genommen, bis er bereit ist.",
+            "ok": true,
+            "reply": "Genau! Liveness = „lebt er?“ (sonst Neustart), Readiness = „kann er schon bedienen?“. Readiness rot heißt: kein Traffic, aber KEIN Neustart. Der Pod fehlt dann im Service – das sehen wir uns gleich an."
+          },
+          {
+            "t": "Der Pod ist abgestürzt und startet ständig neu (CrashLoopBackOff).",
+            "ok": false,
+            "reply": "Nein – dann stünden Restarts in der Liste und der Status wäre CrashLoopBackOff. Hier ist es Running, 0 Restarts: Er LÄUFT, meldet sich nur nicht bereit. Das ist die Readiness-Probe."
+          },
+          {
+            "t": "Das Image ließ sich nicht laden (ImagePullBackOff).",
+            "ok": false,
+            "reply": "Nein, das wäre ein ganz anderes Bild. Der Container ist gestartet (steht in den Events) – er sagt nur „noch nicht bereit“. Reine Readiness-Sache."
+          }
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Service davorstellen",
+        "tasks": [
+          {
+            "id": "t-j24-3",
+            "text": "Stell der Kombüse einen <b>Service</b> voran (Port 80) – der verteilt den Verkehr auf die bereiten Pods.",
+            "accept": [
+              "^kubectl\\s+expose\\s+deployment\\s+kombuese\\s+--port[=\\s]80$"
+            ],
+            "check": "k8s-service-endpoints/t-j24-3",
+            "solution": "kubectl expose deployment kombuese --port=80",
+            "hint": "Muster: kubectl expose deployment <name> --port=<zahl>"
+          }
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Wer bedient wirklich?",
+        "cmd": {
+          "id": "t-endpoints",
+          "intro": "🆕 Neuer Befehl: <code>kubectl get endpoints</code> (kurz <code>ep</code>) – zeigt, welche Pods ein Service <b>tatsächlich</b> bedient. Nur <b>bereite</b> Pods stehen hier.",
+          "text": "Schau, welche Endpoints der Service <code>kombuese</code> hat. (Spoiler: <code>&lt;none&gt;</code> – der nicht-bereite Pod fehlt!)",
+          "accept": [
+            "^kubectl\\s+get\\s+(endpoints|endpoint|ep)\\s+kombuese$"
+          ],
+          "solution": "kubectl get endpoints kombuese",
+          "hint": "Muster: kubectl get endpoints <service>"
+        }
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Da hast du den Beweis: Service vorhanden, Pod läuft – aber <code>ENDPOINTS &lt;none&gt;</code>. Die rote Readiness-Probe hält den Pod aus dem Service raus, damit kein Gast vor einer halb gestarteten Küche steht. Genau dafür ist Readiness da.",
+          "Und der Grund? Der Probe-Pfad <code>/ready</code> antwortet erst grün, wenn die Kombüse ihre <b>Speisekarte</b> hat – ein Secret namens <code>kombuese-menue</code>. Leg es an. Achte danach drauf: Du wirst <b>nicht</b> neu starten müssen!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Ursache beheben & beobachten",
+        "tasks": [
+          {
+            "id": "t-j24-4",
+            "text": "Leg das fehlende Secret <code>kombuese-menue</code> an (Wert frei wählbar).",
+            "accept": [
+              "^kubectl\\s+create\\s+secret\\s+generic\\s+kombuese-menue\\s+--from-literal[=\\s][\\w.-]+=\\S+$"
+            ],
+            "solution": "kubectl create secret generic kombuese-menue --from-literal=menue=fischeintopf",
+            "hint": "kubectl create secret generic <name> --from-literal=k=v"
+          },
+          {
+            "id": "t-j24-5",
+            "text": "Kein <code>rollout restart</code>! Frag einfach nochmal die Endpoints ab – die Probe prüft von selbst weiter.",
+            "accept": [
+              "^kubectl\\s+get\\s+(endpoints|endpoint|ep)\\s+kombuese$"
+            ],
+            "check": "k8s-service-endpoints/t-j24-5",
+            "solution": "kubectl get endpoints kombuese",
+            "hint": "Gleicher Befehl wie eben – jetzt steht eine Pod-IP drin statt <none>."
+          },
+          {
+            "id": "t-j24-6",
+            "text": "Gegenprobe mit <code>get pods</code>: READY müsste jetzt <code>1/1</code> sein.",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "k8s-service-endpoints/t-j24-6",
+            "solution": "kubectl get pods",
+            "hint": "READY 1/1, Status Running – ganz ohne Neustart."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Merk dir den Unterschied fürs Leben: <b>Liveness</b> schlägt fehl → Pod wird neu gestartet. <b>Readiness</b> schlägt fehl → Pod läuft weiter, fliegt aber aus dem Service, bis er bereit ist. Beim Rollout schützt das deine Nutzer: Traffic geht erst auf neue Pods, wenn sie wirklich bereit sind.",
+          "Und du hast's gesehen: Ursache behoben → Readiness wird von selbst grün, kein Neustart nötig. Das ist der feine Unterschied zum Crash. Sturmwache-würdig, Lotse! ⚓"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "k8s-resource-limits",
+    "title": "Der hungrige Kartograf",
+    "giver": "juno",
+    "rewardXp": 65,
+    "rewardCoins": 50,
+    "steps": [
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Neuer Sturm, neue Sorte Ärger. Der <b>kartograf</b> – unser Dienst, der die Seekarten neu berechnet – will einfach nicht stehenbleiben. Kein Image-Fehler, kein fehlendes Secret. Er startet, läuft kurz, ist weg. Wieder und wieder.",
+          "Das riecht nach <b>Speicher</b>. Jeder Container bekommt zwei Zahlen mit auf den Weg: <b>requests</b> (so viel reserviert ihm der Cluster fest) und <b>limits</b> (die Obergrenze). Sprengt er beim Speicher das Limit, macht der Kernel kurzen Prozess: <b>OOMKilled</b>. Mantra wie immer – erst gucken!"
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Diagnose",
+        "scenario": {
+          "deployments": [
+            {
+              "name": "kartograf",
+              "image": "nginx",
+              "replicas": 1,
+              "broken": {
+                "type": "oomkilled",
+                "memNeeded": 256
+              }
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "t-j26-1",
+            "text": "Mantra-Schritt 1: <code>get pods</code>. Lies STATUS und RESTARTS – der kartograf-Pod sieht übel aus.",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "solution": "kubectl get pods",
+            "hint": "Der Übersichts-Befehl. STATUS zeigt OOMKilled, RESTARTS klettern."
+          },
+          {
+            "id": "t-j26-2",
+            "text": "Schritt 2: <code>describe</code> den kartograf-Pod. Achte auf <b>Last State</b>, <b>Reason</b> und das <b>memory-Limit</b> unten!",
+            "accept": [
+              "^kubectl\\s+describe\\s+pods?\\s+kartograf-\\S+$"
+            ],
+            "solution": "kubectl describe pod <kartograf-pod>",
+            "hint": "kubectl describe pod <name> – Name aus get pods."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-ts-7",
+        "q": "<code>Last State: Terminated, Reason: OOMKilled</code> bei einem Limit von 64Mi. Und in den Logs? Nichts Auffälliges. Diagnose?",
+        "options": [
+          {
+            "t": "Der Container sprengt sein memory-Limit – der Kernel killt ihn (Out Of Memory). Das Limit ist zu knapp.",
+            "ok": true,
+            "reply": "Genau! OOMKilled = Out Of Memory Killed. Der Beweis steht NIE in den App-Logs, sondern in describe unter Last State / Reason. Fix: das Limit realistisch anheben."
+          },
+          {
+            "t": "Die App hat einen Bug und stürzt ab (CrashLoopBackOff).",
+            "ok": false,
+            "reply": "Naheliegend, aber nein: Bei einem App-Crash stünde die Ursache in den Logs. Hier sagen die Logs nichts – und describe nennt klar OOMKilled. Das ist der Speicher, nicht der Code."
+          },
+          {
+            "t": "Das Image ließ sich nicht laden (ImagePullBackOff).",
+            "ok": false,
+            "reply": "Nein – das Image ist da, der Container startet ja (steht in den Events). Er wird nur wegen Speicher-Überschreitung gekillt: OOMKilled."
+          }
+        ]
+      },
+      {
+        "type": "terminal",
+        "brief": "Die saubere Lösung lesen",
+        "scenario": {
+          "files": {
+            "resources.yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: kartograf\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: kartograf\n  template:\n    metadata:\n      labels:\n        app: kartograf\n    spec:\n      containers:\n        - name: kartograf\n          image: nginx\n          resources:\n            requests:        # so viel reserviert der Scheduler fest\n              memory: 128Mi\n              cpu: 100m\n            limits:          # ab hier killt der Kernel den Container (OOMKilled)\n              memory: 256Mi\n              cpu: 250m"
+          }
+        },
+        "tasks": [
+          {
+            "id": "t-j26-3",
+            "text": "So sieht es richtig aus: <code>cat resources.yaml</code>. Findest du den <code>resources</code>-Block mit <code>requests</code> und <code>limits</code>?",
+            "accept": [
+              "^cat\\s+resources\\.yaml$"
+            ],
+            "solution": "cat resources.yaml",
+            "hint": "cat <datei>"
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Siehst du's? <b>requests.memory</b> ist der reservierte Platz (danach sucht der Scheduler einen passenden Node), <b>limits.memory</b> die harte Obergrenze. Unser kartograf braucht real ~256Mi, hatte aber nur 64Mi Limit. Kein Wunder, dass er zerplatzt.",
+          "Wir heben das Limit an. Der Befehl dafür: <code>kubectl set resources</code> – setzt requests/limits an einem laufenden Deployment, ohne dass du das ganze Manifest neu schreibst."
+        ]
+      },
+      {
+        "type": "teach",
+        "brief": "Mehr Speicher geben",
+        "cmd": {
+          "id": "t-setresources",
+          "intro": "🆕 Neuer Befehl: <code>kubectl set resources deployment/&lt;name&gt; --limits=memory=&lt;X&gt; --requests=memory=&lt;Y&gt;</code> – setzt die Ressourcen-Grenzen.",
+          "text": "Gib dem <code>kartograf</code> ein <code>--limits=memory=256Mi</code> und ein <code>--requests=memory=128Mi</code>. Schau danach zum Dock!",
+          "accept": [
+            "^kubectl\\s+set\\s+resources\\s+deployment\\/kartograf\\s+(?:--limits[=\\s][^\\s]*memory=256Mi\\s+--requests[=\\s][^\\s]*memory=128Mi|--requests[=\\s][^\\s]*memory=128Mi\\s+--limits[=\\s][^\\s]*memory=256Mi)$"
+          ],
+          "solution": "kubectl set resources deployment/kartograf --limits=memory=256Mi --requests=memory=128Mi",
+          "hint": "Muster: kubectl set resources deployment/<name> --limits=memory=256Mi --requests=memory=128Mi"
+        }
+      },
+      {
+        "type": "terminal",
+        "brief": "Verifizieren",
+        "tasks": [
+          {
+            "id": "t-j26-4",
+            "text": "Dritte Regel: verifizieren! Steht der kartograf jetzt stabil?",
+            "accept": [
+              "^kubectl\\s+get\\s+(pods|pod|po)$"
+            ],
+            "check": "k8s-resource-limits/t-j26-4",
+            "solution": "kubectl get pods",
+            "hint": "STATUS muss Running sein, keine neuen Restarts."
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-res-cost",
+        "q": "Geschafft! Warum nicht einfach allen Diensten <code>--limits=memory=4Gi</code> „sicherheitshalber\" geben?",
+        "options": [
+          {
+            "t": "Weil requests echten Node-Platz reservieren – zu üppig = teurer, verschwendeter Platz. Man dimensioniert nach echtem Bedarf.",
+            "ok": true,
+            "reply": "Genau das ist Right-Sizing! Zu knapp → OOMKilled, zu üppig → du zahlst Dublonen für reservierte Luft. Die Kunst ist die Mitte: am echten Verbrauch messen, dann passend setzen."
+          },
+          {
+            "t": "Weil große Limits den Pod automatisch langsamer machen.",
+            "ok": false,
+            "reply": "Nein, langsamer macht das nichts. Das Problem ist die Reservierung: große requests blockieren Node-Kapazität, die keiner nutzt – und Kapazität kostet."
+          }
+        ]
+      },
+      {
+        "type": "dialog",
+        "npc": "juno",
+        "lines": [
+          "Letzter Profi-Tipp, bevor du weiterziehst: Last schwankt – tagsüber Hochbetrieb, nachts Ebbe. Statt von Hand zu skalieren, setzt man einen <b>HorizontalPodAutoscaler (HPA)</b> davor. Der zählt die Auslastung (gemessen an den requests!) und dreht die Replica-Zahl automatisch hoch und runter."
+        ]
+      },
+      {
+        "type": "choice",
+        "npc": "juno",
+        "reviewId": "q-res-hpa",
+        "q": "Was macht ein HorizontalPodAutoscaler?",
+        "options": [
+          {
+            "t": "Er passt die Anzahl der Pods automatisch an die Last an (mehr Pods bei hoher Auslastung).",
+            "ok": true,
+            "reply": "Richtig – die Automatik hinter dem manuellen 'kubectl scale'. Genau deshalb sind saubere requests so wichtig: Ohne sie weiß der HPA gar nicht, was „ausgelastet\" heißt. Du hast die Speicher-Stürme im Griff, Lotse! ⚓"
+          },
+          {
+            "t": "Er vergrößert automatisch das memory-Limit eines einzelnen Pods.",
+            "ok": false,
+            "reply": "Fast – das wäre VERTIKAL (das macht der VPA). Der HPA skaliert HORIZONTAL: er ändert die Pod-ANZAHL, nicht die Größe eines einzelnen Pods."
+          }
+        ]
+      }
+    ]
+  }
+]

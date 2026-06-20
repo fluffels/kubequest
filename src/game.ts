@@ -7,8 +7,7 @@
 import { KQContent } from "./content";
 import { Sim as KQSim } from "./sim";
 import { SaveStore } from "./store";
-import { SFX } from "./sfx";
-import { worldScene } from "./runtime";
+import { worldScene, applyAudioConfig } from "./runtime";
 import { NPC_SPAWNS, TILE } from "./world";
 import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
 
@@ -45,39 +44,88 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
   // Hinweis: Baustein-Karten (#231, q-flag-*) hängen an genau der Quest, in der ihr
   // Flag/Teil per teach-Schritt eingeführt wird – erst eingeführt, dann abgefragt (#227).
   const EXTRA_CARDS: Record<string, string[]> = {
-    q2: ["q-flag-ps-a"],                                  // docker ps -a (eingeführt in q2)
-    q3: ["q-ch1-3", "q-ch1-5", "q-flag-run-d", "q-flag-run-name"], // -d/--name (q3)
-    q3b: ["q-flag-build-t"],                              // docker build -t/--tag, „tag“ entwirrt (#285)
-    q4: ["q-ch2-1"],
-    q5: ["q-flag-kubectl-n"],                             // kubectl -n (q5)
-    // q-ch2-4 (Self-Healing) bewusst erst ab q7: bewiesen wird Self-Healing dort,
-    // nicht schon in q4 – Lernreihenfolge-Wächter #235 (siehe content/learnorder.ts).
-    q7: ["q-ch2-4", "q-ch3-2", "q-tools-ingress"],
-    q8: ["q-ch4-1", "q-ch4-2", "q-ch4-3", "q-flag-apply-f"], // apply -f (q8)
-    q10: ["q-ch5-3", "q-tools-stack", "q-tools-monitoring"],
-    q11: ["q-flag-helm-set"],                             // helm upgrade --set (q11)
-    q13: ["q-ch6-1", "q-ch6-4"],
-    q14: ["q-sec-2", "q-tools-keycloak"],
-    q15: ["q-ts-4"],
-    q16: ["q-ts-5"],
-    q18: ["q-flag-git-commit-m"],                         // git commit -m (q18)
-    q19: ["q-flag-git-checkout-b"],                       // git checkout -b (q19)
-    q20: ["q-flag-git-add-dot"],                          // git add . (q20)
-    // Umbrella-/Bundle-Charts (#264): in q21 im Schluss-Dialog erklärt (dependencies,
+    "docker-list-containers": ["q-flag-ps-a"],                                  // docker ps -a (eingeführt in docker-list-containers)
+    "docker-run-options": ["q-ch1-3", "q-ch1-5", "q-flag-run-d", "q-flag-run-name"], // -d/--name (docker-run-options)
+    "docker-build-image": ["q-flag-build-t"],                              // docker build -t/--tag, „tag“ entwirrt (#285)
+    "k8s-first-deployment": ["q-ch2-1"],
+    "k8s-inspect-pods": ["q-flag-kubectl-n"],                             // kubectl -n (k8s-inspect-pods)
+    // q-ch2-4 (Self-Healing) bewusst erst ab k8s-self-healing: bewiesen wird Self-Healing dort,
+    // nicht schon in k8s-first-deployment – Lernreihenfolge-Wächter #235 (siehe content/learnorder.ts).
+    "k8s-self-healing": ["q-ch2-4", "q-ch3-2", "q-tools-ingress"],
+    "k8s-apply-manifests": ["q-ch4-1", "q-ch4-2", "q-ch4-3", "q-flag-apply-f"], // apply -f (k8s-apply-manifests)
+    "helm-release-install": ["q-ch5-3", "q-tools-stack", "q-tools-monitoring"],
+    "helm-upgrade-rollback": ["q-flag-helm-set"],                             // helm upgrade --set (helm-upgrade-rollback)
+    "terraform-state-destroy": ["q-ch6-1", "q-ch6-4"],
+    "kraken-boss": ["q-sec-2", "q-tools-keycloak"],
+    "k8s-debug-imagepull": ["q-ts-4"],
+    "k8s-debug-crashloop": ["q-ts-5"],
+    "git-version-control": ["q-flag-git-commit-m"],                         // git commit -m (git-version-control)
+    "git-feature-branch": ["q-flag-git-checkout-b"],                       // git checkout -b (git-feature-branch)
+    "git-pipeline": ["q-flag-git-add-dot"],                          // git add . (git-pipeline)
+    // Umbrella-/Bundle-Charts (#264): in helm-umbrella-chart im Schluss-Dialog erklärt (dependencies,
     // inoffizieller Begriff, vendored vs. Registry, condition:-Toggle) – hier drillt Kralle nach.
-    q21: ["q-helm-deps", "q-helm-lock", "q-helm-umbrella-term", "q-helm-condition", "q-helm-subchart-source"],
+    "helm-umbrella-chart": ["q-helm-deps", "q-helm-lock", "q-helm-umbrella-term", "q-helm-condition", "q-helm-subchart-source"],
     // Monitoring-Leuchtturm (#118, Phase 5): SR-Karten zu Begriffen, die NICHT als
-    // Choice-reviewId in den Quests auftauchen – Scrape-Targets (q32), Log-Follow (q34),
-    // PrometheusRule/PromQL/Alertmanager (q35). Die übrigen q-obs-* hängen schon als
-    // Choice-Fragen in q32–q35 und kommen darüber in den Pool.
-    q32: ["q-obs-targets"],
-    q34: ["q-obs-logs-follow"],
-    q35: ["q-obs-prom-rule", "q-obs-promql", "q-obs-alertmanager"],
+    // Choice-reviewId in den Quests auftauchen – Scrape-Targets (observability-metrics), Log-Follow (observability-logs),
+    // PrometheusRule/PromQL/Alertmanager (observability-alerts). Die übrigen q-obs-* hängen schon als
+    // Choice-Fragen in observability-metrics–observability-alerts und kommen darüber in den Pool.
+    "observability-metrics": ["q-obs-targets"],
+    "observability-logs": ["q-obs-logs-follow"],
+    "observability-alerts": ["q-obs-prom-rule", "q-obs-promql", "q-obs-alertmanager"],
   };
 
   function today() {
     const now = new Date();
     return Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
+  }
+
+  /* ---------- Quest-Fortschritt: ID <-> Laufzeit-Index (#353) ----------
+   * Persistiert wird die Quest-ID (currentQuestId), gespielt wird mit dem Index. Diese
+   * beiden Helfer sind die einzige Brücke dazwischen – so bleibt der Index ein rein
+   * abgeleiteter Laufzeitwert und Quests einschieben/umsortieren bricht keinen Stand. */
+
+  /** Sentinel für „alle Quests durch" (Index === QUESTS.length): kein aktiver Quest,
+   *  daher leere ID. Ein FEHLENDES Feld heißt dagegen „Alt-Stand vor #353" (→ aus questIdx
+   *  migrieren) – bewusst unterscheidbar von "" (= bewusst am Ende). */
+  const QUEST_DONE_ID = "";
+
+  /** Quest-ID für einen Laufzeit-Index. Endzustand (QUESTS.length) → "" (= durch). */
+  function questIdForIndex(idx: number): string {
+    return KQContent.QUESTS[idx]?.id ?? QUEST_DONE_ID;
+  }
+
+  /** Laufzeit-Index für eine gespeicherte Quest-ID. "" → Endzustand (QUESTS.length).
+   *  Unbekannte ID (z.B. Quest später entfernt) → -1; der Aufrufer entscheidet den Fallback,
+   *  damit ein Stand nie kommentarlos auf Quest 0 zurückfällt. */
+  function questIndexForId(id: string): number {
+    if (id === QUEST_DONE_ID) return KQContent.QUESTS.length;
+    return KQContent.QUESTS.findIndex(q => q.id === id);
+  }
+
+  /** Save-Migration #354: alte numerische Quest-IDs (q0, q2b, …) → neue sprechende Slugs.
+   *  Quest-IDs sind in Spielständen persistiert (completedQuests + currentQuestId aus #353),
+   *  also dürfen sie beim Umbenennen NICHT brechen – bestehende Spieler behalten ihren
+   *  exakten Fortschritt. Diese Tabelle ist die EINMALIGE, eingefrorene Übersetzung
+   *  (historische Migration, nicht mehr ändern). Unbekannte/neue IDs bleiben unverändert. */
+  const LEGACY_QUEST_ID_MAP: Record<string, string> = {
+    q0: "onboarding-sign-on", q1: "docker-first-container", q2: "docker-list-containers",
+    q2b: "docker-stack-minigame", q3: "docker-run-options", q3b: "docker-build-image",
+    q4: "k8s-first-deployment", q5: "k8s-inspect-pods", q6: "k8s-service",
+    q7: "k8s-self-healing", q8: "k8s-apply-manifests", q9: "helm-intro",
+    q10: "helm-release-install", q11: "helm-upgrade-rollback", q12: "terraform-intro",
+    q13: "terraform-state-destroy", q14: "kraken-boss", q15: "k8s-debug-imagepull",
+    q16: "k8s-debug-crashloop", q17: "k8s-node-capacity", q18: "git-version-control",
+    q19: "git-feature-branch", q20: "git-pipeline", q21: "helm-umbrella-chart",
+    q22: "network-policy", q23: "secrets-encrypted", q24: "k8s-service-endpoints",
+    q25: "git-merge-branches", q26: "k8s-configmap-secret", q27: "k8s-resource-limits",
+    q28: "gitops-argocd-intro", q29: "gitops-self-sync", q30: "gitops-drift-detection",
+    q31: "gitops-app-of-apps", q32: "observability-metrics", q33: "observability-grafana",
+    q34: "observability-logs", q35: "observability-alerts", q36: "storage-statefulset",
+    q37: "storage-pvc",
+  };
+  /** Hebt eine evtl. alte Quest-ID auf den aktuellen Slug (No-op für bereits neue/fremde IDs). */
+  function migrateQuestId(id: string): string {
+    return LEGACY_QUEST_ID_MAP[id] ?? id;
   }
 
   /** Frischer Spielstand – genau die Form von GameState. */
@@ -93,6 +141,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       // links davon (Pixel), begehbar und innerhalb der Redeweite (1,7 Kacheln).
       // Returning-Spieler überschreiben das mit ihrer gespeicherten Position.
       player: { x: 400, y: 248 },
+      currentQuestId: questIdForIndex(0), // erste Quest; Persistenz-Autorität (#353)
       questIdx: 0,
       questStep: 0,
       taskIdx: 0,
@@ -166,8 +215,8 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       sfx: typeof a.sfx === "boolean" ? a.sfx : d.sfx,
       musicVol: safeVol(a.musicVol, d.musicVol),
       sfxVol: safeVol(a.sfxVol, d.sfxVol),
-      // Track als String übernehmen; SFX.applyConfig prüft zur Laufzeit gegen die
-      // bekannten Themes und fällt sonst auf den Default zurück.
+      // Track als String übernehmen; die Audio-Schicht prüft ihn zur Laufzeit gegen
+      // die bekannten Themes und fällt sonst auf den Default zurück.
       track: typeof a.track === "string" ? a.track : d.track,
     };
   }
@@ -220,15 +269,34 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       unlockedAbbrev = hatFortschritt ? [ALL_ABBREV_UNLOCKED] : [];
     }
 
+    // Quest-Fortschritt auflösen (#353): die Quest-ID ist die Autorität, der numerische
+    // questIdx nur abgeleitet. So bricht das Einfügen/Umsortieren von Quests keinen Stand.
+    //   - currentQuestId vorhanden (Stand ab #353): ID gewinnt -> Index daraus auflösen.
+    //       Unbekannte ID (Quest entfernt) -> Fallback auf den (geklemmten) Zahl-Index,
+    //       damit Fortschritt nicht still auf Quest 0 zurückfällt.
+    //   - currentQuestId fehlt (Alt-Stand VOR #353): aus dem numerischen questIdx ableiten.
+    // Danach wird die ID kanonisch aus dem aufgelösten Index neu gesetzt (Endzustand -> "").
+    // Save-Migration #354: eine evtl. alte Quest-ID (q5, …) zuerst auf den neuen Slug heben.
+    let questIdx: number;
+    if (typeof raw.currentQuestId === "string") {
+      const resolved = questIndexForId(migrateQuestId(raw.currentQuestId));
+      questIdx = resolved >= 0 ? resolved : safeCount(raw.questIdx, def.questIdx);
+    } else {
+      questIdx = safeCount(raw.questIdx, def.questIdx);
+    }
+    if (questIdx > KQContent.QUESTS.length) questIdx = KQContent.QUESTS.length; // nie über den Endzustand
+    const currentQuestId = questIdForIndex(questIdx);
+
     return {
       xp: safeCount(raw.xp, def.xp),
       coins: safeCount(raw.coins, def.coins),
       character: typeof raw.character === "number" && Number.isFinite(raw.character) ? raw.character : null,
       player: { x: safeNum(player.x, def.player.x), y: safeNum(player.y, def.player.y) },
-      questIdx: safeCount(raw.questIdx, def.questIdx),
+      currentQuestId,
+      questIdx,
       questStep: safeCount(raw.questStep, def.questStep),
       taskIdx: safeCount(raw.taskIdx, def.taskIdx),
-      completedQuests: safeStrArray(raw.completedQuests),
+      completedQuests: safeStrArray(raw.completedQuests).map(migrateQuestId), // alte Quest-IDs -> neue Slugs (#354)
       inventory,
       owned: safeStrArray(raw.owned),
       activePet: safeStrOrNull(raw.activePet),
@@ -267,8 +335,9 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       } catch (e) {
         this.state = makeDefaultState();
       }
-      // Audio-Einstellungen aus dem Spielstand an die zentrale SFX-Schicht geben.
-      SFX.applyConfig(this.state.audio);
+      // Audio-Einstellungen aus dem Spielstand an die Präsentation geben – entkoppelt
+      // über den Laufzeit-Sink (#344), NICHT mehr per direktem sfx.ts-Import.
+      applyAudioConfig(this.state.audio);
       this.sim = new KQSim(this.state.clusterSnapshot || {});
       // Szenarien bereits erreichter Funk-Schritte wieder einmischen
       for (let qi = 0; qi <= Math.min(this.state.questIdx, KQContent.QUESTS.length - 1); qi++) {
@@ -486,6 +555,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       if (this.state.questStep >= q.steps.length) {
         this.state.completedQuests.push(q.id);
         this.state.questIdx++;
+        this.state.currentQuestId = questIdForIndex(this.state.questIdx); // ID synchron halten (#353)
         this.state.questStep = 0;
         this.state.questsSinceGate++;
         this.save();
@@ -542,6 +612,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       if (!Number.isInteger(questIdx) || questIdx < 0 || questIdx > quests.length) return false;
 
       this.state.questIdx = questIdx;
+      this.state.currentQuestId = questIdForIndex(questIdx); // ID synchron halten (#353)
       this.state.questStep = 0;
       this.state.taskIdx = 0;
       this.state.completedQuests = quests.slice(0, questIdx).map(q => q.id);
@@ -630,7 +701,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
     /** Sanftes Wiederholungs-Gate (#222/#323): true, wenn der Spieler am ANFANG einer
      *  Quest steht UND (a) mindestens eine Karte fällig ist ODER (b) seit dem letzten
      *  Gate-Feuern ≥ 3 Quests abgeschlossen wurden und es überhaupt Review-Items gibt.
-     *  Variante (b) ist ein Quest-Count-Nudge (#323): bei verketteten Quests (z.B. q3→q3b)
+     *  Variante (b) ist ein Quest-Count-Nudge (#323): bei verketteten Quests (z.B. docker-run-options→docker-build-image)
      *  kommt auch ohne Fälligkeiten ein Kralle-Beat. */
     shouldReviewGate(): boolean {
       if (this.state.questStep !== 0) return false;

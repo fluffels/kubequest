@@ -228,6 +228,24 @@ test("readState: sichert einen Zukunfts-Stand (v>CURRENT) vor dem Herunterstufen
   expect(SaveStore.readBackup()).toBe(futureRaw);
 });
 
+test("readState: ein v1-Stand wird auf das aktuelle Format migriert und vorher gesichert (#353)", async () => {
+  const ls = makeLocalStorageStub();
+  vi.stubGlobal("window", { localStorage: ls });
+  vi.resetModules();
+  const { SaveStore, CURRENT_SAVE_VERSION } = await import("../src/store");
+
+  // #353 hat das Format auf v2 gehoben (Quest-Fortschritt zusätzlich als ID). Ein v1-Stand
+  // ist also älter als CURRENT -> wird gesichert. Die ID-Ableitung selbst macht game.ts
+  // (deckt auch den JSON-Import ab), darum bleibt die store-Migration strukturell ein No-op:
+  // die Nutzlast kommt unverändert zurück, nur in den Backup-Slot kopiert.
+  expect(CURRENT_SAVE_VERSION).toBeGreaterThanOrEqual(2);
+  const v1Raw = JSON.stringify({ v: 1, data: { xp: 5, questIdx: 2 } });
+  ls._map.set(SAVE_KEY, v1Raw);
+
+  expect(SaveStore.readState()).toEqual({ xp: 5, questIdx: 2 }); // Daten unverändert
+  expect(SaveStore.readBackup()).toBe(v1Raw);                    // Original gesichert
+});
+
 test("readState: ein Roundtrip in aktueller Version legt KEIN Backup an", async () => {
   const ls = makeLocalStorageStub();
   vi.stubGlobal("window", { localStorage: ls });
