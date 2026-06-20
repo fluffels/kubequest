@@ -80,6 +80,23 @@ function abbrevCommand(a: AbbrevPair): string {
   return a.context.trim().toLowerCase().split(/\s+/)[0];
 }
 
+/** Welche Abkürzungs-Bausteine nutzt die Eingabe in ihrer LANGFORM? (#313)
+ *  Befehls-genau wie das Gating (ein `-f` zählt nur fürs passende Kommando). Das ist
+ *  die Grundlage des Nutzungszählers „verdiente Abkürzung": jede korrekt getippte
+ *  Langform zählt Richtung Freischaltung der zugehörigen Kurzform. Kurzformen zählen
+ *  nicht (die werden ja verdient, nicht geübt). Pur (Phaser-/DOM-frei), testbar. */
+export function longFormsInInput(input: string): string[] {
+  const tokens = input.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+  const cmd = tokens[0];
+  const ids: string[] = [];
+  for (const a of ABBREVS) {
+    if (abbrevCommand(a) !== cmd) continue;
+    if (tokens.includes(a.long.toLowerCase())) ids.push(a.id);
+  }
+  return ids;
+}
+
 /** Treffer des Gatings: das gesperrte Paar + das konkret getippte Kürzel-Token. */
 export interface LockedAbbrev {
   readonly pair: AbbrevPair;

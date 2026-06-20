@@ -10,7 +10,7 @@
  */
 import { test, expect, describe } from "vitest";
 import assert from "node:assert/strict";
-import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, flagNearMiss, flagNearMissHint, type AbbrevPair } from "../src/content/abbrev";
+import { ABBREVS, findAbbrevByShort, lockedAbbrevInInput, abbrevLockHint, flagNearMiss, flagNearMissHint, longFormsInInput, type AbbrevPair } from "../src/content/abbrev";
 import { KQContent } from "../src/content";
 import { Sim as KQSim } from "../src/sim";
 
@@ -191,7 +191,7 @@ describe("lockedAbbrevInInput – Regressionsfixes #308", () => {
  * Quest-Schritt freigeschaltet werden (unlockAbbrev). Damit fliegt sofort auf,
  * wenn eine neue AbbrevPair-ID hinzukommt, aber kein passender Teach-/Terminal-
  * Schritt angelegt wird. */
-describe("unlockAbbrev-Lernpfad: jede Abkürzung wird in einem Quest-Schritt freigeschaltet (#300)", () => {
+describe("unlockAbbrev-Lernpfad: jede Abkürzung ist freischaltbar – Quest-Schritt ODER Nutzungszähler (#300/#313)", () => {
   function allUnlockIds(): Set<string> {
     const ids = new Set<string>();
     for (const quest of KQContent.QUESTS) {
@@ -202,10 +202,13 @@ describe("unlockAbbrev-Lernpfad: jede Abkürzung wird in einem Quest-Schritt fre
     return ids;
   }
 
-  test("jede ABBREVS-ID hat exakt einen freischaltenden Quest-Schritt", () => {
+  test("jede ABBREVS-ID ist freischaltbar: per Quest-Schritt ODER nutzungsbasiert (Langform im Content)", () => {
     const unlocked = allUnlockIds();
-    const fehlend = ABBREVS.filter(a => !unlocked.has(a.id)).map(a => a.id);
-    assert.deepEqual(fehlend, [], "Abkürzungen ohne unlockAbbrev-Schritt:\n" + fehlend.join("\n"));
+    // #313: Ohne expliziten Freischalt-Schritt muss die Abkürzung über den Nutzungszähler
+    // verdienbar sein – das setzt voraus, dass ihre Langform überhaupt im Content vorkommt
+    // (sonst könnte man sie nie tippen und damit nie verdienen). Mind. einer der Wege muss gelten.
+    const fehlend = ABBREVS.filter(a => !unlocked.has(a.id) && !appearsAnywhere(a.long)).map(a => `${a.id} (${a.long})`);
+    assert.deepEqual(fehlend, [], "Abkürzungen, die WEDER per Schritt NOCH per Nutzung freischaltbar sind:\n" + fehlend.join("\n"));
   });
 
   test("alle unlockAbbrev-Referenzen in Quests zeigen auf existierende ABBREVS-IDs", () => {
@@ -383,5 +386,30 @@ describe("#367: Beinahe-Schreibweise eines Flags (-all statt -a/--all)", () => {
       expect(flagNearMissHint("docker ps -a", NICHTS_FREI, "docker-ps-all")).toBeUndefined();
       expect(flagNearMissHint("docker ps --all", NICHTS_FREI)).toBeUndefined();
     });
+  });
+});
+
+/* #313: longFormsInInput – erkennt korrekt getippte LANGFORMEN (Grundlage des
+ * Nutzungszählers „verdiente Abkürzung"). Kurzformen zählen bewusst nicht. */
+describe("#313: longFormsInInput – Langform-Nutzung für den Zähler", () => {
+  test("erkennt die Langform für den passenden Befehl", () => {
+    expect(longFormsInInput("docker ps --all")).toEqual(["docker-ps-all"]);
+    expect(longFormsInInput("kubectl get pods")).toEqual(["kubectl-pods"]);
+    expect(longFormsInInput('git commit --message "x"')).toEqual(["git-commit-message"]);
+  });
+
+  test("Kurzform zählt NICHT (die wird verdient, nicht geübt)", () => {
+    expect(longFormsInInput("docker ps -a")).toEqual([]);
+    expect(longFormsInInput("kubectl get po")).toEqual([]);
+  });
+
+  test("befehls-genau: --filename nur für kubectl, --values nur für helm", () => {
+    expect(longFormsInInput("kubectl apply --filename app.yaml")).toEqual(["kubectl-filename"]);
+    expect(longFormsInInput("helm install r ./c --values v.yaml")).toEqual(["helm-values"]);
+  });
+
+  test("leere/fremde Eingabe oder reiner Befehl → nichts", () => {
+    expect(longFormsInInput("")).toEqual([]);
+    expect(longFormsInInput("docker ps")).toEqual([]);
   });
 });

@@ -142,22 +142,21 @@
         "type": "dialog",
         "npc": "bo",
         "lines": [
-          "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps -a</code> zeigt ALLE – auch gestoppte. Das <code>-a</code> heißt „all“."
+          "WICHTIG: Gestoppt heißt nicht weg! Die Kiste steht noch im Lager. <code>docker ps --all</code> zeigt ALLE – auch gestoppte. Das <code>--all</code> heißt „alle“. (Profis tippen dafür die Kurzform <code>-a</code> – die <b>verdienst</b> du dir, wenn du <code>--all</code> oft genug ausgeschrieben hast.)"
         ]
       },
       {
         "type": "teach",
-        "unlockAbbrev": "docker-ps-all",
         "brief": "Alle Kisten sehen",
         "cmd": {
           "id": "t-ps-a",
-          "intro": "🆕 Neue Variante: <code>docker ps -a</code> – zeigt auch gestoppte Container.",
+          "intro": "🆕 Neue Variante: <code>docker ps --all</code> – zeigt auch gestoppte Container. Schreib die Langform aus; die Kurzform <code>-a</code> schaltest du frei, wenn du <code>--all</code> oft genug benutzt hast.",
           "text": "Zeig ALLE Container an. Dein gestoppter müsste mit „Exited“ auftauchen.",
           "accept": [
             "^docker\\s+ps\\s+(-a|--all)$"
           ],
-          "solution": "docker ps -a",
-          "hint": "docker ps + Flag für „alle“."
+          "solution": "docker ps --all",
+          "hint": "docker ps + die ausgeschriebene Flag für „alle“ (<code>--all</code>)."
         }
       },
       {
@@ -181,12 +180,12 @@
           {
             "t": "Nur die gerade laufenden Container.",
             "ok": true,
-            "reply": "RICHTIG. Für alle (auch gestoppte): docker ps -a. Bo nickt steinern."
+            "reply": "RICHTIG. Für alle (auch gestoppte): docker ps --all. Bo nickt steinern."
           },
           {
             "t": "Alle Container, die es je gab.",
             "ok": false,
-            "reply": "FAST. Das macht docker ps -a. Ohne -a: nur die laufenden."
+            "reply": "FAST. Das macht docker ps --all. Ohne --all: nur die laufenden."
           }
         ]
       },

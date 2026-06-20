@@ -1176,7 +1176,7 @@ export interface Scenario {
       if (sub === "ps") {
         const all = t.includes("-a") || t.includes("--all");
         const list = this.docker.containers.filter(c => all || c.running);
-        if (list.length === 0) return "CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES" + (all ? "" : "\n💡 Keine laufenden Container. Mit 'docker ps -a' siehst du auch gestoppte.");
+        if (list.length === 0) return "CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES" + (all ? "" : "\n💡 Keine laufenden Container. Mit 'docker ps --all' siehst du auch gestoppte.");
         return table(
           ["CONTAINER ID", "IMAGE", "STATUS", "NAMES"],
           list.map(c => [c.id, c.image, c.running ? "Up " + this._age(c.created) : "Exited (0) " + this._age(c.created) + " ago", c.name])

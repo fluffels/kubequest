@@ -16,6 +16,7 @@ import { MAP_REGISTRY } from "../src/mapregistry";
 let Game: typeof import("../src/game").Game;
 let Sim: typeof import("../src/sim").Sim;
 let SaveStore: typeof import("../src/store").SaveStore;
+let THRESHOLD: number;
 
 beforeAll(async () => {
   const map = new Map<string, string>();
@@ -27,6 +28,7 @@ beforeAll(async () => {
     },
   });
   ({ Game } = await import("../src/game"));
+  THRESHOLD = (await import("../src/game")).ABBREV_EARN_THRESHOLD;
   ({ Sim } = await import("../src/sim"));
   ({ SaveStore } = await import("../src/store"));
 });
@@ -104,6 +106,56 @@ test("Migration: kaputtes unlockedAbbrev (kein Array) fällt auf leer zurück", 
   Game.importData(JSON.stringify({ v: 1, data: { xp: 50, unlockedAbbrev: "alles" } }));
   Game.load();
   expect(Game.state.unlockedAbbrev).toEqual([]);
+});
+
+/* ---------- „Verdiente Abkürzung" durch Nutzung: Zähler (#313) ---------- */
+test("recordAbbrevLongFormUse: zählt unter der Schwelle und schaltet GENAU bei der Schwelle frei", () => {
+  const id = "docker-ps-all";
+  expect(Game.isAbbrevUnlocked(id)).toBe(false);
+  for (let i = 1; i < THRESHOLD; i++) {
+    expect(Game.recordAbbrevLongFormUse(id)).toBe(false);   // unter der Schwelle: nur zählen
+    expect(Game.state.abbrevUsage[id]).toBe(i);
+    expect(Game.isAbbrevUnlocked(id)).toBe(false);
+  }
+  expect(Game.recordAbbrevLongFormUse(id)).toBe(true);       // dieser Aufruf verdient sie
+  expect(Game.isAbbrevUnlocked(id)).toBe(true);
+});
+
+test("recordAbbrevLongFormUse: bereits freigeschaltet → No-op, kein Weiterzählen", () => {
+  const id = "docker-ps-all";
+  Game.unlockAbbrev(id);
+  expect(Game.recordAbbrevLongFormUse(id)).toBe(false);
+  expect(Game.state.abbrevUsage[id]).toBeUndefined();        // gar nicht erst gezählt
+});
+
+test("recordAbbrevLongFormUse: grandfatherter Stand (*) zählt nicht", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 99 } }));   // → grandfathered "*"
+  Game.load();
+  expect(Game.recordAbbrevLongFormUse("docker-ps-all")).toBe(false);
+  expect(Game.state.abbrevUsage["docker-ps-all"]).toBeUndefined();
+});
+
+test("Zähler persistiert über load()", () => {
+  Game.recordAbbrevLongFormUse("docker-ps-all");
+  Game.recordAbbrevLongFormUse("docker-ps-all");
+  expect(Game.state.abbrevUsage["docker-ps-all"]).toBe(2);
+  Game.load();
+  expect(Game.state.abbrevUsage["docker-ps-all"]).toBe(2);
+});
+
+test("Migration: Alt-Stand ohne abbrevUsage → leerer Zähler; kaputte Werte werden gefiltert/geklemmt", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { xp: 5, unlockedAbbrev: [], abbrevUsage: { "docker-ps-all": 3, neg: -1, str: "nope", frac: 2.9 } } }));
+  Game.load();
+  expect(Game.state.abbrevUsage["docker-ps-all"]).toBe(3);
+  expect(Game.state.abbrevUsage.neg).toBeUndefined();   // negativ raus
+  expect(Game.state.abbrevUsage.str).toBeUndefined();   // falscher Typ raus
+  expect(Game.state.abbrevUsage.frac).toBe(2);          // abgerundet
+});
+
+test("Migration: frischer Stand hat leeren Zähler", () => {
+  Game.importData(JSON.stringify({ v: 1, data: { coins: 40 } }));
+  Game.load();
+  expect(Game.state.abbrevUsage).toEqual({});
 });
 
 /* ---------- Reset: Spielerposition (#295) ---------- */

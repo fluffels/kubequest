@@ -26,8 +26,8 @@
     "accept": [
       "^docker\\s+ps\\s+(-a|--all)$"
     ],
-    "solution": "docker ps -a",
-    "explain": "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten."
+    "solution": "docker ps --all",
+    "explain": "Ohne --all siehst du nur laufende Container; --all zeigt auch die gestoppten. (Die Kurzform -a verdienst du dir durch Nutzung der Langform.)"
   },
   {
     "id": "c-ch1-4",

@@ -112,7 +112,7 @@ export const DRILLS: Record<string, (sim: Sim) => DrillTask> = {
     } };
   },
   "docker-ps": () => ({ text: "Zeig alle <b>laufenden</b> Container.", accept: [/^docker\s+ps$/], solution: "docker ps", hint: "Zwei Buchstaben nach docker.", why: "ps zeigt nur die laufenden Container; mit -a kämen auch die gestoppten dazu." }),
-  "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps -a", hint: "docker ps + die Flag für „alle“.", why: "Ohne -a siehst du nur laufende Container; erst -a (--all) zeigt auch die gestoppten." }),
+  "docker-ps-a": () => ({ text: "Zeig <b>alle</b> Container – auch gestoppte.", accept: [/^docker\s+ps\s+(-a|--all)$/], solution: "docker ps --all", hint: "docker ps + die ausgeschriebene Flag für „alle“ (--all).", why: "Ohne --all siehst du nur laufende Container; --all zeigt auch die gestoppten." }),
   "docker-stop": sim => {
     let c = sim.docker.containers.find(c => c.running);
     if (!c) { const name = pick(NAMES); sim.exec("docker run -d --name " + name + " nginx"); c = sim.docker.containers.find(x => x.name === name)!; }

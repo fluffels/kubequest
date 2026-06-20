@@ -40,6 +40,10 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
    *  wenn das Gating (#299) aktiv wird. Neue Spiele starten mit leerem Array. */
   export const ALL_ABBREV_UNLOCKED = "*";
 
+  /** Schwelle (#313): so oft muss die Langform korrekt getippt werden, bis sich die
+   *  zugehörige Kurzform „verdient" und freischaltet. Zentral & bewusst tunebar. */
+  export const ABBREV_EARN_THRESHOLD = 20;
+
   // Welche Karteikarten zusätzlich zu den Choice-Fragen pro Quest freigeschaltet werden
   // Hinweis: Baustein-Karten (#231, q-flag-*) hängen an genau der Quest, in der ihr
   // Flag/Teil per teach-Schritt eingeführt wird – erst eingeführt, dann abgefragt (#227).
@@ -156,6 +160,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       introSeen: false,
       questLogIntroShown: false,
       unlockedAbbrev: [],
+      abbrevUsage: {},
       stats: { commands: 0, reviews: 0, quizRight: 0, quizWrong: 0, piratesBeaten: 0, krakenBeaten: 0, stackBest: 0 },
       lastSeen: 0,
       clusterSnapshot: null,
@@ -269,6 +274,15 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       unlockedAbbrev = hatFortschritt ? [ALL_ABBREV_UNLOCKED] : [];
     }
 
+    // Nutzungszähler je Baustein (#313): nur endliche, nicht-negative Zahlen übernehmen.
+    // Fehlt das Feld (Alt-Stand), bleibt es leer – kein Bruch, kein Rückschritt.
+    const abbrevUsage: Record<string, number> = {};
+    if (isPlainObject(raw.abbrevUsage)) {
+      for (const [id, n] of Object.entries(raw.abbrevUsage)) {
+        if (typeof n === "number" && Number.isFinite(n) && n >= 0) abbrevUsage[id] = Math.floor(n);
+      }
+    }
+
     // Quest-Fortschritt auflösen (#353): die Quest-ID ist die Autorität, der numerische
     // questIdx nur abgeleitet. So bricht das Einfügen/Umsortieren von Quests keinen Stand.
     //   - currentQuestId vorhanden (Stand ab #353): ID gewinnt -> Index daraus auflösen.
@@ -307,6 +321,7 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       introSeen: typeof raw.introSeen === "boolean" ? raw.introSeen : def.introSeen,
       questLogIntroShown: typeof raw.questLogIntroShown === "boolean" ? raw.questLogIntroShown : def.questLogIntroShown,
       unlockedAbbrev,
+      abbrevUsage,
       stats,
       lastSeen: safeCount(raw.lastSeen, def.lastSeen),
       // Snapshot ist ein freies Sim-Objekt; nur ein echtes Objekt akzeptieren, sonst null.
@@ -404,6 +419,23 @@ import type { GameState, QuestStep, FunkStep, EventMode } from "./types";
       if (this.isAbbrevUnlocked(id)) return;
       this.state.unlockedAbbrev.push(id);
       this.save();
+    },
+
+    /** Zählt eine korrekt getippte Langform Richtung „verdiente Abkürzung" (#313).
+     *  Ist die Kurzform noch gesperrt, erhöht das ihren Zähler; bei Erreichen von
+     *  `ABBREV_EARN_THRESHOLD` wird sie freigeschaltet. Gibt `true` zurück, wenn GENAU
+     *  dieser Aufruf sie verdient hat (für die Freischalt-Feier). No-op + `false`,
+     *  sobald sie freigeschaltet ist (auch grandfathered `*`). */
+    recordAbbrevLongFormUse(id: string): boolean {
+      if (this.isAbbrevUnlocked(id)) return false;
+      const n = (this.state.abbrevUsage[id] || 0) + 1;
+      this.state.abbrevUsage[id] = n;
+      if (n >= ABBREV_EARN_THRESHOLD) {
+        this.unlockAbbrev(id); // pusht + speichert
+        return true;
+      }
+      this.save();
+      return false;
     },
 
     /* ---------- Spielstand als Datei sichern / laden ---------- */

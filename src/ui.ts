@@ -2,13 +2,13 @@
  * Dialoge, Funkgerät (teach/drill/terminal + freies Üben), Shop,
  * Krabben-Quiz, Stapel-Minispiel, Alarm-Leiste, HUD.
  */
-import { Game } from "./game";
+import { Game, ABBREV_EARN_THRESHOLD } from "./game";
 import { KQContent } from "./content";
 import { KQAssets } from "./assets-data";
 import { SFX, MUSIC_THEMES } from "./sfx";
 import { worldScene, interiorOpen } from "./runtime";
 import { resolveOverlayKey } from "./overlaykbd";
-import { ABBREVS, lockedAbbrevInInput, abbrevLockHint, flagNearMissHint } from "./content/abbrev";
+import { ABBREVS, lockedAbbrevInInput, abbrevLockHint, flagNearMissHint, longFormsInInput } from "./content/abbrev";
 import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlog";
 
   // Die DOM-Knoten liegen alle fest in index.html – darum geben wir hier ein
@@ -766,6 +766,14 @@ import { buildQuestLogRows, questLogUnlocked, buildQuestDetail } from "./questlo
 
       if (cmdOk && !result.error && checkOk) {
         this.failCount = 0;
+        // #313: jede korrekt getippte Langform eines noch gesperrten Bausteins zählt
+        // Richtung Freischaltung; bei Erreichen der Schwelle ist die Kurzform „verdient".
+        for (const id of longFormsInInput(norm)) {
+          if (Game.recordAbbrevLongFormUse(id)) {
+            const pair = ABBREVS.find(a => a.id === id);
+            if (pair) this.toast(`🔓 Profi-Abkürzung verdient: <code>${pair.short[pair.short.length - 1]}</code> = <code>${pair.long}</code> – ${ABBREV_EARN_THRESHOLD}× ausgeschrieben!`, "rankup");
+          }
+        }
         SFX.success();
         this.taskSolved();
       } else {

@@ -44,6 +44,11 @@ export interface GameState {
    *  bereits gelerntes Kürzel rückwirkend gesperrt wird. Das Gating kommt in #299, der
    *  Katalog der IDs in #298. */
   unlockedAbbrev: string[];
+  /** Nutzungszähler je Abkürzungs-Baustein (#313): wie oft die Langform schon
+   *  korrekt getippt wurde. Erreicht der Zähler `ABBREV_EARN_THRESHOLD`, wird die
+   *  Kurzform verdient (landet in `unlockedAbbrev`). Fehlt/`{}` = noch nichts gezählt;
+   *  bereits freigeschaltete Bausteine werden nicht weitergezählt. */
+  abbrevUsage: Record<string, number>;
   stats: {
     commands: number;
     reviews: number;
