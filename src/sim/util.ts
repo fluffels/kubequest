@@ -16,6 +16,13 @@ export function randSuffix(len: number): string {
   return s;
 }
 
+/** Pod-Name im echten Kubernetes-Stil: `<deployment>-<replicaset-hash>-<pod-suffix>`
+ *  (z.B. `web-7d8f9c6b54-x2k9p`). Von `sim.ts` (reset/Helm/Argo) UND `sim/kubectl.ts`
+ *  (scale/rollout/apply/delete-Self-Healing) gebraucht – darum hier als geteilter Helfer. */
+export function makePodName(depName: string): string {
+  return depName + "-" + randSuffix(9) + "-" + randSuffix(5);
+}
+
 /** Mit Leerzeichen auf Mindestbreite `n` auffüllen (Spalten-Ausrichtung der CLI-Tabellen). */
 export function pad(s: string | number, n: number): string {
   const str = String(s);
