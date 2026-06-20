@@ -35,6 +35,7 @@ export type {
 import { dockerCommand } from "./sim/docker";
 import { kubectlCommand } from "./sim/kubectl";
 import { helmCommand } from "./sim/helm";
+import { terraformCommand } from "./sim/terraform";
 import { randSuffix, pad, table, makePodName } from "./sim/util";
 
   /** Stabiler kleiner Hash (FNV-1a-artig). Liefert aus einem Namen einen festen
@@ -520,7 +521,7 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
           case "docker": out = dockerCommand(this, tokens, raw); break;
           case "kubectl": out = kubectlCommand(this, tokens, raw); break;
           case "helm": out = helmCommand(this, tokens, raw); break;
-          case "terraform": out = this._terraform(tokens, raw); break;
+          case "terraform": out = terraformCommand(this, tokens, raw); break;
           case "git": out = this._git(tokens, raw); break;
           case "argocd": out = this._argocd(tokens); break;
           case "glab": out = this._glab(tokens); break;
@@ -713,76 +714,6 @@ import { randSuffix, pad, table, makePodName } from "./sim/util";
         out.push({ name, severity: r.severity, state: "resolved", summary: r.summary });
       }
       return out.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    /* ===================== terraform ===================== */
-    _terraform(t: string[], _raw?: string) {
-      const sub = t[1];
-      if (!sub) return this._err("terraform: Unterbefehl fehlt.", "Probier 'terraform init'.");
-      const tf = this.tf;
-
-      if (sub === "init") {
-        tf.initialized = true;
-        return [
-          "Initializing the backend...",
-          "Initializing provider plugins...",
-          "- Installing hashicorp/local v2.5.1...",
-          "",
-          "Terraform has been successfully initialized!",
-          "",
-          "You may now begin working with Terraform. Try running \"terraform plan\".",
-        ].join("\n");
-      }
-
-      if (!tf.initialized && ["plan", "apply", "destroy"].includes(sub)) {
-        return this._err("Error: Backend initialization required, please run \"terraform init\"", "Der Ordner muss erst initialisiert werden: 'terraform init'");
-      }
-
-      if (sub === "plan") {
-        if (tf.applied) {
-          return "No changes. Your infrastructure matches the configuration.\n\n" +
-            "Terraform hat verglichen: Was in main.tf steht, existiert schon genau so. Nichts zu tun. 🧘";
-        }
-        return tf.resources.map(r =>
-          "  # " + r.addr + " will be created\n  + resource " + r.addr.replace(".", " \"") + "\" {\n      + " + r.desc + "\n    }"
-        ).join("\n\n") +
-          "\n\nPlan: " + tf.resources.length + " to add, 0 to change, 0 to destroy.";
-      }
-
-      if (sub === "apply") {
-        if (tf.applied) return "No changes. Your infrastructure matches the configuration.\n\nApply complete! Resources: 0 added, 0 changed, 0 destroyed.";
-        tf.applied = true;
-        // Neue Server werden echte Cluster-Nodes – wartende Pods bekommen Platz!
-        if (tf.resources.some(r => r.addr.includes("hafen_server"))) {
-          for (const name of ["ahoi-worker-3", "ahoi-worker-4"]) {
-            if (!this.nodes.some(n => n.name === name)) {
-              this.nodes.push({ name, status: "Ready", roles: "<none>", version: "v1.30.2" });
-            }
-          }
-          this._reschedulePending();
-        }
-        return tf.resources.map(r => r.addr + ": Creating...\n" + r.addr + ": Creation complete after 2s").join("\n") +
-          "\n\nApply complete! Resources: " + tf.resources.length + " added, 0 changed, 0 destroyed.";
-      }
-
-      if (sub === "destroy") {
-        if (!tf.applied) return "No changes. No objects need to be destroyed.";
-        tf.applied = false;
-        this.nodes = this.nodes.filter(n => !["ahoi-worker-3", "ahoi-worker-4"].includes(n.name));
-        return tf.resources.map(r => r.addr + ": Destroying...\n" + r.addr + ": Destruction complete after 1s").join("\n") +
-          "\n\nDestroy complete! Resources: " + tf.resources.length + " destroyed.";
-      }
-
-      if (sub === "state") {
-        if (t[2] !== "list") return this._err("Der Simulator kann nur 'terraform state list'.");
-        if (!tf.applied) return this._err("Noch nichts im State.", "Der State füllt sich erst nach 'terraform apply'.");
-        return tf.resources.map(r => r.addr).join("\n");
-      }
-
-      if (sub === "fmt") return "main.tf";
-      if (sub === "validate") return "Success! The configuration is valid.";
-
-      return this._err("terraform: unbekannter Unterbefehl '" + sub + "'", "Tippe 'help' für alle Befehle.");
     }
 
     /* ===================== Dateisystem ===================== */
