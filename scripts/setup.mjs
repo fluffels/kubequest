@@ -61,6 +61,7 @@ const steps = [
   ['Tests', 'npm test'],
   ['Typecheck (strict)', 'npm run typecheck'],
   ['Architektur-Wächter', 'npm run check:arch'],
+  ['Dateigröße-Wächter', 'npm run check:size'],
 ]
 
 for (const [label, cmd] of steps) {

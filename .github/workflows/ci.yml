@@ -41,6 +41,9 @@ jobs:
       - name: Architektur-Wächter (Schichtung, #347)
         run: npm run check:arch
 
+      - name: Dateigröße-Wächter (God-File-Budget, #390)
+        run: npm run check:size
+
       - name: Host-Build
         run: npm run build
 

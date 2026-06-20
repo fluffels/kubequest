@@ -3,12 +3,12 @@
  * Kein echtes Cluster nötig – aber die Befehle und Ausgaben fühlen sich echt an.
  */
 
-import type { ExecResult } from "./types";
-
 // Cluster-Zustand & Domänentypen leben seit #372 in ./sim/state.ts (Schritt 1/7 des
 // sim.ts-Datei-Splits). Hier für die Sim-Klasse importiert und als Barrel re-exportiert,
 // damit bestehende `import … from "../sim"` (game, types, content/*, Tests) unverändert bleiben.
+// `ExecResult` liegt seit #390 ebenfalls hier (war in types.ts) – das bricht den Zyklus types ↔ sim.
 import type {
+  ExecResult,
   Broken, PodInstance, Deployment, ServiceRes, IngressRes, NetworkPolicyRes,
   Secret, ConfigMap, ClusterNode, Container, HistoryEntry, Release,
   Chart, TfResource, GitCommit, GitConflict, GitPending, PipelineStage,
@@ -19,6 +19,7 @@ import type {
   ScrapeTarget, Alert, Scenario, ClusterState,
 } from "./sim/state";
 export type {
+  ExecResult,
   Broken, PodInstance, Deployment, ServiceRes, IngressRes, NetworkPolicyRes,
   Secret, ConfigMap, ClusterNode, Container, HistoryEntry, Release,
   Chart, TfResource, GitCommit, GitConflict, GitPending, PipelineStage,

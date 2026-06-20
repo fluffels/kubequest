@@ -4,8 +4,8 @@
  * Kein `any` mehr an diesen Rändern – der Compiler fängt falsch gebaute Inhalte.
  */
 
-// Reiner Typ-Import (zur Laufzeit gelöscht) – sim.ts importiert seinerseits nur
-// `ExecResult` als Typ aus dieser Datei, der Zyklus ist daher unkritisch.
+// Reiner Typ-Import (zur Laufzeit gelöscht). Seit #390 zeigt sim.ts NICHT mehr auf types.ts
+// zurück (ExecResult liegt jetzt in sim/state.ts) – die Kante types → sim ist einseitig, kein Zyklus.
 import type { Sim, Scenario } from "./sim";
 
 /** Vollständiger, serialisierbarer Spielstand (genau die Form aus Game.defaultState). */
@@ -95,13 +95,6 @@ export interface AudioConfig {
   sfxVol: number;
   /** ID des aktuell gewählten Musikstücks (siehe MUSIC_THEMES in sfx.ts). */
   track: string;
-}
-
-/** Ergebnis einer simulierten Befehlszeile (Sim.exec). */
-export interface ExecResult {
-  output: string | null;
-  error: boolean;
-  clear?: boolean;
 }
 
 /* ---------- Inhalts-Strukturen ----------

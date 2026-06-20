@@ -60,10 +60,44 @@ module.exports = {
       from: { path: APPLICATION },
       to: { path: PRESENTATION },
     },
+    // ── Architektur-Unit-Tests über die Schichtung hinaus (#390) ──────────────
+    {
+      name: "keine-zyklen",
+      comment:
+        "Import-Zyklen sind verboten (#390). Genau dafür gibt es das runtime.ts-/Host-Interface-" +
+        "Muster – zyklenfreie Module bleiben bei Stardew-Scope les-, test- und tree-shake-bar. " +
+        "Zyklus auflösen (z.B. geteilten Zustand nach runtime.ts ziehen), nicht die Regel aufweichen.",
+      severity: "error",
+      from: {},
+      to: { circular: true },
+    },
+    {
+      name: "keine-verwaisten-module",
+      comment:
+        "Verwaiste Module (nichts importiert sie, sie importieren nichts) sind toter Code (#390). " +
+        "Einbinden oder löschen. Bewusste Ausnahmen hier per pathNot dokumentieren (mit Begründung).",
+      severity: "error",
+      from: {
+        orphan: true,
+        pathNot: [
+          // Reine Typdeklarationen sind per Definition „verwaist“ (kein Laufzeit-Import) – kein toter Code.
+          "\\.d\\.ts$",
+          // Lernpfad-Wächter: enthält Domänenlogik (lernpfadVerstoesse + CONCEPT_INTRO), die
+          // bewusst NUR der Test-Wächter content.test.ts aufruft – kein src-Laufzeit-Import. Da
+          // check:arch nur `src` cruist, gilt das Modul sonst fälschlich als verwaist (#390).
+          "^src/content/learnorder\\.ts$",
+        ],
+      },
+      to: {},
+    },
   ],
   options: {
     // TS-Pfade sauber auflösen.
     tsConfig: { fileName: "tsconfig.json" },
+    // Typ-Importe (`import type …`) als Abhängigkeit MITzählen (#390). Ohne das gelten reine
+    // Typ-Module wie types.ts/sim/state.ts als „verwaist" (der Import wird wegkompiliert) und
+    // Zyklen über Typen blieben unsichtbar. Mit dieser Option sieht der Wächter den echten Graphen.
+    tsPreCompilationDeps: true,
     // node_modules als Ziel erfassen (für die Phaser-Grenze), aber nicht hineincruisen.
     // (Kein includeOnly: "^src/" – das würde die Kante zu node_modules/phaser
     //  herausfiltern, sodass die Phaser-Grenze nie anschlagen könnte. Der CLI-Aufruf

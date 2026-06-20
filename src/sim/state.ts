@@ -16,6 +16,15 @@
  * `any`. Sie sichern Felder + Mutationen im ganzen Simulator ab.
  */
 
+/** Ergebnis einer simulierten Befehlszeile (`Sim.exec`). Lebt hier (Sim-Domänentyp)
+ *  und nicht in `types.ts`, damit `sim.ts` nicht zurück auf `types.ts` zeigen muss –
+ *  das vermeidet den Import-Zyklus types ↔ sim (#390, keine-zyklen-Regel). */
+export interface ExecResult {
+  output: string | null;
+  error: boolean;
+  clear?: boolean;
+}
+
 /** Art einer absichtlich kaputten Workload (für die Troubleshooting-Quests). */
 export interface Broken {
   type: string; // "imagepull" | "crashloop" | "pending" | "notready" | "oomkilled"
