@@ -1,0 +1,98 @@
+[
+  {
+    "id": "q-ts-1",
+    "q": "Ein Pod zeigt CrashLoopBackOff. Was heißt das?",
+    "options": [
+      "Die App startet, stürzt ab, startet wieder … – die Ursache steht in den Logs.",
+      "Das Image kann nicht geladen werden.",
+      "Der Pod wartet auf einen freien Node.",
+      "Der Pod wurde absichtlich gestoppt."
+    ],
+    "correct": 0,
+    "explain": "CrashLoop = die App selbst stirbt beim Start (fehlende Config, fehlendes Secret, Bug). kubectl logs verrät, warum."
+  },
+  {
+    "id": "q-ts-2",
+    "q": "Ein Pod zeigt ImagePullBackOff. Häufigste Ursachen?",
+    "options": [
+      "Tippfehler im Image-Namen, falscher Tag oder fehlende Registry-Rechte.",
+      "Zu wenig Arbeitsspeicher.",
+      "Der Service ist falsch konfiguriert.",
+      "Das YAML hat Tabs statt Leerzeichen."
+    ],
+    "correct": 0,
+    "explain": "Das Image kann nicht geladen werden – describe zeigt in den Events den genauen Grund. Fix: kubectl set image mit dem richtigen Namen."
+  },
+  {
+    "id": "q-ts-3",
+    "q": "Ein Pod hängt ewig in Pending. Was ist los?",
+    "options": [
+      "Er findet keinen Platz – kein Node hat genug Kapazität (oder passt nicht).",
+      "Das Image lädt noch herunter.",
+      "Die App ist abgestürzt.",
+      "Pending ist der Normalzustand."
+    ],
+    "correct": 0,
+    "explain": "Pending = noch nicht eingeplant. describe → Events zeigt z.B. „0/3 nodes are available“. Lösung: Platz schaffen oder Nodes hinzufügen (Terraform!)."
+  },
+  {
+    "id": "q-ts-4",
+    "q": "Das Debugging-Mantra für kaputte Pods?",
+    "options": [
+      "get pods → describe → logs, dann fixen und verifizieren.",
+      "Sofort alles löschen und neu deployen.",
+      "Den Cluster neu starten.",
+      "Im Code nach Bugs suchen."
+    ],
+    "correct": 0,
+    "explain": "Erst STATUS lesen (get), dann Events (describe), dann die App-Sicht (logs). Damit findest du 80% aller Ursachen in Minuten."
+  },
+  {
+    "id": "q-ts-5",
+    "q": "Wann hilft kubectl rollout restart?",
+    "options": [
+      "Wenn die Ursache behoben ist (z.B. Secret angelegt) und die Pods sauber neu starten sollen.",
+      "Bei jedem Fehler als erstes.",
+      "Nur bei ImagePullBackOff.",
+      "Um den Node neu zu starten."
+    ],
+    "correct": 0,
+    "explain": "Restart ersetzt alle Pods rollierend. Wichtig: ERST die Ursache beheben, sonst crasht es wieder. Reihenfolge: Ursache → Fix → Restart → Verifikation."
+  },
+  {
+    "id": "q-ts-6",
+    "q": "Ein Pod ist READY 0/1, aber STATUS Running – kein Absturz, keine Restarts. Was steckt dahinter?",
+    "options": [
+      "Die Readiness-Probe meldet „noch nicht bereit“ – Kubernetes nimmt den Pod so lange aus dem Service.",
+      "Der Pod ist abgestürzt (CrashLoopBackOff).",
+      "Das Image konnte nicht geladen werden (ImagePullBackOff).",
+      "Der Pod findet keinen freien Node (Pending)."
+    ],
+    "correct": 0,
+    "explain": "Liveness fragt „lebt der Pod?“ – schlägt sie fehl, wird neu gestartet. Readiness fragt „kann er schon Anfragen annehmen?“ – schlägt sie fehl, läuft der Pod weiter, wird aber aus dem Service genommen (kein Traffic, READY 0/1). Sichtbar in 'kubectl get endpoints': der Pod fehlt dort. Kein Neustart nötig – die Probe prüft von selbst weiter und lässt ihn rein, sobald er bereit ist."
+  },
+  {
+    "id": "q-ts-8",
+    "q": "<code>kubectl describe pod</code> vs. <code>kubectl logs</code> – worin liegt der Unterschied?",
+    "options": [
+      "describe = Kubernetes-Sicht auf den Pod (Zustand + Events, das Warum); logs = was die App selbst ausgibt (stdout/stderr).",
+      "Kein Unterschied – beide zeigen dieselbe Ausgabe.",
+      "describe zeigt die App-Logs, logs zeigt die Kubernetes-Events.",
+      "logs ist nur die Kurzform von describe."
+    ],
+    "correct": 0,
+    "explain": "describe ist die Orchestrierungs-Sicht: Zustand, Image, Limits und die Events (Scheduling, ImagePull, Restarts, OOMKilled, Probes) – also WARUM der Pod in diesem Zustand ist. logs zeigt stdout/stderr der App selbst. Faustregel: erst describe (läuft er überhaupt?), dann logs (was meldet die App?). Bei ImagePullBackOff/Pending/OOMKilled helfen Logs nicht – der Container startet nie."
+  },
+  {
+    "id": "q-ts-7",
+    "q": "Ein Pod sammelt RESTARTS und <code>describe</code> zeigt <code>Last State: Terminated, Reason: OOMKilled</code>. Was ist passiert?",
+    "options": [
+      "Der Container hat sein memory-Limit gesprengt – der Kernel hat ihn gekillt (Out Of Memory).",
+      "Das Image ließ sich nicht laden (Tippfehler im Namen).",
+      "Die App fehlt ein Secret und stürzt beim Start ab.",
+      "Der Pod findet keinen freien Node."
+    ],
+    "correct": 0,
+    "explain": "OOMKilled = Out Of Memory Killed: Der Container wollte mehr Speicher als sein limits.memory erlaubt, also beendet ihn der Kernel hart (Exit Code 137). Die App-Logs sagen oft nichts – der Beweis steht in 'describe' unter Last State / Reason. Fix: das memory-Limit realistisch anheben (kubectl set resources)."
+  }
+]

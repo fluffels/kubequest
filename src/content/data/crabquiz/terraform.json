@@ -1,0 +1,50 @@
+[
+  {
+    "id": "q-ch6-1",
+    "q": "Was bedeutet „Infrastructure as Code“?",
+    "options": [
+      "Server, Netze & Co. werden als Textdateien beschrieben statt zusammengeklickt.",
+      "Programme laufen ohne Betriebssystem.",
+      "Die Infrastruktur schreibt eigenen Code.",
+      "Rechenzentren werden durch Software ersetzt."
+    ],
+    "correct": 0,
+    "explain": "Die Dateien liegen in Git – nachvollziehbar, wiederholbar, teilbar."
+  },
+  {
+    "id": "q-ch6-2",
+    "q": "terraform plan vs. apply?",
+    "options": [
+      "plan zeigt nur, was passieren würde – apply führt es aus.",
+      "plan für kleine, apply für große Infrastruktur.",
+      "apply zeigt den Plan, plan wendet an.",
+      "Kein Unterschied."
+    ],
+    "correct": 0,
+    "explain": "Immer erst plan lesen, dann apply. Die Generalprobe vor der Aufführung."
+  },
+  {
+    "id": "q-ch6-3",
+    "q": "Was ist der Terraform-State?",
+    "options": [
+      "Terraforms Gedächtnis: was es bereits gebaut hat.",
+      "Der Bundesstaat des Rechenzentrums.",
+      "Eine Statusanzeige der Installation.",
+      "Das Fehlerprotokoll."
+    ],
+    "correct": 0,
+    "explain": "Dank State vergleicht Terraform Soll (.tf-Dateien) mit Ist und setzt nur die Differenz um."
+  },
+  {
+    "id": "q-ch6-4",
+    "q": "Kubernetes und Terraform sind beide deklarativ. Unterschied?",
+    "options": [
+      "Kubernetes verwaltet Container im Cluster – Terraform baut die Infrastruktur drumherum.",
+      "Terraform ist nur für Windows-Server.",
+      "Kubernetes ersetzt Terraform.",
+      "Terraform verwaltet nur Datenbanken."
+    ],
+    "correct": 0,
+    "explain": "Terraform baut den Hafen, Kubernetes betreibt den Verkehr darin. Oft baut Terraform sogar den K8s-Cluster."
+  }
+]

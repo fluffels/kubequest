@@ -29,8 +29,15 @@
  * Ebenfalls migriert (#352): die **Befehls-Karten** (Spaced-Repetition-Drills),
  * **pro Geber aufgeteilt** wie die Quests (`./data/cmdcards/<giver>.json`, kein
  * Monolith bei Stardew-Scope). Ihre `accept`-Pattern werden – wie bei den Quests –
- * hier als String geladen und zu `RegExp` kompiliert. Noch TS: die reinen
- * Quiz-Karten `CRAB_QUIZ` in `quiz.ts` (kein RegExp, eigenes Folgeticket).
+ * hier als String geladen und zu `RegExp` kompiliert.
+ *
+ * Und migriert (#368): die **Quiz-Karteikarten** `CRAB_QUIZ` (Krabbe Kralle,
+ * Multiple Choice). Anders als Quests/Befehls-Karten **pro THEMA aufgeteilt**
+ * (`./data/crabquiz/<thema>.json`, z.B. docker/kubernetes/helm/rbac …), nicht pro
+ * Geber: ein Wissens-Quiz ist nach Thema organisiert (die ID kodiert es), und ein
+ * Thema ist stabil, auch wenn seine Region/sein Geber noch gar nicht gebaut ist
+ * (z.B. RBAC – Wachturm #130 ist zurückgestellt, hat weder Quest noch Geber). Reine
+ * Daten ohne RegExp; damit ist `quiz.ts` entfallen.
  *
  * **Warum JSON-`import` statt `fetch` zur Laufzeit?** Der Offline-Build
  * (`vite-plugin-singlefile`) inlinet alle `import`s in eine self-contained
@@ -62,6 +69,8 @@ import questOrder from "./data/quest-order.json";
 const questRegionModules = import.meta.glob<{ default: unknown }>("./data/quests/*.json", { eager: true });
 // Befehls-Karten (#352) liegen analog zu den Quests pro Geber in data/cmdcards/<giver>.json.
 const cmdCardModules = import.meta.glob<{ default: unknown }>("./data/cmdcards/*.json", { eager: true });
+// Quiz-Karteikarten (#368) liegen pro THEMA in data/crabquiz/<thema>.json (nicht pro Geber).
+const crabQuizModules = import.meta.glob<{ default: unknown }>("./data/crabquiz/*.json", { eager: true });
 import { QUEST_CHECKS } from "./checks";
 import type { Sim } from "../sim";
 import type {
@@ -424,3 +433,74 @@ const CMD_CARD_REGIONS: CmdCard[][] = Object.entries(cmdCardModules)
 
 /** Validierte Befehls-Karten in Laufzeit-Form – Quelle: `./data/cmdcards/<giver>.json`. */
 export const CMD_CARDS: CmdCard[] = assembleCmdCards(CMD_CARD_REGIONS);
+
+/* ===================== Quiz-Karteikarten (Content-as-Data, #368) =====================
+ * Die Verständnis-Karten der Quiz-Krabbe Kralle (Multiple Choice): Frage (`q`),
+ * `options` (≥2), Index der richtigen Antwort (`correct`) + Begründung (`explain`,
+ * Pflichtfeld #233). Anders als Quests/Befehls-Karten **pro THEMA aufgeteilt**
+ * (`./data/crabquiz/<thema>.json`) – ein Wissens-Quiz ist nach Wissensgebiet
+ * organisiert, nicht nach Geber, und ein Thema (z.B. RBAC) existiert auch dann
+ * schon, wenn seine Region/sein Geber noch nicht gebaut ist. Welche Quest eine
+ * Karte über `reviewId` einbindet, prüft `validateContent` (`content/validate.ts`). */
+
+/** Quiz-Karteikarte in Laufzeit-Form (Multiple Choice). */
+export interface QuizCard {
+  id: string;
+  q: string;
+  options: string[];
+  correct: number;
+  explain: string;
+}
+
+/** Validiert EINE rohe Quiz-Karte und gibt sie typisiert zurück.
+ *  Wirft `ContentValidationError` beim ersten Verstoß. */
+function parseOneQuizCard(v: unknown, where: string): QuizCard {
+  const o = asRecord(v, where);
+  const id = asNonEmptyString(o.id, `${where}.id`);
+  const path = `quizcard ${id}`;
+  const options = asNonEmptyStringArray(o.options, `${path}.options`);
+  if (options.length < 2) fail(`${path}.options`, "mindestens zwei Optionen erwartet");
+  const correct = asInt(o.correct, `${path}.correct`);
+  if (correct < 0 || correct >= options.length) {
+    fail(`${path}.correct`, `Index ${correct} außerhalb der ${options.length} Optionen`);
+  }
+  return {
+    id,
+    q: asNonEmptyString(o.q, `${path}.q`),
+    options,
+    correct,
+    explain: asNonEmptyString(o.explain, `${path}.explain`),
+  };
+}
+
+/** Validiert eine rohe Quiz-Liste (eine Thema-Datei). Wirft beim ersten Verstoß. */
+export function parseQuizCards(raw: unknown, where = "crabquiz"): QuizCard[] {
+  const arr = asArray(raw, where);
+  if (arr.length === 0) fail(where, "mindestens eine Quiz-Karte erwartet");
+  return arr.map((c, i) => parseOneQuizCard(c, `${where}[${i}]`));
+}
+
+/** Führt die Thema-Listen zusammen und prüft auf doppelte IDs über die Dateien
+ *  hinweg (die Karten-ID ist im Spielstand persistiert – die Spaced-Repetition-Box
+ *  hängt an ihr, eine Dublette würde den Lernfortschritt teilen). Keine Reihenfolge
+ *  nötig: Karten werden per `id` referenziert, nicht per Index. */
+export function assembleQuizCards(topics: QuizCard[][]): QuizCard[] {
+  const seen = new Set<string>();
+  const out: QuizCard[] = [];
+  for (const topic of topics) {
+    for (const c of topic) {
+      if (seen.has(c.id)) fail("crabquiz", `doppelte Quiz-ID „${c.id}" (über Thema-Dateien hinweg)`);
+      seen.add(c.id);
+      out.push(c);
+    }
+  }
+  return out;
+}
+
+/** Alle Quiz-Thema-Dateien geladen + validiert (deterministisch nach Pfad sortiert). */
+const CRAB_QUIZ_TOPICS: QuizCard[][] = Object.entries(crabQuizModules)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, mod]) => parseQuizCards(mod.default, path));
+
+/** Validierte Quiz-Karteikarten in Laufzeit-Form – Quelle: `./data/crabquiz/<thema>.json`. */
+export const CRAB_QUIZ: QuizCard[] = assembleQuizCards(CRAB_QUIZ_TOPICS);

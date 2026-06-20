@@ -1,0 +1,50 @@
+[
+  {
+    "id": "q-netpol",
+    "q": "Ohne jede NetworkPolicy – wer darf im Cluster mit wem reden?",
+    "options": [
+      "Jeder mit jedem – das Netzwerk ist offen, bis eine NetworkPolicy es einschränkt.",
+      "Niemand – jede Verbindung muss erst freigegeben werden.",
+      "Nur Pods im selben Deployment.",
+      "Nur der Ingress-Controller."
+    ],
+    "correct": 0,
+    "explain": "Kubernetes ist von Haus aus offen: jeder Pod erreicht jeden. Erst eine NetworkPolicy schaltet die ausgewählten Pods auf default-deny und lässt nur erlaubte Quellen durch – so sichert man z.B. Datenbanken ab."
+  },
+  {
+    "id": "q-netpol-2",
+    "q": "Was bestimmt der <code>podSelector</code> einer NetworkPolicy?",
+    "options": [
+      "WELCHE Pods die Regel schützt (auf wen sie wirkt).",
+      "WER von außen durchdarf.",
+      "Den Port, der geöffnet wird.",
+      "Den Namen des Ingress-Controllers."
+    ],
+    "correct": 0,
+    "explain": "Der podSelector wählt die geschützten Ziel-Pods (z.B. app=lager). WER zu ihnen durchdarf, steht getrennt in den ingress/from-Regeln. Selektor = WEN man schützt, from = WER rein darf."
+  },
+  {
+    "id": "q-tls",
+    "q": "Was bedeutet <b>TLS-Terminierung</b> am Ingress?",
+    "options": [
+      "Der Ingress-Controller wickelt das HTTPS am Eingang ab und reicht intern HTTP an den Service weiter.",
+      "Der Service wird abgeschaltet (terminiert), sobald HTTPS aktiv ist.",
+      "Jeder Pod muss sein eigenes Zertifikat mitbringen.",
+      "TLS verschlüsselt die YAML-Datei auf der Festplatte."
+    ],
+    "correct": 0,
+    "explain": "„Terminieren“ heißt: die TLS-Verschlüsselung endet am Hafentor. Außen verschlüsseltes HTTPS, im Cluster dann normales HTTP. Das Zertifikat liegt als TLS-Secret und wird im Ingress unter spec.tls referenziert."
+  },
+  {
+    "id": "q-dns",
+    "q": "Wie landet ein Hostname wie <code>hafen.de</code> beim richtigen Ingress-Controller?",
+    "options": [
+      "DNS löst den Hostnamen zur Adresse des Ingress-Controllers auf; der Controller wählt anhand des Hosts die passende Regel.",
+      "Der Ingress ruft den Browser des Besuchers direkt an.",
+      "Kubernetes verschickt den Hostnamen per E-Mail an alle Nodes.",
+      "Jeder Pod kennt von Geburt an alle Hostnamen."
+    ],
+    "correct": 0,
+    "explain": "DNS ist das Adressbuch des Internets: hafen.de → IP des Ingress-Controllers (im Spiel die feste 203.0.113.10). Beim selben Controller können viele Hosts ankommen – er entscheidet per host-Regel, an welchen Service es geht."
+  }
+]

@@ -11,14 +11,18 @@ import {
   SMALLTALK,
   QUESTS,
   CMD_CARDS,
+  CRAB_QUIZ,
   parseNpcs,
   parseSmalltalk,
   parseQuests,
   assembleQuests,
   parseCmdCards,
   assembleCmdCards,
+  parseQuizCards,
+  assembleQuizCards,
   ContentValidationError,
   type CmdCard,
+  type QuizCard,
 } from "../src/content/loader";
 import type { Quest } from "../src/types";
 
@@ -362,5 +366,91 @@ test("assembleCmdCards: wirft bei doppelter Karten-ID über Geber-Dateien hinweg
   assert.throws(
     () => assembleCmdCards([[mkCard("c-dup")], [mkCard("c-dup")]]),
     (e: unknown) => e instanceof ContentValidationError && /doppelte Karten-ID/.test((e as Error).message),
+  );
+});
+
+/* ===================== Quiz-Karteikarten (Content-as-Data, #368) ===================== */
+
+/** Minimal-Quiz-Karte (rohe JSON-Form) für die Parser-Tests. */
+const minimalQuiz = {
+  id: "q-x",
+  q: "Was zeigt docker ps?",
+  options: ["Laufende Container.", "Alle Images."],
+  correct: 0,
+  explain: "ps zeigt die laufenden Container.",
+};
+
+/** Minimal-Quiz-Karte in Laufzeit-Form für die Assembler-Tests (nur id zählt dort). */
+const mkQuiz = (id: string): QuizCard => ({ id, q: "q", options: ["a", "b"], correct: 0, explain: "e" });
+
+/* ---------- Echte Daten: vollständig & konsistent geladen ---------- */
+
+test("loader: CRAB_QUIZ geladen, IDs eindeutig, Optionen/correct/explain wohlgeformt", () => {
+  assert.ok(CRAB_QUIZ.length > 0, "keine Quiz-Karten geladen");
+  assert.equal(CRAB_QUIZ.length, new Set(CRAB_QUIZ.map((c) => c.id)).size, "doppelte Quiz-IDs geladen");
+  for (const c of CRAB_QUIZ) {
+    assert.ok(c.id.length > 0);
+    assert.ok(c.q.trim().length > 0, `${c.id}: leere Frage`);
+    assert.ok(Array.isArray(c.options) && c.options.length >= 2, `${c.id}: <2 Optionen`);
+    assert.ok(Number.isInteger(c.correct) && c.correct >= 0 && c.correct < c.options.length, `${c.id}: correct-Index außerhalb`);
+    assert.ok(c.explain.trim().length > 0, `${c.id}: explain leer`);
+  }
+});
+
+/* ---------- parseQuizCards: gültige Daten ---------- */
+
+test("parseQuizCards: akzeptiert wohlgeformte Karte", () => {
+  const cards = parseQuizCards([minimalQuiz]);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].correct, 0);
+  assert.equal(cards[0].options.length, 2);
+});
+
+/* ---------- parseQuizCards: kaputte Daten MÜSSEN explizit werfen (Negativfälle) ---------- */
+
+test("parseQuizCards: wirft bei Nicht-Array", () => {
+  assert.throws(() => parseQuizCards({}), ContentValidationError);
+});
+
+test("parseQuizCards: wirft bei leerer Liste", () => {
+  assert.throws(() => parseQuizCards([]), ContentValidationError);
+});
+
+test("parseQuizCards: wirft bei nur einer Option (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuizCards([{ ...minimalQuiz, options: ["nur eine"] }]),
+    (e: unknown) => e instanceof ContentValidationError && /quizcard q-x\.options/.test((e as Error).message),
+  );
+});
+
+test("parseQuizCards: wirft bei correct-Index außerhalb der Optionen (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuizCards([{ ...minimalQuiz, correct: 5 }]),
+    (e: unknown) => e instanceof ContentValidationError && /quizcard q-x\.correct/.test((e as Error).message),
+  );
+});
+
+test("parseQuizCards: wirft bei correct ohne Ganzzahl", () => {
+  assert.throws(() => parseQuizCards([{ ...minimalQuiz, correct: 1.5 }]), ContentValidationError);
+});
+
+test("parseQuizCards: wirft bei fehlendem explain (mit Pfad)", () => {
+  assert.throws(
+    () => parseQuizCards([{ id: "q-x", q: "q", options: ["a", "b"], correct: 0 }]),
+    (e: unknown) => e instanceof ContentValidationError && /quizcard q-x\.explain/.test((e as Error).message),
+  );
+});
+
+/* ---------- assembleQuizCards: Thema-Listen zusammenführen ---------- */
+
+test("assembleQuizCards: führt Thema-Listen zusammen, Reihenfolge bleibt erhalten", () => {
+  const out = assembleQuizCards([[mkQuiz("q-1"), mkQuiz("q-2")], [mkQuiz("q-3")]]);
+  assert.deepEqual(out.map((c) => c.id), ["q-1", "q-2", "q-3"]);
+});
+
+test("assembleQuizCards: wirft bei doppelter Quiz-ID über Thema-Dateien hinweg", () => {
+  assert.throws(
+    () => assembleQuizCards([[mkQuiz("q-dup")], [mkQuiz("q-dup")]]),
+    (e: unknown) => e instanceof ContentValidationError && /doppelte Quiz-ID/.test((e as Error).message),
   );
 });
