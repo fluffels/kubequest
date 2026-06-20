@@ -10,11 +10,15 @@ import {
   NPCS,
   SMALLTALK,
   QUESTS,
+  CMD_CARDS,
   parseNpcs,
   parseSmalltalk,
   parseQuests,
   assembleQuests,
+  parseCmdCards,
+  assembleCmdCards,
   ContentValidationError,
+  type CmdCard,
 } from "../src/content/loader";
 import type { Quest } from "../src/types";
 
@@ -263,4 +267,100 @@ test("assembleQuests: wirft bei doppeltem Eintrag in der order", () => {
 test("loader: echte QUESTS sind eindeutig und beginnen mit onboarding-sign-on (Reihenfolge erhalten)", () => {
   assert.equal(QUESTS.length, new Set(QUESTS.map((q) => q.id)).size, "doppelte Quest-IDs geladen");
   assert.equal(QUESTS[0].id, "onboarding-sign-on", "erste Quest sollte onboarding-sign-on sein (order-Reihenfolge)");
+});
+
+/* ===================== Befehls-Karten (Content-as-Data, #352) ===================== */
+
+/** Minimal-Karte (rohe JSON-Form: accept als String-Pattern) für die Parser-Tests. */
+const minimalCard = {
+  id: "c-x",
+  chapter: "docker-first-container",
+  q: "Zeige alle laufenden Container.",
+  accept: ["^docker\\s+ps$"],
+  solution: "docker ps",
+  explain: "ps zeigt nur die laufenden Container.",
+};
+
+/** Minimal-Karte in Laufzeit-Form für die Assembler-Tests (nur id zählt dort). */
+const mkCard = (id: string): CmdCard => ({ id, chapter: "docker-first-container", q: "q", accept: [/^x$/], solution: "x", explain: "e" });
+
+/* ---------- Echte Daten: vollständig & konsistent geladen ---------- */
+
+test("loader: CMD_CARDS geladen, accept als RegExp, chapter+explain vorhanden, IDs eindeutig", () => {
+  assert.ok(CMD_CARDS.length > 0, "keine Befehls-Karten geladen");
+  assert.equal(CMD_CARDS.length, new Set(CMD_CARDS.map((c) => c.id)).size, "doppelte Karten-IDs geladen");
+  let sawAccept = false;
+  for (const c of CMD_CARDS) {
+    assert.ok(c.id.length > 0);
+    assert.ok(c.chapter.length > 0, `${c.id}: chapter fehlt`);
+    assert.ok(c.explain.trim().length > 0, `${c.id}: explain leer`);
+    assert.ok(Array.isArray(c.accept) && c.accept.length > 0, `${c.id}: kein accept`);
+    for (const re of c.accept) {
+      assert.ok(re instanceof RegExp, `${c.id}: accept kein RegExp`);
+      sawAccept = true;
+    }
+    // Beweist, dass das Pattern korrekt aus dem String kompiliert wurde: die
+    // Musterlösung muss ihre eigene accept-Regex treffen (Whitespace wie in der UI normalisiert).
+    const norm = c.solution.trim().replace(/\s+/g, " ");
+    assert.ok(c.accept.some((re) => re.test(norm)), `${c.id}: Lösung „${c.solution}" matcht keine eigene accept-Regex`);
+  }
+  assert.ok(sawAccept, "kein einziger accept-RegExp – Revival hat nichts getan?");
+});
+
+/* ---------- parseCmdCards: gültige Daten ---------- */
+
+test("parseCmdCards: akzeptiert wohlgeformte Karte (accept → RegExp)", () => {
+  const cards = parseCmdCards([minimalCard]);
+  assert.equal(cards.length, 1);
+  assert.ok(cards[0].accept[0] instanceof RegExp, "accept nicht zu RegExp kompiliert");
+  assert.ok(cards[0].accept[0].test("docker ps"), "kompiliertes RegExp matcht die Lösung nicht");
+});
+
+/* ---------- parseCmdCards: kaputte Daten MÜSSEN explizit werfen (Negativfälle) ---------- */
+
+test("parseCmdCards: wirft bei Nicht-Array", () => {
+  assert.throws(() => parseCmdCards({}), ContentValidationError);
+});
+
+test("parseCmdCards: wirft bei leerer Liste", () => {
+  assert.throws(() => parseCmdCards([]), ContentValidationError);
+});
+
+test("parseCmdCards: wirft bei fehlendem chapter (mit Pfad)", () => {
+  assert.throws(
+    () => parseCmdCards([{ id: "c-x", q: "q", accept: ["^x$"], solution: "x", explain: "e" }]),
+    (e: unknown) => e instanceof ContentValidationError && /cmdcard c-x\.chapter/.test((e as Error).message),
+  );
+});
+
+test("parseCmdCards: wirft bei fehlendem explain (mit Pfad)", () => {
+  assert.throws(
+    () => parseCmdCards([{ id: "c-x", chapter: "docker-first-container", q: "q", accept: ["^x$"], solution: "x" }]),
+    (e: unknown) => e instanceof ContentValidationError && /cmdcard c-x\.explain/.test((e as Error).message),
+  );
+});
+
+test("parseCmdCards: wirft bei leerem accept-Array", () => {
+  assert.throws(() => parseCmdCards([{ ...minimalCard, accept: [] }]), ContentValidationError);
+});
+
+test("parseCmdCards: wirft bei ungültigem RegExp-Pattern (mit Pfad)", () => {
+  assert.throws(
+    () => parseCmdCards([{ ...minimalCard, accept: ["("] }]),
+    (e: unknown) => e instanceof ContentValidationError && /accept\[0\]/.test((e as Error).message),
+  );
+});
+
+/* ---------- assembleCmdCards: Geber-Listen zusammenführen ---------- */
+
+test("assembleCmdCards: führt Geber-Listen zusammen, Reihenfolge bleibt erhalten", () => {
+  const out = assembleCmdCards([[mkCard("c-1"), mkCard("c-2")], [mkCard("c-3")]]);
+  assert.deepEqual(out.map((c) => c.id), ["c-1", "c-2", "c-3"]);
+});
+
+test("assembleCmdCards: wirft bei doppelter Karten-ID über Geber-Dateien hinweg", () => {
+  assert.throws(
+    () => assembleCmdCards([[mkCard("c-dup")], [mkCard("c-dup")]]),
+    (e: unknown) => e instanceof ContentValidationError && /doppelte Karten-ID/.test((e as Error).message),
+  );
 });

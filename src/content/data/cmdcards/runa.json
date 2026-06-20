@@ -1,0 +1,92 @@
+[
+  {
+    "id": "c-ch5-1",
+    "chapter": "helm-release-install",
+    "q": "Installiere das Chart <code>bitnami/redis</code> als Release <code>cache</code>.",
+    "accept": [
+      "^helm\\s+install\\s+cache\\s+bitnami\\/redis$"
+    ],
+    "solution": "helm install cache bitnami/redis",
+    "explain": "install rollt ein Chart als benanntes Release aus – der Release-Name kommt vor dem Chart: helm install <release> <repo>/<chart>."
+  },
+  {
+    "id": "c-ch5-2",
+    "chapter": "helm-release-install",
+    "q": "Zeige alle installierten Helm-Releases an.",
+    "accept": [
+      "^helm\\s+(list|ls)$"
+    ],
+    "solution": "helm list",
+    "explain": "list (Kurzform ls) zeigt alle installierten Releases mit Revision und Status."
+  },
+  {
+    "id": "c-ch5-3",
+    "chapter": "helm-upgrade-rollback",
+    "q": "Rolle das Release <code>cache</code> auf Revision 1 zurück.",
+    "accept": [
+      "^helm\\s+rollback\\s+cache\\s+1$"
+    ],
+    "solution": "helm rollback cache 1",
+    "explain": "Helm führt pro Release eine Revisions-Historie; rollback setzt auf eine frühere Revision zurück – Muster: helm rollback <release> <revision>."
+  },
+  {
+    "id": "c-ch5-4",
+    "chapter": "helm-umbrella-chart",
+    "q": "Lege ein eigenes Chart-Gerüst namens <code>funkdienst</code> an.",
+    "accept": [
+      "^helm\\s+create\\s+funkdienst$"
+    ],
+    "solution": "helm create funkdienst",
+    "explain": "create legt das Chart-Gerüst an: Chart.yaml (Steckbrief), values.yaml (Drehknöpfe) und templates/ (Vorlagen)."
+  },
+  {
+    "id": "c-ch5-5",
+    "chapter": "helm-umbrella-chart",
+    "q": "Prüfe dein Chart <code>funkdienst</code> auf Fehler.",
+    "accept": [
+      "^helm\\s+lint\\s+(\\.\\/)?funkdienst$"
+    ],
+    "solution": "helm lint funkdienst",
+    "explain": "lint ist die Generalprobe fürs Chart: es prüft Struktur und Stil, bevor du es ausrollst oder teilst."
+  },
+  {
+    "id": "c-ch5-6",
+    "chapter": "helm-umbrella-chart",
+    "q": "Pack dein Chart <code>funkdienst</code> in ein Archiv.",
+    "accept": [
+      "^helm\\s+package\\s+(\\.\\/)?funkdienst$"
+    ],
+    "solution": "helm package funkdienst",
+    "explain": "package schnürt das Chart in ein versioniertes .tgz – genau das, was in Chart-Repos liegt und sich teilen lässt."
+  },
+  {
+    "id": "c-ch5-7",
+    "chapter": "helm-umbrella-chart",
+    "q": "Installiere aus deinem eigenen Chart <code>./funkdienst</code> ein Release <code>mein-funk</code>.",
+    "accept": [
+      "^helm\\s+install\\s+mein-funk\\s+\\.\\/funkdienst$"
+    ],
+    "solution": "helm install mein-funk ./funkdienst",
+    "explain": "Aus einem lokalen Chart-Ordner installierst du über den Pfad ./<chart> statt über <repo>/<chart>."
+  },
+  {
+    "id": "c-ch5-8",
+    "chapter": "helm-umbrella-chart",
+    "q": "Dein <code>funkdienst</code> ist ein Umbrella-Chart mit Subcharts. Löse die Abhängigkeiten auf und pinne sie (schreibt <code>Chart.lock</code>).",
+    "accept": [
+      "^helm\\s+(dependency|dep)\\s+(update|build|up)\\s+(\\.\\/)?funkdienst$"
+    ],
+    "solution": "helm dependency update funkdienst",
+    "explain": "dependency update liest dependencies: aus dem Chart.yaml, holt die Subcharts und hält die gepinnten Versionen in Chart.lock fest – reproduzierbar wie ein Lockfile."
+  },
+  {
+    "id": "c-ch5-9",
+    "chapter": "helm-umbrella-chart",
+    "q": "Installiere Release <code>hafen-prod</code> aus <code>./funkdienst</code> und überlagere <code>base.yaml</code> mit <code>prod.yaml</code> (Prod-Werte gewinnen).",
+    "accept": [
+      "^helm\\s+install\\s+hafen-prod\\s+\\.\\/funkdienst\\s+(?:-f|--values)\\s+base\\.yaml\\s+(?:-f|--values)\\s+prod\\.yaml$"
+    ],
+    "solution": "helm install hafen-prod ./funkdienst -f base.yaml -f prod.yaml",
+    "explain": "Mehrere -f (Langform <code>--values</code>, gleichwertig) werden von links nach rechts überlagert – das spätere prod.yaml sticht base.yaml. So baut man gleiche Charts mit anderen Werten je Umgebung/Region."
+  }
+]

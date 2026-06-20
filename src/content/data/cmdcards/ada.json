@@ -1,0 +1,102 @@
+[
+  {
+    "id": "c-ch4-1",
+    "chapter": "k8s-apply-manifests",
+    "q": "Wende die Datei <code>app.yaml</code> deklarativ auf den Cluster an.",
+    "accept": [
+      "^kubectl\\s+apply\\s+(?:-f|--filename)\\s+app\\.yaml$"
+    ],
+    "solution": "kubectl apply -f app.yaml",
+    "explain": "apply gleicht den Cluster an die Datei an – deklarativ und idempotent (zweimal apply schadet nicht)."
+  },
+  {
+    "id": "c-git-1",
+    "chapter": "git-version-control",
+    "q": "Mach aus dem aktuellen Ordner ein Git-Repository.",
+    "accept": [
+      "^git\\s+init$"
+    ],
+    "solution": "git init",
+    "explain": "init macht aus dem Ordner ein Git-Repo (legt den versteckten .git-Ordner an)."
+  },
+  {
+    "id": "c-git-2",
+    "chapter": "git-version-control",
+    "q": "Merke die Datei <code>seekarte.md</code> für den nächsten Commit vor.",
+    "accept": [
+      "^git\\s+add\\s+seekarte\\.md$"
+    ],
+    "solution": "git add seekarte.md",
+    "explain": "add merkt eine Datei für den nächsten Commit vor (Staging) – erst auswählen, dann mit commit festhalten."
+  },
+  {
+    "id": "c-git-3",
+    "chapter": "git-version-control",
+    "q": "Halte die vorgemerkten Änderungen fest (Nachricht: <code>Erste Seekarte</code>).",
+    "accept": [
+      "^git\\s+commit\\s+(?:-m|--message)\\s+(\"[^\"]+\"|'[^']+'|\\S+)$"
+    ],
+    "solution": "git commit -m \"Erste Seekarte\"",
+    "explain": "commit hält die vorgemerkten Änderungen als Schnappschuss fest; -m gibt die Nachricht. Hochgeladen wird erst mit push."
+  },
+  {
+    "id": "c-git-4",
+    "chapter": "git-feature-branch",
+    "q": "Lege den Branch <code>experiment-route</code> an und wechsle hinein.",
+    "accept": [
+      "^git\\s+checkout\\s+-b\\s+experiment-route$"
+    ],
+    "solution": "git checkout -b experiment-route",
+    "explain": "checkout -b macht beides in einem Schritt: Branch anlegen UND direkt hineinwechseln."
+  },
+  {
+    "id": "c-git-5",
+    "chapter": "git-feature-branch",
+    "q": "Führe <code>experiment-route</code> in deinen aktuellen Branch zusammen.",
+    "accept": [
+      "^git\\s+merge\\s+experiment-route$"
+    ],
+    "solution": "git merge experiment-route",
+    "explain": "merge führt den genannten Branch in deinen aktuellen zusammen – das Experiment kommt zurück in main."
+  },
+  {
+    "id": "c-ci-1",
+    "chapter": "git-pipeline",
+    "q": "Schau dir den Status der letzten GitLab-Pipeline an.",
+    "accept": [
+      "^glab\\s+ci\\s+status$"
+    ],
+    "solution": "glab ci status",
+    "explain": "Ein Push löst die Pipeline aus; glab ci status zeigt, ob sie durchlief – kein Mensch klickt das an."
+  },
+  {
+    "id": "c-ci-2",
+    "chapter": "git-pipeline",
+    "q": "Merke ALLE Änderungen auf einmal für den nächsten Commit vor.",
+    "accept": [
+      "^git\\s+add\\s+\\.$"
+    ],
+    "solution": "git add .",
+    "explain": "Der Punkt steht für den aktuellen Ordner – damit merkst du alle Änderungen auf einmal vor, statt jede Datei einzeln."
+  },
+  {
+    "id": "c-git-6",
+    "chapter": "git-merge-branches",
+    "q": "Hol die neuen Commits vom Server in deinen aktuellen Branch (holen + zusammenführen).",
+    "accept": [
+      "^git\\s+pull$"
+    ],
+    "solution": "git pull",
+    "explain": "„Erst holen, dann pushen“: pull holt die neuen Commits und führt sie zusammen – so vermeidest du abgewiesene Pushes."
+  },
+  {
+    "id": "c-git-7",
+    "chapter": "git-merge-branches",
+    "q": "Im Merge-Konflikt: übernimm für <code>seekarte.md</code> die <b>hereinkommende</b> Version.",
+    "accept": [
+      "^git\\s+checkout\\s+--theirs\\s+seekarte\\.md$"
+    ],
+    "solution": "git checkout --theirs seekarte.md",
+    "explain": "Im Konflikt wählt --theirs die hereinkommende, --ours die eigene Version – danach add + commit."
+  }
+]
