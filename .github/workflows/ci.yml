@@ -60,6 +60,39 @@ jobs:
           path: dist-offline/index.html
           if-no-files-found: error
 
+  # Security-Audit (#396): npm audit als CI-Gate. Bewusst ZWEISTUFIG, um die
+  # ⚠️-Falle aus dem Ticket zu vermeiden – ein hartes high+-Gate über den GANZEN
+  # Baum wäre durch die dev-only-Advisories aus #395 (vite high, vitest critical)
+  # dauerhaft rot und würde damit nur abgeschaltet/ignoriert:
+  #   1) BLOCKIEREND nur über die ausgelieferten Produktiv-Deps (--omit=dev). Das
+  #      ist das echte Nutzerrisiko – im dist-Artefakt steckt nur phaser & Co.,
+  #      kein vite/vitest. Selbstwartend: kein hartcodierter Advisory-Allowlist,
+  #      der bei Stardew-Scope verrottet.
+  #   2) NUR BERICHT über den vollen Baum (inkl. Dev): macht Dev-Advisories
+  #      sichtbar, hält den Build aber nicht rot. Dev-Findings greift zusätzlich
+  #      Dependabot als Security-PR auf (.github/dependabot.yml).
+  # npm audit liest den Lockfile direkt – kein `npm ci`/node_modules nötig.
+  security-audit:
+    name: Security-Audit (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Audit der Produktiv-Deps (blockt bei high+)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit aller Deps inkl. Dev (nur Bericht, blockt nicht)
+        if: always()
+        continue-on-error: true
+        run: npm audit
+
   # Dev-Panel-Build (#331): liefert das sonst dev-server-only Panel als eine
   # self-contained Datei aus, passwortgated über das Repo-Secret VITE_KQ_DEVPANEL_PW.
   # WICHTIG (Geheimhaltung): nur bei Push auf main bzw. manuellem Start – NICHT bei

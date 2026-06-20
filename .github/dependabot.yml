@@ -1,0 +1,47 @@
+# Dependabot (#396): hält Abhängigkeiten + GitHub-Actions automatisch aktuell und
+# öffnet Security-Update-PRs, sobald ein Advisory bekannt wird – statt dass so etwas
+# zufällig beim lokalen `npm install` auffällt (Auslöser war #395). GitHub-nativ,
+# kostenlos, kein externer Dienst.
+#
+# Stardew-Scope: mit wachsendem Dependency-Baum skaliert manuelle Pflege nicht.
+# Auto-Update-PRs halten Updates klein und häufig statt selten und riskant.
+version: 2
+updates:
+  # --- npm-Pakete (phaser, vite, vitest, eslint, typescript …) ---
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    # Minor + Patch in EINEN PR bündeln, damit es das Board nicht zuspammt.
+    # Major-Updates landen bewusst NICHT in der Gruppe -> Dependabot öffnet dafür
+    # eigene Einzel-PRs, weil ein vite-/vitest-Major geprüft werden will (#395).
+    # Security-Updates öffnet Dependabot ohnehin automatisch, unabhängig vom Plan.
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels:
+      - "dependencies"
+
+  # --- GitHub-Actions in den Workflows aktuell halten (verwandt mit #398) ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "ci(actions)"
+    labels:
+      - "dependencies"
