@@ -96,6 +96,10 @@ Tests ausführen: `npm test` (Vitest). Typen prüfen: `npm run typecheck` (voll 
 
 ## Lizenzen
 
+**KubeQuest selbst ist proprietär:** © 2026 [fluffels](https://github.com/fluffels) – **alle Rechte vorbehalten**. Den Quellcode hier ansehen und das Spiel über die bereitgestellten Kanäle spielen ist ausdrücklich erlaubt; Forken/Klonen zur eigenständigen Weiterführung sowie jede kommerzielle Nutzung sind **nicht** gestattet. Verbindlich ist die [`LICENSE`](LICENSE) im Repo-Root. Beiträge per Pull Request sind weiterhin willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Verwendete Fremd-Bausteine mit eigener Lizenz:
+
 - **Phaser 3** – MIT-Lizenz (kostenlos, auch kommerziell): https://phaser.io
 - **Grafiken (eigener Pixel-Art-Stil)** – mit **[PixelLab AI](https://pixellab.ai)** im Top-down-Pixel-Art-Look erzeugt; sie ersetzen nach und nach die ursprünglichen Platzhalter. Asset-Liste, IDs & Workflow: [`assets/pixellab/README.md`](assets/pixellab/README.md).
 - **Grafiken (Platzhalter)** – „Tiny Town" & „Tiny Dungeon" von [Kenney](https://kenney.nl), **CC0** (public domain), noch für einzelne Tiles im Einsatz, bis der PixelLab-Ersatz steht. Danke, Kenney! 💛
